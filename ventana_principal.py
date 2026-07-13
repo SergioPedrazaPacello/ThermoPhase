@@ -151,21 +151,24 @@ def section_label(text, left=False):
     return lbl
 
 def make_table(rows, cols, row_h=22):
-    """Tabla sin cabeceras, sin scroll, tamaño fijo."""
+    """Tabla sin cabeceras, sin scroll, tamaño fijo.
+
+    IMPORTANTE: no estilizar 'QTableWidget::item' con border/background en
+    la hoja de estilos. En cuanto se hace, Qt deja de respetar el
+    setBackground() de cada QTableWidgetItem y pinta todas las celdas de
+    blanco, ademas de sustituir la grilla nativa por un borde fino.
+    El color de fondo por celda se controla SOLO desde cell(..., bg=...),
+    y la grilla SOLO con setShowGrid + gridline-color.
+    """
     t = QTableWidget(rows, cols)
     t.horizontalHeader().hide()
     t.verticalHeader().hide()
     t.setShowGrid(True)
     t.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-    # La grilla nativa de Windows a veces no dibuja la linea del borde
-    # exterior. Se fuerza el borde por celda (derecha e inferior) via QSS,
-    # de modo que ninguna celda quede "sin margen".
     t.setStyleSheet(
         f'QTableWidget {{ border:1px solid {BORDER}; '
         f'font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER}; }}'
-        f'QTableWidget::item {{ padding:2px 6px; '
-        f'  border-right:1px solid {BORDER}; '
-        f'  border-bottom:1px solid {BORDER}; }}'
+        f'QTableWidget::item {{ padding:2px 6px; }}'
     )
     for r in range(rows):
         t.setRowHeight(r, row_h)
