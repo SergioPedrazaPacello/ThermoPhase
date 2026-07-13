@@ -30,7 +30,8 @@ kij_user = copy.deepcopy(KIJ_DEFAULT)
 # ── Paleta ────────────────────────────────────────────────────
 WHITE    = "#FFFFFF"
 GRAY_TIT = "#A8A8A8"   # plomo oscuro para títulos / cabeceras
-GRAY_LBL = "#D0D0D0"   # plomo medio para etiquetas
+GRAY_LBL = "#D0D0D0"   # plomo medio para encabezados de tabla y barras
+GRAY_CEL = "#DCDCDC"   # plomo intermedio para celdas de etiqueta (fila/componente)
 GRAY_RES = "#E8E8E8"   # plomo claro para celdas de resultado (vacías)
 BORDER   = "#888888"
 TEXT     = "#000000"
@@ -156,10 +157,15 @@ def make_table(rows, cols, row_h=22):
     t.verticalHeader().hide()
     t.setShowGrid(True)
     t.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+    # La grilla nativa de Windows a veces no dibuja la linea del borde
+    # exterior. Se fuerza el borde por celda (derecha e inferior) via QSS,
+    # de modo que ninguna celda quede "sin margen".
     t.setStyleSheet(
         f'QTableWidget {{ border:1px solid {BORDER}; '
         f'font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER}; }}'
-        f'QTableWidget::item {{ padding:2px 6px; }}'
+        f'QTableWidget::item {{ padding:2px 6px; '
+        f'  border-right:1px solid {BORDER}; '
+        f'  border-bottom:1px solid {BORDER}; }}'
     )
     for r in range(rows):
         t.setRowHeight(r, row_h)
@@ -168,9 +174,16 @@ def make_table(rows, cols, row_h=22):
     return t
 
 def fix_table_size(t):
-    """Ajusta el tamaño de la tabla a su contenido."""
-    w = sum(t.columnWidth(c) for c in range(t.columnCount())) + 2
-    h = sum(t.rowHeight(r) for r in range(t.rowCount())) + 2
+    """Ajusta el tamaño de la tabla a su contenido.
+
+    Se suman 4 px (no 2) por dimension: 2 px del marco de la tabla
+    (border:1px a cada lado) MAS 2 px para que la ultima linea de la
+    grilla —la del borde derecho de la ultima columna y la del borde
+    inferior de la ultima fila— tenga espacio y no quede recortada.
+    Sin esos 2 px extra, las celdas del borde se ven "sin margen".
+    """
+    w = sum(t.columnWidth(c) for c in range(t.columnCount())) + 4
+    h = sum(t.rowHeight(r) for r in range(t.rowCount())) + 4
     t.setFixedSize(w, h)
 
 # ── Dimensiones ──────────────────────────────────────────────
@@ -456,7 +469,7 @@ class TabEquilibrio(QWidget):
         self.res_has_mix = {3, 5}   # Densidad y PM tienen valor de mezcla
 
         for i, lbl_txt in enumerate(res_labels):
-            self.tbl_res.setItem(i, 0, cell(lbl_txt, bg=GRAY_LBL))
+            self.tbl_res.setItem(i, 0, cell(lbl_txt, bg=GRAY_CEL))
             # Celdas de resultado: fondo plomo claro (GRAY_RES)
             self.tbl_res.setItem(i, 1, cell("", bg=GRAY_RES))
             self.tbl_res.setItem(i, 2, cell("", bg=GRAY_RES))
@@ -504,14 +517,14 @@ class TabEquilibrio(QWidget):
 
         for i in range(NC):
             self.tbl_comp.setItem(i, 0, cell(
-                NOMBRES[i], bg=GRAY_LBL,
+                NOMBRES[i], bg=GRAY_CEL,
                 align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
             self.tbl_comp.setItem(i, 1, cell("", bg=WHITE, editable=True))
             self.tbl_comp.setItem(i, 2, cell("", bg=GRAY_RES, color=TEXT_RES))
             self.tbl_comp.setItem(i, 3, cell("", bg=GRAY_RES, color=TEXT_RES))
 
         # Fila de sumatorias dentro de tbl_comp (fila NC)
-        self.tbl_comp.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_LBL,
+        self.tbl_comp.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_CEL,
             align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
         self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE))
         self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_RES))
