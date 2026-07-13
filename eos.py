@@ -113,16 +113,61 @@ def get_eos():
 def ai_pr(i):     return 0.45724*R_GAS**2*TC[i]**2/PC[i]
 def bi_pr(i):     return 0.07780*R_GAS*TC[i]/PC[i]
 
+# ═══════════════════════════════════════════════════════════════════
+# PARAMETROS CRITICOS ESPECIFICOS POR ECUACION DE ESTADO
+# ═══════════════════════════════════════════════════════════════════
+# HALLAZGO (Aspen Physical Property Methods V8.8, cap. 2 "Property
+# Method Descriptions", metodos HYSPR y HYSSRK):
+# HYSYS NO comparte los parametros criticos entre PR y SRK. Mantiene
+# dos juegos separados en su banco de datos:
+#
+#   Metodo HYSPR  -> TCHPR,  PCHPR,  OMGHPR, HPRKIJ, VTHPR
+#   Metodo HYSSRK -> TCHSRK, PCHSRK, OMHSRK, HSRKIJ, VTHSRK
+#
+# El factor acentrico de SRK (OMHSRK) es el que HYSYS muestra como
+# "SRK Acentricity" en la ficha de cada componente, y NO coincide con
+# el de PR (p.ej. metano: 0.00740 en SRK vs 0.011498 en PR).
+#
+# Estos valores ya estaban extraidos de HYSYS en el proyecto, pero se
+# usaban unicamente en COSTALD; el flash de SRK seguia tomando el
+# omega de PR, lo que producia un sesgo sistematico en la fraccion de
+# vapor (~+1e-3). Ahora el bloque SRK los usa de verdad.
+#
+# Precision COMPLETA tal como los reporta HYSYS (DATOS.xlsx).
+OMEGA_SRK = [
+    0.0357998013496399,   # N2
+    0.237250000238419,    # CO2
+    0.00740000000223517,  # C1
+    0.098300002515316,    # C2
+    0.153200000524521,    # C3
+    0.182500004768372,    # iC4
+    0.200800001621246,    # nC4
+    0.239950001239777,    # iC5
+    0.25220000743866,     # nC5
+    0.300700008869171,    # C6
+    0.350690007209778,    # C7
+    0.399800002574921,    # C8
+    0.447800010442734,    # C9
+]
+
+# Tc y Pc especificos de SRK (TCHSRK / PCHSRK). Verificado contra el
+# reporte de HYSYS: coinciden BIT A BIT con los de PR en doble
+# precision, de modo que HYSYS NO varia las criticas entre paquetes.
+# Lo unico que cambia entre PR y SRK es el factor acentrico y los kij.
+TC_SRK = list(TC)
+PC_SRK = list(PC)
+
 # ── Parámetros individuales SRK (Soave-Redlich-Kwong 1972) ───────
-# Formulación estándar HYSYS-SRK sin Boston-Mathias (subcrítico) y
-# regla de mezcla Van der Waals clásica; kij por defecto = 0 (se
-# actualizarán con los valores publicados por HYSYS cuando estén).
-# Referencias:
-#   • Soave (1972) Chem. Eng. Sci. 27, 1196-1203.
-#   • Aspen Physical Property Methods 11.1 § 3.5 (Standard RKS).
-#   • Aspen HYSYS Fluid Package Reference § 2.4 (SRK).
-def ai_srk(i):    return 0.42747*R_GAS**2*TC[i]**2/PC[i]
-def bi_srk(i):    return 0.08664*R_GAS*TC[i]/PC[i]
+# Constantes EXACTAS derivadas de las condiciones criticas:
+#   Omega_a = 1 / (9 (2^(1/3) - 1))   = 0.4274802335...
+#   Omega_b = (2^(1/3) - 1) / 3       = 0.0866403500...
+# El manual de HYSYS (Property Methods and Calculations, tabla
+# SRK vs PR) publica 0.42748 y 0.08664: los mismos valores truncados.
+OMEGA_A_SRK = 0.42748023354
+OMEGA_B_SRK = 0.08664034996
+
+def ai_srk(i):    return OMEGA_A_SRK*R_GAS**2*TC_SRK[i]**2/PC_SRK[i]
+def bi_srk(i):    return OMEGA_B_SRK*R_GAS*TC_SRK[i]/PC_SRK[i]
 
 # ── Despachadores ai/bi ─────────────────────────────────────────
 def ai(i):
@@ -130,21 +175,32 @@ def ai(i):
 def bi(i):
     return bi_srk(i) if _EOS_ACTIVA == 'SRK' else bi_pr(i)
 
-# ── Corrección de volumen de Peneloux (volume shift) ──
-# Mejora la densidad de líquido del PR. Z_RA = factor de Rackett.
-def Z_RA(i):    return 0.29056 - 0.08775*OMEGA[i]
-def ci(i):      return 0.40768*(R_GAS*TC[i]/PC[i])*(0.29441 - Z_RA(i))
-def cm(comp):   return sum(comp[i]*ci(i) for i in range(NC))
+# NOTA sobre la traslacion volumetrica (Peneloux-Rauzy):
+# Aqui habia definidas Z_RA(i), ci(i) y cm(comp), pero NUNCA se usaban
+# en ningun calculo: eran codigo muerto. Se eliminaron.
+#
+# Es correcto que no afecten al flash. El manual de Aspen (Physical
+# Property Methods, cap. 1, "Equation-of-State Models") lo dice de forma
+# explicita: la traslacion volumetrica "is independent of VLE
+# computation". La razon es algebraica: el desplazamiento c_i entra en
+# ln(phi_i) como un termino -c_i*P/(RT) que es identico en la fase
+# liquida y en la vapor, de modo que se cancela exactamente en
+# K_i = phi_i^L / phi_i^V. Solo corrige el volumen molar (densidad),
+# nunca el equilibrio.
+#
+# HYSYS reporta parametros de traslacion (VTHPR para PR, VTHSRK para
+# SRK), pero para la DENSIDAD DE LIQUIDO el HYSYS de escritorio no los
+# usa: aplica COSTALD + correccion de presion de Chueh-Prausnitz para
+# Tr < 1, y el factor Z de la EOS por encima (manual HYSYS, seccion
+# A.4.1). Eso es justamente lo que ya implementamos.
 
 # ── COSTALD (Hankinson-Thomson 1979) para densidad de líquido ──
-# Volumen característico V* (ft3/lbmol) y factor acéntrico SRK por componente
+# Volumen característico V* (ft3/lbmol) por componente.
 # Orden: N2, CO2, C1, C2, C3, iC4, nC4, iC5, nC5, C6, C7, C8, C9
-# Valores exactos extraídos de HYSYS (Characteristic Volume y SRK Acentricity)
+# Valores exactos extraídos de HYSYS (Characteristic Volume).
+# COSTALD usa el factor acentrico SRK (OMEGA_SRK), definido arriba.
 VSTAR_COSTALD = [1.44406, 1.50301, 1.59207, 2.33469, 3.20497, 4.11402, 4.07494,
                  4.95916, 4.98687, 5.89800, 6.89499, 7.85577, 8.85661]
-OMEGA_SRK = [0.0357998, 0.237250, 0.00740000, 0.0983000, 0.153200, 0.182500,
-             0.200800, 0.239950, 0.252200, 0.300700, 0.350690, 0.399800,
-             0.447800]
 
 def costald_Vs(comp, T):
     """Volumen molar de líquido saturado por COSTALD (ft3/lbmol).
@@ -329,9 +385,9 @@ def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
 # PR: m = 0.37464 + 1.54226 ω − 0.26992 ω²
 # SRK: m = 0.480 + 1.574 ω − 0.176 ω²  (Soave 1972 original)
 def mi_pr(i):     w=OMEGA[i]; return 0.37464+1.54226*w-0.26992*w**2
-def mi_srk(i):    w=OMEGA[i]; return 0.480  +1.574  *w-0.176  *w**2
+def mi_srk(i):    w=OMEGA_SRK[i]; return 0.480+1.574*w-0.176*w**2
 def alpha_pr(i,T):  return (1+mi_pr(i) *(1-np.sqrt(T/TC[i])))**2
-def alpha_srk(i,T): return (1+mi_srk(i)*(1-np.sqrt(T/TC[i])))**2
+def alpha_srk(i,T): return (1+mi_srk(i)*(1-np.sqrt(T/TC_SRK[i])))**2
 def ai_alpha_pr(i,T):  return ai_pr(i) *alpha_pr(i,T)
 def ai_alpha_srk(i,T): return ai_srk(i)*alpha_srk(i,T)
 
@@ -349,7 +405,8 @@ _MI_PR  = np.array([mi_pr(i)  for i in range(NC)])
 _AI_SRK = np.array([ai_srk(i) for i in range(NC)])
 _BI_SRK = np.array([bi_srk(i) for i in range(NC)])
 _MI_SRK = np.array([mi_srk(i) for i in range(NC)])
-_TC = np.array(TC)
+_TC     = np.array(TC)        # criticas de PR
+_TC_SRK = np.array(TC_SRK)    # criticas de SRK (banco HYSSRK)
 
 # Retro-compatibilidad: nombres antiguos (usados por si algún módulo
 # externo los importaba) apuntan al bloque PR.
@@ -363,7 +420,7 @@ def _ai_alpha_vec_pr(T):
     return _AI_PR*al
 
 def _ai_alpha_vec_srk(T):
-    al = (1.0 + _MI_SRK*(1.0 - np.sqrt(T/_TC)))**2
+    al = (1.0 + _MI_SRK*(1.0 - np.sqrt(T/_TC_SRK)))**2
     return _AI_SRK*al
 
 def _ai_alpha_vec(T):
