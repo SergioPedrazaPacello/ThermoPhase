@@ -246,9 +246,10 @@ class TabSaturacion(QWidget):
         self.tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.tbl.setShowGrid(False)
         self.tbl.setStyleSheet(
             f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
             f'QHeaderView::section {{ background:{GRAY_HDR};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px; }}')
         hh=self.tbl.horizontalHeader()
@@ -297,9 +298,10 @@ class TabSaturacion(QWidget):
         self.tbl_prop.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl_prop.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.tbl_prop.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.tbl_prop.setShowGrid(False)
         self.tbl_prop.setStyleSheet(
             f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
             f'QHeaderView::section {{ background:{GRAY_HDR};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px; }}')
         hp=self.tbl_prop.horizontalHeader()
