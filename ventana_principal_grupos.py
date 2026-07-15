@@ -423,29 +423,37 @@ class TabEquilibrio(QWidget):
         # ── BLOQUE RESUMEN ────────────────────────────────────
         root.addWidget(section_label("Resumen de los calculos:", left=True))
 
-        # Anchos: W_COMP reducido 9px (3 gaps x 3px) para que todo entre igual
-        W0 = W_COMP - 9  # 281 etiquetas
-        W1 = W_VAL       # 140 Mezcla
-        W2 = W_VAL       # 140 Fase Vapor
-        W3 = W_VAL       # 140 Fase Liquida
+        W0 = W_COMP; W1 = W_VAL; W2 = W_VAL; W3 = W_VAL
 
-        hdr_res = make_table(1, 4)
-        hdr_res.setColumnWidth(0, W0); hdr_res.setColumnWidth(1, W1)
-        hdr_res.setColumnWidth(2, W2); hdr_res.setColumnWidth(3, W3)
-        hdr_res.setItem(0,0, cell("", bg=GRAY_LBL))
-        hdr_res.setItem(0,1, cell("Mezcla", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter))
-        hdr_res.setItem(0,2, cell("Fase Vapor", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter))
-        hdr_res.setItem(0,3, cell("Fase Liquida", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter))
-        fix_table_size(hdr_res)
-        root.addWidget(hdr_res)
+        def _tg(rows, col_w):
+            """QTableWidget de 1 col, sin border ni grilla."""
+            t = QTableWidget(rows, 1)
+            t.horizontalHeader().hide(); t.verticalHeader().hide()
+            t.setShowGrid(False)
+            t.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+            t.setColumnWidth(0, col_w); t.setFixedWidth(col_w)
+            for r in range(rows): t.setRowHeight(r, ROW_H)
+            t.setFixedHeight(rows * ROW_H)
+            t.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            t.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            t.setStyleSheet(
+                f'QTableWidget {{ border:none; '
+                f'font-family:"{FONT_F}"; font-size:{FS}pt; }}'
+                f'QTableWidget::item {{ padding:2px 6px; }}')
+            return t
 
-        self.tbl_res = make_table(6, 4)
-        self.tbl_res.setColumnWidth(0, W0); self.tbl_res.setColumnWidth(1, W1)
-        self.tbl_res.setColumnWidth(2, W2); self.tbl_res.setColumnWidth(3, W3)
+        def _fg(col_w, rows):
+            """QFrame con borde exterior, tamanio exacto."""
+            fr = QFrame()
+            fr.setStyleSheet(f'QFrame {{ border:1px solid {BORDER}; }}')
+            fr.setFixedWidth(col_w + 2)
+            fr.setFixedHeight(rows * ROW_H + 2)
+            lay = QVBoxLayout(fr)
+            lay.setContentsMargins(0, 0, 0, 0); lay.setSpacing(0)
+            return fr, lay
 
+        # Resumen: 1 hdr + 6 datos = 7 filas
+        R_TOT = 7
         res_labels = [
             "Fase fraccion [molar]:", "Fase fraccion [masica]:",
             "Gravedad especifica:", "Densidad masica [lb/ft3]:",
@@ -453,71 +461,83 @@ class TabEquilibrio(QWidget):
         ]
         self.res_has_mix = {3, 5}
 
-        for i, lbl_txt in enumerate(res_labels):
-            self.tbl_res.setItem(i, 0, cell(lbl_txt, bg=GRAY_CEL,
-                align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
-            self.tbl_res.setItem(i, 1, cell("", bg=GRAY_RES))
-            self.tbl_res.setItem(i, 2, cell("", bg=GRAY_RES))
-            self.tbl_res.setItem(i, 3, cell("", bg=GRAY_RES))
+        def _gr(col_w, hdr_txt):
+            fr, lay = _fg(col_w, R_TOT)
+            t = _tg(R_TOT, col_w)
+            t.setItem(0, 0, cell(hdr_txt, bg=GRAY_LBL,
+                                 align=Qt.AlignmentFlag.AlignCenter))
+            lay.addWidget(t)
+            return fr, t
 
-        fix_table_size(self.tbl_res)
-        root.addWidget(self.tbl_res)
+        fr_r0,t_r0=_gr(W0,""); fr_r1,t_r1=_gr(W1,"Mezcla")
+        fr_r2,t_r2=_gr(W2,"Fase Vapor"); fr_r3,t_r3=_gr(W3,"Fase Liquida")
+
+        for i, lbl in enumerate(res_labels):
+            r = i + 1
+            t_r0.setItem(r,0,cell(lbl,bg=GRAY_CEL,
+                align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
+            t_r1.setItem(r,0,cell("",bg=GRAY_RES))
+            t_r2.setItem(r,0,cell("",bg=GRAY_RES))
+            t_r3.setItem(r,0,cell("",bg=GRAY_RES))
+
+        self.tbl_res = None
+        self._tr0,self._tr1,self._tr2,self._tr3 = t_r0,t_r1,t_r2,t_r3
+        self._tr_offset = 1
+
+        hbox_res = QHBoxLayout()
+        hbox_res.setSpacing(3); hbox_res.setContentsMargins(0,0,0,0)
+        for fr in (fr_r0,fr_r1,fr_r2,fr_r3): hbox_res.addWidget(fr)
+        hbox_res.addStretch()
+        root.addLayout(hbox_res)
 
         # ── BLOQUE COMPOSICIÓN ────────────────────────────────
         root.addWidget(section_label("Composicion de las fases:", left=True))
 
-        hdr_comp = make_table(2, 4)
-        hdr_comp.setRowHeight(0, ROW_H); hdr_comp.setRowHeight(1, ROW_H)
-        hdr_comp.setColumnWidth(0, W0)
-        for c in [1,2,3]: hdr_comp.setColumnWidth(c, W_VAL)
-        hdr_comp.setItem(0,0, cell("Componente", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter))
-        hdr_comp.setItem(0,1, cell("Composicion General", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter))
-        hdr_comp.setItem(0,2, cell("Fase Vapor", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter))
-        hdr_comp.setItem(0,3, cell("Fase Liquida", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter))
-        hdr_comp.setItem(1,0, cell("", bg=GRAY_LBL))
-        self.hdr_comp_gen = cell("Fraccion Molar", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter)
-        self.hdr_comp_vap = cell("Fraccion molar", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter)
-        self.hdr_comp_liq = cell("Fraccion molar", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter)
-        hdr_comp.setItem(1,1, self.hdr_comp_gen)
-        hdr_comp.setItem(1,2, self.hdr_comp_vap)
-        hdr_comp.setItem(1,3, self.hdr_comp_liq)
-        fix_table_size(hdr_comp)
-        root.addWidget(hdr_comp)
+        HDR_C = 2; C_TOT = HDR_C + NC + 1
 
-        self.tbl_comp = make_table(NC+1, 4)
-        self.tbl_comp.setColumnWidth(0, W0)
-        for c in [1,2,3]: self.tbl_comp.setColumnWidth(c, W_VAL)
+        def _gc(col_w, hdr0, hdr1):
+            fr, lay = _fg(col_w, C_TOT)
+            t = _tg(C_TOT, col_w)
+            it0=cell(hdr0,bg=GRAY_LBL,align=Qt.AlignmentFlag.AlignCenter)
+            it1=cell(hdr1,bg=GRAY_LBL,align=Qt.AlignmentFlag.AlignCenter)
+            t.setItem(0,0,it0); t.setItem(1,0,it1)
+            lay.addWidget(t)
+            return fr, t, it1
+
+        fr_c0,t_c0,_       = _gc(W0,"Componente","")
+        fr_c1,t_c1,hdr1_c1 = _gc(W1,"Composicion General","Fraccion Molar")
+        fr_c2,t_c2,hdr1_c2 = _gc(W2,"Fase Vapor","Fraccion molar")
+        fr_c3,t_c3,hdr1_c3 = _gc(W3,"Fase Liquida","Fraccion molar")
+
+        self.hdr_comp_gen=hdr1_c1; self.hdr_comp_vap=hdr1_c2; self.hdr_comp_liq=hdr1_c3
 
         for i in range(NC):
-            self.tbl_comp.setItem(i, 0, cell(
-                NOMBRES[i], bg=GRAY_CEL,
+            r = HDR_C + i
+            t_c0.setItem(r,0,cell(NOMBRES[i],bg=GRAY_CEL,
                 align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
-            self.tbl_comp.setItem(i, 1, cell("", bg=WHITE, editable=True))
-            self.tbl_comp.setItem(i, 2, cell("", bg=GRAY_RES, color=TEXT_RES))
-            self.tbl_comp.setItem(i, 3, cell("", bg=GRAY_RES, color=TEXT_RES))
+            t_c1.setItem(r,0,cell("",bg=WHITE,editable=True))
+            t_c2.setItem(r,0,cell("",bg=GRAY_RES,color=TEXT_RES))
+            t_c3.setItem(r,0,cell("",bg=GRAY_RES,color=TEXT_RES))
 
-        self.tbl_comp.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_CEL,
+        r_sum = HDR_C + NC
+        t_c0.setItem(r_sum,0,cell("Sumatorias:",bg=GRAY_CEL,
             align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
-        self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE))
-        self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_RES))
-        self.tbl_comp.setItem(NC, 3, cell("", bg=GRAY_RES))
-        self.sum_row = NC
-        fix_table_size(self.tbl_comp)
-        self.tbl_comp.itemChanged.connect(self._on_item_changed)
-        root.addWidget(self.tbl_comp)
+        t_c1.setItem(r_sum,0,cell("",bg=WHITE))
+        t_c2.setItem(r_sum,0,cell("",bg=GRAY_RES))
+        t_c3.setItem(r_sum,0,cell("",bg=GRAY_RES))
 
-        # compatibilidad con _render (no hay sub-tablas)
-        self._tr0 = self._tr1 = self._tr2 = self._tr3 = None
-        self._tr_offset = 0
-        self._tc0 = self._tc1 = self._tc2 = self._tc3 = None
-        self._tc_offset = 0
+        self.sum_row=r_sum
+        self._tc0,self._tc1,self._tc2,self._tc3 = t_c0,t_c1,t_c2,t_c3
+        self._tc_offset = HDR_C
+
+        self.tbl_comp = t_c1
+        self.tbl_comp.itemChanged.connect(self._on_item_changed)
+
+        hbox_comp = QHBoxLayout()
+        hbox_comp.setSpacing(3); hbox_comp.setContentsMargins(0,0,0,0)
+        for fr in (fr_c0,fr_c1,fr_c2,fr_c3): hbox_comp.addWidget(fr)
+        hbox_comp.addStretch()
+        root.addLayout(hbox_comp)
 
 
 
@@ -569,7 +589,7 @@ class TabEquilibrio(QWidget):
         z = e.get('composicion') or [0.0]*NC
         self.tbl_comp.blockSignals(True)
         for i in range(NC):
-            self.tbl_comp.item(i, 1).setText(f"{z[i] if i<len(z) else 0.0:.4f}")
+            self.tbl_comp.item(i+self._tc_offset, 0).setText(f"{z[i] if i<len(z) else 0.0:.4f}")
         self.tbl_comp.blockSignals(False)
         self._upd_suma()
         # T (en °R directo, el sp_T ya esta en °R). Al setear sp_T, el
@@ -621,14 +641,14 @@ class TabEquilibrio(QWidget):
     def get_z(self):
         z = []
         for i in range(NC):
-            try: z.append(float(self.tbl_comp.item(i,1).text()))
+            try: z.append(float(self.tbl_comp.item(i+self._tc_offset,0).text()))
             except: z.append(0.0)
         return z
 
     def _upd_suma(self):
         s = sum(self.get_z())
         self.tbl_comp.blockSignals(True)
-        self.tbl_comp.item(self.sum_row,1).setText(f"{s:.4f}")
+        self.tbl_comp.item(self.sum_row,0).setText(f"{s:.4f}")
         self.tbl_comp.blockSignals(False)
 
     def normalizar(self):
@@ -636,7 +656,7 @@ class TabEquilibrio(QWidget):
         if s <= 0: return
         self.tbl_comp.blockSignals(True)
         for i in range(NC):
-            self.tbl_comp.item(i,1).setText(f"{z[i]/s:.4f}")
+            self.tbl_comp.item(i+self._tc_offset,0).setText(f"{z[i]/s:.4f}")
         self.tbl_comp.blockSignals(False)
         self._upd_suma()  # actualiza fila sumatorias
 
@@ -728,12 +748,12 @@ class TabEquilibrio(QWidget):
         for i, (mix, vap, liq) in enumerate(data):
             # col0=etiqueta (plomo fijo), col1=mezcla, col2=vapor, col3=liquida
             if i in self.res_has_mix:
-                paint(self.tbl_res.item(i,1), mix)
+                paint(self._tr1.item(i+self._tr_offset,0), mix)
             else:
-                self.tbl_res.item(i,1).setText("")
-                self.tbl_res.item(i,1).setBackground(_brush(GRAY_RES))
-            paint(self.tbl_res.item(i,2), vap)
-            paint(self.tbl_res.item(i,3), liq)
+                self._tr1.item(i+self._tr_offset,0).setText("")
+                self._tr1.item(i+self._tr_offset,0).setBackground(_brush(GRAY_RES))
+            paint(self._tr2.item(i+self._tr_offset,0), vap)
+            paint(self._tr3.item(i+self._tr_offset,0), liq)
 
         # ── Composiciones ─────────────────────────────────────
         sy = sx = 0
@@ -749,18 +769,18 @@ class TabEquilibrio(QWidget):
             sy += yi_s; sx += xi_s
             tv = f"{yi_s:.4f}" if V>0 else ""
             tl = f"{xi_s:.4f}" if L>0 else ""
-            it2 = self.tbl_comp.item(i,2)
-            it3 = self.tbl_comp.item(i,3)
+            it2 = self._tc2.item(i+self._tc_offset,0)
+            it3 = self._tc3.item(i+self._tc_offset,0)
             it2.setText(tv); it2.setBackground(_brush(WHITE if tv else GRAY_RES))
             it3.setText(tl); it3.setBackground(_brush(WHITE if tl else GRAY_RES))
         self.tbl_comp.blockSignals(False)
 
         ts2 = f"{sy:.4f}" if V>0 else ""
         ts3 = f"{sx:.4f}" if L>0 else ""
-        self.tbl_comp.item(self.sum_row,2).setText(ts2)
-        self.tbl_comp.item(self.sum_row,3).setText(ts3)
-        self.tbl_comp.item(self.sum_row,2).setBackground(_brush(WHITE if ts2 else GRAY_RES))
-        self.tbl_comp.item(self.sum_row,3).setBackground(_brush(WHITE if ts3 else GRAY_RES))
+        self._tc2.item(self.sum_row,0).setText(ts2)
+        self._tc3.item(self.sum_row,0).setText(ts3)
+        self._tc2.item(self.sum_row,0).setBackground(_brush(WHITE if ts2 else GRAY_RES))
+        self._tc3.item(self.sum_row,0).setBackground(_brush(WHITE if ts3 else GRAY_RES))
 
 
 # ══════════════════════════════════════════════════════════════
