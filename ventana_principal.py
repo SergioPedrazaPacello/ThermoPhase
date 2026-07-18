@@ -24,7 +24,6 @@ from eos import (
 from pestana_envolvente import TabEnvolvente
 from pestana_saturacion import TabSaturacion
 from pestana_propiedades import TabPropiedades
-from pestana_corriente import TabCorriente
 import dialogos as dialogos
 from rutas import ruta_recurso
 from ribbon import construir_ribbon, NavigatorPanel
@@ -1018,6 +1017,15 @@ class PdfWorker(QThread):
             self.done.emit(False, f"Error inesperado:\n{ex}\n{traceback.format_exc()}")
 
 
+class _SubVentana(QMdiSubWindow):
+    """Subventana MDI que, al cerrarse, se OCULTA en vez de destruirse. Asi,
+    al volver a abrirla desde el navegador, reaparece con su contenido y su
+    estado intactos (no queda en gris/vacia)."""
+    def closeEvent(self, ev):
+        ev.ignore()
+        self.hide()
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -1119,7 +1127,7 @@ class MainWindow(QMainWindow):
         m_win.addAction(_act("&Cascada", self.mdi.cascadeSubWindows))
         m_win.addAction(_act("&Mosaico", self.mdi.tileSubWindows))
         m_win.addSeparator()
-        m_win.addAction(_act("Cerrar &todas", self.mdi.closeAllSubWindows))
+        m_win.addAction(_act("Cerrar &todas", self._cerrar_todas))
 
         # ── Ayuda ────────────────────────────────────────────
         m_ayuda = menubar.addMenu("A&yuda")
@@ -1208,7 +1216,6 @@ class MainWindow(QMainWindow):
                 'envolvente':  self.tab_env.get_estado(),
                 'saturacion':  self.tab_sat.get_estado(),
                 'propiedades': self.tab_prop.get_estado(),
-                'corriente':   self.tab_corr.get_estado(),
             },
         }
 
@@ -1250,8 +1257,6 @@ class MainWindow(QMainWindow):
             self.tab_sat.set_estado(tabs['saturacion'])
         if 'propiedades' in tabs:
             self.tab_prop.set_estado(tabs['propiedades'])
-        if 'corriente' in tabs:
-            self.tab_corr.set_estado(tabs['corriente'])
 
         # 4. Label permanente del status bar
         nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
@@ -1276,8 +1281,6 @@ class MainWindow(QMainWindow):
         self.tab_env.set_estado({'entrada': {}, 'resultado': None})
         self.tab_sat.set_estado({'entrada': {}, 'resultado': None})
         self.tab_prop.set_estado({'entrada': {'T_R':0.0,'P_psi':0.0},'resultado':None})
-        if hasattr(self, 'tab_corr'):
-            self.tab_corr.set_estado({'entrada': {}, 'resultado': None})
         if hasattr(self, 'tab_par'):
             self.tab_par.refrescar_tabla()
         self.current_path = None
@@ -1338,8 +1341,6 @@ class MainWindow(QMainWindow):
                                       get_kij=lambda: kij_user)
         self.tab_prop = TabPropiedades(get_z=self.tab_eq.get_z,
                                        get_kij=lambda: kij_user)
-        self.tab_corr = TabCorriente(get_z=self.tab_eq.get_z,
-                                     get_kij=lambda: kij_user)
         self.tab_par  = TabParametros()
 
         # Definicion de cada calculo: clave -> (widget, titulo, icono)
@@ -1348,13 +1349,13 @@ class MainWindow(QMainWindow):
             'envolvente':  (self.tab_env,  "Envolvente de fases",                 "envolvente"),
             'saturacion':  (self.tab_sat,  "Puntos de saturación",                "saturacion"),
             'propiedades': (self.tab_prop, "Propiedades termodinámicas",          "propiedades"),
-            'corriente':   (self.tab_corr, "Propiedades de la corriente",         "corriente"),
             'parametros':  (self.tab_par,  "Parámetros de la ecuación de estado", "parametros"),
         }
         self._subventanas = {}     # clave -> QMdiSubWindow
 
-        # ── Cinta de opciones (ribbon) ───────────────────────
-        self.ribbon, self.botones_ribbon = construir_ribbon(self._acciones_ribbon())
+        # ── Barra superior de selectores globales ────────────
+        self.ribbon, self.selectores = construir_ribbon()
+        self._cablear_selectores()
 
         # ── Panel Navegador lateral ──────────────────────────
         self.nav = NavigatorPanel()
@@ -1362,51 +1363,48 @@ class MainWindow(QMainWindow):
         self.nav.dato_pedido.connect(self._accion_nav)
 
         # ── Area de simulacion (MDI) ─────────────────────────
-        # Cada calculo se abre como una subventana de tamaño fijo que no puede
-        # salir de esta area; se pueden tener varias abiertas a la vez.
+        # Cada calculo se abre como una subventana con barra de titulo nativa
+        # (icono + cerrar), tamaño fijo, que no puede salir del area; se
+        # pueden tener varias abiertas a la vez.
         self.mdi = QMdiArea()
-        self.mdi.setBackground(QBrush(QColor("#B0B0B0")))
+        self.mdi.setBackground(QBrush(QColor("#C8C8C8")))
         self.mdi.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.mdi.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.mdi.setViewMode(QMdiArea.ViewMode.SubWindowView)
         self.mdi.setOption(
             QMdiArea.AreaOption.DontMaximizeSubWindowOnActivation, True)
-        self.mdi.setStyleSheet(
-            f'QMdiArea {{ background:#B0B0B0; }}'
-            f'QMdiSubWindow {{ background:#C0C0C0;'
-            f' border-top:1px solid #FFFFFF; border-left:1px solid #FFFFFF;'
-            f' border-right:1px solid #404040; border-bottom:1px solid #404040; }}'
-            f'QMdiSubWindow::title {{ background:{GRAY_TIT}; color:#000000;'
-            f' font-family:"{FONT_F}"; font-size:{FS}pt;'
-            f' height:20px; padding-left:4px; }}'
-        )
+        # Sin QSS sobre QMdiSubWindow: la subventana usa la decoracion nativa
+        # de Windows (barra de titulo con icono y boton de cerrar).
+        self.mdi.setStyleSheet('QMdiArea { background:#C8C8C8; }')
         self.mdi.subWindowActivated.connect(self._on_sub_activada)
 
         # ── Ensamblado central ───────────────────────────────
         cw = QWidget(); self.setCentralWidget(cw)
-        cw.setStyleSheet('background:#C0C0C0;')
+        cw.setStyleSheet('background:#D4D4D4;')
         v = QVBoxLayout(cw)
         v.setContentsMargins(0, 0, 0, 0); v.setSpacing(0)
         v.addWidget(self.ribbon)
 
+        # Divisor con borde grabado entre el navegador y el area de calculo.
         split = QSplitter(Qt.Orientation.Horizontal)
         split.setStyleSheet(
-            'QSplitter { background:#C0C0C0; }'
-            'QSplitter::handle { background:#C0C0C0; }')
+            'QSplitter { background:#D4D4D4; }'
+            'QSplitter::handle { background:#808080;'
+            ' border-left:1px solid #FFFFFF; border-right:1px solid #606060; }')
         split.addWidget(self.nav)
         split.addWidget(self.mdi)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setChildrenCollapsible(False)
         split.setSizes([NavigatorPanel.ANCHO, 1100])
-        split.setHandleWidth(3)
+        split.setHandleWidth(4)
         v.addWidget(split, 1)
 
         # ── Barra de estado (paneles hundidos clasicos) ──────
         sb = QStatusBar()
         sb.setSizeGripEnabled(True)
         sb.setStyleSheet(
-            f'QStatusBar {{ background:#C0C0C0; font-family:"{FONT_F}";'
+            f'QStatusBar {{ background:#D4D4D4; font-family:"{FONT_F}";'
             f' font-size:9pt; border-top:1px solid #FFFFFF; }}'
             f'QStatusBar::item {{ border:none; }}')
         def _panel(txt, ancho=None):
@@ -1414,9 +1412,9 @@ class MainWindow(QMainWindow):
             if ancho:
                 l.setFixedWidth(ancho)
             l.setStyleSheet(
-                f'QLabel {{ background:#C0C0C0; color:{TEXT};'
+                f'QLabel {{ background:#D4D4D4; color:{TEXT};'
                 f' font-family:"{FONT_F}"; font-size:9pt; padding:1px 6px;'
-                f' border-top:1px solid #808080; border-left:1px solid #808080;'
+                f' border-top:1px solid #A8A8A8; border-left:1px solid #A8A8A8;'
                 f' border-right:1px solid #FFFFFF; border-bottom:1px solid #FFFFFF; }}')
             return l
         self._lbl_estado = _panel("Listo")
@@ -1431,8 +1429,48 @@ class MainWindow(QMainWindow):
         # Cablear cambio de EOS desde el calculo de Equilibrio.
         self.tab_eq.eos_changed.connect(self._on_eos_changed)
 
-        # Abrir el calculo de Equilibrio al iniciar.
-        self._abrir_calculo('equilibrio')
+        # Al iniciar NO se abre ninguna subventana: el area queda vacia.
+
+    # ── Selectores globales de la barra superior ─────────────
+    def _cablear_selectores(self):
+        """Enlaza los tres desplegables globales con el desplegable
+        correspondiente de cada ventana (en ambos sentidos)."""
+        # EOS: barra -> equilibrio.cmb_eos (dispara eos_changed y propaga)
+        cmb = self.selectores['eos']
+        idx = self.tab_eq.cmb_eos.currentIndex()
+        cmb.setCurrentIndex(idx if idx >= 0 else 0)
+        cmb.currentIndexChanged.connect(
+            lambda i: self.tab_eq.cmb_eos.setCurrentIndex(i))
+        # Reflejar de vuelta cuando cambie en la ventana.
+        self.tab_eq.cmb_eos.currentIndexChanged.connect(
+            lambda i: self._sync_combo(cmb, i))
+
+        # Densidad: barra <-> equilibrio.cmb_dens
+        cmbd = self.selectores['densidad']
+        idx = self.tab_eq.cmb_dens.currentIndex()
+        cmbd.setCurrentIndex(idx if idx >= 0 else 0)
+        cmbd.currentIndexChanged.connect(
+            lambda i: self.tab_eq.cmb_dens.setCurrentIndex(i))
+        self.tab_eq.cmb_dens.currentIndexChanged.connect(
+            lambda i: self._sync_combo(cmbd, i))
+
+        # Envolvente: barra <-> envolvente.cmb_metodo
+        cmbe = self.selectores['envolvente']
+        if hasattr(self.tab_env, 'cmb_metodo'):
+            idx = self.tab_env.cmb_metodo.currentIndex()
+            cmbe.setCurrentIndex(idx if idx >= 0 else 0)
+            cmbe.currentIndexChanged.connect(
+                lambda i: self.tab_env.cmb_metodo.setCurrentIndex(i))
+            self.tab_env.cmb_metodo.currentIndexChanged.connect(
+                lambda i: self._sync_combo(cmbe, i))
+
+    @staticmethod
+    def _sync_combo(cmb, i):
+        """Actualiza un combo evitando reentradas de señal."""
+        if cmb.currentIndex() != i and 0 <= i < cmb.count():
+            cmb.blockSignals(True)
+            cmb.setCurrentIndex(i)
+            cmb.blockSignals(False)
 
     # ── Gestion de subventanas del area de simulacion ────────
     def _abrir_calculo(self, clave):
@@ -1444,37 +1482,46 @@ class MainWindow(QMainWindow):
         sw = self._subventanas.get(clave)
         if sw is None:
             widget, titulo, ic = self._defs_calc[clave]
+            # Contenedor con el fondo ORIGINAL del contenido (evita que se
+            # vea mas oscuro que antes) + scroll para alturas grandes.
+            cont = QWidget()
+            cont.setAutoFillBackground(True)
+            cont.setStyleSheet(f'background:{GRAY_LBL};')
+            lc = QVBoxLayout(cont)
+            lc.setContentsMargins(0, 0, 0, 0); lc.setSpacing(0)
+            lc.addWidget(widget)
             sc = QScrollArea()
-            sc.setWidget(widget)
+            sc.setWidget(cont)
             sc.setWidgetResizable(True)
             sc.setFrameShape(QFrame.Shape.NoFrame)
             sc.setStyleSheet(f'QScrollArea {{ background:{GRAY_LBL}; border:none; }}')
-            sw = QMdiSubWindow()
+            sc.viewport().setStyleSheet(f'background:{GRAY_LBL};')
+            # _SubVentana con decoracion NATIVA de Windows (icono + titulo +
+            # botones min/cerrar). No se restringen los flags para conservar
+            # el encabezado por defecto; el tamaño fijo desactiva "maximizar".
+            sw = _SubVentana()
             sw.setWidget(sc)
-            sw.setWindowTitle("  " + titulo)
+            sw.setWindowTitle(titulo)
             sw.setWindowIcon(iconos.icono(ic, 16))
             sw.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-            # Solo minimizar / cerrar: sin maximizar (tamaño fijo).
-            sw.setWindowFlags(Qt.WindowType.SubWindow
-                              | Qt.WindowType.WindowMinimizeButtonHint
-                              | Qt.WindowType.WindowCloseButtonHint)
             hint = widget.sizeHint()
-            ancho = max(hint.width() + 12, 742)
-            alto  = min(max(hint.height() + 40, 420), 858)
+            ancho = max(hint.width() + 16, 742)
+            alto  = min(max(hint.height() + 44, 420), 858)
             sw.setFixedSize(ancho, alto)
             sw._clave = clave
             self._subventanas[clave] = sw
         if sw not in self.mdi.subWindowList():
             self.mdi.addSubWindow(sw)
             self._cascada(sw)
-        sw.show()
+        sw.showNormal()
+        sw.widget().show()
         self.mdi.setActiveSubWindow(sw)
         sw.raise_()
 
     def _cascada(self, sw):
         """Ubica la subventana recien abierta en cascada dentro del area."""
-        n = len(self.mdi.subWindowList())
-        off = 26 * ((n - 1) % 6)
+        n = sum(1 for s in self.mdi.subWindowList() if s.isVisible())
+        off = 26 * (max(n - 1, 0) % 6)
         sw.move(12 + off, 10 + off)
 
     def _on_sub_activada(self, sw):
@@ -1482,52 +1529,15 @@ class MainWindow(QMainWindow):
         if sw is not None and hasattr(sw, '_clave'):
             self.nav.sincronizar(sw._clave)
 
-    # ── Acciones de la cinta ─────────────────────────────────
-    def _acciones_ribbon(self):
-        """Mapa clave -> funcion para los botones de la cinta. Los botones ya
-        funcionales apuntan a la logica existente; el resto muestran un aviso
-        de 'no implementado' (interfaz preliminar)."""
-        return {
-            'nuevo':         self._menu_nuevo,
-            'abrir':         self._menu_abrir,
-            'guardar':       self._menu_guardar,
-            'guardar_como':  self._menu_guardar_como,
-            'imprimir':      self._menu_exportar_pdf,
-            'deshacer':      lambda: self._placeholder("Deshacer"),
-            'rehacer':       lambda: self._placeholder("Rehacer"),
-            'copiar':        lambda: self._placeholder("Copiar"),
-            'pegar':         lambda: self._placeholder("Pegar"),
-            'fraccion':      self._ribbon_fraccion,
-            'normalizar':    self._ribbon_normalizar,
-            'ejecutar':      self._ribbon_calcular,
-            'detener':       lambda: self._placeholder("Detener"),
-            'componentes':   lambda: self._placeholder("Componentes"),
-            'fluidos':       lambda: self._placeholder("Fluidos"),
-            'acerca':        self._menu_acerca,
-        }
+    def _cerrar_todas(self):
+        """Cierra (oculta) todas las subventanas abiertas."""
+        for sw in self._subventanas.values():
+            sw.hide()
 
     def _placeholder(self, nombre):
         dialogos.info(self,
             f"La función «{nombre}» todavía no está implementada.\n"
             "(Interfaz preliminar.)")
-
-    def _ribbon_fraccion(self):
-        # Alterna molar/masica en el calculo de Equilibrio.
-        self.tab_eq.btn_frac.click()
-
-    def _ribbon_normalizar(self):
-        self.tab_eq.normalizar()
-
-    def _ribbon_calcular(self):
-        """Ejecuta el calculo de la subventana activa (si lo tiene)."""
-        sw = self.mdi.activeSubWindow()
-        clave = getattr(sw, '_clave', None) if sw is not None else None
-        widget = self._defs_calc[clave][0] if clave in self._defs_calc else None
-        b = getattr(widget, 'btn', None) if widget is not None else None
-        if b is not None and b.isEnabled():
-            b.click()
-        else:
-            self._placeholder("Realizar cálculo")
 
     def _accion_nav(self, clave):
         nombres = {'componentes': "Componentes", 'fluidos': "Fluidos"}

@@ -1,59 +1,43 @@
 """
-ribbon.py — Barra de herramientas clasica (Win95) y panel Navegador lateral.
+ribbon.py — Barra de selectores globales y panel Navegador lateral (retro).
 
-Estetica retro monocromatica: gris #C0C0C0, biseles 3D (luz arriba-izquierda,
-sombra abajo-derecha), Arial Narrow. La antigua "cinta" office se sustituyo
-por una barra de herramientas delgada de iconos pequenos, mas fiel al estilo
-clasico de Windows.
+La barra superior ya no tiene botones de iconos: contiene tres listas
+desplegables globales (Ecuacion de estado, Metodo de densidad y Metodo de
+envolvente) cuya seleccion se propaga a la ventana correspondiente. El
+navegador conserva el arbol de Calculos y los accesos de Datos.
 
-API publica (sin cambios para el resto del programa):
-    construir_ribbon(acciones) -> (QWidget barra, dict de botones)
-    NavigatorPanel  — panel lateral con arbol de Calculos y Datos.
+Estetica: monocromatica, grises claros, sin relieve 3D en los controles,
+Arial Narrow.
+
+API publica:
+    construir_ribbon() -> (QWidget barra, dict de QComboBox {eos,densidad,envolvente})
+    NavigatorPanel
 """
 from PyQt6.QtWidgets import (
-    QWidget, QToolButton, QLabel, QHBoxLayout, QVBoxLayout, QFrame,
-    QScrollArea, QTreeWidget, QTreeWidgetItem, QAbstractItemView
+    QWidget, QLabel, QComboBox, QHBoxLayout, QVBoxLayout, QFrame,
+    QScrollArea, QTreeWidget, QTreeWidgetItem, QAbstractItemView, QListView
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from iconos import icono
 
-# ── Paleta clasica Win95 (monocromatica) ─────────────────────
+# ── Paleta clasica clara (monocromatica) ─────────────────────
 FUENTE_UI  = "Arial Narrow"
-CARA       = "#C0C0C0"   # gris de cara de control
-LUZ        = "#FFFFFF"   # highlight (borde superior-izq)
-LUZ2       = "#DFDFDF"
-SOMBRA     = "#808080"   # sombra (borde inferior-der)
-SOMBRA_OSC = "#404040"
-BORDE      = "#808080"
+CARA       = "#D4D4D4"   # gris de cara (mas claro que antes)
+LUZ        = "#FFFFFF"
+SOMBRA     = "#A8A8A8"
+SOMBRA_OSC = "#8A8A8A"
+BORDE      = "#A8A8A8"
 TXT        = "#000000"
-SEL_BG     = "#000080"   # azul de seleccion clasico
+SEL_BG     = "#000080"
 SEL_TXT    = "#FFFFFF"
 HDR_TXT    = "#000000"
 
-# Barra de herramientas: (clave, texto/tooltip, icono). Los None son
-# separadores de grupo (linea vertical grabada).
-_TOOLBAR = [
-    ("nuevo",        "Nuevo",             "nuevo"),
-    ("abrir",        "Abrir",             "abrir"),
-    ("guardar",      "Guardar",           "guardar"),
-    ("guardar_como", "Guardar como",      "guardar_como"),
-    ("imprimir",     "Imprimir",          "imprimir"),
-    (None, None, None),
-    ("deshacer",     "Deshacer",          "deshacer"),
-    ("rehacer",      "Rehacer",           "rehacer"),
-    ("copiar",       "Copiar",            "copiar"),
-    ("pegar",        "Pegar",             "pegar"),
-    (None, None, None),
-    ("fraccion",     "Fracción másica",   "fraccion_masica"),
-    ("normalizar",   "Normalizar",        "normalizar"),
-    ("ejecutar",     "Realizar cálculo",  "ejecutar"),
-    ("detener",      "Detener",           "detener"),
-    (None, None, None),
-    ("componentes",  "Componentes",       "componentes"),
-    ("fluidos",      "Fluidos",           "fluidos"),
-    (None, None, None),
-    ("acerca",       "Acerca de",         "acerca"),
+# ── Selectores globales de la barra: (clave, etiqueta, items) ─
+_SELECTORES = [
+    ("eos",        "Ecuación de estado:", ["Peng-Robinson", "SRK"]),
+    ("densidad",   "Densidad:",           ["COSTALD", "EOS"]),
+    ("envolvente", "Método envolvente:",  ["Ziervogel-Poling", "Michelsen"]),
 ]
 
 # Items del arbol "Cálculos": (clave, texto). La clave abre la subventana MDI.
@@ -62,7 +46,6 @@ NAV_CALCULOS = [
     ("envolvente",  "Envolvente de fases"),
     ("saturacion",  "Puntos de saturación"),
     ("propiedades", "Propiedades termodinámicas"),
-    ("corriente",   "Propiedades de la corriente"),
     ("parametros",  "Parámetros de la ecuación de estado"),
 ]
 
@@ -72,84 +55,66 @@ NAV_DATOS = [
     ("fluidos",     "Fluidos",     "fluidos"),
 ]
 
-
-# ── Botones y separadores estilo Win95 ───────────────────────
-_BTN_QSS = (
-    f'QToolButton {{ border:1px solid transparent; background:transparent;'
-    f' padding:1px; }}'
-    f'QToolButton:hover {{ background:{CARA};'
-    f' border-top:1px solid {LUZ}; border-left:1px solid {LUZ};'
-    f' border-right:1px solid {SOMBRA_OSC}; border-bottom:1px solid {SOMBRA_OSC}; }}'
-    f'QToolButton:pressed, QToolButton:checked {{ background:{CARA};'
-    f' border-top:1px solid {SOMBRA_OSC}; border-left:1px solid {SOMBRA_OSC};'
-    f' border-right:1px solid {LUZ}; border-bottom:1px solid {LUZ}; }}'
-    f'QToolButton:disabled {{ }}'
+# Estilo plano (sin relieve) de las listas desplegables de la barra.
+_COMBO_QSS = (
+    f'QComboBox {{ background:#FFFFFF; color:{TXT};'
+    f' border:1px solid {BORDE}; padding:1px 4px;'
+    f' font-family:"{FUENTE_UI}"; font-size:10pt; min-height:20px; }}'
+    f'QComboBox:hover {{ border:1px solid {SOMBRA_OSC}; }}'
+    f'QComboBox::drop-down {{ border:none; width:16px; }}'
+    f'QComboBox QAbstractItemView {{ background:#FFFFFF; color:{TXT};'
+    f' border:1px solid {BORDE}; outline:0;'
+    f' selection-background-color:{SEL_BG}; selection-color:{SEL_TXT}; }}'
 )
 
 
-class SepVertical(QWidget):
-    """Separador vertical grabado (sombra + luz), estilo clasico."""
-    def __init__(self, alto=22, parent=None):
-        super().__init__(parent)
-        self.setFixedSize(6, alto)
-
-    def paintEvent(self, e):
-        from PyQt6.QtGui import QPainter, QColor
-        p = QPainter(self)
-        x = 2; h = self.height()
-        p.setPen(QColor(SOMBRA))
-        p.drawLine(x, 2, x, h - 3)
-        p.setPen(QColor(LUZ))
-        p.drawLine(x + 1, 2, x + 1, h - 3)
-        p.end()
-
-
-class ToolBtn(QToolButton):
-    def __init__(self, texto, nombre_icono, parent=None):
-        super().__init__(parent)
-        self.setToolTip(texto)
-        self.setIcon(icono(nombre_icono, 20))
-        self.setIconSize(QSize(20, 20))
-        self.setFixedSize(QSize(26, 26))
-        self.setStyleSheet(_BTN_QSS)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-
 def construir_ribbon(acciones=None):
-    """Barra de herramientas clasica. Devuelve (barra, {clave: ToolBtn})."""
-    acciones = acciones or {}
+    """Barra superior de selectores globales.
+
+    Devuelve (barra, {clave: QComboBox}) con claves 'eos', 'densidad' y
+    'envolvente'. El parametro `acciones` se mantiene por compatibilidad
+    pero ya no se usa (la barra no tiene botones)."""
     barra = QFrame()
-    barra.setFixedHeight(32)
-    # Cara gris con una linea de luz arriba y sombra abajo (barra elevada).
+    barra.setFixedHeight(34)
     barra.setStyleSheet(
-        f'QFrame {{ background:{CARA};'
-        f' border-top:1px solid {LUZ};'
-        f' border-bottom:1px solid {SOMBRA}; }}')
+        f'QFrame {{ background:{CARA}; border-bottom:1px solid {SOMBRA}; }}')
     lay = QHBoxLayout(barra)
-    lay.setContentsMargins(4, 2, 4, 2)
-    lay.setSpacing(1)
+    lay.setContentsMargins(8, 3, 8, 3)
+    lay.setSpacing(6)
     lay.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
-    botones = {}
-    for clave, texto, ic in _TOOLBAR:
-        if clave is None:
-            lay.addWidget(SepVertical(22))
-            continue
-        b = ToolBtn(texto, ic)
-        fn = acciones.get(clave)
-        if fn is not None:
-            b.clicked.connect(fn)
-        botones[clave] = b
-        lay.addWidget(b)
+    def _lbl(txt):
+        l = QLabel(txt)
+        l.setStyleSheet(
+            f'background:transparent; color:{TXT};'
+            f' font-family:"{FUENTE_UI}"; font-size:10pt;')
+        return l
+
+    combos = {}
+    for i, (clave, etiqueta, items) in enumerate(_SELECTORES):
+        lay.addWidget(_lbl(etiqueta))
+        cmb = QComboBox()
+        cmb.addItems(items)
+        cmb.setView(QListView())
+        cmb.setStyleSheet(_COMBO_QSS)
+        cmb.setFixedWidth(148)
+        cmb.setCursor(Qt.CursorShape.PointingHandCursor)
+        combos[clave] = cmb
+        lay.addWidget(cmb)
+        if i < len(_SELECTORES) - 1:
+            sep = QFrame()
+            sep.setFrameShape(QFrame.Shape.VLine)
+            sep.setStyleSheet(f'color:{SOMBRA}; background:{SOMBRA};')
+            sep.setFixedWidth(1)
+            lay.addSpacing(4); lay.addWidget(sep); lay.addSpacing(4)
     lay.addStretch()
-    return barra, botones
+    return barra, combos
 
 
 # ══════════════════════════════════════════════════════════════
 # Panel Navegador lateral (docked, estilo clasico)
 # ══════════════════════════════════════════════════════════════
 def _seccion(texto):
-    """Cabecera de seccion: etiqueta en negrita + linea grabada debajo."""
     cont = QWidget()
     v = QVBoxLayout(cont)
     v.setContentsMargins(0, 4, 0, 1)
@@ -174,7 +139,6 @@ def _tree_base():
     t.setIndentation(14)
     t.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
     t.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-    # Borde hundido (inset) clasico alrededor del arbol.
     t.setStyleSheet(
         f'QTreeWidget {{ background:#FFFFFF; color:{TXT};'
         f' font-family:"{FUENTE_UI}"; font-size:10pt; outline:0;'
@@ -182,17 +146,17 @@ def _tree_base():
         f' border-right:1px solid {LUZ}; border-bottom:1px solid {LUZ}; }}'
         f'QTreeWidget::item {{ height:22px; padding-left:2px; }}'
         f'QTreeWidget::item:selected {{ background:{SEL_BG}; color:{SEL_TXT}; }}'
-        f'QTreeWidget::item:hover {{ background:#D8D8E8; }}')
+        f'QTreeWidget::item:hover {{ background:#E0E0EC; }}')
     return t
 
 
 class NavigatorPanel(QWidget):
-    """Panel lateral izquierdo (docked) con barra de titulo 'Navegador' y X,
-    arbol de Calculos (abre subventanas) y accesos a Datos."""
+    """Panel lateral con barra de titulo 'Navegador' + X, arbol de Calculos
+    (abre subventanas) y accesos a Datos."""
 
-    calculo_pedido = pyqtSignal(str)   # clave del calculo a abrir
-    dato_pedido    = pyqtSignal(str)   # clave de dato (componentes, fluidos)
-    cerrar_pedido  = pyqtSignal()      # X de la barra de titulo del panel
+    calculo_pedido = pyqtSignal(str)
+    dato_pedido    = pyqtSignal(str)
+    cerrar_pedido  = pyqtSignal()
 
     ANCHO = 244
 
@@ -208,7 +172,7 @@ class NavigatorPanel(QWidget):
         outer.setContentsMargins(2, 2, 2, 2)
         outer.setSpacing(2)
 
-        # ── Barra de titulo del panel (docked) ───────────────
+        # Barra de titulo del panel (docked)
         cap = QFrame()
         cap.setFixedHeight(20)
         cap.setStyleSheet(
@@ -222,30 +186,26 @@ class NavigatorPanel(QWidget):
             f'background:transparent; color:{TXT};'
             f' font-family:"{FUENTE_UI}"; font-size:10pt; font-weight:bold;')
         hc.addWidget(tit); hc.addStretch()
+        from PyQt6.QtWidgets import QToolButton
         x = QToolButton()
         x.setText("✕")
         x.setFixedSize(16, 16)
         x.setStyleSheet(
             f'QToolButton {{ background:{CARA}; color:{TXT};'
-            f' font-family:"{FUENTE_UI}"; font-size:8pt;'
-            f' border-top:1px solid {LUZ}; border-left:1px solid {LUZ};'
-            f' border-right:1px solid {SOMBRA_OSC}; border-bottom:1px solid {SOMBRA_OSC}; }}'
-            f'QToolButton:pressed {{'
-            f' border-top:1px solid {SOMBRA_OSC}; border-left:1px solid {SOMBRA_OSC};'
-            f' border-right:1px solid {LUZ}; border-bottom:1px solid {LUZ}; }}')
+            f' font-family:"{FUENTE_UI}"; font-size:8pt; border:1px solid {SOMBRA}; }}'
+            f'QToolButton:hover {{ background:#E4E4E4; }}')
         x.setCursor(Qt.CursorShape.PointingHandCursor)
         x.clicked.connect(self.cerrar_pedido.emit)
         hc.addWidget(x)
         outer.addWidget(cap)
 
-        # Contenido (con scroll para alturas pequenas)
         cont = QWidget()
         cont.setStyleSheet(f'background:{CARA};')
         v = QVBoxLayout(cont)
         v.setContentsMargins(4, 2, 4, 4)
         v.setSpacing(2)
 
-        # ── Cálculos ─────────────────────────────────────────
+        # Cálculos
         v.addWidget(_seccion("Cálculos"))
         self.tree_calc = _tree_base()
         self.tree_calc.setRootIsDecorated(True)
@@ -264,7 +224,7 @@ class NavigatorPanel(QWidget):
         self.tree_calc.setFixedHeight(24 + 22 * (len(NAV_CALCULOS) + 1))
         v.addWidget(self.tree_calc)
 
-        # ── Datos ────────────────────────────────────────────
+        # Datos
         v.addWidget(_seccion("Datos"))
         self.tree_datos = _tree_base()
         self.tree_datos.setRootIsDecorated(False)
@@ -287,7 +247,6 @@ class NavigatorPanel(QWidget):
         scroll.setStyleSheet(f'QScrollArea {{ background:{CARA}; border:none; }}')
         outer.addWidget(scroll, 1)
 
-    # ── Slots ────────────────────────────────────────────────
     def _on_calc_click(self, item, col):
         clave = item.data(0, Qt.ItemDataRole.UserRole)
         if clave:
