@@ -1434,11 +1434,12 @@ class MainWindow(QMainWindow):
         self.mdi.setViewMode(QMdiArea.ViewMode.SubWindowView)
         self.mdi.setOption(
             QMdiArea.AreaOption.DontMaximizeSubWindowOnActivation, True)
-        # Area de simulacion BLANCA. Las subventanas van SIN barra de titulo
-        # (frameless) y con un borde gris #7F7F7F alrededor de toda la ventana.
+        # Area de simulacion BLANCA. El borde gris #7F7F7F de cada ventana se
+        # dibuja en el contenido (ver _abrir_calculo), porque en una subventana
+        # frameless el borde del marco no se renderiza.
         self.mdi.setStyleSheet(
             'QMdiArea { background:#FFFFFF; }'
-            'QMdiSubWindow { background:#E6E6E6; border:1px solid #7F7F7F; }')
+            'QMdiSubWindow { background:#E6E6E6; }')
         self.mdi.subWindowActivated.connect(self._on_sub_activada)
 
         # Logo de ThermoPhase (por si se necesita en otros contextos).
@@ -1558,8 +1559,12 @@ class MainWindow(QMainWindow):
             sc = QScrollArea()
             sc.setWidget(cont)
             sc.setWidgetResizable(True)
-            sc.setFrameShape(QFrame.Shape.NoFrame)
-            sc.setStyleSheet('QScrollArea { background:#E6E6E6; border:none; }')
+            # El borde de la ventana se dibuja aqui (el scroll llena toda la
+            # subventana frameless). Marco Box + color oscuro para que se vea.
+            sc.setFrameShape(QFrame.Shape.Box)
+            sc.setLineWidth(1)
+            sc.setStyleSheet(
+                'QScrollArea { background:#E6E6E6; border:1px solid #5A5A5A; }')
             sc.viewport().setStyleSheet('background:#E6E6E6;')
             # _SubVentana SIN barra de titulo (frameless): solo el contenido
             # con el borde gris #7F7F7F alrededor de toda la ventana.
