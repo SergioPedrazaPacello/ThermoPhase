@@ -9,7 +9,8 @@ from PyQt6.QtWidgets import (
     QTabWidget, QTabBar, QTableWidget, QTableWidgetItem, QLabel, QPushButton,
     QDoubleSpinBox, QGridLayout, QFrame, QHeaderView,
     QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox,
-    QAbstractSpinBox, QMenuBar, QFileDialog, QSplitter
+    QAbstractSpinBox, QMenuBar, QFileDialog, QSplitter,
+    QMdiArea, QMdiSubWindow
 )
 import matplotlib
 matplotlib.use('QtAgg')
@@ -1032,71 +1033,101 @@ class MainWindow(QMainWindow):
         self._actualizar_titulo()
 
     def _construir_menu(self):
-        """Barra de menu superior con acciones de archivo. Estilo Win95
-        para armonizar con el resto de la aplicacion."""
+        """Barra de menu clasica (Win95): Archivo, Editar, Ver, Herramientas,
+        Exportar, Ventana, Ayuda."""
+        CARA = "#C0C0C0"; LUZ = "#FFFFFF"; SOMBRA = "#808080"
         menubar = self.menuBar()
         menubar.setStyleSheet(
-            f'QMenuBar {{ background:{GRAY_LBL}; '
-            f'  font-family:"{FONT_F}"; font-size:{FS}pt; '
-            f'  border-bottom:1px solid {BORDER}; }} '
-            f'QMenuBar::item {{ padding:3px 10px; background:transparent; }} '
-            f'QMenuBar::item:selected {{ background:#000080; color:#FFFFFF; }} '
-            f'QMenu {{ background:{WHITE}; color:{TEXT}; '
-            f'  border:1px solid {BORDER}; '
-            f'  font-family:"{FONT_F}"; font-size:{FS}pt; }} '
-            f'QMenu::item {{ padding:3px 22px 3px 20px; }} '
-            f'QMenu::item:selected {{ background:#000080; color:#FFFFFF; }} '
-            f'QMenu::separator {{ height:1px; background:{BORDER}; '
-            f'  margin:2px 4px; }}')
+            f'QMenuBar {{ background:{CARA}; color:#000000;'
+            f'  font-family:"{FONT_F}"; font-size:{FS}pt;'
+            f'  border-bottom:1px solid {SOMBRA}; }}'
+            f'QMenuBar::item {{ padding:3px 9px; background:transparent; }}'
+            f'QMenuBar::item:selected {{ background:#000080; color:#FFFFFF; }}'
+            f'QMenu {{ background:{CARA}; color:#000000;'
+            f'  border-top:1px solid {LUZ}; border-left:1px solid {LUZ};'
+            f'  border-right:1px solid #404040; border-bottom:1px solid #404040;'
+            f'  font-family:"{FONT_F}"; font-size:{FS}pt; }}'
+            f'QMenu::item {{ padding:3px 24px 3px 20px; }}'
+            f'QMenu::item:selected {{ background:#000080; color:#FFFFFF; }}'
+            f'QMenu::item:disabled {{ color:{SOMBRA}; }}'
+            f'QMenu::separator {{ height:2px; margin:2px 3px;'
+            f'  border-top:1px solid {SOMBRA}; border-bottom:1px solid {LUZ}; }}')
 
+        def _act(texto, slot, atajo=None):
+            a = QAction(texto, self)
+            if atajo is not None:
+                a.setShortcut(atajo)
+            a.triggered.connect(slot)
+            return a
+
+        # ── Archivo ──────────────────────────────────────────
         m_arch = menubar.addMenu("&Archivo")
-
-        act_new = QAction("&Nuevo", self)
-        act_new.setShortcut(QKeySequence.StandardKey.New)
-        act_new.triggered.connect(self._menu_nuevo)
-        m_arch.addAction(act_new)
-
-        act_open = QAction("&Abrir...", self)
-        act_open.setShortcut(QKeySequence.StandardKey.Open)
-        act_open.triggered.connect(self._menu_abrir)
-        m_arch.addAction(act_open)
-
+        m_arch.addAction(_act("&Nuevo", self._menu_nuevo,
+                              QKeySequence.StandardKey.New))
+        m_arch.addAction(_act("&Abrir...", self._menu_abrir,
+                              QKeySequence.StandardKey.Open))
         m_arch.addSeparator()
-
-        act_save = QAction("&Guardar", self)
-        act_save.setShortcut(QKeySequence.StandardKey.Save)
-        act_save.triggered.connect(self._menu_guardar)
-        m_arch.addAction(act_save)
-
-        act_save_as = QAction("Guardar &como...", self)
-        act_save_as.setShortcut(QKeySequence.StandardKey.SaveAs)
-        act_save_as.triggered.connect(self._menu_guardar_como)
-        m_arch.addAction(act_save_as)
-
+        m_arch.addAction(_act("&Guardar", self._menu_guardar,
+                              QKeySequence.StandardKey.Save))
+        m_arch.addAction(_act("Guardar &como...", self._menu_guardar_como,
+                              QKeySequence.StandardKey.SaveAs))
         m_arch.addSeparator()
+        m_arch.addAction(_act("&Imprimir / Exportar a PDF...",
+                              self._menu_exportar_pdf))
+        m_arch.addSeparator()
+        m_arch.addAction(_act("&Salir", self.close,
+                              QKeySequence.StandardKey.Quit))
 
-        act_exit = QAction("&Salir", self)
-        act_exit.setShortcut(QKeySequence.StandardKey.Quit)
-        act_exit.triggered.connect(self.close)
-        m_arch.addAction(act_exit)
+        # ── Editar ───────────────────────────────────────────
+        m_edit = menubar.addMenu("&Editar")
+        m_edit.addAction(_act("&Deshacer", lambda: self._placeholder("Deshacer")))
+        m_edit.addAction(_act("&Rehacer", lambda: self._placeholder("Rehacer")))
+        m_edit.addSeparator()
+        m_edit.addAction(_act("&Copiar", lambda: self._placeholder("Copiar")))
+        m_edit.addAction(_act("&Pegar", lambda: self._placeholder("Pegar")))
 
-        # ── Menu Herramientas ────────────────────────────────
+        # ── Ver ──────────────────────────────────────────────
+        m_ver = menubar.addMenu("&Ver")
+        self._act_nav = QAction("&Navegador", self, checkable=True)
+        self._act_nav.setChecked(True)
+        self._act_nav.toggled.connect(self._toggle_nav)
+        m_ver.addAction(self._act_nav)
+        self._act_tb = QAction("Barra de &herramientas", self, checkable=True)
+        self._act_tb.setChecked(True)
+        self._act_tb.toggled.connect(
+            lambda on: self.ribbon.setVisible(on))
+        m_ver.addAction(self._act_tb)
+        # La X del panel navegador desmarca la opcion de Ver.
+        if hasattr(self, 'nav'):
+            self.nav.cerrar_pedido.connect(
+                lambda: self._act_nav.setChecked(False))
+
+        # ── Herramientas ─────────────────────────────────────
         m_herr = menubar.addMenu("&Herramientas")
+        m_herr.addAction(_act("&Asociar archivos .tpsim con este programa",
+                              self._menu_asociar))
+        m_herr.addAction(_act("&Quitar asociacion de archivos .tpsim",
+                              self._menu_desasociar))
 
-        act_reg = QAction("&Asociar archivos .tpsim con este programa", self)
-        act_reg.triggered.connect(self._menu_asociar)
-        m_herr.addAction(act_reg)
-
-        act_desr = QAction("&Quitar asociacion de archivos .tpsim", self)
-        act_desr.triggered.connect(self._menu_desasociar)
-        m_herr.addAction(act_desr)
-
-        # ── Menu Exportar ────────────────────────────────────
+        # ── Exportar ─────────────────────────────────────────
         m_exp = menubar.addMenu("&Exportar")
+        m_exp.addAction(_act("Exportar resultados a &PDF...",
+                             self._menu_exportar_pdf))
 
-        act_pdf = QAction("Exportar resultados a &PDF", self)
-        act_pdf.triggered.connect(self._menu_exportar_pdf)
-        m_exp.addAction(act_pdf)
+        # ── Ventana (gestion del area MDI) ───────────────────
+        m_win = menubar.addMenu("Ve&ntana")
+        m_win.addAction(_act("&Cascada", self.mdi.cascadeSubWindows))
+        m_win.addAction(_act("&Mosaico", self.mdi.tileSubWindows))
+        m_win.addSeparator()
+        m_win.addAction(_act("Cerrar &todas", self.mdi.closeAllSubWindows))
+
+        # ── Ayuda ────────────────────────────────────────────
+        m_ayuda = menubar.addMenu("A&yuda")
+        m_ayuda.addAction(_act("&Acerca de ThermoPhase...", self._menu_acerca))
+
+    def _toggle_nav(self, on):
+        if hasattr(self, 'nav'):
+            self.nav.setVisible(on)
 
     # ── Exportacion a PDF ────────────────────────────────────
     def _menu_exportar_pdf(self):
@@ -1164,7 +1195,6 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(f"ThermoPhase — {nombre}")
         else:
             self.setWindowTitle("ThermoPhase")
-        self._actualizar_info_nav()
 
     # ── Recopilar y aplicar estado global (todas las pestañas + globales) ──
     def _recopilar_estado(self):
@@ -1226,11 +1256,10 @@ class MainWindow(QMainWindow):
         # 4. Label permanente del status bar
         nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
         self._lbl_info.setText(
-            f"  {nombre} EOS  |  "
-            f"R = {R_GAS} psi·ft³/(lb-mol·°R)  |  13 componentes")
+            f"{nombre} EOS  /  R = {R_GAS} psi·ft³/(lb-mol·°R)"
+            f"  /  13 componentes")
 
         # 5. Navegador
-        self._actualizar_info_nav()
 
     # ── Slots del menu ─────────────────────────────────────────────
     def _menu_nuevo(self):
@@ -1253,10 +1282,9 @@ class MainWindow(QMainWindow):
             self.tab_par.refrescar_tabla()
         self.current_path = None
         self._actualizar_titulo()
-        self._actualizar_info_nav()
         self._lbl_info.setText(
-            f"  Peng-Robinson EOS  |  "
-            f"R = {R_GAS} psi·ft³/(lb-mol·°R)  |  13 componentes")
+            f"Peng-Robinson EOS  /  R = {R_GAS} psi·ft³/(lb-mol·°R)"
+            f"  /  13 componentes")
 
     def _menu_abrir(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1302,7 +1330,7 @@ class MainWindow(QMainWindow):
             dialogos.error(self, f"No se pudo guardar el archivo:\n\n{ex}")
 
     def _build(self):
-        # ── Pestañas de contenido (tamaño fijo) ──────────────
+        # ── Widgets de cada calculo (tamaño / colores identicos) ──
         self.tab_eq   = TabEquilibrio()
         self.tab_env  = TabEnvolvente(get_z=self.tab_eq.get_z,
                                       get_kij=lambda: kij_user)
@@ -1314,126 +1342,145 @@ class MainWindow(QMainWindow):
                                      get_kij=lambda: kij_user)
         self.tab_par  = TabParametros()
 
-        # Ancho minimo uniforme del contenido: antes la ventana fija forzaba
-        # el ancho de las tablas; ahora que el contenido se centra dentro del
-        # scroll le damos un piso para que no se comprima (la pestaña de
-        # Parametros conserva su scroll horizontal interno como antes).
-        for _w in (self.tab_eq, self.tab_env, self.tab_sat,
-                   self.tab_prop, self.tab_corr, self.tab_par):
-            _w.setMinimumWidth(730)
-
-        # QTabWidget central. Cada pagina se envuelve en un QScrollArea para
-        # que el contenido conserve su tamaño fijo mientras la ventana crece
-        # o se encoge (antes la ventana entera era de tamaño fijo).
-        self.tabs = QTabWidget()
-        self.tabs.setTabBar(ScrollableTabBar())
-        self.tabs.setUsesScrollButtons(True)
-        self.tabs.tabBar().setUsesScrollButtons(True)
-        self.tabs.setIconSize(QSize(16, 16))
-        self.tabs.setStyleSheet(
-            f'QTabWidget::pane {{border:1px solid {BORDER}; background:{GRAY_LBL};}}'
-            f'QTabBar::tab {{background:{GRAY_LBL};color:{TEXT};'
-            f'padding:4px 12px;border:1px solid {BORDER};border-bottom:none;'
-            f'margin-right:1px;font-family:"{FONT_F}";font-size:{FS}pt;}}'
-            f'QTabBar::tab:selected {{background:{WHITE};'
-            f'border-bottom:1px solid {WHITE};}}'
-            f'QTabBar::scroller {{width:0px;}}'
-            f'QTabBar QToolButton {{width:0px;height:0px;padding:0px;'
-            f'margin:0px;border:none;image:none;}}'
-        )
-        paginas = [
-            (self.tab_eq,   "Equilibrio de fases",                 "equilibrio"),
-            (self.tab_env,  "Envolvente de fases",                 "envolvente"),
-            (self.tab_sat,  "Puntos de saturación",                "saturacion"),
-            (self.tab_prop, "Propiedades termodinámicas",          "propiedades"),
-            (self.tab_corr, "Propiedades de la corriente",         "corriente"),
-            (self.tab_par,  "Parámetros de la ecuación de estado", "parametros"),
-        ]
-        for widget, titulo, ic in paginas:
-            self.tabs.addTab(self._envolver_scroll(widget),
-                             iconos.icono(ic, 16), titulo)
+        # Definicion de cada calculo: clave -> (widget, titulo, icono)
+        self._defs_calc = {
+            'equilibrio':  (self.tab_eq,   "Equilibrio de fases",                 "equilibrio"),
+            'envolvente':  (self.tab_env,  "Envolvente de fases",                 "envolvente"),
+            'saturacion':  (self.tab_sat,  "Puntos de saturación",                "saturacion"),
+            'propiedades': (self.tab_prop, "Propiedades termodinámicas",          "propiedades"),
+            'corriente':   (self.tab_corr, "Propiedades de la corriente",         "corriente"),
+            'parametros':  (self.tab_par,  "Parámetros de la ecuación de estado", "parametros"),
+        }
+        self._subventanas = {}     # clave -> QMdiSubWindow
 
         # ── Cinta de opciones (ribbon) ───────────────────────
         self.ribbon, self.botones_ribbon = construir_ribbon(self._acciones_ribbon())
 
         # ── Panel Navegador lateral ──────────────────────────
         self.nav = NavigatorPanel()
-        self.nav.pestana_pedida.connect(self.tabs.setCurrentIndex)
+        self.nav.calculo_pedido.connect(self._abrir_calculo)
         self.nav.dato_pedido.connect(self._accion_nav)
-        self.tabs.currentChanged.connect(self.nav.sincronizar)
-        self.nav.sincronizar(0)
+
+        # ── Area de simulacion (MDI) ─────────────────────────
+        # Cada calculo se abre como una subventana de tamaño fijo que no puede
+        # salir de esta area; se pueden tener varias abiertas a la vez.
+        self.mdi = QMdiArea()
+        self.mdi.setBackground(QBrush(QColor("#B0B0B0")))
+        self.mdi.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.mdi.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.mdi.setViewMode(QMdiArea.ViewMode.SubWindowView)
+        self.mdi.setOption(
+            QMdiArea.AreaOption.DontMaximizeSubWindowOnActivation, True)
+        self.mdi.setStyleSheet(
+            f'QMdiArea {{ background:#B0B0B0; }}'
+            f'QMdiSubWindow {{ background:#C0C0C0;'
+            f' border-top:1px solid #FFFFFF; border-left:1px solid #FFFFFF;'
+            f' border-right:1px solid #404040; border-bottom:1px solid #404040; }}'
+            f'QMdiSubWindow::title {{ background:{GRAY_TIT}; color:#000000;'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt;'
+            f' height:20px; padding-left:4px; }}'
+        )
+        self.mdi.subWindowActivated.connect(self._on_sub_activada)
 
         # ── Ensamblado central ───────────────────────────────
         cw = QWidget(); self.setCentralWidget(cw)
+        cw.setStyleSheet('background:#C0C0C0;')
         v = QVBoxLayout(cw)
         v.setContentsMargins(0, 0, 0, 0); v.setSpacing(0)
         v.addWidget(self.ribbon)
 
         split = QSplitter(Qt.Orientation.Horizontal)
+        split.setStyleSheet(
+            'QSplitter { background:#C0C0C0; }'
+            'QSplitter::handle { background:#C0C0C0; }')
         split.addWidget(self.nav)
-        cont_tabs = QWidget()
-        cont_tabs.setStyleSheet(f'background:{GRAY_LBL};')
-        lt = QVBoxLayout(cont_tabs)
-        lt.setContentsMargins(4, 4, 4, 2); lt.setSpacing(0)
-        lt.addWidget(self.tabs)
-        split.addWidget(cont_tabs)
+        split.addWidget(self.mdi)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setChildrenCollapsible(False)
-        split.setSizes([NavigatorPanel.ANCHO, 1000])
+        split.setSizes([NavigatorPanel.ANCHO, 1100])
         split.setHandleWidth(3)
         v.addWidget(split, 1)
 
-        # ── Barra de estado ──────────────────────────────────
+        # ── Barra de estado (paneles hundidos clasicos) ──────
         sb = QStatusBar()
+        sb.setSizeGripEnabled(True)
         sb.setStyleSheet(
-            f'background:{GRAY_LBL};font-family:"Segoe UI";font-size:9pt;'
-            f'border-top:1px solid {BORDER};'
+            f'QStatusBar {{ background:#C0C0C0; font-family:"{FONT_F}";'
+            f' font-size:9pt; border-top:1px solid #FFFFFF; }}'
             f'QStatusBar::item {{ border:none; }}')
-        self._lbl_estado = QLabel("  Listo")
-        self._lbl_estado.setStyleSheet(
-            f'background:transparent;color:{TEXT};'
-            f'font-family:"Segoe UI";font-size:9pt;padding:0px 4px;')
-        sb.addWidget(self._lbl_estado)
-        # Widget permanente para el mensaje de EOS/R/componentes. Se usa
-        # addPermanentWidget (no addWidget) para que NO se oculte cuando
-        # Qt muestra los tooltips temporales del hover del menu Archivo.
-        self._lbl_info = QLabel(
-            f"  Peng-Robinson EOS  |  "
-            f"R = {R_GAS} psi·ft³/(lb-mol·°R)  |  13 componentes")
-        self._lbl_info.setStyleSheet(
-            f'background:transparent;color:{TEXT};'
-            f'font-family:"Segoe UI";font-size:9pt;padding:0px 8px;')
+        def _panel(txt, ancho=None):
+            l = QLabel(txt)
+            if ancho:
+                l.setFixedWidth(ancho)
+            l.setStyleSheet(
+                f'QLabel {{ background:#C0C0C0; color:{TEXT};'
+                f' font-family:"{FONT_F}"; font-size:9pt; padding:1px 6px;'
+                f' border-top:1px solid #808080; border-left:1px solid #808080;'
+                f' border-right:1px solid #FFFFFF; border-bottom:1px solid #FFFFFF; }}')
+            return l
+        self._lbl_estado = _panel("Listo")
+        sb.addWidget(self._lbl_estado, 1)
+        self._lbl_info = _panel(
+            f"Peng-Robinson EOS  /  R = {R_GAS} psi·ft³/(lb-mol·°R)"
+            f"  /  13 componentes")
         sb.addPermanentWidget(self._lbl_info, 0)
         self.setStatusBar(sb)
         self._sb = sb
 
-        # Cablear cambio de EOS desde la pestaña Equilibrio.
+        # Cablear cambio de EOS desde el calculo de Equilibrio.
         self.tab_eq.eos_changed.connect(self._on_eos_changed)
-        # Refrescar el contador de componentes del navegador al editar la
-        # composicion en la pestaña de Equilibrio.
-        self.tab_eq.tbl_comp.itemChanged.connect(
-            lambda *_: self._actualizar_info_nav())
-        self._actualizar_info_nav()
 
-    # ── Envoltura de pestañas (contenido fijo, ventana elastica) ─
-    def _envolver_scroll(self, widget):
-        """Envuelve una pestaña de tamaño fijo en un area con scroll: al
-        agrandar la ventana el contenido no se estira (queda centrado y
-        alineado arriba); al encogerla aparecen barras de scroll."""
-        cont = QWidget()
-        cont.setStyleSheet(f'background:{GRAY_LBL};')
-        h = QHBoxLayout(cont)
-        h.setContentsMargins(0, 0, 0, 0); h.setSpacing(0)
-        h.addStretch()
-        h.addWidget(widget, alignment=Qt.AlignmentFlag.AlignTop)
-        h.addStretch()
-        sc = QScrollArea()
-        sc.setWidget(cont)
-        sc.setWidgetResizable(True)
-        sc.setFrameShape(QFrame.Shape.NoFrame)
-        sc.setStyleSheet(f'QScrollArea {{ background:{GRAY_LBL}; border:none; }}')
-        return sc
+        # Abrir el calculo de Equilibrio al iniciar.
+        self._abrir_calculo('equilibrio')
+
+    # ── Gestion de subventanas del area de simulacion ────────
+    def _abrir_calculo(self, clave):
+        """Abre (o activa, si ya existe) la subventana MDI del calculo pedido.
+        La subventana es de tamaño fijo, no puede salir del area y varias
+        pueden estar abiertas simultaneamente."""
+        if clave not in self._defs_calc:
+            return
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            widget, titulo, ic = self._defs_calc[clave]
+            sc = QScrollArea()
+            sc.setWidget(widget)
+            sc.setWidgetResizable(True)
+            sc.setFrameShape(QFrame.Shape.NoFrame)
+            sc.setStyleSheet(f'QScrollArea {{ background:{GRAY_LBL}; border:none; }}')
+            sw = QMdiSubWindow()
+            sw.setWidget(sc)
+            sw.setWindowTitle("  " + titulo)
+            sw.setWindowIcon(iconos.icono(ic, 16))
+            sw.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+            # Solo minimizar / cerrar: sin maximizar (tamaño fijo).
+            sw.setWindowFlags(Qt.WindowType.SubWindow
+                              | Qt.WindowType.WindowMinimizeButtonHint
+                              | Qt.WindowType.WindowCloseButtonHint)
+            hint = widget.sizeHint()
+            ancho = max(hint.width() + 12, 742)
+            alto  = min(max(hint.height() + 40, 420), 858)
+            sw.setFixedSize(ancho, alto)
+            sw._clave = clave
+            self._subventanas[clave] = sw
+        if sw not in self.mdi.subWindowList():
+            self.mdi.addSubWindow(sw)
+            self._cascada(sw)
+        sw.show()
+        self.mdi.setActiveSubWindow(sw)
+        sw.raise_()
+
+    def _cascada(self, sw):
+        """Ubica la subventana recien abierta en cascada dentro del area."""
+        n = len(self.mdi.subWindowList())
+        off = 26 * ((n - 1) % 6)
+        sw.move(12 + off, 10 + off)
+
+    def _on_sub_activada(self, sw):
+        """Sincroniza el resaltado del navegador con la subventana activa."""
+        if sw is not None and hasattr(sw, '_clave'):
+            self.nav.sincronizar(sw._clave)
 
     # ── Acciones de la cinta ─────────────────────────────────
     def _acciones_ribbon(self):
@@ -1448,24 +1495,14 @@ class MainWindow(QMainWindow):
             'imprimir':      self._menu_exportar_pdf,
             'deshacer':      lambda: self._placeholder("Deshacer"),
             'rehacer':       lambda: self._placeholder("Rehacer"),
-            'cortar':        lambda: self._placeholder("Cortar"),
             'copiar':        lambda: self._placeholder("Copiar"),
             'pegar':         lambda: self._placeholder("Pegar"),
             'fraccion':      self._ribbon_fraccion,
             'normalizar':    self._ribbon_normalizar,
             'ejecutar':      self._ribbon_calcular,
             'detener':       lambda: self._placeholder("Detener"),
-            'sistema':       lambda: self._placeholder("Sistema de unidades"),
-            'conversor':     lambda: self._placeholder("Conversor de unidades"),
             'componentes':   lambda: self._placeholder("Componentes"),
             'fluidos':       lambda: self._placeholder("Fluidos"),
-            'mezclas':       lambda: self._placeholder("Mezclas"),
-            'tablas':        lambda: self._placeholder("Tablas"),
-            'calculadora':   lambda: self._placeholder("Calculadora"),
-            'graficas':      lambda: self.tabs.setCurrentIndex(1),
-            'opciones':      lambda: self._placeholder("Opciones"),
-            'configuracion': lambda: self._placeholder("Configuración"),
-            'ayuda':         lambda: self._placeholder("Ayuda"),
             'acerca':        self._menu_acerca,
         }
 
@@ -1475,35 +1512,25 @@ class MainWindow(QMainWindow):
             "(Interfaz preliminar.)")
 
     def _ribbon_fraccion(self):
-        # Alterna molar/masica accionando el mismo boton de la pestaña Equilibrio.
+        # Alterna molar/masica en el calculo de Equilibrio.
         self.tab_eq.btn_frac.click()
 
     def _ribbon_normalizar(self):
         self.tab_eq.normalizar()
 
     def _ribbon_calcular(self):
-        """Ejecuta el calculo de la pestaña activa (si lo tiene)."""
-        botones = [
-            getattr(self.tab_eq,   'btn', None),
-            getattr(self.tab_env,  'btn', None),
-            getattr(self.tab_sat,  'btn', None),
-            getattr(self.tab_prop, 'btn', None),
-            getattr(self.tab_corr, 'btn', None),
-            None,   # Parametros no tiene calculo
-        ]
-        idx = self.tabs.currentIndex()
-        b = botones[idx] if 0 <= idx < len(botones) else None
+        """Ejecuta el calculo de la subventana activa (si lo tiene)."""
+        sw = self.mdi.activeSubWindow()
+        clave = getattr(sw, '_clave', None) if sw is not None else None
+        widget = self._defs_calc[clave][0] if clave in self._defs_calc else None
+        b = getattr(widget, 'btn', None) if widget is not None else None
         if b is not None and b.isEnabled():
             b.click()
         else:
             self._placeholder("Realizar cálculo")
 
     def _accion_nav(self, clave):
-        nombres = {
-            'componentes': "Componentes", 'fluidos': "Fluidos",
-            'mezclas': "Mezclas", 'conversor': "Conversor de unidades",
-            'tablas': "Tablas", 'calculadora': "Calculadora",
-        }
+        nombres = {'componentes': "Componentes", 'fluidos': "Fluidos"}
         self._placeholder(nombres.get(clave, clave))
 
     def _menu_acerca(self):
@@ -1513,21 +1540,6 @@ class MainWindow(QMainWindow):
             "para mezclas de hidrocarburos (13 componentes).\n"
             "Ecuaciones de estado: Peng-Robinson y Soave-Redlich-Kwong.")
 
-    def _actualizar_info_nav(self):
-        """Refresca el bloque 'Informacion de la base de datos' del navegador."""
-        if not hasattr(self, 'nav'):
-            return
-        if self.current_path:
-            archivo = os.path.basename(self.current_path)
-            ruta    = self.current_path
-        else:
-            archivo = "Sin título.tpsim"
-            ruta    = "—"
-        try:
-            n = sum(1 for val in self.tab_eq.get_z() if val and val > 0)
-        except Exception:
-            n = 0
-        self.nav.set_info(archivo=archivo, ruta=ruta, estado="Listo", n_comp=n)
 
     def _on_eos_changed(self, eos):
         """Propaga el cambio de ecuación de estado a todo el sistema:
@@ -1552,13 +1564,16 @@ class MainWindow(QMainWindow):
         # Actualizar el label permanente del status bar
         nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
         self._lbl_info.setText(
-            f"  {nombre} EOS  |  "
-            f"R = {R_GAS} psi·ft³/(lb-mol·°R)  |  13 componentes")
+            f"{nombre} EOS  /  R = {R_GAS} psi·ft³/(lb-mol·°R)"
+            f"  /  13 componentes")
 
 def main():
     """Arranca la aplicacion. Llamado desde main.py en la raiz."""
     import time as _time
     app = QApplication(sys.argv)
+    # Fuente global Arial Narrow (todo el cromo retro la hereda).
+    _f = QFont("Arial Narrow", 9)
+    app.setFont(_f)
     # Icono global de la aplicacion
     _ico2 = ruta_recurso('thermophase.ico')
     if os.path.exists(_ico2):

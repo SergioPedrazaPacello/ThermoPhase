@@ -16,23 +16,30 @@ azul profundo para liquido, verde para ejecutar, rojo para detener).
 """
 from PyQt6.QtGui import (
     QPixmap, QPainter, QColor, QPen, QBrush, QIcon, QPolygonF, QPainterPath,
-    QFont, QLinearGradient
+    QFont, QLinearGradient, QImage, qGray, qAlpha, qRgba
 )
 from PyQt6.QtCore import Qt, QPointF, QRectF
 
-# ── Paleta office ────────────────────────────────────────────
-AZUL      = QColor("#2D6CDF")   # azul office primario
-AZUL_OSC  = QColor("#1A4FA8")   # azul profundo (liquido)
-AZUL_CLR  = QColor("#7FA9E8")
-GRIS      = QColor("#6E6E6E")
-GRIS_CLR  = QColor("#B8B8B8")
-ROJO_OX   = QColor("#A83218")   # rojo oxido (envolvente / vapor)
-ROJO      = QColor("#D0392B")   # rojo detener
-VERDE      = QColor("#2E9E4F")  # verde ejecutar
-AMBAR     = QColor("#E0902F")   # ambar (gas / flama)
+# ── Paleta monocromatica ─────────────────────────────────────
+# Todo el conjunto de iconos se dibuja con una unica tinta gris oscura para
+# las lineas y grises claros / blanco para los rellenos, en linea con la
+# estetica retro monocromatica de ThermoPhase. Ademas, un desaturado final
+# (ver _desaturar) fuerza escala de grises aunque algun icono use un color
+# puntual embebido en su funcion de dibujo.
+NEGRO     = QColor("#303030")   # tinta principal (lineas)
+GRIS      = QColor("#5A5A5A")   # gris medio
+GRIS_CLR  = QColor("#B8B8B8")   # gris claro (rellenos suaves)
 BLANCO    = QColor("#FFFFFF")
-NEGRO     = QColor("#303030")
-PAPEL     = QColor("#FCFCFC")
+PAPEL     = QColor("#F4F4F4")
+# Alias de compatibilidad: los iconos siguen nombrando estos colores, pero
+# todos apuntan ahora a la escala de grises.
+AZUL      = QColor("#8A8A8A")
+AZUL_OSC  = QColor("#3A3A3A")
+AZUL_CLR  = QColor("#C4C4C4")
+ROJO_OX   = QColor("#4A4A4A")
+ROJO      = QColor("#565656")
+VERDE     = QColor("#4A4A4A")
+AMBAR     = QColor("#777777")
 
 
 # ── Infraestructura ──────────────────────────────────────────
@@ -517,6 +524,22 @@ _REGISTRO = {
 _CACHE = {}
 
 
+def _desaturar(pm):
+    """Convierte un QPixmap a escala de grises conservando el canal alfa.
+    Garantiza el resultado monocromatico aunque un icono use algun color
+    puntual embebido en su funcion de dibujo."""
+    img = pm.toImage().convertToFormat(QImage.Format.Format_ARGB32)
+    for y in range(img.height()):
+        for x in range(img.width()):
+            px = img.pixel(x, y)
+            a = qAlpha(px)
+            if a == 0:
+                continue
+            g = qGray(px)
+            img.setPixel(x, y, qRgba(g, g, g, a))
+    return QPixmap.fromImage(img)
+
+
 def icono(nombre, tam=32):
     """Devuelve un QIcon con el glifo pedido, escalado a `tam` px.
 
@@ -536,6 +559,7 @@ def icono(nombre, tam=32):
         fn(p)
     finally:
         p.end()
+    pm = _desaturar(pm)
     ic = QIcon(pm)
     _CACHE[clave] = ic
     return ic
@@ -550,6 +574,7 @@ def pixmap(nombre, tam=32):
             fn(p)
         finally:
             p.end()
+        pm = _desaturar(pm)
     else:
         p.end()
     return pm
