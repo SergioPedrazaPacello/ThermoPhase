@@ -9,11 +9,11 @@ from PyQt6.QtWidgets import (
     QTabWidget, QTabBar, QTableWidget, QTableWidgetItem, QLabel, QPushButton,
     QDoubleSpinBox, QGridLayout, QFrame, QHeaderView,
     QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox,
-    QAbstractSpinBox, QMenuBar, QFileDialog
+    QAbstractSpinBox, QMenuBar, QFileDialog, QSplitter
 )
 import matplotlib
 matplotlib.use('QtAgg')
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QKeySequence
 
 from eos import (
@@ -23,15 +23,17 @@ from eos import (
 from pestana_envolvente import TabEnvolvente
 from pestana_saturacion import TabSaturacion
 from pestana_propiedades import TabPropiedades
+from pestana_corriente import TabCorriente
 import dialogos as dialogos
 from rutas import ruta_recurso
+from ribbon import construir_ribbon, NavigatorPanel
+import iconos
 kij_user = copy.deepcopy(KIJ_DEFAULT)
 
 # ── Paleta ────────────────────────────────────────────────────
 WHITE    = "#FFFFFF"
 GRAY_TIT = "#A8A8A8"   # plomo oscuro para títulos / cabeceras
-GRAY_LBL = "#D0D0D0"   # plomo medio para encabezados de tabla y barras
-GRAY_CEL = "#D0D0D0"   # celdas de etiqueta (por ahora, igual al encabezado)
+GRAY_LBL = "#D0D0D0"   # plomo medio para etiquetas
 GRAY_RES = "#E8E8E8"   # plomo claro para celdas de resultado (vacías)
 BORDER   = "#888888"
 TEXT     = "#000000"
@@ -151,26 +153,15 @@ def section_label(text, left=False):
     return lbl
 
 def make_table(rows, cols, row_h=22):
-    """Tabla sin cabeceras, sin scroll, tamaño fijo.
-
-    Grilla interna DESACTIVADA: solo se dibuja el borde externo de la
-    tabla (el 'border' del QTableWidget). Las lineas entre celdas se
-    quitan con setShowGrid(False).
-
-    IMPORTANTE: no estilizar 'QTableWidget::item' con border/background en
-    la hoja de estilos. En cuanto se hace, Qt deja de respetar el
-    setBackground() de cada QTableWidgetItem y pinta todas las celdas de
-    blanco. El color de fondo por celda se controla SOLO desde
-    cell(..., bg=...).
-    """
+    """Tabla sin cabeceras, sin scroll, tamaño fijo."""
     t = QTableWidget(rows, cols)
     t.horizontalHeader().hide()
     t.verticalHeader().hide()
-    t.setShowGrid(False)                       # sin grilla interna
+    t.setShowGrid(True)
     t.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     t.setStyleSheet(
         f'QTableWidget {{ border:1px solid {BORDER}; '
-        f'font-family:"{FONT_F}"; font-size:{FS}pt; }}'
+        f'font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER}; }}'
         f'QTableWidget::item {{ padding:2px 6px; }}'
     )
     for r in range(rows):
@@ -180,16 +171,9 @@ def make_table(rows, cols, row_h=22):
     return t
 
 def fix_table_size(t):
-    """Ajusta el tamaño de la tabla a su contenido.
-
-    Se suman 4 px (no 2) por dimension: 2 px del marco de la tabla
-    (border:1px a cada lado) MAS 2 px para que la ultima linea de la
-    grilla —la del borde derecho de la ultima columna y la del borde
-    inferior de la ultima fila— tenga espacio y no quede recortada.
-    Sin esos 2 px extra, las celdas del borde se ven "sin margen".
-    """
-    w = sum(t.columnWidth(c) for c in range(t.columnCount())) + 4
-    h = sum(t.rowHeight(r) for r in range(t.rowCount())) + 4
+    """Ajusta el tamaño de la tabla a su contenido."""
+    w = sum(t.columnWidth(c) for c in range(t.columnCount())) + 2
+    h = sum(t.rowHeight(r) for r in range(t.rowCount())) + 2
     t.setFixedSize(w, h)
 
 # ── Dimensiones ──────────────────────────────────────────────
@@ -421,17 +405,28 @@ class TabEquilibrio(QWidget):
         root.addWidget(title_label("ThermoPhase — Equilibrio de Fases"))
 
         # ── BLOQUE RESUMEN ────────────────────────────────────
+        # Título de sección
         root.addWidget(section_label("Resumen de los calculos:", left=True))
 
-        # Anchos: W_COMP reducido 9px (3 gaps x 3px) para que todo entre igual
-        W0 = W_COMP - 9  # 281 etiquetas
-        W1 = W_VAL       # 140 Mezcla
-        W2 = W_VAL       # 140 Fase Vapor
-        W3 = W_VAL       # 140 Fase Liquida
-
+        # Cabecera de columnas del resumen (plomo medio)
+        # Anchos del resumen = mismos que composicion para alinear columnas
+        WR0 = W_COMP        # 290 — etiqueta
+        WR1 = 100           # Mezcla
+        WR2 = W_VAL         # Vapor  (140)
+        WR3 = W_VAL         # Liquida(140)
+        # Total = 290+100+140+140 = 670 — coincide con W_COMP+3*W_VAL si W_VAL=126.6
+        # Ajustamos W_VAL para que todo sume igual:
+        # W_COMP + 3*W_VAL = WR0+WR1+WR2+WR3 → 290+3*W_VAL = 290+100+2*W_VAL → W_VAL=100
+        # Mejor: fijamos total = W_COMP+W_VAL*3 y distribuimos:
+        # WR0=W_COMP, WR1+WR2+WR3 = W_VAL*3 → WR1=W_VAL-40, WR2=WR3=(W_VAL*3-(W_VAL-40))/2
+        WR1 = W_VAL   # misma anchura que Vapor y Liquida
+        WR2 = W_VAL
+        WR3 = W_VAL
         hdr_res = make_table(1, 4)
-        hdr_res.setColumnWidth(0, W0); hdr_res.setColumnWidth(1, W1)
-        hdr_res.setColumnWidth(2, W2); hdr_res.setColumnWidth(3, W3)
+        hdr_res.setColumnWidth(0, W_COMP)
+        hdr_res.setColumnWidth(1, WR1)
+        hdr_res.setColumnWidth(2, WR2)
+        hdr_res.setColumnWidth(3, WR3)
         hdr_res.setItem(0,0, cell("", bg=GRAY_LBL))
         hdr_res.setItem(0,1, cell("Mezcla", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
@@ -442,20 +437,30 @@ class TabEquilibrio(QWidget):
         fix_table_size(hdr_res)
         root.addWidget(hdr_res)
 
+        # Tabla de datos del resumen
+        # Filas: ff_mol, ff_mas, grav, dens, Z, PM
+        # Tabla resumen: 4 columnas
+        # col0=etiqueta, col1=mezcla(solo dens y PM), col2=Fase Vapor, col3=Fase Liquida
+        # Para filas sin mezcla: col1 queda plomo/vacía, col2 y col3 tienen los valores
         self.tbl_res = make_table(6, 4)
-        self.tbl_res.setColumnWidth(0, W0); self.tbl_res.setColumnWidth(1, W1)
-        self.tbl_res.setColumnWidth(2, W2); self.tbl_res.setColumnWidth(3, W3)
+        self.tbl_res.setColumnWidth(0, W_COMP)
+        self.tbl_res.setColumnWidth(1, W_VAL)
+        self.tbl_res.setColumnWidth(2, W_VAL)
+        self.tbl_res.setColumnWidth(3, W_VAL)
 
         res_labels = [
-            "Fase fraccion [molar]:", "Fase fraccion [masica]:",
-            "Gravedad especifica:", "Densidad masica [lb/ft3]:",
-            "Factor de compresibilidad:", "Peso molecular:",
+            "Fase fraccion [molar]:",
+            "Fase fraccion [masica]:",
+            "Gravedad especifica:",
+            "Densidad masica [lb/ft3]:",
+            "Factor de compresibilidad:",
+            "Peso molecular:",
         ]
-        self.res_has_mix = {3, 5}
+        self.res_has_mix = {3, 5}   # Densidad y PM tienen valor de mezcla
 
         for i, lbl_txt in enumerate(res_labels):
-            self.tbl_res.setItem(i, 0, cell(lbl_txt, bg=GRAY_CEL,
-                align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
+            self.tbl_res.setItem(i, 0, cell(lbl_txt, bg=GRAY_LBL))
+            # Celdas de resultado: fondo plomo claro (GRAY_RES)
             self.tbl_res.setItem(i, 1, cell("", bg=GRAY_RES))
             self.tbl_res.setItem(i, 2, cell("", bg=GRAY_RES))
             self.tbl_res.setItem(i, 3, cell("", bg=GRAY_RES))
@@ -466,10 +471,13 @@ class TabEquilibrio(QWidget):
         # ── BLOQUE COMPOSICIÓN ────────────────────────────────
         root.addWidget(section_label("Composicion de las fases:", left=True))
 
+        # Cabecera de composición (2 niveles)
         hdr_comp = make_table(2, 4)
-        hdr_comp.setRowHeight(0, ROW_H); hdr_comp.setRowHeight(1, ROW_H)
-        hdr_comp.setColumnWidth(0, W0)
+        hdr_comp.setRowHeight(0, ROW_H)
+        hdr_comp.setRowHeight(1, ROW_H)
+        hdr_comp.setColumnWidth(0, W_COMP)
         for c in [1,2,3]: hdr_comp.setColumnWidth(c, W_VAL)
+
         hdr_comp.setItem(0,0, cell("Componente", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
         hdr_comp.setItem(0,1, cell("Composicion General", bg=GRAY_LBL,
@@ -478,12 +486,13 @@ class TabEquilibrio(QWidget):
             align=Qt.AlignmentFlag.AlignCenter))
         hdr_comp.setItem(0,3, cell("Fase Liquida", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
+
         hdr_comp.setItem(1,0, cell("", bg=GRAY_LBL))
-        self.hdr_comp_gen = cell("Fraccion Molar", bg=GRAY_LBL,
+        self.hdr_comp_gen  = cell("Fraccion Molar", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter)
-        self.hdr_comp_vap = cell("Fraccion molar", bg=GRAY_LBL,
+        self.hdr_comp_vap  = cell("Fraccion molar", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter)
-        self.hdr_comp_liq = cell("Fraccion molar", bg=GRAY_LBL,
+        self.hdr_comp_liq  = cell("Fraccion molar", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter)
         hdr_comp.setItem(1,1, self.hdr_comp_gen)
         hdr_comp.setItem(1,2, self.hdr_comp_vap)
@@ -491,33 +500,29 @@ class TabEquilibrio(QWidget):
         fix_table_size(hdr_comp)
         root.addWidget(hdr_comp)
 
+        # Tabla de componentes
         self.tbl_comp = make_table(NC+1, 4)
-        self.tbl_comp.setColumnWidth(0, W0)
+        self.tbl_comp.setColumnWidth(0, W_COMP)
         for c in [1,2,3]: self.tbl_comp.setColumnWidth(c, W_VAL)
 
         for i in range(NC):
             self.tbl_comp.setItem(i, 0, cell(
-                NOMBRES[i], bg=GRAY_CEL,
+                NOMBRES[i], bg=GRAY_LBL,
                 align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
             self.tbl_comp.setItem(i, 1, cell("", bg=WHITE, editable=True))
             self.tbl_comp.setItem(i, 2, cell("", bg=GRAY_RES, color=TEXT_RES))
             self.tbl_comp.setItem(i, 3, cell("", bg=GRAY_RES, color=TEXT_RES))
 
-        self.tbl_comp.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_CEL,
+        # Fila de sumatorias dentro de tbl_comp (fila NC)
+        self.tbl_comp.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
         self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE))
         self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_RES))
         self.tbl_comp.setItem(NC, 3, cell("", bg=GRAY_RES))
-        self.sum_row = NC
+        self.sum_row = NC  # índice de la fila sumatoria dentro de tbl_comp
         fix_table_size(self.tbl_comp)
         self.tbl_comp.itemChanged.connect(self._on_item_changed)
         root.addWidget(self.tbl_comp)
-
-        # compatibilidad con _render (no hay sub-tablas)
-        self._tr0 = self._tr1 = self._tr2 = self._tr3 = None
-        self._tr_offset = 0
-        self._tc0 = self._tc1 = self._tc2 = self._tc3 = None
-        self._tc_offset = 0
 
 
 
@@ -786,11 +791,11 @@ class TabParametros(QWidget):
         self.tbl_p = QTableWidget(NC+1, 5)  # fila 0=cabecera, filas 1..NC=datos
         self.tbl_p.horizontalHeader().hide()
         self.tbl_p.verticalHeader().hide()
-        self.tbl_p.setShowGrid(False)
+        self.tbl_p.setShowGrid(True)
         self.tbl_p.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl_p.setStyleSheet(
             f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
             f'QTableWidget::item {{ padding:2px 6px; }}')
         for c,w in enumerate(WP): self.tbl_p.setColumnWidth(c,w)
         for r in range(NC+1): self.tbl_p.setRowHeight(r, ROW_H)
@@ -822,10 +827,10 @@ class TabParametros(QWidget):
         self.tbl_k = QTableWidget(NC+1, NC+1)  # fila 0=cabecera
         self.tbl_k.horizontalHeader().hide()
         self.tbl_k.verticalHeader().hide()
-        self.tbl_k.setShowGrid(False)
+        self.tbl_k.setShowGrid(True)
         self.tbl_k.setStyleSheet(
             f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
             f'QTableWidget::item {{ padding:2px 4px; }}')
         self.tbl_k.setColumnWidth(0, WK)
         for c in range(1,NC+1): self.tbl_k.setColumnWidth(c, WK)
@@ -1016,9 +1021,11 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ThermoPhase")
-        TW = W_COMP + 3*W_VAL + 30   # ancho total + márgenes
-        TH = 830                      # +25 para acomodar la barra de menu
-        self.setFixedSize(TW, TH)
+        # Ventana redimensionable / maximizable. El contenido de cada pestaña
+        # sigue siendo de tamaño fijo (se envuelve en un QScrollArea), pero la
+        # ventana ya puede maximizarse, minimizarse y ajustarse libremente.
+        self.setMinimumSize(920, 620)
+        self.resize(1300, 840)
         self.current_path = None        # ruta del .tpsim actual (None = sin guardar)
         self._build()
         self._construir_menu()
@@ -1157,6 +1164,7 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(f"ThermoPhase — {nombre}")
         else:
             self.setWindowTitle("ThermoPhase")
+        self._actualizar_info_nav()
 
     # ── Recopilar y aplicar estado global (todas las pestañas + globales) ──
     def _recopilar_estado(self):
@@ -1170,6 +1178,7 @@ class MainWindow(QMainWindow):
                 'envolvente':  self.tab_env.get_estado(),
                 'saturacion':  self.tab_sat.get_estado(),
                 'propiedades': self.tab_prop.get_estado(),
+                'corriente':   self.tab_corr.get_estado(),
             },
         }
 
@@ -1211,12 +1220,17 @@ class MainWindow(QMainWindow):
             self.tab_sat.set_estado(tabs['saturacion'])
         if 'propiedades' in tabs:
             self.tab_prop.set_estado(tabs['propiedades'])
+        if 'corriente' in tabs:
+            self.tab_corr.set_estado(tabs['corriente'])
 
         # 4. Label permanente del status bar
         nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
         self._lbl_info.setText(
             f"  {nombre} EOS  |  "
             f"R = {R_GAS} psi·ft³/(lb-mol·°R)  |  13 componentes")
+
+        # 5. Navegador
+        self._actualizar_info_nav()
 
     # ── Slots del menu ─────────────────────────────────────────────
     def _menu_nuevo(self):
@@ -1233,10 +1247,13 @@ class MainWindow(QMainWindow):
         self.tab_env.set_estado({'entrada': {}, 'resultado': None})
         self.tab_sat.set_estado({'entrada': {}, 'resultado': None})
         self.tab_prop.set_estado({'entrada': {'T_R':0.0,'P_psi':0.0},'resultado':None})
+        if hasattr(self, 'tab_corr'):
+            self.tab_corr.set_estado({'entrada': {}, 'resultado': None})
         if hasattr(self, 'tab_par'):
             self.tab_par.refrescar_tabla()
         self.current_path = None
         self._actualizar_titulo()
+        self._actualizar_info_nav()
         self._lbl_info.setText(
             f"  Peng-Robinson EOS  |  "
             f"R = {R_GAS} psi·ft³/(lb-mol·°R)  |  13 componentes")
@@ -1285,23 +1302,38 @@ class MainWindow(QMainWindow):
             dialogos.error(self, f"No se pudo guardar el archivo:\n\n{ex}")
 
     def _build(self):
-        cw = QWidget(); self.setCentralWidget(cw)
-        lay = QVBoxLayout(cw)
-        lay.setContentsMargins(4,4,4,2); lay.setSpacing(2)
+        # ── Pestañas de contenido (tamaño fijo) ──────────────
+        self.tab_eq   = TabEquilibrio()
+        self.tab_env  = TabEnvolvente(get_z=self.tab_eq.get_z,
+                                      get_kij=lambda: kij_user)
+        self.tab_sat  = TabSaturacion(get_z=self.tab_eq.get_z,
+                                      get_kij=lambda: kij_user)
+        self.tab_prop = TabPropiedades(get_z=self.tab_eq.get_z,
+                                       get_kij=lambda: kij_user)
+        self.tab_corr = TabCorriente(get_z=self.tab_eq.get_z,
+                                     get_kij=lambda: kij_user)
+        self.tab_par  = TabParametros()
 
-        tabs = QTabWidget()
-        # Reemplaza la barra por defecto con una que hace scroll al hacer
-        # clic en pestañas cortadas y responde a la rueda del mouse.
-        tabs.setTabBar(ScrollableTabBar())
-        # Se mantiene el mecanismo interno de scroll (necesario para que
-        # setCurrentIndex desplace la barra) pero se ocultan las flechas
-        # con QSS (QToolButton width:0).
-        tabs.setUsesScrollButtons(True)
-        tabs.tabBar().setUsesScrollButtons(True)
-        tabs.setStyleSheet(
-            f'QTabWidget::pane {{border:1px solid {BORDER};}}'
+        # Ancho minimo uniforme del contenido: antes la ventana fija forzaba
+        # el ancho de las tablas; ahora que el contenido se centra dentro del
+        # scroll le damos un piso para que no se comprima (la pestaña de
+        # Parametros conserva su scroll horizontal interno como antes).
+        for _w in (self.tab_eq, self.tab_env, self.tab_sat,
+                   self.tab_prop, self.tab_corr, self.tab_par):
+            _w.setMinimumWidth(730)
+
+        # QTabWidget central. Cada pagina se envuelve en un QScrollArea para
+        # que el contenido conserve su tamaño fijo mientras la ventana crece
+        # o se encoge (antes la ventana entera era de tamaño fijo).
+        self.tabs = QTabWidget()
+        self.tabs.setTabBar(ScrollableTabBar())
+        self.tabs.setUsesScrollButtons(True)
+        self.tabs.tabBar().setUsesScrollButtons(True)
+        self.tabs.setIconSize(QSize(16, 16))
+        self.tabs.setStyleSheet(
+            f'QTabWidget::pane {{border:1px solid {BORDER}; background:{GRAY_LBL};}}'
             f'QTabBar::tab {{background:{GRAY_LBL};color:{TEXT};'
-            f'padding:4px 14px;border:1px solid {BORDER};border-bottom:none;'
+            f'padding:4px 12px;border:1px solid {BORDER};border-bottom:none;'
             f'margin-right:1px;font-family:"{FONT_F}";font-size:{FS}pt;}}'
             f'QTabBar::tab:selected {{background:{WHITE};'
             f'border-bottom:1px solid {WHITE};}}'
@@ -1309,32 +1341,60 @@ class MainWindow(QMainWindow):
             f'QTabBar QToolButton {{width:0px;height:0px;padding:0px;'
             f'margin:0px;border:none;image:none;}}'
         )
-        self.tab_eq  = TabEquilibrio()
-        self.tab_env = TabEnvolvente(
-            get_z=self.tab_eq.get_z,
-            get_kij=lambda: kij_user
-        )
-        self.tab_sat = TabSaturacion(
-            get_z=self.tab_eq.get_z,
-            get_kij=lambda: kij_user
-        )
-        self.tab_prop = TabPropiedades(
-            get_z=self.tab_eq.get_z,
-            get_kij=lambda: kij_user
-        )
-        self.tab_par = TabParametros()
-        tabs.addTab(self.tab_eq,   "Equilibrio de fases")
-        tabs.addTab(self.tab_env,  "Envolvente de fases")
-        tabs.addTab(self.tab_sat,  "Puntos de saturacion")
-        tabs.addTab(self.tab_prop, "Propiedades termodinamicas")
-        tabs.addTab(self.tab_par,  "Parametros de la ecuacion de estado")
-        lay.addWidget(tabs)
+        paginas = [
+            (self.tab_eq,   "Equilibrio de fases",                 "equilibrio"),
+            (self.tab_env,  "Envolvente de fases",                 "envolvente"),
+            (self.tab_sat,  "Puntos de saturación",                "saturacion"),
+            (self.tab_prop, "Propiedades termodinámicas",          "propiedades"),
+            (self.tab_corr, "Propiedades de la corriente",         "corriente"),
+            (self.tab_par,  "Parámetros de la ecuación de estado", "parametros"),
+        ]
+        for widget, titulo, ic in paginas:
+            self.tabs.addTab(self._envolver_scroll(widget),
+                             iconos.icono(ic, 16), titulo)
 
+        # ── Cinta de opciones (ribbon) ───────────────────────
+        self.ribbon, self.botones_ribbon = construir_ribbon(self._acciones_ribbon())
+
+        # ── Panel Navegador lateral ──────────────────────────
+        self.nav = NavigatorPanel()
+        self.nav.pestana_pedida.connect(self.tabs.setCurrentIndex)
+        self.nav.dato_pedido.connect(self._accion_nav)
+        self.tabs.currentChanged.connect(self.nav.sincronizar)
+        self.nav.sincronizar(0)
+
+        # ── Ensamblado central ───────────────────────────────
+        cw = QWidget(); self.setCentralWidget(cw)
+        v = QVBoxLayout(cw)
+        v.setContentsMargins(0, 0, 0, 0); v.setSpacing(0)
+        v.addWidget(self.ribbon)
+
+        split = QSplitter(Qt.Orientation.Horizontal)
+        split.addWidget(self.nav)
+        cont_tabs = QWidget()
+        cont_tabs.setStyleSheet(f'background:{GRAY_LBL};')
+        lt = QVBoxLayout(cont_tabs)
+        lt.setContentsMargins(4, 4, 4, 2); lt.setSpacing(0)
+        lt.addWidget(self.tabs)
+        split.addWidget(cont_tabs)
+        split.setStretchFactor(0, 0)
+        split.setStretchFactor(1, 1)
+        split.setChildrenCollapsible(False)
+        split.setSizes([NavigatorPanel.ANCHO, 1000])
+        split.setHandleWidth(3)
+        v.addWidget(split, 1)
+
+        # ── Barra de estado ──────────────────────────────────
         sb = QStatusBar()
         sb.setStyleSheet(
-            f'background:{GRAY_LBL};font-family:"{FONT_F}";font-size:9pt;'
+            f'background:{GRAY_LBL};font-family:"Segoe UI";font-size:9pt;'
             f'border-top:1px solid {BORDER};'
             f'QStatusBar::item {{ border:none; }}')
+        self._lbl_estado = QLabel("  Listo")
+        self._lbl_estado.setStyleSheet(
+            f'background:transparent;color:{TEXT};'
+            f'font-family:"Segoe UI";font-size:9pt;padding:0px 4px;')
+        sb.addWidget(self._lbl_estado)
         # Widget permanente para el mensaje de EOS/R/componentes. Se usa
         # addPermanentWidget (no addWidget) para que NO se oculte cuando
         # Qt muestra los tooltips temporales del hover del menu Archivo.
@@ -1343,13 +1403,131 @@ class MainWindow(QMainWindow):
             f"R = {R_GAS} psi·ft³/(lb-mol·°R)  |  13 componentes")
         self._lbl_info.setStyleSheet(
             f'background:transparent;color:{TEXT};'
-            f'font-family:"{FONT_F}";font-size:9pt;padding:0px 4px;')
-        sb.addPermanentWidget(self._lbl_info, 1)
+            f'font-family:"Segoe UI";font-size:9pt;padding:0px 8px;')
+        sb.addPermanentWidget(self._lbl_info, 0)
         self.setStatusBar(sb)
         self._sb = sb
 
         # Cablear cambio de EOS desde la pestaña Equilibrio.
         self.tab_eq.eos_changed.connect(self._on_eos_changed)
+        # Refrescar el contador de componentes del navegador al editar la
+        # composicion en la pestaña de Equilibrio.
+        self.tab_eq.tbl_comp.itemChanged.connect(
+            lambda *_: self._actualizar_info_nav())
+        self._actualizar_info_nav()
+
+    # ── Envoltura de pestañas (contenido fijo, ventana elastica) ─
+    def _envolver_scroll(self, widget):
+        """Envuelve una pestaña de tamaño fijo en un area con scroll: al
+        agrandar la ventana el contenido no se estira (queda centrado y
+        alineado arriba); al encogerla aparecen barras de scroll."""
+        cont = QWidget()
+        cont.setStyleSheet(f'background:{GRAY_LBL};')
+        h = QHBoxLayout(cont)
+        h.setContentsMargins(0, 0, 0, 0); h.setSpacing(0)
+        h.addStretch()
+        h.addWidget(widget, alignment=Qt.AlignmentFlag.AlignTop)
+        h.addStretch()
+        sc = QScrollArea()
+        sc.setWidget(cont)
+        sc.setWidgetResizable(True)
+        sc.setFrameShape(QFrame.Shape.NoFrame)
+        sc.setStyleSheet(f'QScrollArea {{ background:{GRAY_LBL}; border:none; }}')
+        return sc
+
+    # ── Acciones de la cinta ─────────────────────────────────
+    def _acciones_ribbon(self):
+        """Mapa clave -> funcion para los botones de la cinta. Los botones ya
+        funcionales apuntan a la logica existente; el resto muestran un aviso
+        de 'no implementado' (interfaz preliminar)."""
+        return {
+            'nuevo':         self._menu_nuevo,
+            'abrir':         self._menu_abrir,
+            'guardar':       self._menu_guardar,
+            'guardar_como':  self._menu_guardar_como,
+            'imprimir':      self._menu_exportar_pdf,
+            'deshacer':      lambda: self._placeholder("Deshacer"),
+            'rehacer':       lambda: self._placeholder("Rehacer"),
+            'cortar':        lambda: self._placeholder("Cortar"),
+            'copiar':        lambda: self._placeholder("Copiar"),
+            'pegar':         lambda: self._placeholder("Pegar"),
+            'fraccion':      self._ribbon_fraccion,
+            'normalizar':    self._ribbon_normalizar,
+            'ejecutar':      self._ribbon_calcular,
+            'detener':       lambda: self._placeholder("Detener"),
+            'sistema':       lambda: self._placeholder("Sistema de unidades"),
+            'conversor':     lambda: self._placeholder("Conversor de unidades"),
+            'componentes':   lambda: self._placeholder("Componentes"),
+            'fluidos':       lambda: self._placeholder("Fluidos"),
+            'mezclas':       lambda: self._placeholder("Mezclas"),
+            'tablas':        lambda: self._placeholder("Tablas"),
+            'calculadora':   lambda: self._placeholder("Calculadora"),
+            'graficas':      lambda: self.tabs.setCurrentIndex(1),
+            'opciones':      lambda: self._placeholder("Opciones"),
+            'configuracion': lambda: self._placeholder("Configuración"),
+            'ayuda':         lambda: self._placeholder("Ayuda"),
+            'acerca':        self._menu_acerca,
+        }
+
+    def _placeholder(self, nombre):
+        dialogos.info(self,
+            f"La función «{nombre}» todavía no está implementada.\n"
+            "(Interfaz preliminar.)")
+
+    def _ribbon_fraccion(self):
+        # Alterna molar/masica accionando el mismo boton de la pestaña Equilibrio.
+        self.tab_eq.btn_frac.click()
+
+    def _ribbon_normalizar(self):
+        self.tab_eq.normalizar()
+
+    def _ribbon_calcular(self):
+        """Ejecuta el calculo de la pestaña activa (si lo tiene)."""
+        botones = [
+            getattr(self.tab_eq,   'btn', None),
+            getattr(self.tab_env,  'btn', None),
+            getattr(self.tab_sat,  'btn', None),
+            getattr(self.tab_prop, 'btn', None),
+            getattr(self.tab_corr, 'btn', None),
+            None,   # Parametros no tiene calculo
+        ]
+        idx = self.tabs.currentIndex()
+        b = botones[idx] if 0 <= idx < len(botones) else None
+        if b is not None and b.isEnabled():
+            b.click()
+        else:
+            self._placeholder("Realizar cálculo")
+
+    def _accion_nav(self, clave):
+        nombres = {
+            'componentes': "Componentes", 'fluidos': "Fluidos",
+            'mezclas': "Mezclas", 'conversor': "Conversor de unidades",
+            'tablas': "Tablas", 'calculadora': "Calculadora",
+        }
+        self._placeholder(nombres.get(clave, clave))
+
+    def _menu_acerca(self):
+        dialogos.info(self,
+            "ThermoPhase 1.0\n\n"
+            "Calculadora de equilibrio de fases y propiedades termodinamicas "
+            "para mezclas de hidrocarburos (13 componentes).\n"
+            "Ecuaciones de estado: Peng-Robinson y Soave-Redlich-Kwong.")
+
+    def _actualizar_info_nav(self):
+        """Refresca el bloque 'Informacion de la base de datos' del navegador."""
+        if not hasattr(self, 'nav'):
+            return
+        if self.current_path:
+            archivo = os.path.basename(self.current_path)
+            ruta    = self.current_path
+        else:
+            archivo = "Sin título.tpsim"
+            ruta    = "—"
+        try:
+            n = sum(1 for val in self.tab_eq.get_z() if val and val > 0)
+        except Exception:
+            n = 0
+        self.nav.set_info(archivo=archivo, ruta=ruta, estado="Listo", n_comp=n)
 
     def _on_eos_changed(self, eos):
         """Propaga el cambio de ecuación de estado a todo el sistema:
@@ -1397,7 +1575,7 @@ def main():
     if _espera > 0:
         _time.sleep(_espera)
     splash.close()
-    win.show()
+    win.showMaximized()
     # Si el programa fue invocado con un .tpsim como argumento (por ejemplo
     # al hacer doble clic sobre el archivo en Windows Explorer), abrirlo
     # automaticamente despues de mostrar la ventana.
