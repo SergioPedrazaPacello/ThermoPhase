@@ -1367,16 +1367,26 @@ class MainWindow(QMainWindow):
         # (icono + cerrar), tamaño fijo, que no puede salir del area; se
         # pueden tener varias abiertas a la vez.
         self.mdi = QMdiArea()
-        self.mdi.setBackground(QBrush(QColor("#C8C8C8")))
+        self.mdi.setBackground(QBrush(QColor("#D0D0D0")))
         self.mdi.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.mdi.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.mdi.setViewMode(QMdiArea.ViewMode.SubWindowView)
         self.mdi.setOption(
             QMdiArea.AreaOption.DontMaximizeSubWindowOnActivation, True)
-        # Sin QSS sobre QMdiSubWindow: la subventana usa la decoracion nativa
-        # de Windows (barra de titulo con icono y boton de cerrar).
-        self.mdi.setStyleSheet('QMdiArea { background:#C8C8C8; }')
+        # Barra de titulo clara (como la ventana principal) con el logo de
+        # ThermoPhase. Borde sutil alrededor de la subventana.
+        self.mdi.setStyleSheet(
+            'QMdiArea { background:#D0D0D0; }'
+            'QMdiSubWindow { background:#E6E6E6; border:1px solid #B4B4B4; }'
+            f'QMdiSubWindow::title {{ background:#F2F2F2; color:#000000;'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; height:24px;'
+            f' padding-left:2px; }}')
         self.mdi.subWindowActivated.connect(self._on_sub_activada)
+
+        # Logo de ThermoPhase para las subventanas (mismo que la app).
+        _logo_path = ruta_recurso('thermophase.ico')
+        self._logo = (QIcon(_logo_path) if os.path.exists(_logo_path)
+                      else iconos.icono('equilibrio', 16))
 
         # ── Ensamblado central ───────────────────────────────
         cw = QWidget(); self.setCentralWidget(cw)
@@ -1385,37 +1395,34 @@ class MainWindow(QMainWindow):
         v.setContentsMargins(0, 0, 0, 0); v.setSpacing(0)
         v.addWidget(self.ribbon)
 
-        # Divisor con borde grabado entre el navegador y el area de calculo.
+        # Divisor delgado y sutil entre el navegador y el area de calculo.
         split = QSplitter(Qt.Orientation.Horizontal)
         split.setStyleSheet(
             'QSplitter { background:#D4D4D4; }'
-            'QSplitter::handle { background:#808080;'
-            ' border-left:1px solid #FFFFFF; border-right:1px solid #606060; }')
+            'QSplitter::handle { background:#C4C4C4; }')
         split.addWidget(self.nav)
         split.addWidget(self.mdi)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setChildrenCollapsible(False)
         split.setSizes([NavigatorPanel.ANCHO, 1100])
-        split.setHandleWidth(4)
+        split.setHandleWidth(1)
         v.addWidget(split, 1)
 
-        # ── Barra de estado (paneles hundidos clasicos) ──────
+        # ── Barra de estado (plana, sutil) ───────────────────
         sb = QStatusBar()
-        sb.setSizeGripEnabled(True)
+        sb.setSizeGripEnabled(False)
         sb.setStyleSheet(
             f'QStatusBar {{ background:#D4D4D4; font-family:"{FONT_F}";'
-            f' font-size:9pt; border-top:1px solid #FFFFFF; }}'
+            f' font-size:9pt; border-top:1px solid #C4C4C4; }}'
             f'QStatusBar::item {{ border:none; }}')
         def _panel(txt, ancho=None):
             l = QLabel(txt)
             if ancho:
                 l.setFixedWidth(ancho)
             l.setStyleSheet(
-                f'QLabel {{ background:#D4D4D4; color:{TEXT};'
-                f' font-family:"{FONT_F}"; font-size:9pt; padding:1px 6px;'
-                f' border-top:1px solid #A8A8A8; border-left:1px solid #A8A8A8;'
-                f' border-right:1px solid #FFFFFF; border-bottom:1px solid #FFFFFF; }}')
+                f'QLabel {{ background:transparent; color:{TEXT};'
+                f' font-family:"{FONT_F}"; font-size:9pt; padding:1px 8px; }}')
             return l
         self._lbl_estado = _panel("Listo")
         sb.addWidget(self._lbl_estado, 1)
@@ -1482,11 +1489,11 @@ class MainWindow(QMainWindow):
         sw = self._subventanas.get(clave)
         if sw is None:
             widget, titulo, ic = self._defs_calc[clave]
-            # Contenedor con el fondo ORIGINAL del contenido (evita que se
-            # vea mas oscuro que antes) + scroll para alturas grandes.
+            # Contenedor con fondo gris tenue y bajo + scroll para alturas
+            # grandes.
             cont = QWidget()
             cont.setAutoFillBackground(True)
-            cont.setStyleSheet(f'background:{GRAY_LBL};')
+            cont.setStyleSheet('background:#E6E6E6;')
             lc = QVBoxLayout(cont)
             lc.setContentsMargins(0, 0, 0, 0); lc.setSpacing(0)
             lc.addWidget(widget)
@@ -1494,20 +1501,21 @@ class MainWindow(QMainWindow):
             sc.setWidget(cont)
             sc.setWidgetResizable(True)
             sc.setFrameShape(QFrame.Shape.NoFrame)
-            sc.setStyleSheet(f'QScrollArea {{ background:{GRAY_LBL}; border:none; }}')
-            sc.viewport().setStyleSheet(f'background:{GRAY_LBL};')
-            # _SubVentana con decoracion NATIVA de Windows (icono + titulo +
-            # botones min/cerrar). No se restringen los flags para conservar
-            # el encabezado por defecto; el tamaño fijo desactiva "maximizar".
+            sc.setStyleSheet('QScrollArea { background:#E6E6E6; border:none; }')
+            sc.viewport().setStyleSheet('background:#E6E6E6;')
+            # _SubVentana con barra de titulo clara (estilo ventana principal)
+            # y el logo de ThermoPhase.
             sw = _SubVentana()
             sw.setWidget(sc)
             sw.setWindowTitle(titulo)
-            sw.setWindowIcon(iconos.icono(ic, 16))
+            sw.setWindowIcon(self._logo)
             sw.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-            hint = widget.sizeHint()
-            ancho = max(hint.width() + 16, 742)
-            alto  = min(max(hint.height() + 44, 420), 858)
-            sw.setFixedSize(ancho, alto)
+            # Todas las subventanas comparten el tamaño de "Equilibrio de fases".
+            if not hasattr(self, '_tam_sub'):
+                h = self.tab_eq.sizeHint()
+                self._tam_sub = (max(h.width() + 16, 742),
+                                 min(max(h.height() + 60, 500), 900))
+            sw.setFixedSize(self._tam_sub[0], self._tam_sub[1])
             sw._clave = clave
             self._subventanas[clave] = sw
         if sw not in self.mdi.subWindowList():

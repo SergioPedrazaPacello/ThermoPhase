@@ -122,13 +122,11 @@ def _seccion(texto):
     lbl = QLabel(texto)
     lbl.setStyleSheet(
         f'background:transparent; color:{HDR_TXT};'
-        f' font-family:"{FUENTE_UI}"; font-size:10pt; font-weight:bold;')
+        f' font-family:"{FUENTE_UI}"; font-size:10pt;')
     v.addWidget(lbl)
     linea = QFrame()
-    linea.setFixedHeight(2)
-    linea.setStyleSheet(
-        f'background:{CARA}; border-top:1px solid {SOMBRA};'
-        f' border-bottom:1px solid {LUZ};')
+    linea.setFixedHeight(1)
+    linea.setStyleSheet('background:#C4C4C4; border:none;')
     v.addWidget(linea)
     return cont
 
@@ -142,11 +140,10 @@ def _tree_base():
     t.setStyleSheet(
         f'QTreeWidget {{ background:#FFFFFF; color:{TXT};'
         f' font-family:"{FUENTE_UI}"; font-size:10pt; outline:0;'
-        f' border-top:1px solid {SOMBRA}; border-left:1px solid {SOMBRA};'
-        f' border-right:1px solid {LUZ}; border-bottom:1px solid {LUZ}; }}'
+        f' border:1px solid #C4C4C4; }}'
         f'QTreeWidget::item {{ height:22px; padding-left:2px; }}'
-        f'QTreeWidget::item:selected {{ background:{SEL_BG}; color:{SEL_TXT}; }}'
-        f'QTreeWidget::item:hover {{ background:#E0E0EC; }}')
+        f'QTreeWidget::item:selected {{ background:#DCDCDC; color:{TXT}; }}'
+        f'QTreeWidget::item:hover {{ background:#EDEDED; }}')
     return t
 
 
@@ -172,31 +169,19 @@ class NavigatorPanel(QWidget):
         outer.setContentsMargins(2, 2, 2, 2)
         outer.setSpacing(2)
 
-        # Barra de titulo del panel (docked)
+        # Barra de titulo del panel (plana, sin relieve ni boton X)
         cap = QFrame()
         cap.setFixedHeight(20)
         cap.setStyleSheet(
-            f'QFrame {{ background:{CARA};'
-            f' border-top:1px solid {LUZ}; border-left:1px solid {LUZ};'
-            f' border-right:1px solid {SOMBRA}; border-bottom:1px solid {SOMBRA}; }}')
+            f'QFrame {{ background:{CARA}; border:none;'
+            f' border-bottom:1px solid #C4C4C4; }}')
         hc = QHBoxLayout(cap)
         hc.setContentsMargins(5, 0, 2, 0); hc.setSpacing(0)
         tit = QLabel("Navegador")
         tit.setStyleSheet(
             f'background:transparent; color:{TXT};'
-            f' font-family:"{FUENTE_UI}"; font-size:10pt; font-weight:bold;')
+            f' font-family:"{FUENTE_UI}"; font-size:10pt;')
         hc.addWidget(tit); hc.addStretch()
-        from PyQt6.QtWidgets import QToolButton
-        x = QToolButton()
-        x.setText("✕")
-        x.setFixedSize(16, 16)
-        x.setStyleSheet(
-            f'QToolButton {{ background:{CARA}; color:{TXT};'
-            f' font-family:"{FUENTE_UI}"; font-size:8pt; border:1px solid {SOMBRA}; }}'
-            f'QToolButton:hover {{ background:#E4E4E4; }}')
-        x.setCursor(Qt.CursorShape.PointingHandCursor)
-        x.clicked.connect(self.cerrar_pedido.emit)
-        hc.addWidget(x)
         outer.addWidget(cap)
 
         cont = QWidget()
@@ -211,7 +196,6 @@ class NavigatorPanel(QWidget):
         self.tree_calc.setRootIsDecorated(True)
         raiz = QTreeWidgetItem(["Cálculos"])
         raiz.setFlags(raiz.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-        f = raiz.font(0); f.setBold(True); raiz.setFont(0, f)
         self.tree_calc.addTopLevelItem(raiz)
         for clave, texto in NAV_CALCULOS:
             it = QTreeWidgetItem([texto])
