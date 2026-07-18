@@ -29,8 +29,8 @@ SOMBRA     = "#A8A8A8"
 SOMBRA_OSC = "#8A8A8A"
 BORDE      = "#A8A8A8"
 TXT        = "#000000"
-SEL_BG     = "#000080"
-SEL_TXT    = "#FFFFFF"
+SEL_BG     = "#DCDCDC"
+SEL_TXT    = "#000000"
 HDR_TXT    = "#000000"
 
 # ── Selectores globales de la barra: (clave, etiqueta, items) ─
@@ -140,7 +140,7 @@ def _tree_base():
     t.setStyleSheet(
         f'QTreeWidget {{ background:#FFFFFF; color:{TXT};'
         f' font-family:"{FUENTE_UI}"; font-size:10pt; outline:0;'
-        f' border:1px solid #C4C4C4; }}'
+        f' border:1px solid #7F7F7F; }}'
         f'QTreeWidget::item {{ height:22px; padding-left:2px; }}'
         f'QTreeWidget::item:selected {{ background:#DCDCDC; color:{TXT}; }}'
         f'QTreeWidget::item:hover {{ background:#EDEDED; }}')

@@ -52,7 +52,7 @@ COMBO_STYLE = (
     f' color:{TEXT}; font-family:"{FONT_F}"; font-size:{FS}pt; padding:1px 4px; }}'
     f'QComboBox:on {{ border:2px inset #555555; }}'
     f'QAbstractItemView {{ background:{WHITE}; border:1px solid #000000;'
-    f' color:{TEXT}; selection-background-color:#000080; selection-color:#FFFFFF;'
+    f' color:{TEXT}; selection-background-color:#DCDCDC; selection-color:#000000;'
     f' outline:0; font-family:"{FONT_F}"; font-size:{FS}pt; }}'
     f'QAbstractItemView::item {{ min-height:18px; padding:1px 6px; }}'
 )
@@ -1367,23 +1367,20 @@ class MainWindow(QMainWindow):
         # (icono + cerrar), tamaño fijo, que no puede salir del area; se
         # pueden tener varias abiertas a la vez.
         self.mdi = QMdiArea()
-        self.mdi.setBackground(QBrush(QColor("#D0D0D0")))
+        self.mdi.setBackground(QBrush(QColor("#FFFFFF")))
         self.mdi.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.mdi.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.mdi.setViewMode(QMdiArea.ViewMode.SubWindowView)
         self.mdi.setOption(
             QMdiArea.AreaOption.DontMaximizeSubWindowOnActivation, True)
-        # Barra de titulo clara (como la ventana principal) con el logo de
-        # ThermoPhase. Borde sutil alrededor de la subventana.
+        # Area de simulacion BLANCA. Las subventanas van SIN barra de titulo
+        # (frameless) y con un borde gris #7F7F7F alrededor de toda la ventana.
         self.mdi.setStyleSheet(
-            'QMdiArea { background:#D0D0D0; }'
-            'QMdiSubWindow { background:#E6E6E6; border:1px solid #B4B4B4; }'
-            f'QMdiSubWindow::title {{ background:#F2F2F2; color:#000000;'
-            f' font-family:"{FONT_F}"; font-size:{FS}pt; height:24px;'
-            f' padding-left:2px; }}')
+            'QMdiArea { background:#FFFFFF; }'
+            'QMdiSubWindow { background:#E6E6E6; border:1px solid #7F7F7F; }')
         self.mdi.subWindowActivated.connect(self._on_sub_activada)
 
-        # Logo de ThermoPhase para las subventanas (mismo que la app).
+        # Logo de ThermoPhase (por si se necesita en otros contextos).
         _logo_path = ruta_recurso('thermophase.ico')
         self._logo = (QIcon(_logo_path) if os.path.exists(_logo_path)
                       else iconos.icono('equilibrio', 16))
@@ -1395,18 +1392,18 @@ class MainWindow(QMainWindow):
         v.setContentsMargins(0, 0, 0, 0); v.setSpacing(0)
         v.addWidget(self.ribbon)
 
-        # Divisor delgado y sutil entre el navegador y el area de calculo.
+        # Divisor gris oscuro #7F7F7F entre el navegador y el area de calculo.
         split = QSplitter(Qt.Orientation.Horizontal)
         split.setStyleSheet(
             'QSplitter { background:#D4D4D4; }'
-            'QSplitter::handle { background:#C4C4C4; }')
+            'QSplitter::handle { background:#7F7F7F; }')
         split.addWidget(self.nav)
         split.addWidget(self.mdi)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setChildrenCollapsible(False)
         split.setSizes([NavigatorPanel.ANCHO, 1100])
-        split.setHandleWidth(1)
+        split.setHandleWidth(2)
         v.addWidget(split, 1)
 
         # ── Barra de estado (plana, sutil) ───────────────────
@@ -1503,12 +1500,14 @@ class MainWindow(QMainWindow):
             sc.setFrameShape(QFrame.Shape.NoFrame)
             sc.setStyleSheet('QScrollArea { background:#E6E6E6; border:none; }')
             sc.viewport().setStyleSheet('background:#E6E6E6;')
-            # _SubVentana con barra de titulo clara (estilo ventana principal)
-            # y el logo de ThermoPhase.
+            # _SubVentana SIN barra de titulo (frameless): solo el contenido
+            # con el borde gris #7F7F7F alrededor de toda la ventana.
             sw = _SubVentana()
             sw.setWidget(sc)
             sw.setWindowTitle(titulo)
             sw.setWindowIcon(self._logo)
+            sw.setWindowFlags(Qt.WindowType.FramelessWindowHint
+                              | Qt.WindowType.SubWindow)
             sw.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
             # Todas las subventanas comparten el tamaño de "Equilibrio de fases".
             if not hasattr(self, '_tam_sub'):

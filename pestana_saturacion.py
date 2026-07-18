@@ -25,7 +25,7 @@ COMBO_STYLE = (
     f' color:{TEXT}; font-family:"{FONT_F}"; font-size:{FS}pt; padding:1px 4px; }}'
     f'QComboBox:on {{ border:2px inset #555555; }}'
     f'QAbstractItemView {{ background:{WHITE}; border:1px solid #000000;'
-    f' color:{TEXT}; selection-background-color:#000080; selection-color:#FFFFFF;'
+    f' color:{TEXT}; selection-background-color:#DCDCDC; selection-color:#000000;'
     f' outline:0; font-family:"{FONT_F}"; font-size:{FS}pt; }}'
     f'QAbstractItemView::item {{ min-height:22px; padding:1px 6px; }}'
 )
