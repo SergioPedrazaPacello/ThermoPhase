@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 )
 import matplotlib
 matplotlib.use('QtAgg')
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QEvent
 from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QKeySequence
 
 from eos import (
@@ -74,6 +74,12 @@ def _aplicar_estilo_combo(combo):
     combo._vstyle = QStyleFactory.create("Fusion")
     combo.view().setStyle(combo._vstyle)
     combo.view().setUniformItemSizes(True)   # todas las filas con la misma altura
+    # Forzar resaltado gris (la vista usa la paleta para el highlight).
+    from PyQt6.QtGui import QPalette, QColor
+    _pal = combo.view().palette()
+    _pal.setColor(QPalette.ColorRole.Highlight, QColor("#DCDCDC"))
+    _pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#000000"))
+    combo.view().setPalette(_pal)
     combo.setStyleSheet(COMBO_STYLE)
     combo.view().setStyleSheet(COMBO_STYLE)
 # Modelo 2 — Plomo IBM / monocromo
@@ -228,6 +234,9 @@ class TabEquilibrio(QWidget):
         root = QVBoxLayout(box)
         root.setContentsMargins(0, 8, 0, 8)
         root.setSpacing(4)
+
+        # ── ENCABEZADO (parte alta de la ventana) ─────────────
+        root.addWidget(title_label("ThermoPhase — Equilibrio de Fases"))
 
         # ── Fila entradas P/T + checkbox + botón ─────────────
         top = QHBoxLayout()
@@ -400,9 +409,6 @@ class TabEquilibrio(QWidget):
 
         top.addLayout(rp)
         root.addLayout(top)
-
-        # ── TÍTULO principal ──────────────────────────────────
-        root.addWidget(title_label("ThermoPhase — Equilibrio de Fases"))
 
         # ── BLOQUE RESUMEN ────────────────────────────────────
         # Título de sección
@@ -1018,12 +1024,67 @@ class PdfWorker(QThread):
 
 
 class _SubVentana(QMdiSubWindow):
-    """Subventana MDI que, al cerrarse, se OCULTA en vez de destruirse. Asi,
-    al volver a abrirla desde el navegador, reaparece con su contenido y su
-    estado intactos (no queda en gris/vacia)."""
+    """Subventana MDI SIN barra de titulo (frameless). Se arrastra tomandola
+    de la franja superior (donde va el encabezado "ThermoPhase — ..."). Al
+    cerrarse se OCULTA (no se destruye) para conservar contenido y estado."""
+
+    ALTO_ARRASTRE = 30      # franja superior arrastrable, en px
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._arrastrando = False
+        self._press_global = None
+        self._pos_inicial = None
+
     def closeEvent(self, ev):
         ev.ignore()
         self.hide()
+
+    def instalar_arrastre(self):
+        """Instala el filtro en el contenido para detectar el press del
+        arrastre aunque ocurra sobre un hijo (p.ej. la etiqueta del titulo)."""
+        for w in self.findChildren(QWidget):
+            w.installEventFilter(self)
+
+    def _en_franja(self, gp):
+        y = self.mapFromGlobal(gp).y()
+        return 0 <= y <= self.ALTO_ARRASTRE
+
+    def _iniciar(self, gp):
+        self._arrastrando = True
+        self._press_global = gp
+        self._pos_inicial = self.pos()
+        self.grabMouse()
+
+    def eventFilter(self, obj, ev):
+        if (ev.type() == QEvent.Type.MouseButtonPress
+                and ev.button() == Qt.MouseButton.LeftButton
+                and self._en_franja(ev.globalPosition().toPoint())):
+            self._iniciar(ev.globalPosition().toPoint())
+            return True
+        return super().eventFilter(obj, ev)
+
+    def mousePressEvent(self, ev):
+        if (ev.button() == Qt.MouseButton.LeftButton
+                and self._en_franja(ev.globalPosition().toPoint())):
+            self._iniciar(ev.globalPosition().toPoint())
+            ev.accept(); return
+        super().mousePressEvent(ev)
+
+    def mouseMoveEvent(self, ev):
+        if self._arrastrando:
+            delta = ev.globalPosition().toPoint() - self._press_global
+            nueva = self._pos_inicial + delta
+            self.move(max(0, nueva.x()), max(0, nueva.y()))
+            ev.accept(); return
+        super().mouseMoveEvent(ev)
+
+    def mouseReleaseEvent(self, ev):
+        if self._arrastrando and ev.button() == Qt.MouseButton.LeftButton:
+            self._arrastrando = False
+            self.releaseMouse()
+            ev.accept(); return
+        super().mouseReleaseEvent(ev)
 
 
 class MainWindow(QMainWindow):
@@ -1043,23 +1104,23 @@ class MainWindow(QMainWindow):
     def _construir_menu(self):
         """Barra de menu clasica (Win95): Archivo, Editar, Ver, Herramientas,
         Exportar, Ventana, Ayuda."""
-        CARA = "#C0C0C0"; LUZ = "#FFFFFF"; SOMBRA = "#808080"
+        CARA = "#D4D4D4"
         menubar = self.menuBar()
         menubar.setStyleSheet(
             f'QMenuBar {{ background:{CARA}; color:#000000;'
             f'  font-family:"{FONT_F}"; font-size:{FS}pt;'
-            f'  border-bottom:1px solid {SOMBRA}; }}'
+            f'  border-bottom:1px solid #7F7F7F; }}'
             f'QMenuBar::item {{ padding:3px 9px; background:transparent; }}'
-            f'QMenuBar::item:selected {{ background:#000080; color:#FFFFFF; }}'
+            f'QMenuBar::item:selected {{ background:#DCDCDC; color:#000000; }}'
+            f'QMenuBar::item:pressed {{ background:#DCDCDC; color:#000000; }}'
             f'QMenu {{ background:{CARA}; color:#000000;'
-            f'  border-top:1px solid {LUZ}; border-left:1px solid {LUZ};'
-            f'  border-right:1px solid #404040; border-bottom:1px solid #404040;'
+            f'  border:1px solid #7F7F7F;'
             f'  font-family:"{FONT_F}"; font-size:{FS}pt; }}'
             f'QMenu::item {{ padding:3px 24px 3px 20px; }}'
-            f'QMenu::item:selected {{ background:#000080; color:#FFFFFF; }}'
-            f'QMenu::item:disabled {{ color:{SOMBRA}; }}'
-            f'QMenu::separator {{ height:2px; margin:2px 3px;'
-            f'  border-top:1px solid {SOMBRA}; border-bottom:1px solid {LUZ}; }}')
+            f'QMenu::item:selected {{ background:#DCDCDC; color:#000000; }}'
+            f'QMenu::item:disabled {{ color:#909090; }}'
+            f'QMenu::separator {{ height:1px; margin:3px 4px;'
+            f'  background:#BFBFBF; }}')
 
         def _act(texto, slot, atajo=None):
             a = QAction(texto, self)
@@ -1508,14 +1569,14 @@ class MainWindow(QMainWindow):
             sw.setWindowIcon(self._logo)
             sw.setWindowFlags(Qt.WindowType.FramelessWindowHint
                               | Qt.WindowType.SubWindow)
-            sw.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-            # Todas las subventanas comparten el tamaño de "Equilibrio de fases".
+            sw._clave = clave
+            # Todas las subventanas comparten el tamaño de "Equilibrio de fases",
+            # ajustado al contenido (sin espacio vacio sobrante).
             if not hasattr(self, '_tam_sub'):
                 h = self.tab_eq.sizeHint()
-                self._tam_sub = (max(h.width() + 16, 742),
-                                 min(max(h.height() + 60, 500), 900))
+                self._tam_sub = (h.width() + 6, h.height() + 6)
             sw.setFixedSize(self._tam_sub[0], self._tam_sub[1])
-            sw._clave = clave
+            sw.instalar_arrastre()
             self._subventanas[clave] = sw
         if sw not in self.mdi.subWindowList():
             self.mdi.addSubWindow(sw)

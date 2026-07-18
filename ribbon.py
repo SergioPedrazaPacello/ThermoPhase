@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QTreeWidget, QTreeWidgetItem, QAbstractItemView, QListView
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPalette, QColor
 
 from iconos import icono
 
@@ -95,7 +96,18 @@ def construir_ribbon(acciones=None):
         lay.addWidget(_lbl(etiqueta))
         cmb = QComboBox()
         cmb.addItems(items)
-        cmb.setView(QListView())
+        vista = QListView()
+        # Forzar el color de resaltado de la LISTA a gris (el QListView usa la
+        # paleta, no el QSS, para el highlight de la seleccion).
+        pal = vista.palette()
+        pal.setColor(QPalette.ColorRole.Highlight, QColor("#DCDCDC"))
+        pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#000000"))
+        vista.setPalette(pal)
+        vista.setStyleSheet(
+            'QListView { background:#FFFFFF; color:#000000; outline:0; }'
+            'QListView::item:selected { background:#DCDCDC; color:#000000; }'
+            'QListView::item:hover { background:#ECECEC; color:#000000; }')
+        cmb.setView(vista)
         cmb.setStyleSheet(_COMBO_QSS)
         cmb.setFixedWidth(148)
         cmb.setCursor(Qt.CursorShape.PointingHandCursor)
