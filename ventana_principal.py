@@ -212,10 +212,11 @@ class TabEquilibrio(QWidget):
     # encarga de propagar el cambio al motor y al resto de pestañas.
     eos_changed = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, kij_get=None):
         super().__init__()
         self.worker      = None
         self.last_result = None
+        self._kij_get    = kij_get   # None -> kij global; callable -> kij propio
         self._build()
 
     def _build(self):
@@ -674,7 +675,8 @@ class TabEquilibrio(QWidget):
         self.btn.setEnabled(False); self.btn.setText("Calculando...")
         # Cada ventana de Equilibrio usa la EOS de su propio combo.
         _set_eos('SRK' if self.cmb_eos.currentText() == 'SRK' else 'PR')
-        self.worker = Worker(z, self.get_T(), self.get_P(), kij_user,
+        kij = self._kij_get() if self._kij_get is not None else kij_user
+        self.worker = Worker(z, self.get_T(), self.get_P(), kij,
                              metodo_densidad=self.cmb_dens.currentText())
         self.worker.done.connect(self._on_result)
         self.worker.error.connect(self._on_error)
@@ -790,9 +792,31 @@ class TabEquilibrio(QWidget):
 # Tab 2 — Parámetros EOS
 # ══════════════════════════════════════════════════════════════
 class TabParametros(QWidget):
-    def __init__(self):
+    def __init__(self, objetivo=None):
+        # objetivo=None -> edita el kij global; objetivo=dict fluido -> edita
+        # el kij independiente de ese fluido (objetivo['kij']).
         super().__init__()
+        self._objetivo = objetivo
+        self._WK = 65
         self._build()
+
+    def _kij(self):
+        """Matriz kij que edita esta tabla (global o la del fluido)."""
+        if self._objetivo is not None:
+            return self._objetivo['kij']
+        return kij_user
+
+    def _eos_ctx(self):
+        if self._objetivo is not None:
+            return self._objetivo.get('eos', 'PR')
+        return _eng.get_eos()
+
+    def tam_ideal(self):
+        """Tamaño (ancho, alto) que hace entrar todo el contenido justo, sin
+        scrollbars ni espacio sobrante."""
+        ancho = (NC + 1) * self._WK + 22      # cols kij + borde + margenes
+        alto = 8 + 22 + 3 + 309 + 3 + 22 + 3 + 310 + 3 + 30
+        return (ancho, alto)
 
     def _build(self):
         outer = QVBoxLayout(self)
@@ -866,7 +890,7 @@ class TabParametros(QWidget):
             self.tbl_k.setItem(r,0, cell(COMPONENTES[i], bg=GRAY_LBL,
                 align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
             for j in range(NC):
-                v = kij_user[i][j]
+                v = self._kij()[i][j]
                 if i == j:
                     it = cell(f"{v:.5f}", bg=GRAY_LBL,
                         color=TEXT_DIM, align=Qt.AlignmentFlag.AlignCenter)
@@ -906,8 +930,9 @@ class TabParametros(QWidget):
         if i == j: return
         try:
             v = float(item.text())
-            kij_user[i][j] = v
-            kij_user[j][i] = v
+            m = self._kij()
+            m[i][j] = v
+            m[j][i] = v
             self.tbl_k.blockSignals(True)
             sym = self.tbl_k.item(j+1, i+1)  # +1 por fila de cabecera
             if sym: sym.setText(f"{v:.5f}")
@@ -917,22 +942,27 @@ class TabParametros(QWidget):
         except: pass
 
     def refrescar_tabla(self):
-        """Refresca la tabla visible desde la variable global kij_user
-        (sin diálogo). La usa MainWindow cuando cambia la EOS activa."""
+        """Refresca la tabla visible desde la matriz kij correspondiente
+        (global o la del fluido). Sin diálogo."""
+        m = self._kij()
         self.tbl_k.blockSignals(True)
         for i in range(NC):
             for j in range(NC):
                 it = self.tbl_k.item(i+1, j+1)  # +1 por fila de cabecera
                 if it and i != j:
-                    it.setText(f"{kij_user[i][j]:.5f}")
+                    it.setText(f"{m[i][j]:.5f}")
         self.tbl_k.blockSignals(False)
 
     def _reset(self):
-        # Restaura al default de la EOS activa (PR o SRK).
-        global kij_user
-        import eos as _eng
-        base = _eng.KIJ_DEFAULT_SRK if _eng.get_eos() == 'SRK' else _eng.KIJ_DEFAULT_PR
-        kij_user = copy.deepcopy(base)
+        # Restaura al default de la EOS del contexto (global o del fluido).
+        base = (_eng.KIJ_DEFAULT_SRK if self._eos_ctx() == 'SRK'
+                else _eng.KIJ_DEFAULT_PR)
+        nuevo = copy.deepcopy(base)
+        if self._objetivo is not None:
+            self._objetivo['kij'] = nuevo
+        else:
+            global kij_user
+            kij_user = nuevo
         self.refrescar_tabla()
         dialogos.info(self, "Coeficientes restaurados.")
 
@@ -1092,7 +1122,7 @@ class TabFluidos(QWidget):
         self.tbl = make_table(NC + 1, 2)
         self.tbl.setColumnWidth(0, W_COMP); self.tbl.setColumnWidth(1, W_VAL)
         for i in range(NC):
-            self.tbl.setItem(i, 0, cell(f"{NOMBRES[i]}:", bg=GRAY_LBL))
+            self.tbl.setItem(i, 0, cell(NOMBRES[i], bg=GRAY_LBL))
             self.tbl.setItem(i, 1, cell("", bg=WHITE, editable=True))
         self.tbl.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_LBL))
         self.tbl.setItem(NC, 1, cell("", bg=WHITE))
@@ -1185,14 +1215,15 @@ class TabFluidos(QWidget):
 
     def _nuevo(self):
         self.fluidos.append({'nombre': self._nombre_nuevo(), 'z': [0.0] * NC,
-                             'eos': 'PR'})
+                             'eos': 'PR', 'kij': copy.deepcopy(KIJ_DEFAULT)})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
     def _capturar(self):
         z = list(self._get_z_actual())
         self.fluidos.append({'nombre': self._nombre_nuevo("Cromatografia"),
-                             'z': z, 'eos': 'PR'})
+                             'z': z, 'eos': 'PR',
+                             'kij': copy.deepcopy(KIJ_DEFAULT)})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
@@ -1499,9 +1530,13 @@ class MainWindow(QMainWindow):
         self.fluidos.clear()
         for f in (doc.get('fluidos') or []):
             try:
-                self.fluidos.append({'nombre': str(f.get('nombre', 'Fluido')),
-                                     'z': [float(v) for v in f.get('z', [])],
-                                     'eos': 'SRK' if f.get('eos') == 'SRK' else 'PR'})
+                fl = {'nombre': str(f.get('nombre', 'Fluido')),
+                      'z': [float(v) for v in f.get('z', [])],
+                      'eos': 'SRK' if f.get('eos') == 'SRK' else 'PR'}
+                kij = f.get('kij')
+                fl['kij'] = ([[float(v) for v in fila] for fila in kij]
+                             if kij else copy.deepcopy(KIJ_DEFAULT))
+                self.fluidos.append(fl)
             except Exception:
                 pass
         if hasattr(self, '_tab_fluidos'):
@@ -1809,7 +1844,10 @@ class MainWindow(QMainWindow):
             # Propiedades termodinamicas usa siempre PR; el resto, la EOS
             # principal (barra / Equilibrio principal).
             prov = (lambda: 'PR') if clave == 'propiedades' else self._eos_main_code
-            sw = self._montar_subventana(clave, widget, titulo, eos_provider=prov)
+            # Parametros tiene su propio tamaño (para que entre todo justo).
+            tam = widget.tam_ideal() if clave == 'parametros' else None
+            sw = self._montar_subventana(clave, widget, titulo, tam=tam,
+                                         eos_provider=prov)
         self._mostrar_subventana(sw)
 
     def _abrir_fluidos(self):
@@ -1858,6 +1896,7 @@ class MainWindow(QMainWindow):
         if clave not in etiquetas:
             return
         fluido.setdefault('eos', 'PR')
+        fluido.setdefault('kij', copy.deepcopy(KIJ_DEFAULT))
         subclave = f"{clave}@{fluido['nombre']}"
         sw = self._subventanas.get(subclave)
         if sw is None:
@@ -1868,7 +1907,9 @@ class MainWindow(QMainWindow):
             # Pie con la EOS del fluido (Propiedades siempre PR).
             prov = ((lambda: 'PR') if clave == 'propiedades'
                     else (lambda f=fluido: f.get('eos', 'PR')))
-            sw = self._montar_subventana(subclave, widget, titulo, eos_provider=prov)
+            tam = widget.tam_ideal() if clave == 'parametros' else None
+            sw = self._montar_subventana(subclave, widget, titulo,
+                                         tam=tam, eos_provider=prov)
         self._mostrar_subventana(sw)
 
     def _getz_fluido(self, fluido):
@@ -1878,21 +1919,23 @@ class MainWindow(QMainWindow):
         return list(fluido['z'])
 
     def _crear_widget_fluido(self, clave, fluido):
-        """Construye el widget de calculo ligado a la composicion del fluido."""
+        """Construye el widget de calculo ligado a la composicion y kij del
+        fluido."""
         gz = lambda f=fluido: self._getz_fluido(f)
+        gk = lambda f=fluido: f['kij']
         if clave == 'envolvente':
-            return TabEnvolvente(get_z=gz, get_kij=lambda: kij_user)
+            return TabEnvolvente(get_z=gz, get_kij=gk)
         if clave == 'saturacion':
-            return TabSaturacion(get_z=gz, get_kij=lambda: kij_user)
+            return TabSaturacion(get_z=gz, get_kij=gk)
         if clave == 'propiedades':
-            return TabPropiedades(get_z=gz, get_kij=lambda: kij_user)
+            return TabPropiedades(get_z=gz, get_kij=gk)
         if clave == 'parametros':
-            # Parametros de la EOS (kij / criticos): globales.
-            return TabParametros()
+            # Parametros (kij / criticos) INDEPENDIENTES del fluido.
+            return TabParametros(objetivo=fluido)
         if clave == 'equilibrio':
             # Equilibrio propio del fluido: su combo EOS define la EOS del
-            # fluido (afecta a su envolvente y demas ventanas).
-            w = TabEquilibrio()
+            # fluido y usa el kij del fluido.
+            w = TabEquilibrio(kij_get=gk)
             w.set_z(fluido['z'])
             w.cmb_eos.blockSignals(True)
             w.cmb_eos.setCurrentIndex(1 if fluido.get('eos') == 'SRK' else 0)
@@ -1905,8 +1948,17 @@ class MainWindow(QMainWindow):
 
     def _on_fluido_eos(self, fluido, w):
         """La EOS del combo de la ventana de Equilibrio del fluido pasa a ser
-        la EOS del fluido; se refrescan los pies de sus ventanas."""
+        la EOS del fluido; su kij se reinicia al default de esa EOS y se
+        refrescan los pies y la ventana de Parametros del fluido si esta abierta."""
         fluido['eos'] = 'SRK' if w.cmb_eos.currentText() == 'SRK' else 'PR'
+        base = (_eng.KIJ_DEFAULT_SRK if fluido['eos'] == 'SRK'
+                else _eng.KIJ_DEFAULT_PR)
+        fluido['kij'] = copy.deepcopy(base)
+        par = self._subventanas.get(f"parametros@{fluido['nombre']}")
+        if par is not None and hasattr(par, 'widget'):
+            # refrescar la tabla de Parametros del fluido si esta abierta
+            for tp in par.findChildren(TabParametros):
+                tp.refrescar_tabla()
         self._refrescar_pies()
 
     def _cascada(self, sw=None):
