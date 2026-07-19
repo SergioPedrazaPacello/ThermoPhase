@@ -19,8 +19,9 @@ from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QKeySequence
 
 from eos import (
     COMPONENTES, NOMBRES, PM, TC, PC, OMEGA, KIJ_DEFAULT, NC,
-    calcular, R_GAS
+    calcular, R_GAS, set_eos as _set_eos, get_eos as _get_eos
 )
+import eos as _eng
 from pestana_envolvente import TabEnvolvente
 from pestana_saturacion import TabSaturacion
 from pestana_propiedades import TabPropiedades
@@ -671,6 +672,8 @@ class TabEquilibrio(QWidget):
                 "La suma de fracciones debe ser 1.0")
             return
         self.btn.setEnabled(False); self.btn.setText("Calculando...")
+        # Cada ventana de Equilibrio usa la EOS de su propio combo.
+        _set_eos('SRK' if self.cmb_eos.currentText() == 'SRK' else 'PR')
         self.worker = Worker(z, self.get_T(), self.get_P(), kij_user,
                              metodo_densidad=self.cmb_dens.currentText())
         self.worker.done.connect(self._on_result)
@@ -1181,13 +1184,15 @@ class TabFluidos(QWidget):
         return f"{base} {i}"
 
     def _nuevo(self):
-        self.fluidos.append({'nombre': self._nombre_nuevo(), 'z': [0.0] * NC})
+        self.fluidos.append({'nombre': self._nombre_nuevo(), 'z': [0.0] * NC,
+                             'eos': 'PR'})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
     def _capturar(self):
         z = list(self._get_z_actual())
-        self.fluidos.append({'nombre': self._nombre_nuevo("Cromatografia"), 'z': z})
+        self.fluidos.append({'nombre': self._nombre_nuevo("Cromatografia"),
+                             'z': z, 'eos': 'PR'})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
@@ -1495,7 +1500,8 @@ class MainWindow(QMainWindow):
         for f in (doc.get('fluidos') or []):
             try:
                 self.fluidos.append({'nombre': str(f.get('nombre', 'Fluido')),
-                                     'z': [float(v) for v in f.get('z', [])]})
+                                     'z': [float(v) for v in f.get('z', [])],
+                                     'eos': 'SRK' if f.get('eos') == 'SRK' else 'PR'})
             except Exception:
                 pass
         if hasattr(self, '_tab_fluidos'):
@@ -1504,9 +1510,7 @@ class MainWindow(QMainWindow):
 
         # 4. Label permanente del status bar
         nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
-        self._lbl_info.setText(
-            f"{nombre} EOS  /  R = {R_GAS} psi·ft³/(lb-mol·°R)"
-            f"  /  13 componentes")
+        self._lbl_info.setText(f"{nombre} EOS")
 
         # 5. Navegador
 
@@ -1533,9 +1537,7 @@ class MainWindow(QMainWindow):
         self._sync_nav_fluidos()
         self.current_path = None
         self._actualizar_titulo()
-        self._lbl_info.setText(
-            f"Peng-Robinson EOS  /  R = {R_GAS} psi·ft³/(lb-mol·°R)"
-            f"  /  13 componentes")
+        self._lbl_info.setText("Peng-Robinson EOS")
 
     def _menu_abrir(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1583,11 +1585,11 @@ class MainWindow(QMainWindow):
     def _build(self):
         # ── Widgets de cada calculo (tamaño / colores identicos) ──
         self.tab_eq   = TabEquilibrio()
-        self.tab_env  = TabEnvolvente(get_z=self.tab_eq.get_z,
+        self.tab_env  = TabEnvolvente(get_z=self._getz_main,
                                       get_kij=lambda: kij_user)
-        self.tab_sat  = TabSaturacion(get_z=self.tab_eq.get_z,
+        self.tab_sat  = TabSaturacion(get_z=self._getz_main,
                                       get_kij=lambda: kij_user)
-        self.tab_prop = TabPropiedades(get_z=self.tab_eq.get_z,
+        self.tab_prop = TabPropiedades(get_z=self._getz_main,
                                        get_kij=lambda: kij_user)
         self.tab_par  = TabParametros()
 
@@ -1665,9 +1667,7 @@ class MainWindow(QMainWindow):
             return l
         self._lbl_estado = _panel("Listo")
         sb.addWidget(self._lbl_estado, 1)
-        self._lbl_info = _panel(
-            f"Peng-Robinson EOS  /  R = {R_GAS} psi·ft³/(lb-mol·°R)"
-            f"  /  13 componentes")
+        self._lbl_info = _panel("Peng-Robinson EOS")
         sb.addPermanentWidget(self._lbl_info, 0)
         self.setStatusBar(sb)
         self._sb = sb
@@ -1718,11 +1718,33 @@ class MainWindow(QMainWindow):
             cmb.setCurrentIndex(i)
             cmb.blockSignals(False)
 
+    # ── EOS principal / por fluido y pies de pagina ──────────
+    @staticmethod
+    def _nombre_eos(code):
+        return "Soave-Redlich-Kwong" if code == 'SRK' else "Peng-Robinson"
+
+    def _eos_main_code(self):
+        return 'SRK' if self.tab_eq.cmb_eos.currentText() == 'SRK' else 'PR'
+
+    def _getz_main(self):
+        """get_z para las ventanas NO asignadas a un fluido: fija la EOS
+        principal (la de la barra / Equilibrio principal) antes de leer z."""
+        _set_eos(self._eos_main_code())
+        return self.tab_eq.get_z()
+
+    def _refrescar_pies(self):
+        """Actualiza el pie (EOS) de cada ventana abierta."""
+        for w in self._subventanas.values():
+            prov = getattr(w, '_eos_prov', None)
+            pie = getattr(w, '_pie', None)
+            if prov is not None and pie is not None:
+                pie.setText(f"  {self._nombre_eos(prov())} EOS")
+
     # ── Gestion de ventanas de funcionalidad (top-level) ─────
-    def _montar_subventana(self, clave, widget, titulo, tam=None):
+    def _montar_subventana(self, clave, widget, titulo, tam=None, eos_provider=None):
         """Envuelve un widget en una ventana top-level nativa de Windows
-        (marco del sistema) de TAMAÑO FIJO y la registra. `tam` permite dar
-        un tamaño propio (p.ej. la ventana de Fluidos, mas baja)."""
+        (marco del sistema) de TAMAÑO FIJO y la registra. `tam` da un tamaño
+        propio; `eos_provider` agrega un pie con la EOS que usa la ventana."""
         cont = QWidget()
         cont.setAutoFillBackground(True)
         cont.setStyleSheet('background:#E6E6E6;')
@@ -1741,7 +1763,22 @@ class MainWindow(QMainWindow):
         win.setWindowIcon(self._logo)
         lay = QVBoxLayout(win)
         lay.setContentsMargins(0, 0, 0, 0); lay.setSpacing(0)
-        lay.addWidget(sc)
+        lay.addWidget(sc, 1)
+
+        # Pie de pagina con la EOS que ocupa esta ventana.
+        alto_pie = 0
+        if eos_provider is not None:
+            pie = QLabel(f"  {self._nombre_eos(eos_provider())} EOS")
+            pie.setFixedHeight(20)
+            pie.setStyleSheet(
+                f'QLabel {{ background:#D4D4D4; color:{TEXT};'
+                f' font-family:"{FONT_F}"; font-size:9pt; padding:1px 6px;'
+                f' border-top:1px solid #B4B4B4; }}')
+            lay.addWidget(pie)
+            win._pie = pie
+            win._eos_prov = eos_provider
+            alto_pie = 20
+
         win._clave = clave
         # Tamaño FIJO (solo la ventana principal se puede redimensionar). Los
         # calculos comparten el tamaño de "Equilibrio de fases", un pelin mas
@@ -1751,7 +1788,7 @@ class MainWindow(QMainWindow):
                 h = self.tab_eq.sizeHint()
                 self._tam_sub = (h.width() + 26, h.height() + 12)
             tam = self._tam_sub
-        win.setFixedSize(tam[0], tam[1])
+        win.setFixedSize(tam[0], tam[1] + alto_pie)
         self._subventanas[clave] = win
         return win
 
@@ -1769,7 +1806,10 @@ class MainWindow(QMainWindow):
         sw = self._subventanas.get(clave)
         if sw is None:
             widget, titulo, ic = self._defs_calc[clave]
-            sw = self._montar_subventana(clave, widget, titulo)
+            # Propiedades termodinamicas usa siempre PR; el resto, la EOS
+            # principal (barra / Equilibrio principal).
+            prov = (lambda: 'PR') if clave == 'propiedades' else self._eos_main_code
+            sw = self._montar_subventana(clave, widget, titulo, eos_provider=prov)
         self._mostrar_subventana(sw)
 
     def _abrir_fluidos(self):
@@ -1817,6 +1857,7 @@ class MainWindow(QMainWindow):
         }
         if clave not in etiquetas:
             return
+        fluido.setdefault('eos', 'PR')
         subclave = f"{clave}@{fluido['nombre']}"
         sw = self._subventanas.get(subclave)
         if sw is None:
@@ -1824,37 +1865,49 @@ class MainWindow(QMainWindow):
             if widget is None:
                 return
             titulo = f"{etiquetas[clave]} - {fluido['nombre']}"
-            sw = self._montar_subventana(subclave, widget, titulo)
+            # Pie con la EOS del fluido (Propiedades siempre PR).
+            prov = ((lambda: 'PR') if clave == 'propiedades'
+                    else (lambda f=fluido: f.get('eos', 'PR')))
+            sw = self._montar_subventana(subclave, widget, titulo, eos_provider=prov)
         self._mostrar_subventana(sw)
+
+    def _getz_fluido(self, fluido):
+        """get_z para las ventanas de un fluido: fija la EOS del fluido antes
+        de leer su composicion (asi su envolvente/saturacion la respetan)."""
+        _set_eos(fluido.get('eos', 'PR'))
+        return list(fluido['z'])
 
     def _crear_widget_fluido(self, clave, fluido):
         """Construye el widget de calculo ligado a la composicion del fluido."""
+        gz = lambda f=fluido: self._getz_fluido(f)
         if clave == 'envolvente':
-            return TabEnvolvente(get_z=lambda f=fluido: f['z'],
-                                 get_kij=lambda: kij_user)
+            return TabEnvolvente(get_z=gz, get_kij=lambda: kij_user)
         if clave == 'saturacion':
-            return TabSaturacion(get_z=lambda f=fluido: f['z'],
-                                 get_kij=lambda: kij_user)
+            return TabSaturacion(get_z=gz, get_kij=lambda: kij_user)
         if clave == 'propiedades':
-            return TabPropiedades(get_z=lambda f=fluido: f['z'],
-                                  get_kij=lambda: kij_user)
+            return TabPropiedades(get_z=gz, get_kij=lambda: kij_user)
         if clave == 'parametros':
-            # Parametros de la EOS (kij / criticos): son globales, se muestran
-            # los actuales del programa.
+            # Parametros de la EOS (kij / criticos): globales.
             return TabParametros()
         if clave == 'equilibrio':
-            # Equilibrio propio del fluido, con su composicion precargada.
+            # Equilibrio propio del fluido: su combo EOS define la EOS del
+            # fluido (afecta a su envolvente y demas ventanas).
             w = TabEquilibrio()
             w.set_z(fluido['z'])
-            # Reflejar EOS/densidad globales actuales.
             w.cmb_eos.blockSignals(True)
-            w.cmb_eos.setCurrentIndex(self.tab_eq.cmb_eos.currentIndex())
+            w.cmb_eos.setCurrentIndex(1 if fluido.get('eos') == 'SRK' else 0)
             w.cmb_eos.blockSignals(False)
             w.cmb_dens.setCurrentIndex(self.tab_eq.cmb_dens.currentIndex())
-            # El cambio de EOS se propaga globalmente (la EOS es global).
-            w.eos_changed.connect(self._on_eos_changed)
+            w.eos_changed.connect(
+                lambda *_a, f=fluido, ww=w: self._on_fluido_eos(f, ww))
             return w
         return None
+
+    def _on_fluido_eos(self, fluido, w):
+        """La EOS del combo de la ventana de Equilibrio del fluido pasa a ser
+        la EOS del fluido; se refrescan los pies de sus ventanas."""
+        fluido['eos'] = 'SRK' if w.cmb_eos.currentText() == 'SRK' else 'PR'
+        self._refrescar_pies()
 
     def _cascada(self, sw=None):
         """Coloca las ventanas en cascada partiendo cerca de la ventana
@@ -1939,9 +1992,9 @@ class MainWindow(QMainWindow):
             self.tab_par.refrescar_tabla()
         # Actualizar el label permanente del status bar
         nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
-        self._lbl_info.setText(
-            f"{nombre} EOS  /  R = {R_GAS} psi·ft³/(lb-mol·°R)"
-            f"  /  13 componentes")
+        self._lbl_info.setText(f"{nombre} EOS")
+        # Refrescar el pie (EOS) de las ventanas NO asignadas a un fluido.
+        self._refrescar_pies()
 
 def main():
     """Arranca la aplicacion. Llamado desde main.py en la raiz."""
