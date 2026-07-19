@@ -1053,7 +1053,7 @@ class TabFluidos(QWidget):
         BTN = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
                f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;'
                f'padding:1px 8px;')
-        box = QWidget(); box.setFixedWidth(700)
+        box = QWidget(); box.setFixedWidth(736)
         box.setStyleSheet('background:#ECECEC;')
         root = QVBoxLayout(box)
         root.setContentsMargins(0, 8, 0, 8); root.setSpacing(6)
@@ -1109,11 +1109,11 @@ class TabFluidos(QWidget):
         root.addWidget(section_label(
             "Abrir calculo del fluido seleccionado (ventana independiente):", left=True))
         g3 = QHBoxLayout(); g3.setSpacing(4)
-        for txt, clave in [("Equilibrio", "equilibrio"),
-                           ("Envolvente", "envolvente"),
-                           ("Pts. saturacion", "saturacion"),
-                           ("Prop. termodinamicas", "propiedades"),
-                           ("Parametros EOS", "parametros")]:
+        for txt, clave in [("Equilibrio de fases", "equilibrio"),
+                           ("Envolvente de fases", "envolvente"),
+                           ("Puntos de saturación", "saturacion"),
+                           ("Propiedades termodinámicas", "propiedades"),
+                           ("Parámetros EOS", "parametros")]:
             b = QPushButton(txt); b.setStyleSheet(BTN)
             b.clicked.connect(lambda _=False, c=clave: self._abrir(c))
             g3.addWidget(b)
@@ -1719,9 +1719,10 @@ class MainWindow(QMainWindow):
             cmb.blockSignals(False)
 
     # ── Gestion de ventanas de funcionalidad (top-level) ─────
-    def _montar_subventana(self, clave, widget, titulo, tam_fijo=True):
+    def _montar_subventana(self, clave, widget, titulo, tam=None):
         """Envuelve un widget en una ventana top-level nativa de Windows
-        (marco/barra de titulo del sistema) y la registra. Devuelve la ventana."""
+        (marco del sistema) de TAMAÑO FIJO y la registra. `tam` permite dar
+        un tamaño propio (p.ej. la ventana de Fluidos, mas baja)."""
         cont = QWidget()
         cont.setAutoFillBackground(True)
         cont.setStyleSheet('background:#E6E6E6;')
@@ -1742,12 +1743,15 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(0, 0, 0, 0); lay.setSpacing(0)
         lay.addWidget(sc)
         win._clave = clave
-        # Tamaño inicial (el del contenido de "Equilibrio de fases"); la
-        # ventana es redimensionable con el marco nativo.
-        if not hasattr(self, '_tam_sub'):
-            h = self.tab_eq.sizeHint()
-            self._tam_sub = (h.width() + 10, h.height() + 10)
-        win.resize(self._tam_sub[0], self._tam_sub[1])
+        # Tamaño FIJO (solo la ventana principal se puede redimensionar). Los
+        # calculos comparten el tamaño de "Equilibrio de fases", un pelin mas
+        # ancho que su contenido; Fluidos recibe su propio `tam`.
+        if tam is None:
+            if not hasattr(self, '_tam_sub'):
+                h = self.tab_eq.sizeHint()
+                self._tam_sub = (h.width() + 50, h.height() + 12)
+            tam = self._tam_sub
+        win.setFixedSize(tam[0], tam[1])
         self._subventanas[clave] = win
         return win
 
@@ -1779,7 +1783,9 @@ class MainWindow(QMainWindow):
                 abrir_calc=self._abrir_calculo_fluido,
                 on_change=self._sync_nav_fluidos)
             self._tab_fluidos = widget
-            sw = self._montar_subventana('fluidos', widget, "Fluidos")
+            h = widget.sizeHint()
+            sw = self._montar_subventana('fluidos', widget, "Fluidos",
+                                         tam=(h.width() + 24, h.height() + 16))
         self._mostrar_subventana(sw)
 
     def _cargar_fluido_principal(self, z):
@@ -1817,7 +1823,7 @@ class MainWindow(QMainWindow):
             widget = self._crear_widget_fluido(clave, fluido)
             if widget is None:
                 return
-            titulo = f"{etiquetas[clave]} — {fluido['nombre']}"
+            titulo = f"{etiquetas[clave]} - {fluido['nombre']}"
             sw = self._montar_subventana(subclave, widget, titulo)
         self._mostrar_subventana(sw)
 
