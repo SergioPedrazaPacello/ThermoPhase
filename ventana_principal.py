@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox, QGridLayout, QFrame, QHeaderView,
     QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox,
     QAbstractSpinBox, QMenuBar, QFileDialog, QSplitter,
-    QMdiArea, QMdiSubWindow
+    QMdiArea, QMdiSubWindow, QListWidget, QInputDialog
 )
 import matplotlib
 matplotlib.use('QtAgg')
@@ -637,6 +637,14 @@ class TabEquilibrio(QWidget):
             except: z.append(0.0)
         return z
 
+    def set_z(self, z):
+        """Carga una composicion (lista de NC fracciones) en la tabla."""
+        self.tbl_comp.blockSignals(True)
+        for i in range(NC):
+            self.tbl_comp.item(i, 1).setText(f"{z[i] if i < len(z) else 0.0:.4f}")
+        self.tbl_comp.blockSignals(False)
+        self._upd_suma()
+
     def _upd_suma(self):
         s = sum(self.get_z())
         self.tbl_comp.blockSignals(True)
@@ -1024,6 +1032,200 @@ class PdfWorker(QThread):
             self.done.emit(False, f"Error inesperado:\n{ex}\n{traceback.format_exc()}")
 
 
+class TabFluidos(QWidget):
+    """Gestor de fluidos: guarda varias composiciones (cromatografias) con
+    nombre, permite editarlas, cargarlas en la composicion principal y abrir
+    calculos independientes por fluido para compararlos entre si."""
+
+    def __init__(self, fluidos, get_z_actual, cargar_en_principal, abrir_calc):
+        super().__init__()
+        self.fluidos = fluidos                 # lista compartida de dicts
+        self._get_z_actual = get_z_actual
+        self._cargar_principal = cargar_en_principal
+        self._abrir_calc = abrir_calc
+        self._idx = -1
+        self._build()
+        self._refrescar_lista()
+
+    def _build(self):
+        BTN = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
+               f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;'
+               f'padding:1px 8px;')
+        box = QWidget(); box.setFixedWidth(700)
+        box.setStyleSheet(f'background:{GRAY_LBL};')
+        root = QVBoxLayout(box)
+        root.setContentsMargins(0, 8, 0, 8); root.setSpacing(6)
+        root.addWidget(title_label("ThermoPhase — Fluidos"))
+
+        fila = QHBoxLayout(); fila.setSpacing(10)
+
+        # Izquierda: lista de fluidos + gestion
+        izq = QVBoxLayout(); izq.setSpacing(4)
+        izq.addWidget(section_label("Fluidos guardados", left=True))
+        self.lista = QListWidget(); self.lista.setFixedWidth(250)
+        self.lista.setStyleSheet(
+            f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; outline:0; }}'
+            f'QListWidget::item {{ height:22px; padding-left:4px; }}'
+            f'QListWidget::item:selected {{ background:#DCDCDC; color:{TEXT}; }}')
+        self.lista.currentRowChanged.connect(self._on_sel)
+        izq.addWidget(self.lista)
+        g1 = QGridLayout(); g1.setSpacing(4)
+        for k, (txt, fn) in enumerate([("Nuevo", self._nuevo),
+                                       ("Capturar actual", self._capturar),
+                                       ("Renombrar", self._renombrar),
+                                       ("Eliminar", self._eliminar)]):
+            b = QPushButton(txt); b.setStyleSheet(BTN); b.clicked.connect(fn)
+            g1.addWidget(b, k // 2, k % 2)
+        izq.addLayout(g1)
+        izq.addStretch()
+        fila.addLayout(izq)
+
+        # Derecha: composicion del fluido seleccionado
+        der = QVBoxLayout(); der.setSpacing(4)
+        der.addWidget(section_label("Composicion del fluido (fraccion molar)", left=True))
+        self.tbl = make_table(NC + 1, 2)
+        self.tbl.setColumnWidth(0, W_COMP); self.tbl.setColumnWidth(1, W_VAL)
+        for i in range(NC):
+            self.tbl.setItem(i, 0, cell(f"{NOMBRES[i]}:", bg=GRAY_LBL))
+            self.tbl.setItem(i, 1, cell("", bg=WHITE, editable=True))
+        self.tbl.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_LBL))
+        self.tbl.setItem(NC, 1, cell("", bg=WHITE))
+        fix_table_size(self.tbl)
+        self.tbl.itemChanged.connect(self._on_edit)
+        der.addWidget(self.tbl, alignment=Qt.AlignmentFlag.AlignLeft)
+        g2 = QHBoxLayout(); g2.setSpacing(4)
+        for txt, fn in [("Normalizar", self._normalizar),
+                        ("Cargar en composicion principal", self._cargar)]:
+            b = QPushButton(txt); b.setStyleSheet(BTN); b.clicked.connect(fn)
+            g2.addWidget(b)
+        g2.addStretch()
+        der.addLayout(g2); der.addStretch()
+        fila.addLayout(der)
+        root.addLayout(fila)
+
+        root.addWidget(section_label(
+            "Abrir calculo del fluido seleccionado (ventana independiente):", left=True))
+        g3 = QHBoxLayout(); g3.setSpacing(4)
+        for txt, clave in [("Envolvente", "envolvente"),
+                           ("Puntos de saturacion", "saturacion"),
+                           ("Propiedades termodinamicas", "propiedades")]:
+            b = QPushButton(txt); b.setStyleSheet(BTN)
+            b.clicked.connect(lambda _=False, c=clave: self._abrir(c))
+            g3.addWidget(b)
+        g3.addStretch()
+        root.addLayout(g3)
+        root.addStretch()
+
+        outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
+        hc = QHBoxLayout(); hc.addStretch(); hc.addWidget(box); hc.addStretch()
+        outer.addLayout(hc)
+
+    # ── Lista / seleccion ────────────────────────────────────
+    def _refrescar_lista(self):
+        self.lista.blockSignals(True)
+        self.lista.clear()
+        for f in self.fluidos:
+            self.lista.addItem(f['nombre'])
+        self.lista.blockSignals(False)
+        if self.fluidos:
+            r = min(max(self._idx, 0), len(self.fluidos) - 1)
+            self.lista.setCurrentRow(r); self._on_sel(r)
+        else:
+            self._idx = -1; self._mostrar_z([0.0] * NC)
+
+    def _on_sel(self, row):
+        self._idx = row
+        if 0 <= row < len(self.fluidos):
+            self._mostrar_z(self.fluidos[row]['z'])
+
+    def _mostrar_z(self, z):
+        self.tbl.blockSignals(True)
+        for i in range(NC):
+            self.tbl.item(i, 1).setText(f"{z[i] if i < len(z) else 0.0:.4f}")
+        self.tbl.blockSignals(False)
+        self._upd_suma()
+
+    def _leer_z(self):
+        z = []
+        for i in range(NC):
+            try: z.append(float(self.tbl.item(i, 1).text()))
+            except: z.append(0.0)
+        return z
+
+    def _upd_suma(self):
+        s = sum(self._leer_z())
+        self.tbl.blockSignals(True)
+        self.tbl.item(NC, 1).setText(f"{s:.4f}")
+        self.tbl.blockSignals(False)
+
+    def _on_edit(self, item):
+        if item.column() != 1 or item.row() >= NC:
+            return
+        self._upd_suma()
+        if 0 <= self._idx < len(self.fluidos):
+            self.fluidos[self._idx]['z'] = self._leer_z()
+
+    # ── Acciones de gestion ──────────────────────────────────
+    def _nombre_nuevo(self, base="Fluido"):
+        existentes = {f['nombre'] for f in self.fluidos}
+        i = 1
+        while f"{base} {i}" in existentes:
+            i += 1
+        return f"{base} {i}"
+
+    def _nuevo(self):
+        self.fluidos.append({'nombre': self._nombre_nuevo(), 'z': [0.0] * NC})
+        self._idx = len(self.fluidos) - 1
+        self._refrescar_lista()
+
+    def _capturar(self):
+        z = list(self._get_z_actual())
+        self.fluidos.append({'nombre': self._nombre_nuevo("Cromatografia"), 'z': z})
+        self._idx = len(self.fluidos) - 1
+        self._refrescar_lista()
+
+    def _renombrar(self):
+        if not (0 <= self._idx < len(self.fluidos)):
+            return
+        actual = self.fluidos[self._idx]['nombre']
+        nuevo, ok = QInputDialog.getText(self, "Renombrar fluido", "Nombre:", text=actual)
+        if ok and nuevo.strip():
+            self.fluidos[self._idx]['nombre'] = nuevo.strip()
+            self._refrescar_lista()
+
+    def _eliminar(self):
+        if not (0 <= self._idx < len(self.fluidos)):
+            return
+        del self.fluidos[self._idx]
+        self._idx = min(self._idx, len(self.fluidos) - 1)
+        self._refrescar_lista()
+
+    def _normalizar(self):
+        z = self._leer_z(); s = sum(z)
+        if s <= 0:
+            return
+        self._mostrar_z([v / s for v in z])
+        if 0 <= self._idx < len(self.fluidos):
+            self.fluidos[self._idx]['z'] = self._leer_z()
+
+    def _cargar(self):
+        if 0 <= self._idx < len(self.fluidos):
+            self._cargar_principal(list(self.fluidos[self._idx]['z']))
+            dialogos.info(self, f"Fluido «{self.fluidos[self._idx]['nombre']}» "
+                                "cargado en la composicion principal.")
+
+    def _abrir(self, clave):
+        if not (0 <= self._idx < len(self.fluidos)):
+            dialogos.advertencia(self, "Selecciona un fluido primero.")
+            return
+        self._abrir_calc(clave, self.fluidos[self._idx])
+
+    def refrescar(self):
+        self._idx = 0 if self.fluidos else -1
+        self._refrescar_lista()
+
+
 class _SubVentana(QMdiSubWindow):
     """Subventana MDI SIN barra de titulo (frameless). Se arrastra tomandola
     de la franja superior (donde va el encabezado "ThermoPhase — ..."). Al
@@ -1098,6 +1300,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(920, 620)
         self.resize(1300, 840)
         self.current_path = None        # ruta del .tpsim actual (None = sin guardar)
+        self.fluidos = []               # lista de fluidos guardados (gestor Fluidos)
         self._build()
         # Gestor de edicion (copiar/pegar/deshacer/rehacer sobre celdas).
         self.gestor_edicion = edicion.GestorEdicion()
@@ -1281,6 +1484,7 @@ class MainWindow(QMainWindow):
         return {
             'kij_user':   copy.deepcopy(kij_user),
             'eos_activa': _eng.get_eos(),
+            'fluidos':    copy.deepcopy(self.fluidos),
             'tabs': {
                 'equilibrio':  self.tab_eq.get_estado(),
                 'envolvente':  self.tab_env.get_estado(),
@@ -1328,6 +1532,17 @@ class MainWindow(QMainWindow):
         if 'propiedades' in tabs:
             self.tab_prop.set_estado(tabs['propiedades'])
 
+        # 3b. Fluidos guardados
+        self.fluidos.clear()
+        for f in (doc.get('fluidos') or []):
+            try:
+                self.fluidos.append({'nombre': str(f.get('nombre', 'Fluido')),
+                                     'z': [float(v) for v in f.get('z', [])]})
+            except Exception:
+                pass
+        if hasattr(self, '_tab_fluidos'):
+            self._tab_fluidos.refrescar()
+
         # 4. Label permanente del status bar
         nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
         self._lbl_info.setText(
@@ -1353,6 +1568,9 @@ class MainWindow(QMainWindow):
         self.tab_prop.set_estado({'entrada': {'T_R':0.0,'P_psi':0.0},'resultado':None})
         if hasattr(self, 'tab_par'):
             self.tab_par.refrescar_tabla()
+        self.fluidos.clear()
+        if hasattr(self, '_tab_fluidos'):
+            self._tab_fluidos.refrescar()
         self.current_path = None
         self._actualizar_titulo()
         self._lbl_info.setText(
@@ -1548,50 +1766,43 @@ class MainWindow(QMainWindow):
             cmb.blockSignals(False)
 
     # ── Gestion de subventanas del area de simulacion ────────
-    def _abrir_calculo(self, clave):
-        """Abre (o activa, si ya existe) la subventana MDI del calculo pedido.
-        La subventana es de tamaño fijo, no puede salir del area y varias
-        pueden estar abiertas simultaneamente."""
-        if clave not in self._defs_calc:
-            return
-        sw = self._subventanas.get(clave)
-        if sw is None:
-            widget, titulo, ic = self._defs_calc[clave]
-            # Contenedor con fondo gris tenue y bajo + scroll para alturas
-            # grandes.
-            cont = QWidget()
-            cont.setAutoFillBackground(True)
-            cont.setStyleSheet('background:#E6E6E6;')
-            lc = QVBoxLayout(cont)
-            lc.setContentsMargins(0, 0, 0, 0); lc.setSpacing(0)
-            lc.addWidget(widget)
-            sc = QScrollArea()
-            sc.setWidget(cont)
-            sc.setWidgetResizable(True)
-            # El borde de la ventana se dibuja aqui (el scroll llena toda la
-            # subventana frameless). Marco Box + color oscuro para que se vea.
-            sc.setFrameShape(QFrame.Shape.Box)
-            sc.setLineWidth(1)
-            sc.setStyleSheet(
-                'QScrollArea { background:#E6E6E6; border:1px solid #9A9A9A; }')
-            sc.viewport().setStyleSheet('background:#E6E6E6;')
-            # _SubVentana SIN barra de titulo (frameless): solo el contenido
-            # con el borde gris #7F7F7F alrededor de toda la ventana.
-            sw = _SubVentana()
-            sw.setWidget(sc)
-            sw.setWindowTitle(titulo)
-            sw.setWindowIcon(self._logo)
-            sw.setWindowFlags(Qt.WindowType.FramelessWindowHint
-                              | Qt.WindowType.SubWindow)
-            sw._clave = clave
-            # Todas las subventanas comparten el tamaño de "Equilibrio de fases",
-            # ajustado al contenido (sin espacio vacio sobrante).
-            if not hasattr(self, '_tam_sub'):
-                h = self.tab_eq.sizeHint()
-                self._tam_sub = (h.width() + 6, h.height() + 6)
+    def _montar_subventana(self, clave, widget, titulo, tam_fijo=True):
+        """Envuelve un widget en una subventana MDI frameless (con borde,
+        arrastre y fondo tenue) y la registra. Devuelve la subventana."""
+        cont = QWidget()
+        cont.setAutoFillBackground(True)
+        cont.setStyleSheet('background:#E6E6E6;')
+        lc = QVBoxLayout(cont)
+        lc.setContentsMargins(0, 0, 0, 0); lc.setSpacing(0)
+        lc.addWidget(widget)
+        sc = QScrollArea()
+        sc.setWidget(cont)
+        sc.setWidgetResizable(True)
+        sc.setFrameShape(QFrame.Shape.Box)
+        sc.setLineWidth(1)
+        sc.setStyleSheet(
+            'QScrollArea { background:#E6E6E6; border:1px solid #9A9A9A; }')
+        sc.viewport().setStyleSheet('background:#E6E6E6;')
+        sw = _SubVentana()
+        sw.setWidget(sc)
+        sw.setWindowTitle(titulo)
+        sw.setWindowIcon(self._logo)
+        sw.setWindowFlags(Qt.WindowType.FramelessWindowHint
+                          | Qt.WindowType.SubWindow)
+        sw._clave = clave
+        # Tamaño uniforme (el de "Equilibrio de fases") ajustado al contenido.
+        if not hasattr(self, '_tam_sub'):
+            h = self.tab_eq.sizeHint()
+            self._tam_sub = (h.width() + 6, h.height() + 6)
+        if tam_fijo:
             sw.setFixedSize(self._tam_sub[0], self._tam_sub[1])
-            sw.instalar_arrastre()
-            self._subventanas[clave] = sw
+        else:
+            sw.resize(self._tam_sub[0], self._tam_sub[1])
+        sw.instalar_arrastre()
+        self._subventanas[clave] = sw
+        return sw
+
+    def _mostrar_subventana(self, sw):
         if sw not in self.mdi.subWindowList():
             self.mdi.addSubWindow(sw)
             self._cascada(sw)
@@ -1599,6 +1810,54 @@ class MainWindow(QMainWindow):
         sw.widget().show()
         self.mdi.setActiveSubWindow(sw)
         sw.raise_()
+
+    def _abrir_calculo(self, clave):
+        """Abre (o activa) la subventana MDI del calculo pedido."""
+        if clave not in self._defs_calc:
+            return
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            widget, titulo, ic = self._defs_calc[clave]
+            sw = self._montar_subventana(clave, widget, titulo)
+        self._mostrar_subventana(sw)
+
+    def _abrir_fluidos(self):
+        """Abre (o activa) el gestor de Fluidos."""
+        sw = self._subventanas.get('fluidos')
+        if sw is None:
+            widget = TabFluidos(
+                fluidos=self.fluidos,
+                get_z_actual=self.tab_eq.get_z,
+                cargar_en_principal=self._cargar_fluido_principal,
+                abrir_calc=self._abrir_calculo_fluido)
+            self._tab_fluidos = widget
+            sw = self._montar_subventana('fluidos', widget, "Fluidos")
+        self._mostrar_subventana(sw)
+
+    def _cargar_fluido_principal(self, z):
+        """Carga la composicion de un fluido en la pestaña de Equilibrio."""
+        self.tab_eq.set_z(z)
+        self._abrir_calculo('equilibrio')
+
+    def _abrir_calculo_fluido(self, clave, fluido):
+        """Abre un calculo (envolvente/saturacion/propiedades) ligado a un
+        fluido concreto, en su propia ventana, para poder comparar varios."""
+        constructores = {
+            'envolvente':  (TabEnvolvente,  "Envolvente"),
+            'saturacion':  (TabSaturacion,  "Saturacion"),
+            'propiedades': (TabPropiedades, "Propiedades"),
+        }
+        if clave not in constructores:
+            return
+        Ctor, etiqueta = constructores[clave]
+        subclave = f"{clave}@{fluido['nombre']}"
+        sw = self._subventanas.get(subclave)
+        if sw is None:
+            widget = Ctor(get_z=lambda f=fluido: f['z'],
+                          get_kij=lambda: kij_user)
+            titulo = f"{etiqueta} — {fluido['nombre']}"
+            sw = self._montar_subventana(subclave, widget, titulo)
+        self._mostrar_subventana(sw)
 
     def _cascada(self, sw):
         """Ubica la subventana recien abierta en cascada dentro del area."""
@@ -1622,7 +1881,10 @@ class MainWindow(QMainWindow):
             "(Interfaz preliminar.)")
 
     def _accion_nav(self, clave):
-        nombres = {'componentes': "Componentes", 'fluidos': "Fluidos"}
+        if clave == 'fluidos':
+            self._abrir_fluidos()
+            return
+        nombres = {'componentes': "Componentes"}
         self._placeholder(nombres.get(clave, clave))
 
     def _menu_acerca(self):
