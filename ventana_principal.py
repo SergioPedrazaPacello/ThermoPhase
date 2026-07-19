@@ -28,6 +28,7 @@ import dialogos as dialogos
 from rutas import ruta_recurso
 from ribbon import construir_ribbon, NavigatorPanel
 import iconos
+import edicion
 kij_user = copy.deepcopy(KIJ_DEFAULT)
 
 # ── Paleta ────────────────────────────────────────────────────
@@ -971,7 +972,7 @@ class SplashScreen(QWidget):
             fnt2 = QFont("Arial Narrow", 11)
             p.setFont(fnt2)
             p.drawText(50,140,320,40, _Qt.AlignmentFlag.AlignCenter,
-                       "Calculadora de Equilibrio de Fases")
+                       "Software de Equilibrio de Fases")
         p.end()
 
 # ══════════════════════════════════════════════════════════════
@@ -1098,6 +1099,10 @@ class MainWindow(QMainWindow):
         self.resize(1300, 840)
         self.current_path = None        # ruta del .tpsim actual (None = sin guardar)
         self._build()
+        # Gestor de edicion (copiar/pegar/deshacer/rehacer sobre celdas).
+        self.gestor_edicion = edicion.GestorEdicion()
+        self.gestor_edicion.registrar(self.tab_eq.tbl_comp)
+        self.gestor_edicion.registrar(self.tab_par.tbl_k)
         self._construir_menu()
         self._actualizar_titulo()
 
@@ -1149,11 +1154,15 @@ class MainWindow(QMainWindow):
 
         # ── Editar ───────────────────────────────────────────
         m_edit = menubar.addMenu("&Editar")
-        m_edit.addAction(_act("&Deshacer", lambda: self._placeholder("Deshacer")))
-        m_edit.addAction(_act("&Rehacer", lambda: self._placeholder("Rehacer")))
+        m_edit.addAction(_act("&Deshacer", self.gestor_edicion.deshacer,
+                              QKeySequence.StandardKey.Undo))
+        m_edit.addAction(_act("&Rehacer", self.gestor_edicion.rehacer,
+                              QKeySequence.StandardKey.Redo))
         m_edit.addSeparator()
-        m_edit.addAction(_act("&Copiar", lambda: self._placeholder("Copiar")))
-        m_edit.addAction(_act("&Pegar", lambda: self._placeholder("Pegar")))
+        m_edit.addAction(_act("&Copiar", self.gestor_edicion.copiar,
+                              QKeySequence.StandardKey.Copy))
+        m_edit.addAction(_act("&Pegar", self.gestor_edicion.pegar,
+                              QKeySequence.StandardKey.Paste))
 
         # ── Ver ──────────────────────────────────────────────
         m_ver = menubar.addMenu("&Ver")
@@ -1564,7 +1573,7 @@ class MainWindow(QMainWindow):
             sc.setFrameShape(QFrame.Shape.Box)
             sc.setLineWidth(1)
             sc.setStyleSheet(
-                'QScrollArea { background:#E6E6E6; border:1px solid #5A5A5A; }')
+                'QScrollArea { background:#E6E6E6; border:1px solid #9A9A9A; }')
             sc.viewport().setStyleSheet('background:#E6E6E6;')
             # _SubVentana SIN barra de titulo (frameless): solo el contenido
             # con el borde gris #7F7F7F alrededor de toda la ventana.
@@ -1619,7 +1628,7 @@ class MainWindow(QMainWindow):
     def _menu_acerca(self):
         dialogos.info(self,
             "ThermoPhase 1.0\n\n"
-            "Calculadora de equilibrio de fases y propiedades termodinamicas "
+            "Software de equilibrio de fases y propiedades termodinamicas "
             "para mezclas de hidrocarburos (13 componentes).\n"
             "Ecuaciones de estado: Peng-Robinson y Soave-Redlich-Kwong.")
 
