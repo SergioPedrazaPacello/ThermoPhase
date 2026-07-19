@@ -1053,7 +1053,7 @@ class TabFluidos(QWidget):
         BTN = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
                f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;'
                f'padding:1px 8px;')
-        box = QWidget(); box.setFixedWidth(736)
+        box = QWidget(); box.setFixedWidth(712)
         box.setStyleSheet('background:#ECECEC;')
         root = QVBoxLayout(box)
         root.setContentsMargins(0, 8, 0, 8); root.setSpacing(6)
@@ -1749,7 +1749,7 @@ class MainWindow(QMainWindow):
         if tam is None:
             if not hasattr(self, '_tam_sub'):
                 h = self.tab_eq.sizeHint()
-                self._tam_sub = (h.width() + 50, h.height() + 12)
+                self._tam_sub = (h.width() + 26, h.height() + 12)
             tam = self._tam_sub
         win.setFixedSize(tam[0], tam[1])
         self._subventanas[clave] = win
