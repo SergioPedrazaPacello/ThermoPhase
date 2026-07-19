@@ -1232,68 +1232,20 @@ class TabFluidos(QWidget):
         self._refrescar_lista()
 
 
-class _SubVentana(QMdiSubWindow):
-    """Subventana MDI SIN barra de titulo (frameless). Se arrastra tomandola
-    de la franja superior (donde va el encabezado "ThermoPhase — ..."). Al
-    cerrarse se OCULTA (no se destruye) para conservar contenido y estado."""
-
-    ALTO_ARRASTRE = 30      # franja superior arrastrable, en px
+class _Ventana(QWidget):
+    """Ventana de funcionalidad como ventana top-level de Windows: usa el
+    marco/barra de titulo NATIVO del sistema (icono + minimizar/maximizar/
+    cerrar), igual que la ventana principal, y puede moverse libremente por
+    la pantalla. Al cerrarse se OCULTA (no se destruye) para conservar su
+    contenido y estado al reabrirla desde el navegador."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._arrastrando = False
-        self._press_global = None
-        self._pos_inicial = None
+        self.setWindowFlags(Qt.WindowType.Window)
 
     def closeEvent(self, ev):
         ev.ignore()
         self.hide()
-
-    def instalar_arrastre(self):
-        """Instala el filtro en el contenido para detectar el press del
-        arrastre aunque ocurra sobre un hijo (p.ej. la etiqueta del titulo)."""
-        for w in self.findChildren(QWidget):
-            w.installEventFilter(self)
-
-    def _en_franja(self, gp):
-        y = self.mapFromGlobal(gp).y()
-        return 0 <= y <= self.ALTO_ARRASTRE
-
-    def _iniciar(self, gp):
-        self._arrastrando = True
-        self._press_global = gp
-        self._pos_inicial = self.pos()
-        self.grabMouse()
-
-    def eventFilter(self, obj, ev):
-        if (ev.type() == QEvent.Type.MouseButtonPress
-                and ev.button() == Qt.MouseButton.LeftButton
-                and self._en_franja(ev.globalPosition().toPoint())):
-            self._iniciar(ev.globalPosition().toPoint())
-            return True
-        return super().eventFilter(obj, ev)
-
-    def mousePressEvent(self, ev):
-        if (ev.button() == Qt.MouseButton.LeftButton
-                and self._en_franja(ev.globalPosition().toPoint())):
-            self._iniciar(ev.globalPosition().toPoint())
-            ev.accept(); return
-        super().mousePressEvent(ev)
-
-    def mouseMoveEvent(self, ev):
-        if self._arrastrando:
-            delta = ev.globalPosition().toPoint() - self._press_global
-            nueva = self._pos_inicial + delta
-            self.move(max(0, nueva.x()), max(0, nueva.y()))
-            ev.accept(); return
-        super().mouseMoveEvent(ev)
-
-    def mouseReleaseEvent(self, ev):
-        if self._arrastrando and ev.button() == Qt.MouseButton.LeftButton:
-            self._arrastrando = False
-            self.releaseMouse()
-            ev.accept(); return
-        super().mouseReleaseEvent(ev)
 
 
 class MainWindow(QMainWindow):
@@ -1403,8 +1355,8 @@ class MainWindow(QMainWindow):
 
         # ── Ventana (gestion del area MDI) ───────────────────
         m_win = menubar.addMenu("Ve&ntana")
-        m_win.addAction(_act("&Cascada", self.mdi.cascadeSubWindows))
-        m_win.addAction(_act("&Mosaico", self.mdi.tileSubWindows))
+        m_win.addAction(_act("&Cascada", lambda: self._cascada()))
+        m_win.addAction(_act("&Mosaico", self._mosaico))
         m_win.addSeparator()
         m_win.addAction(_act("Cerrar &todas", self._cerrar_todas))
 
@@ -1663,22 +1615,14 @@ class MainWindow(QMainWindow):
         # Cada calculo se abre como una subventana con barra de titulo nativa
         # (icono + cerrar), tamaño fijo, que no puede salir del area; se
         # pueden tener varias abiertas a la vez.
-        self.mdi = QMdiArea()
-        self.mdi.setBackground(QBrush(QColor("#FFFFFF")))
-        self.mdi.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.mdi.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.mdi.setViewMode(QMdiArea.ViewMode.SubWindowView)
-        self.mdi.setOption(
-            QMdiArea.AreaOption.DontMaximizeSubWindowOnActivation, True)
-        # Area de simulacion BLANCA. El borde gris #7F7F7F de cada ventana se
-        # dibuja en el contenido (ver _abrir_calculo), porque en una subventana
-        # frameless el borde del marco no se renderiza.
-        self.mdi.setStyleSheet(
-            'QMdiArea { background:#FFFFFF; }'
-            'QMdiSubWindow { background:#E6E6E6; }')
-        self.mdi.subWindowActivated.connect(self._on_sub_activada)
+        # Las ventanas de funcionalidad son ahora ventanas top-level nativas
+        # de Windows (ver _Ventana), no subventanas MDI. El area central queda
+        # como un panel neutro; las ventanas flotan por encima y pueden
+        # moverse libremente por la pantalla.
+        self.area = QWidget()
+        self.area.setStyleSheet('background:#FFFFFF;')
 
-        # Logo de ThermoPhase (por si se necesita en otros contextos).
+        # Logo de ThermoPhase para el icono de cada ventana.
         _logo_path = ruta_recurso('thermophase.ico')
         self._logo = (QIcon(_logo_path) if os.path.exists(_logo_path)
                       else iconos.icono('equilibrio', 16))
@@ -1690,13 +1634,13 @@ class MainWindow(QMainWindow):
         v.setContentsMargins(0, 0, 0, 0); v.setSpacing(0)
         v.addWidget(self.ribbon)
 
-        # Divisor gris oscuro #7F7F7F entre el navegador y el area de calculo.
+        # Divisor gris oscuro #7F7F7F entre el navegador y el area.
         split = QSplitter(Qt.Orientation.Horizontal)
         split.setStyleSheet(
             'QSplitter { background:#D4D4D4; }'
             'QSplitter::handle { background:#7F7F7F; }')
         split.addWidget(self.nav)
-        split.addWidget(self.mdi)
+        split.addWidget(self.area)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setChildrenCollapsible(False)
@@ -1774,10 +1718,10 @@ class MainWindow(QMainWindow):
             cmb.setCurrentIndex(i)
             cmb.blockSignals(False)
 
-    # ── Gestion de subventanas del area de simulacion ────────
+    # ── Gestion de ventanas de funcionalidad (top-level) ─────
     def _montar_subventana(self, clave, widget, titulo, tam_fijo=True):
-        """Envuelve un widget en una subventana MDI frameless (con borde,
-        arrastre y fondo tenue) y la registra. Devuelve la subventana."""
+        """Envuelve un widget en una ventana top-level nativa de Windows
+        (marco/barra de titulo del sistema) y la registra. Devuelve la ventana."""
         cont = QWidget()
         cont.setAutoFillBackground(True)
         cont.setStyleSheet('background:#E6E6E6;')
@@ -1787,41 +1731,35 @@ class MainWindow(QMainWindow):
         sc = QScrollArea()
         sc.setWidget(cont)
         sc.setWidgetResizable(True)
-        sc.setFrameShape(QFrame.Shape.Box)
-        sc.setLineWidth(1)
-        sc.setStyleSheet(
-            'QScrollArea { background:#E6E6E6; border:1px solid #9A9A9A; }')
+        sc.setFrameShape(QFrame.Shape.NoFrame)
+        sc.setStyleSheet('QScrollArea { background:#E6E6E6; border:none; }')
         sc.viewport().setStyleSheet('background:#E6E6E6;')
-        sw = _SubVentana()
-        sw.setWidget(sc)
-        sw.setWindowTitle(titulo)
-        sw.setWindowIcon(self._logo)
-        sw.setWindowFlags(Qt.WindowType.FramelessWindowHint
-                          | Qt.WindowType.SubWindow)
-        sw._clave = clave
-        # Tamaño uniforme (el de "Equilibrio de fases") ajustado al contenido.
+
+        win = _Ventana(self)
+        win.setWindowTitle(titulo)
+        win.setWindowIcon(self._logo)
+        lay = QVBoxLayout(win)
+        lay.setContentsMargins(0, 0, 0, 0); lay.setSpacing(0)
+        lay.addWidget(sc)
+        win._clave = clave
+        # Tamaño inicial (el del contenido de "Equilibrio de fases"); la
+        # ventana es redimensionable con el marco nativo.
         if not hasattr(self, '_tam_sub'):
             h = self.tab_eq.sizeHint()
-            self._tam_sub = (h.width() + 6, h.height() + 6)
-        if tam_fijo:
-            sw.setFixedSize(self._tam_sub[0], self._tam_sub[1])
-        else:
-            sw.resize(self._tam_sub[0], self._tam_sub[1])
-        sw.instalar_arrastre()
-        self._subventanas[clave] = sw
-        return sw
+            self._tam_sub = (h.width() + 10, h.height() + 10)
+        win.resize(self._tam_sub[0], self._tam_sub[1])
+        self._subventanas[clave] = win
+        return win
 
-    def _mostrar_subventana(self, sw):
-        if sw not in self.mdi.subWindowList():
-            self.mdi.addSubWindow(sw)
-            self._cascada(sw)
-        sw.showNormal()
-        sw.widget().show()
-        self.mdi.setActiveSubWindow(sw)
-        sw.raise_()
+    def _mostrar_subventana(self, win):
+        if not win.isVisible():
+            self._cascada(win)
+        win.showNormal()
+        win.raise_()
+        win.activateWindow()
 
     def _abrir_calculo(self, clave):
-        """Abre (o activa) la subventana MDI del calculo pedido."""
+        """Abre (o activa) la ventana del calculo pedido."""
         if clave not in self._defs_calc:
             return
         sw = self._subventanas.get(clave)
@@ -1912,19 +1850,44 @@ class MainWindow(QMainWindow):
             return w
         return None
 
-    def _cascada(self, sw):
-        """Ubica la subventana recien abierta en cascada dentro del area."""
-        n = sum(1 for s in self.mdi.subWindowList() if s.isVisible())
-        off = 26 * (max(n - 1, 0) % 6)
-        sw.move(12 + off, 10 + off)
+    def _cascada(self, sw=None):
+        """Coloca las ventanas en cascada partiendo cerca de la ventana
+        principal. Si se pasa `sw`, solo posiciona esa (al abrirla)."""
+        origen = self.frameGeometry().topLeft()
+        x0, y0 = origen.x() + 130, origen.y() + 120
+        if sw is not None:
+            n = sum(1 for w in self._subventanas.values() if w.isVisible())
+            off = 30 * (n % 8)
+            sw.move(x0 + off, y0 + off)
+            return
+        i = 0
+        for w in self._subventanas.values():
+            if w.isVisible():
+                off = 30 * (i % 8)
+                w.move(x0 + off, y0 + off)
+                w.raise_()
+                i += 1
 
-    def _on_sub_activada(self, sw):
-        """Sincroniza el resaltado del navegador con la subventana activa."""
-        if sw is not None and hasattr(sw, '_clave'):
-            self.nav.sincronizar(sw._clave)
+    def _mosaico(self):
+        """Distribuye en mosaico las ventanas visibles sobre la pantalla."""
+        vis = [w for w in self._subventanas.values() if w.isVisible()]
+        if not vis:
+            return
+        scr = self.screen().availableGeometry() if self.screen() else self.geometry()
+        import math
+        cols = math.ceil(math.sqrt(len(vis)))
+        filas = math.ceil(len(vis) / cols)
+        aw = scr.width() // cols
+        ah = scr.height() // filas
+        for k, w in enumerate(vis):
+            r, c = divmod(k, cols)
+            w.showNormal()
+            w.resize(max(aw - 8, 400), max(ah - 8, 320))
+            w.move(scr.x() + c * aw + 4, scr.y() + r * ah + 4)
+            w.raise_()
 
     def _cerrar_todas(self):
-        """Cierra (oculta) todas las subventanas abiertas."""
+        """Cierra (oculta) todas las ventanas abiertas."""
         for sw in self._subventanas.values():
             sw.hide()
 
