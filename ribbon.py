@@ -56,6 +56,14 @@ NAV_DATOS = [
     ("fluidos",     "Fluidos",     "fluidos"),
 ]
 
+# Funcionalidades que cuelgan de cada fluido en el arbol (nombres abreviados).
+FUNC_FLUIDO = [
+    ("equilibrio",  "Equilibrio"),
+    ("envolvente",  "Envolvente"),
+    ("saturacion",  "Saturación"),
+    ("propiedades", "Propiedades"),
+]
+
 # Estilo plano (sin relieve) de las listas desplegables de la barra.
 _COMBO_QSS = (
     f'QComboBox {{ background:#FFFFFF; color:{TXT};'
@@ -165,6 +173,7 @@ class NavigatorPanel(QWidget):
 
     calculo_pedido = pyqtSignal(str)
     dato_pedido    = pyqtSignal(str)
+    fluido_calc_pedido = pyqtSignal(str, str)   # (nombre_fluido, clave_calculo)
     cerrar_pedido  = pyqtSignal()
 
     ANCHO = 244
@@ -220,18 +229,26 @@ class NavigatorPanel(QWidget):
         self.tree_calc.setFixedHeight(24 + 22 * (len(NAV_CALCULOS) + 1))
         v.addWidget(self.tree_calc)
 
-        # Datos
+        # Datos (Componentes + Fluidos como arbol expandible)
         v.addWidget(_seccion("Datos"))
         self.tree_datos = _tree_base()
-        self.tree_datos.setRootIsDecorated(False)
-        for nombre_ic, texto, clave in NAV_DATOS:
-            it = QTreeWidgetItem([texto])
-            it.setIcon(0, icono(nombre_ic, 16))
-            it.setData(0, Qt.ItemDataRole.UserRole, clave)
-            self.tree_datos.addTopLevelItem(it)
+        self.tree_datos.setRootIsDecorated(True)
+        # Componentes (hoja)
+        it_comp = QTreeWidgetItem(["Componentes"])
+        it_comp.setIcon(0, icono("componentes", 16))
+        it_comp.setData(0, Qt.ItemDataRole.UserRole, "componentes")
+        self.tree_datos.addTopLevelItem(it_comp)
+        # Fluidos (nodo raiz expandible; sus hijos son los fluidos)
+        self._nodo_fluidos = QTreeWidgetItem(["Fluidos"])
+        self._nodo_fluidos.setIcon(0, icono("fluidos", 16))
+        self._nodo_fluidos.setData(0, Qt.ItemDataRole.UserRole, "fluidos")
+        self.tree_datos.addTopLevelItem(self._nodo_fluidos)
+        self._nodo_fluidos.setExpanded(True)
         self.tree_datos.itemClicked.connect(self._on_dato_click)
-        self.tree_datos.setFixedHeight(24 + 22 * len(NAV_DATOS))
+        self.tree_datos.itemExpanded.connect(lambda *_: self._ajustar_alto_datos())
+        self.tree_datos.itemCollapsed.connect(lambda *_: self._ajustar_alto_datos())
         v.addWidget(self.tree_datos)
+        self._ajustar_alto_datos()
 
         v.addStretch()
 
@@ -249,9 +266,46 @@ class NavigatorPanel(QWidget):
             self.calculo_pedido.emit(str(clave))
 
     def _on_dato_click(self, item, col):
-        clave = item.data(0, Qt.ItemDataRole.UserRole)
-        if clave:
-            self.dato_pedido.emit(str(clave))
+        data = item.data(0, Qt.ItemDataRole.UserRole)
+        if isinstance(data, tuple) and data and data[0] == 'calc':
+            # Hoja de funcionalidad de un fluido: (‘calc’, nombre, clave)
+            self.fluido_calc_pedido.emit(data[1], data[2])
+        elif isinstance(data, str):
+            self.dato_pedido.emit(data)
+        else:
+            # Nodo de fluido: alternar expandido/colapsado
+            item.setExpanded(not item.isExpanded())
+
+    def set_fluidos(self, nombres):
+        """Reconstruye el arbol de fluidos: cada fluido con sus 4
+        funcionalidades (equilibrio, envolvente, saturacion, propiedades)."""
+        nodo = self._nodo_fluidos
+        nodo.takeChildren()
+        for nombre in nombres:
+            fl = QTreeWidgetItem([nombre])
+            fl.setData(0, Qt.ItemDataRole.UserRole, ('fluido', nombre))
+            nodo.addChild(fl)
+            for clave, texto in FUNC_FLUIDO:
+                hoja = QTreeWidgetItem([texto])
+                hoja.setIcon(0, icono(clave, 16))
+                hoja.setData(0, Qt.ItemDataRole.UserRole, ('calc', nombre, clave))
+                fl.addChild(hoja)
+            fl.setExpanded(True)
+        nodo.setExpanded(True)
+        self._ajustar_alto_datos()
+
+    def _ajustar_alto_datos(self):
+        """Ajusta la altura del arbol de Datos a las filas visibles."""
+        def contar(item):
+            n = 1
+            if item.isExpanded():
+                for i in range(item.childCount()):
+                    n += contar(item.child(i))
+            return n
+        total = 0
+        for i in range(self.tree_datos.topLevelItemCount()):
+            total += contar(self.tree_datos.topLevelItem(i))
+        self.tree_datos.setFixedHeight(24 + 22 * max(total, 1))
 
     def sincronizar(self, clave):
         it = self._leaf_por_clave.get(clave)

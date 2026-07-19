@@ -1037,12 +1037,14 @@ class TabFluidos(QWidget):
     nombre, permite editarlas, cargarlas en la composicion principal y abrir
     calculos independientes por fluido para compararlos entre si."""
 
-    def __init__(self, fluidos, get_z_actual, cargar_en_principal, abrir_calc):
+    def __init__(self, fluidos, get_z_actual, cargar_en_principal, abrir_calc,
+                 on_change=None):
         super().__init__()
         self.fluidos = fluidos                 # lista compartida de dicts
         self._get_z_actual = get_z_actual
         self._cargar_principal = cargar_en_principal
         self._abrir_calc = abrir_calc
+        self._on_change = on_change
         self._idx = -1
         self._build()
         self._refrescar_lista()
@@ -1052,7 +1054,7 @@ class TabFluidos(QWidget):
                f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;'
                f'padding:1px 8px;')
         box = QWidget(); box.setFixedWidth(700)
-        box.setStyleSheet(f'background:{GRAY_LBL};')
+        box.setStyleSheet('background:#ECECEC;')
         root = QVBoxLayout(box)
         root.setContentsMargins(0, 8, 0, 8); root.setSpacing(6)
         root.addWidget(title_label("ThermoPhase — Fluidos"))
@@ -1107,9 +1109,11 @@ class TabFluidos(QWidget):
         root.addWidget(section_label(
             "Abrir calculo del fluido seleccionado (ventana independiente):", left=True))
         g3 = QHBoxLayout(); g3.setSpacing(4)
-        for txt, clave in [("Envolvente", "envolvente"),
-                           ("Puntos de saturacion", "saturacion"),
-                           ("Propiedades termodinamicas", "propiedades")]:
+        for txt, clave in [("Equilibrio", "equilibrio"),
+                           ("Envolvente", "envolvente"),
+                           ("Pts. saturacion", "saturacion"),
+                           ("Prop. termodinamicas", "propiedades"),
+                           ("Parametros EOS", "parametros")]:
             b = QPushButton(txt); b.setStyleSheet(BTN)
             b.clicked.connect(lambda _=False, c=clave: self._abrir(c))
             g3.addWidget(b)
@@ -1133,6 +1137,8 @@ class TabFluidos(QWidget):
             self.lista.setCurrentRow(r); self._on_sel(r)
         else:
             self._idx = -1; self._mostrar_z([0.0] * NC)
+        if self._on_change:
+            self._on_change()
 
     def _on_sel(self, row):
         self._idx = row
@@ -1542,6 +1548,7 @@ class MainWindow(QMainWindow):
                 pass
         if hasattr(self, '_tab_fluidos'):
             self._tab_fluidos.refrescar()
+        self._sync_nav_fluidos()
 
         # 4. Label permanente del status bar
         nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
@@ -1571,6 +1578,7 @@ class MainWindow(QMainWindow):
         self.fluidos.clear()
         if hasattr(self, '_tab_fluidos'):
             self._tab_fluidos.refrescar()
+        self._sync_nav_fluidos()
         self.current_path = None
         self._actualizar_titulo()
         self._lbl_info.setText(
@@ -1649,6 +1657,7 @@ class MainWindow(QMainWindow):
         self.nav = NavigatorPanel()
         self.nav.calculo_pedido.connect(self._abrir_calculo)
         self.nav.dato_pedido.connect(self._accion_nav)
+        self.nav.fluido_calc_pedido.connect(self._abrir_calc_fluido_por_nombre)
 
         # ── Area de simulacion (MDI) ─────────────────────────
         # Cada calculo se abre como una subventana con barra de titulo nativa
@@ -1829,7 +1838,8 @@ class MainWindow(QMainWindow):
                 fluidos=self.fluidos,
                 get_z_actual=self.tab_eq.get_z,
                 cargar_en_principal=self._cargar_fluido_principal,
-                abrir_calc=self._abrir_calculo_fluido)
+                abrir_calc=self._abrir_calculo_fluido,
+                on_change=self._sync_nav_fluidos)
             self._tab_fluidos = widget
             sw = self._montar_subventana('fluidos', widget, "Fluidos")
         self._mostrar_subventana(sw)
@@ -1839,25 +1849,68 @@ class MainWindow(QMainWindow):
         self.tab_eq.set_z(z)
         self._abrir_calculo('equilibrio')
 
+    def _sync_nav_fluidos(self):
+        """Actualiza el arbol de fluidos del navegador."""
+        if hasattr(self, 'nav'):
+            self.nav.set_fluidos([f['nombre'] for f in self.fluidos])
+
+    def _abrir_calc_fluido_por_nombre(self, nombre, clave):
+        """Abre un calculo de fluido desde el arbol del navegador."""
+        for f in self.fluidos:
+            if f['nombre'] == nombre:
+                self._abrir_calculo_fluido(clave, f)
+                return
+
     def _abrir_calculo_fluido(self, clave, fluido):
-        """Abre un calculo (envolvente/saturacion/propiedades) ligado a un
-        fluido concreto, en su propia ventana, para poder comparar varios."""
-        constructores = {
-            'envolvente':  (TabEnvolvente,  "Envolvente"),
-            'saturacion':  (TabSaturacion,  "Saturacion"),
-            'propiedades': (TabPropiedades, "Propiedades"),
+        """Abre un calculo ligado a un fluido concreto, en su propia ventana,
+        para poder comparar varios fluidos entre si."""
+        etiquetas = {
+            'equilibrio':  "Equilibrio",
+            'envolvente':  "Envolvente",
+            'saturacion':  "Saturacion",
+            'propiedades': "Propiedades",
+            'parametros':  "Parametros",
         }
-        if clave not in constructores:
+        if clave not in etiquetas:
             return
-        Ctor, etiqueta = constructores[clave]
         subclave = f"{clave}@{fluido['nombre']}"
         sw = self._subventanas.get(subclave)
         if sw is None:
-            widget = Ctor(get_z=lambda f=fluido: f['z'],
-                          get_kij=lambda: kij_user)
-            titulo = f"{etiqueta} — {fluido['nombre']}"
+            widget = self._crear_widget_fluido(clave, fluido)
+            if widget is None:
+                return
+            titulo = f"{etiquetas[clave]} — {fluido['nombre']}"
             sw = self._montar_subventana(subclave, widget, titulo)
         self._mostrar_subventana(sw)
+
+    def _crear_widget_fluido(self, clave, fluido):
+        """Construye el widget de calculo ligado a la composicion del fluido."""
+        if clave == 'envolvente':
+            return TabEnvolvente(get_z=lambda f=fluido: f['z'],
+                                 get_kij=lambda: kij_user)
+        if clave == 'saturacion':
+            return TabSaturacion(get_z=lambda f=fluido: f['z'],
+                                 get_kij=lambda: kij_user)
+        if clave == 'propiedades':
+            return TabPropiedades(get_z=lambda f=fluido: f['z'],
+                                  get_kij=lambda: kij_user)
+        if clave == 'parametros':
+            # Parametros de la EOS (kij / criticos): son globales, se muestran
+            # los actuales del programa.
+            return TabParametros()
+        if clave == 'equilibrio':
+            # Equilibrio propio del fluido, con su composicion precargada.
+            w = TabEquilibrio()
+            w.set_z(fluido['z'])
+            # Reflejar EOS/densidad globales actuales.
+            w.cmb_eos.blockSignals(True)
+            w.cmb_eos.setCurrentIndex(self.tab_eq.cmb_eos.currentIndex())
+            w.cmb_eos.blockSignals(False)
+            w.cmb_dens.setCurrentIndex(self.tab_eq.cmb_dens.currentIndex())
+            # El cambio de EOS se propaga globalmente (la EOS es global).
+            w.eos_changed.connect(self._on_eos_changed)
+            return w
+        return None
 
     def _cascada(self, sw):
         """Ubica la subventana recien abierta en cascada dentro del area."""
