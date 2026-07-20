@@ -814,7 +814,7 @@ class TabParametros(QWidget):
     def tam_ideal(self):
         """Tamaño (ancho, alto) que hace entrar todo el contenido justo, sin
         scrollbars ni espacio sobrante."""
-        ancho = (NC + 1) * self._WK + 22      # cols kij + borde + margenes
+        ancho = (NC + 1) * self._WK + 12      # cols kij + borde + margenes justos
         alto = 8 + 22 + 3 + 316 + 3 + 22 + 3 + 310 + 3 + 30
         return (ancho, alto)
 
