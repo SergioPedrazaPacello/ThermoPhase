@@ -21,6 +21,10 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPalette, QColor
 
 from iconos import icono
+try:
+    from eos import NOMBRES as _NOMBRES_COMP
+except Exception:
+    _NOMBRES_COMP = []
 
 # ── Paleta clasica clara (monocromatica) ─────────────────────
 FUENTE_UI  = "Arial Narrow"
@@ -233,11 +237,17 @@ class NavigatorPanel(QWidget):
         v.addWidget(_seccion("Datos"))
         self.tree_datos = _tree_base()
         self.tree_datos.setRootIsDecorated(True)
-        # Componentes (hoja)
-        it_comp = QTreeWidgetItem(["Componentes"])
-        it_comp.setIcon(0, icono("componentes", 16))
-        it_comp.setData(0, Qt.ItemDataRole.UserRole, "componentes")
-        self.tree_datos.addTopLevelItem(it_comp)
+        # Componentes (nodo expandible: muestra los 13 componentes)
+        self._nodo_comp = QTreeWidgetItem(["Componentes"])
+        self._nodo_comp.setIcon(0, icono("componentes", 16))
+        self._nodo_comp.setData(0, Qt.ItemDataRole.UserRole, "componentes")
+        self.tree_datos.addTopLevelItem(self._nodo_comp)
+        for nombre in _NOMBRES_COMP:
+            txt = nombre.rstrip(':')
+            hijo = QTreeWidgetItem([txt])
+            hijo.setData(0, Qt.ItemDataRole.UserRole, ('comp', txt))
+            self._nodo_comp.addChild(hijo)
+        self._nodo_comp.setExpanded(False)
         # Fluidos (nodo raiz expandible; sus hijos son los fluidos)
         self._nodo_fluidos = QTreeWidgetItem(["Fluidos"])
         self._nodo_fluidos.setIcon(0, icono("fluidos", 16))
@@ -270,6 +280,12 @@ class NavigatorPanel(QWidget):
         if isinstance(data, tuple) and data and data[0] == 'calc':
             # Hoja de funcionalidad de un fluido: (‘calc’, nombre, clave)
             self.fluido_calc_pedido.emit(data[1], data[2])
+        elif isinstance(data, tuple) and data and data[0] == 'comp':
+            # Nombre de componente (por ahora solo se muestra).
+            pass
+        elif data == 'componentes':
+            # Expandir/colapsar para mostrar los 13 componentes.
+            item.setExpanded(not item.isExpanded())
         elif isinstance(data, str):
             self.dato_pedido.emit(data)
         else:

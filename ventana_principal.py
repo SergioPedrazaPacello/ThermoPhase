@@ -815,7 +815,7 @@ class TabParametros(QWidget):
         """Tamaño (ancho, alto) que hace entrar todo el contenido justo, sin
         scrollbars ni espacio sobrante."""
         ancho = (NC + 1) * self._WK + 22      # cols kij + borde + margenes
-        alto = 8 + 22 + 3 + 309 + 3 + 22 + 3 + 310 + 3 + 30
+        alto = 8 + 22 + 3 + 316 + 3 + 22 + 3 + 310 + 3 + 30
         return (ancho, alto)
 
     def _build(self):
@@ -824,7 +824,7 @@ class TabParametros(QWidget):
         outer.setSpacing(3)
         self.setStyleSheet(f'background:{GRAY_LBL};')
 
-        WP = [200,160,150,145,165]
+        WP = [250, 170, 165, 155, 170]   # suma 910 = ancho de la tabla kij
         WK = 65
 
         # ─── Tabla propiedades críticas (título+cabecera+datos en una sola tabla) ─
@@ -860,8 +860,8 @@ class TabParametros(QWidget):
 
         self.tbl_p.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tbl_p.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.tbl_p.setFixedHeight(309)
-        outer.addWidget(self.tbl_p)  # altura fija 310px
+        self.tbl_p.setFixedHeight(316)
+        outer.addWidget(self.tbl_p)
 
         # ─── Tabla kij (cabecera+datos en una sola tabla) ─────
         outer.addWidget(title_label("Coeficientes de interaccion binaria"))
