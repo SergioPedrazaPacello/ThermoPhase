@@ -484,7 +484,7 @@ def _propiedades(p):
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QBrush(QColor("#1F5FA8"))); p.drawRect(QRectF(9, 18, 4, 9))
     p.setBrush(QBrush(QColor("#2E8B57"))); p.drawRect(QRectF(15, 13, 4, 14))
-    p.setBrush(QBrush(QColor("#D9A441"))); p.drawRect(QRectF(21, 9, 4, 18))
+    p.setBrush(QBrush(QColor("#C0392B"))); p.drawRect(QRectF(21, 9, 4, 18))
 
 
 def _parametros(p):

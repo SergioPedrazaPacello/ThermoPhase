@@ -1071,13 +1071,14 @@ class TabFluidos(QWidget):
     calculos independientes por fluido para compararlos entre si."""
 
     def __init__(self, fluidos, get_z_actual, cargar_en_principal, abrir_calc,
-                 on_change=None):
+                 on_change=None, on_comp_change=None):
         super().__init__()
         self.fluidos = fluidos                 # lista compartida de dicts
         self._get_z_actual = get_z_actual
         self._cargar_principal = cargar_en_principal
         self._abrir_calc = abrir_calc
         self._on_change = on_change
+        self._on_comp_change = on_comp_change
         self._idx = -1
         self._build()
         self._refrescar_lista()
@@ -1204,6 +1205,8 @@ class TabFluidos(QWidget):
         self._upd_suma()
         if 0 <= self._idx < len(self.fluidos):
             self.fluidos[self._idx]['z'] = self._leer_z()
+            if self._on_comp_change:
+                self._on_comp_change(self.fluidos[self._idx])
 
     # ── Acciones de gestion ──────────────────────────────────
     def _nombre_nuevo(self, base="Fluido"):
@@ -1475,10 +1478,24 @@ class MainWindow(QMainWindow):
     def _recopilar_estado(self):
         """Junta el estado completo del programa en un dict serializable."""
         import eos as _eng
+        # Estados de las funcionalidades por fluido (envolvente, saturacion,
+        # propiedades, equilibrio) que se hayan abierto/calculado.
+        fluido_estados = {}
+        for clave, sw in self._subventanas.items():
+            if '@' not in clave:
+                continue
+            tipo, nombre = clave.split('@', 1)
+            w = getattr(sw, '_widget', None)
+            if w is not None and hasattr(w, 'get_estado'):
+                try:
+                    fluido_estados.setdefault(nombre, {})[tipo] = w.get_estado()
+                except Exception:
+                    pass
         return {
             'kij_user':   copy.deepcopy(kij_user),
             'eos_activa': _eng.get_eos(),
             'fluidos':    copy.deepcopy(self.fluidos),
+            'fluido_estados': fluido_estados,
             'tabs': {
                 'equilibrio':  self.tab_eq.get_estado(),
                 'envolvente':  self.tab_env.get_estado(),
@@ -1527,6 +1544,7 @@ class MainWindow(QMainWindow):
             self.tab_prop.set_estado(tabs['propiedades'])
 
         # 3b. Fluidos guardados
+        self._cerrar_ventanas_fluido()
         self.fluidos.clear()
         for f in (doc.get('fluidos') or []):
             try:
@@ -1542,6 +1560,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, '_tab_fluidos'):
             self._tab_fluidos.refrescar()
         self._sync_nav_fluidos()
+        # Estados de funcionalidades por fluido: se aplican al abrir cada una.
+        self._fluido_estados_pend = doc.get('fluido_estados') or {}
 
         # 4. Label permanente del status bar
         nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
@@ -1566,13 +1586,24 @@ class MainWindow(QMainWindow):
         self.tab_prop.set_estado({'entrada': {'T_R':0.0,'P_psi':0.0},'resultado':None})
         if hasattr(self, 'tab_par'):
             self.tab_par.refrescar_tabla()
+        self._cerrar_ventanas_fluido()
         self.fluidos.clear()
+        self._fluido_estados_pend = {}
         if hasattr(self, '_tab_fluidos'):
             self._tab_fluidos.refrescar()
         self._sync_nav_fluidos()
         self.current_path = None
         self._actualizar_titulo()
         self._lbl_info.setText("Peng-Robinson EOS")
+
+    def _cerrar_ventanas_fluido(self):
+        """Cierra y elimina las ventanas ligadas a fluidos (claves con '@')."""
+        for clave in [k for k in self._subventanas if '@' in k]:
+            sw = self._subventanas.pop(clave)
+            try:
+                sw.hide(); sw.deleteLater()
+            except Exception:
+                pass
 
     def _menu_abrir(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1815,6 +1846,7 @@ class MainWindow(QMainWindow):
             alto_pie = 20
 
         win._clave = clave
+        win._widget = widget
         # Tamaño FIJO (solo la ventana principal se puede redimensionar). Los
         # calculos comparten el tamaño de "Equilibrio de fases", un pelin mas
         # ancho que su contenido; Fluidos recibe su propio `tam`.
@@ -1859,7 +1891,8 @@ class MainWindow(QMainWindow):
                 get_z_actual=self.tab_eq.get_z,
                 cargar_en_principal=self._cargar_fluido_principal,
                 abrir_calc=self._abrir_calculo_fluido,
-                on_change=self._sync_nav_fluidos)
+                on_change=self._sync_nav_fluidos,
+                on_comp_change=lambda f: self._sync_fluido_z(f, 'fluidos'))
             self._tab_fluidos = widget
             h = widget.sizeHint()
             sw = self._montar_subventana('fluidos', widget, "Fluidos",
@@ -1903,6 +1936,14 @@ class MainWindow(QMainWindow):
             widget = self._crear_widget_fluido(clave, fluido)
             if widget is None:
                 return
+            # Restaurar estado guardado (al abrir un archivo) si existe.
+            pend = getattr(self, '_fluido_estados_pend', {}).get(
+                fluido['nombre'], {})
+            if clave in pend and hasattr(widget, 'set_estado'):
+                try:
+                    widget.set_estado(pend[clave])
+                except Exception:
+                    pass
             titulo = f"{etiquetas[clave]} - {fluido['nombre']}"
             # Pie con la EOS del fluido (Propiedades siempre PR).
             prov = ((lambda: 'PR') if clave == 'propiedades'
@@ -1934,7 +1975,8 @@ class MainWindow(QMainWindow):
             return TabParametros(objetivo=fluido)
         if clave == 'equilibrio':
             # Equilibrio propio del fluido: su combo EOS define la EOS del
-            # fluido y usa el kij del fluido.
+            # fluido y usa el kij del fluido. Su composicion queda LIGADA al
+            # fluido (edicion bidireccional con el gestor de Fluidos).
             w = TabEquilibrio(kij_get=gk)
             w.set_z(fluido['z'])
             w.cmb_eos.blockSignals(True)
@@ -1943,8 +1985,38 @@ class MainWindow(QMainWindow):
             w.cmb_dens.setCurrentIndex(self.tab_eq.cmb_dens.currentIndex())
             w.eos_changed.connect(
                 lambda *_a, f=fluido, ww=w: self._on_fluido_eos(f, ww))
+            w.tbl_comp.itemChanged.connect(
+                lambda _it, f=fluido, ww=w: self._on_eq_fluido_comp(f, ww))
             return w
         return None
+
+    def _on_eq_fluido_comp(self, fluido, w):
+        """La composicion editada en el Equilibrio del fluido pasa al fluido
+        y se refleja en el gestor (y viceversa)."""
+        if getattr(self, '_sync_z_lock', False):
+            return
+        fluido['z'] = w.get_z()
+        self._sync_fluido_z(fluido, 'equilibrio')
+
+    def _sync_fluido_z(self, fluido, origen):
+        """Sincroniza la composicion del fluido entre el gestor de Fluidos y
+        la ventana de Equilibrio del fluido (bidireccional, sin bucles)."""
+        if getattr(self, '_sync_z_lock', False):
+            return
+        self._sync_z_lock = True
+        try:
+            if origen != 'equilibrio':
+                sw = self._subventanas.get(f"equilibrio@{fluido['nombre']}")
+                if sw is not None:
+                    for ww in sw.findChildren(TabEquilibrio):
+                        ww.set_z(fluido['z'])
+            if origen != 'fluidos':
+                tf = getattr(self, '_tab_fluidos', None)
+                if (tf is not None and 0 <= tf._idx < len(self.fluidos)
+                        and self.fluidos[tf._idx] is fluido):
+                    tf._mostrar_z(fluido['z'])
+        finally:
+            self._sync_z_lock = False
 
     def _on_fluido_eos(self, fluido, w):
         """La EOS del combo de la ventana de Equilibrio del fluido pasa a ser
