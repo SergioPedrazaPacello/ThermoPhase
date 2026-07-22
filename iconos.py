@@ -440,60 +440,51 @@ def _equilibrio(p):
 
 
 def _envolvente(p):
-    # Envolvente de fases REAL (lazo cerrado): rama de burbuja (rojo) sube al
-    # punto critico y rama de rocio (azul) baja por la derecha.
+    # Envolvente de fases con la forma clasica (lazo tipo domo inclinado):
+    # rama de burbuja (rojo) y rama de rocio (azul) que se unen en el critico.
     p.setPen(_pen(QColor("#8A8A8A"), 1.3))
-    p.drawLine(QPointF(5, 4), QPointF(5, 27))
-    p.drawLine(QPointF(5, 27), QPointF(29, 27))
-    bub = QPainterPath(); bub.moveTo(12, 25)
-    bub.cubicTo(7.5, 20, 9.5, 10, 17, 8)
+    p.drawLine(QPointF(6, 4), QPointF(6, 27))
+    p.drawLine(QPointF(6, 27), QPointF(28, 27))
+    bub = QPainterPath(); bub.moveTo(9, 25)
+    bub.cubicTo(8, 12, 16, 6, 21, 10)          # rama de burbuja
     p.setPen(_pen(QColor("#C0392B"), 2.2)); p.setBrush(Qt.BrushStyle.NoBrush)
     p.drawPath(bub)
-    dew = QPainterPath(); dew.moveTo(17, 8)
-    dew.cubicTo(24, 8.5, 27, 17, 22, 23)
-    dew.cubicTo(20, 25.5, 16, 26, 12, 25)
+    dew = QPainterPath(); dew.moveTo(21, 10)
+    dew.cubicTo(27, 14, 22, 24, 12, 25)        # rama de rocio
     p.setPen(_pen(QColor("#1F5FA8"), 2.2))
     p.drawPath(dew)
     p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#333333")))
-    p.drawEllipse(QRectF(15.4, 6.4, 3.3, 3.3))
+    p.drawEllipse(QRectF(19.35, 8.35, 3.3, 3.3))   # punto critico
 
 
 def _saturacion(p):
-    # Misma envolvente REAL, destacando los puntos de saturacion (burbuja y
-    # rocio) unidos por una isobara.
+    # Misma envolvente clasica, destacando los puntos de saturacion (burbuja
+    # y rocio) unidos por una isobara.
     p.setPen(_pen(QColor("#8A8A8A"), 1.3))
-    p.drawLine(QPointF(5, 4), QPointF(5, 27))
-    p.drawLine(QPointF(5, 27), QPointF(29, 27))
-    env = QPainterPath(); env.moveTo(12, 25)
-    env.cubicTo(7.5, 20, 9.5, 10, 17, 8)
-    env.cubicTo(24, 8.5, 27, 17, 22, 23)
-    env.cubicTo(20, 25.5, 16, 26, 12, 25)
+    p.drawLine(QPointF(6, 4), QPointF(6, 27))
+    p.drawLine(QPointF(6, 27), QPointF(28, 27))
+    env = QPainterPath(); env.moveTo(9, 25)
+    env.cubicTo(8, 12, 16, 6, 21, 10)
+    env.cubicTo(27, 14, 22, 24, 12, 25)
     p.setPen(_pen(QColor("#B8860B"), 2.0)); p.setBrush(Qt.BrushStyle.NoBrush)
     p.drawPath(env)
-    yb = 17.5
+    yb = 16.7
     p.setPen(_pen(QColor("#9A9A9A"), 1.0, cap=Qt.PenCapStyle.FlatCap))
-    p.drawLine(QPointF(9.3, yb), QPointF(24.4, yb))
+    p.drawLine(QPointF(9.8, yb), QPointF(23.3, yb))
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QBrush(QColor("#C0392B"))); p.drawEllipse(QRectF(7.7, yb - 1.6, 3.2, 3.2))
-    p.setBrush(QBrush(QColor("#1F5FA8"))); p.drawEllipse(QRectF(22.9, yb - 1.6, 3.2, 3.2))
+    p.setBrush(QBrush(QColor("#C0392B"))); p.drawEllipse(QRectF(8.2, yb - 1.6, 3.2, 3.2))
+    p.setBrush(QBrush(QColor("#1F5FA8"))); p.drawEllipse(QRectF(21.7, yb - 1.6, 3.2, 3.2))
 
 
 def _propiedades(p):
-    # Reporte: hoja con cabecera azul, filas y mini-grafico de barras.
-    OUT = QColor("#666666")
-    p.setPen(_pen(OUT, 1.4)); p.setBrush(QBrush(QColor("#FFFFFF")))
-    p.drawRect(QRectF(8, 5, 16, 22))
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#6E97C6")))
-    p.drawRect(QRectF(8, 5, 16, 4))
-    p.setPen(_pen(QColor("#C8C8C8"), 1.0))
-    p.drawLine(QPointF(10, 13), QPointF(22, 13))
-    p.drawLine(QPointF(10, 16), QPointF(22, 16))
+    # Grafico de barras sobre ejes (como el icono anterior), en color.
+    p.setPen(_pen(QColor("#8A8A8A"), 1.4))
+    p.drawLine(QPointF(6, 4), QPointF(6, 27))
+    p.drawLine(QPointF(6, 27), QPointF(28, 27))
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QBrush(QColor("#C0392B"))); p.drawRect(QRectF(10, 21, 3, 4))
-    p.setBrush(QBrush(QColor("#2E8B57"))); p.drawRect(QRectF(14.5, 19, 3, 6))
-    p.setBrush(QBrush(QColor("#1F5FA8"))); p.drawRect(QRectF(19, 17, 3, 8))
-    p.setPen(_pen(OUT, 1.4)); p.setBrush(Qt.BrushStyle.NoBrush)
-    p.drawRect(QRectF(8, 5, 16, 22))
+    p.setBrush(QBrush(QColor("#1F5FA8"))); p.drawRect(QRectF(9, 18, 4, 9))
+    p.setBrush(QBrush(QColor("#2E8B57"))); p.drawRect(QRectF(15, 13, 4, 14))
+    p.setBrush(QBrush(QColor("#D9A441"))); p.drawRect(QRectF(21, 9, 4, 18))
 
 
 def _parametros(p):
