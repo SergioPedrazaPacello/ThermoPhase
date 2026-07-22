@@ -274,25 +274,41 @@ def _cilindro(p, color, borde):
 
 
 def _componentes(p):
-    _cilindro(p, QColor("#CBB2E0"), QColor("#7A4FA0"))
-    p.setPen(_pen(QColor("#7A4FA0"), 1.2))
-    p.drawArc(QRectF(7, 11, 18, 6), 0, -180 * 16)
-    p.drawArc(QRectF(7, 16, 18, 6), 0, -180 * 16)
+    # Molecula: atomo central rojo con enlaces a atomos azul/verde.
+    p.setPen(_pen(QColor("#707070"), 2.2))
+    p.drawLine(QPointF(16, 16), QPointF(9, 9))
+    p.drawLine(QPointF(16, 16), QPointF(23, 9))
+    p.drawLine(QPointF(16, 16), QPointF(16, 25))
+    p.setPen(_pen(QColor("#2A4A70"), 0.8)); p.setBrush(QBrush(QColor("#6E97C6")))
+    p.drawEllipse(QRectF(5.5, 5.5, 7, 7))
+    p.drawEllipse(QRectF(19.5, 5.5, 7, 7))
+    p.setPen(_pen(QColor("#3B6D11"), 0.8)); p.setBrush(QBrush(QColor("#8CBF6C")))
+    p.drawEllipse(QRectF(12.5, 21.5, 7, 7))
+    p.setPen(_pen(QColor("#7A1F1F"), 0.8)); p.setBrush(QBrush(QColor("#C0392B")))
+    p.drawEllipse(QRectF(11.5, 11.5, 9, 9))
 
 
 def _fluidos(p):
-    # Gota
-    path = QPainterPath()
-    path.moveTo(16, 5)
-    path.cubicTo(24, 15, 25, 20, 16, 27)
-    path.cubicTo(7, 20, 8, 15, 16, 5)
-    p.setPen(_pen(AZUL_OSC, 1.4))
-    grad = QLinearGradient(16, 5, 16, 27)
-    grad.setColorAt(0, AZUL_CLR); grad.setColorAt(1, AZUL_OSC)
-    p.setBrush(QBrush(grad))
-    p.drawPath(path)
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(BLANCO))
-    p.drawEllipse(QRectF(12, 16, 3, 4))
+    # Matraz Erlenmeyer con liquido ambar UNIFORME.
+    OUT = QColor("#4A4A4A"); OIL = QColor("#D9A441")
+    flask = QPainterPath()
+    flask.moveTo(13, 4); flask.lineTo(19, 4)
+    flask.lineTo(19, 12); flask.lineTo(26, 25)
+    flask.cubicTo(27, 27.5, 25.5, 29, 23, 29)
+    flask.lineTo(9, 29)
+    flask.cubicTo(6.5, 29, 5, 27.5, 6, 25)
+    flask.lineTo(13, 12); flask.closeSubpath()
+    p.setPen(_pen(OUT, 1.5)); p.setBrush(QBrush(QColor("#FFFFFF")))
+    p.drawPath(flask)
+    p.setClipPath(flask)
+    liq = QPainterPath()
+    liq.moveTo(8.7, 21); liq.lineTo(23.3, 21)
+    liq.lineTo(26, 25); liq.cubicTo(27, 27.5, 25.5, 29, 23, 29)
+    liq.lineTo(9, 29); liq.cubicTo(6.5, 29, 5, 27.5, 6, 25); liq.closeSubpath()
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(OIL))
+    p.drawPath(liq)
+    p.setClipping(False)
+    p.setPen(_pen(OUT, 1.5)); p.drawLine(QPointF(13, 4), QPointF(19, 4))
 
 
 def _mezclas(p):
@@ -403,71 +419,99 @@ def _acerca(p):
 
 # ── Iconos: NAVEGADOR (pestanas) ─────────────────────────────
 def _equilibrio(p):
-    # Gota partida vapor/liquido
-    path = QPainterPath()
-    path.moveTo(16, 5)
-    path.cubicTo(24, 15, 25, 20, 16, 27)
-    path.cubicTo(7, 20, 8, 15, 16, 5)
-    p.setPen(_pen(GRIS, 1.4))
-    p.setBrush(QBrush(QColor("#EAF0FB")))
-    p.drawPath(path)
+    # Separador flash (tambor horizontal): gas azul arriba, liquido ambar
+    # UNIFORME abajo, con salida de vapor (arriba) y de liquido (abajo).
+    OIL = QColor("#D9A441"); GAS = QColor("#AFCDE8"); OUT = QColor("#4A4A4A")
+    drum = QRectF(4, 10, 24, 13)
+    path = QPainterPath(); path.addRoundedRect(drum, 6, 6)
     p.setClipPath(path)
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(AZUL_OSC))
-    p.drawRect(QRectF(16, 4, 12, 26))          # mitad liquida
+    p.fillRect(QRectF(4, 10, 24, 6.5), GAS)
+    p.fillRect(QRectF(4, 16.5, 24, 6.5), OIL)
     p.setClipping(False)
-    p.setPen(_pen(GRIS, 1.0))
-    p.drawLine(QPointF(16, 6), QPointF(16, 26))
+    p.setPen(_pen(OUT, 1.6)); p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRoundedRect(drum, 6, 6)
+    p.setPen(_pen(OUT, 0.9)); p.drawLine(QPointF(6, 16.5), QPointF(26, 16.5))
+    p.setPen(_pen(QColor("#1F5FA8"), 1.6))
+    p.drawLine(QPointF(23, 10), QPointF(23, 4))
+    p.drawPolyline(_poly([(21, 6), (23, 4), (25, 6)]))
+    p.setPen(_pen(QColor("#B87A1C"), 1.6))
+    p.drawLine(QPointF(9, 23), QPointF(9, 29))
+    p.drawPolyline(_poly([(7, 27), (9, 29), (11, 27)]))
 
 
 def _envolvente(p):
-    # Curva envolvente P-T con punto critico
-    p.setPen(_pen(GRIS, 1.4))
-    p.drawLine(QPointF(6, 4), QPointF(6, 27))
-    p.drawLine(QPointF(6, 27), QPointF(28, 27))
-    path = QPainterPath()
-    path.moveTo(9, 25)
-    path.cubicTo(8, 12, 16, 6, 21, 10)         # rama burbuja
-    path.cubicTo(27, 14, 22, 24, 12, 25)       # rama rocio
-    p.setPen(_pen(ROJO_OX, 2.2)); p.setBrush(Qt.BrushStyle.NoBrush)
-    p.drawPath(path)
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(AZUL))
-    p.drawEllipse(QRectF(19.5, 8.5, 3.4, 3.4))  # punto critico
+    # Envolvente de fases REAL (lazo cerrado): rama de burbuja (rojo) sube al
+    # punto critico y rama de rocio (azul) baja por la derecha.
+    p.setPen(_pen(QColor("#8A8A8A"), 1.3))
+    p.drawLine(QPointF(5, 4), QPointF(5, 27))
+    p.drawLine(QPointF(5, 27), QPointF(29, 27))
+    bub = QPainterPath(); bub.moveTo(12, 25)
+    bub.cubicTo(7.5, 20, 9.5, 10, 17, 8)
+    p.setPen(_pen(QColor("#C0392B"), 2.2)); p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawPath(bub)
+    dew = QPainterPath(); dew.moveTo(17, 8)
+    dew.cubicTo(24, 8.5, 27, 17, 22, 23)
+    dew.cubicTo(20, 25.5, 16, 26, 12, 25)
+    p.setPen(_pen(QColor("#1F5FA8"), 2.2))
+    p.drawPath(dew)
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#333333")))
+    p.drawEllipse(QRectF(15.4, 6.4, 3.3, 3.3))
 
 
 def _saturacion(p):
-    # Marcador X sobre curva
-    p.setPen(_pen(GRIS, 1.4))
-    p.drawLine(QPointF(5, 26), QPointF(27, 26))
-    p.setPen(_pen(AZUL_CLR, 1.8))
-    p.drawArc(QRectF(6, 6, 20, 30), 20 * 16, 140 * 16)
-    p.setPen(_pen(ROJO, 2.4))
-    p.drawLine(QPointF(12, 10), QPointF(20, 18))
-    p.drawLine(QPointF(20, 10), QPointF(12, 18))
+    # Misma envolvente REAL, destacando los puntos de saturacion (burbuja y
+    # rocio) unidos por una isobara.
+    p.setPen(_pen(QColor("#8A8A8A"), 1.3))
+    p.drawLine(QPointF(5, 4), QPointF(5, 27))
+    p.drawLine(QPointF(5, 27), QPointF(29, 27))
+    env = QPainterPath(); env.moveTo(12, 25)
+    env.cubicTo(7.5, 20, 9.5, 10, 17, 8)
+    env.cubicTo(24, 8.5, 27, 17, 22, 23)
+    env.cubicTo(20, 25.5, 16, 26, 12, 25)
+    p.setPen(_pen(QColor("#B8860B"), 2.0)); p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawPath(env)
+    yb = 17.5
+    p.setPen(_pen(QColor("#9A9A9A"), 1.0, cap=Qt.PenCapStyle.FlatCap))
+    p.drawLine(QPointF(9.3, yb), QPointF(24.4, yb))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor("#C0392B"))); p.drawEllipse(QRectF(7.7, yb - 1.6, 3.2, 3.2))
+    p.setBrush(QBrush(QColor("#1F5FA8"))); p.drawEllipse(QRectF(22.9, yb - 1.6, 3.2, 3.2))
 
 
 def _propiedades(p):
-    # H-S: barras + curva
-    p.setPen(_pen(GRIS, 1.4))
-    p.drawLine(QPointF(6, 4), QPointF(6, 27))
-    p.drawLine(QPointF(6, 27), QPointF(28, 27))
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(AZUL))
-    p.drawRect(QRectF(9, 18, 4, 9))
-    p.setBrush(QBrush(AZUL_CLR)); p.drawRect(QRectF(15, 13, 4, 14))
-    p.setBrush(QBrush(ROJO_OX)); p.drawRect(QRectF(21, 9, 4, 18))
+    # Reporte: hoja con cabecera azul, filas y mini-grafico de barras.
+    OUT = QColor("#666666")
+    p.setPen(_pen(OUT, 1.4)); p.setBrush(QBrush(QColor("#FFFFFF")))
+    p.drawRect(QRectF(8, 5, 16, 22))
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#6E97C6")))
+    p.drawRect(QRectF(8, 5, 16, 4))
+    p.setPen(_pen(QColor("#C8C8C8"), 1.0))
+    p.drawLine(QPointF(10, 13), QPointF(22, 13))
+    p.drawLine(QPointF(10, 16), QPointF(22, 16))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor("#C0392B"))); p.drawRect(QRectF(10, 21, 3, 4))
+    p.setBrush(QBrush(QColor("#2E8B57"))); p.drawRect(QRectF(14.5, 19, 3, 6))
+    p.setBrush(QBrush(QColor("#1F5FA8"))); p.drawRect(QRectF(19, 17, 3, 8))
+    p.setPen(_pen(OUT, 1.4)); p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRect(QRectF(8, 5, 16, 22))
 
 
 def _parametros(p):
-    # Matriz kij (rejilla)
-    p.setPen(_pen(AZUL_OSC, 1.4))
-    p.setBrush(QBrush(BLANCO))
-    p.drawRect(QRectF(6, 6, 20, 20))
-    p.setPen(_pen(AZUL_CLR, 1.0))
+    # Matriz kij tipo hoja de calculo: cabecera azul y celda resaltada verde.
+    OUT = QColor("#666666")
+    p.setPen(_pen(OUT, 1.4)); p.setBrush(QBrush(QColor("#FFFFFF")))
+    p.drawRect(QRectF(5, 6, 22, 20))
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#6E97C6")))
+    p.drawRect(QRectF(5, 6, 22, 5))
+    p.setBrush(QBrush(QColor("#EDEDE4"))); p.drawRect(QRectF(5, 11, 6, 15))
+    p.setBrush(QBrush(QColor("#B7D8A8"))); p.drawRect(QRectF(11, 16, 6, 5))
+    p.setPen(_pen(QColor("#C8C8C8"), 1.0))
     for i in range(1, 4):
-        p.drawLine(QPointF(6 + i * 5, 6), QPointF(6 + i * 5, 26))
-        p.drawLine(QPointF(6, 6 + i * 5), QPointF(26, 6 + i * 5))
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#D8E4F5")))
-    for k in range(4):
-        p.drawRect(QRectF(6 + k * 5, 6 + k * 5, 5, 5))   # diagonal
+        p.drawLine(QPointF(5 + 6 * i, 6), QPointF(5 + 6 * i, 26))
+    for j in range(1, 4):
+        p.drawLine(QPointF(5, 6 + 5 * j), QPointF(27, 6 + 5 * j))
+    p.setPen(_pen(OUT, 1.4)); p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRect(QRectF(5, 6, 22, 20))
 
 
 def _corriente(p):
@@ -559,7 +603,6 @@ def icono(nombre, tam=32):
         fn(p)
     finally:
         p.end()
-    pm = _desaturar(pm)
     ic = QIcon(pm)
     _CACHE[clave] = ic
     return ic
@@ -574,7 +617,6 @@ def pixmap(nombre, tam=32):
             fn(p)
         finally:
             p.end()
-        pm = _desaturar(pm)
     else:
         p.end()
     return pm
