@@ -826,16 +826,6 @@ class TabParametros(QWidget):
             kij_fuente = fuente
             kij_user = nueva
         self.refrescar_tabla()
-        self._nota_fuente()
-
-    def _nota_fuente(self):
-        notas = {
-            'HYSYS':  "kij propios de HYSYS (distintos para PR y SRK)",
-            'PVTSIM': "Knapp: HC-HC = 0; edite los pares con N2/CO2",
-            'CHUEH':  "calculados desde Vc; iguales para PR y SRK",
-        }
-        if hasattr(self, 'lbl_fuente'):
-            self.lbl_fuente.setText(notas.get(self._fuente(), ""))
 
     def _eos_ctx(self):
         if self._objetivo is not None:
@@ -897,30 +887,6 @@ class TabParametros(QWidget):
         # ─── Tabla kij (cabecera+datos en una sola tabla) ─────
         outer.addWidget(title_label("Coeficientes de interaccion binaria"))
 
-        # Selector de fuente de los kij.
-        fila_f = QHBoxLayout(); fila_f.setSpacing(6)
-        fila_f.setContentsMargins(2, 0, 2, 2)
-        lf = QLabel("Fuente de los kij:")
-        lf.setStyleSheet(f'background:transparent; color:{TEXT};'
-                         f' font-family:"{FONT_F}"; font-size:{FS}pt;')
-        fila_f.addWidget(lf)
-        self.cmb_fuente = QComboBox()
-        self.cmb_fuente.addItems(["HYSYS", "PVTsim (Knapp)",
-                                  "Chueh-Prausnitz (Vc)"])
-        _aplicar_estilo_combo(self.cmb_fuente)
-        self.cmb_fuente.setFixedWidth(190)
-        idx = {'HYSYS': 0, 'PVTSIM': 1, 'CHUEH': 2}.get(self._fuente(), 0)
-        self.cmb_fuente.setCurrentIndex(idx)
-        self.cmb_fuente.currentIndexChanged.connect(self._on_fuente)
-        fila_f.addWidget(self.cmb_fuente)
-        self.lbl_fuente = QLabel("")
-        self.lbl_fuente.setStyleSheet(
-            f'background:transparent; color:#555555;'
-            f' font-family:"{FONT_F}"; font-size:9pt;')
-        fila_f.addWidget(self.lbl_fuente)
-        fila_f.addStretch()
-        outer.addLayout(fila_f)
-
         self.tbl_k = QTableWidget(NC+1, NC+1)  # fila 0=cabecera
         self.tbl_k.horizontalHeader().hide()
         self.tbl_k.verticalHeader().hide()
@@ -956,19 +922,26 @@ class TabParametros(QWidget):
                 self.tbl_k.setItem(r,j+1, it)
 
         self.tbl_k.itemChanged.connect(self._on_kij)
-        self._nota_fuente()
         self.tbl_k.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tbl_k.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tbl_k.setFixedHeight(310)
         outer.addWidget(self.tbl_k)  # altura fija 316px
 
         bot = QHBoxLayout()
-        note = QLabel("Doble clic para editar un coeficiente "
-                      "(la celda simetrica se actualiza automaticamente)")
-        note.setStyleSheet(
-            f'color:{TEXT_DIM};font-size:9pt;font-family:"{FONT_F}";'
+        lf = QLabel("Fuente de los coeficientes de iteracion binaria:")
+        lf.setStyleSheet(
+            f'color:{TEXT};font-size:{FS}pt;font-family:"{FONT_F}";'
             f'background:transparent;')
-        bot.addWidget(note)
+        bot.addWidget(lf)
+        self.cmb_fuente = QComboBox()
+        self.cmb_fuente.addItems(["HYSYS", "PVTsim (Knapp)",
+                                  "Chueh-Prausnitz (Vc)"])
+        _aplicar_estilo_combo(self.cmb_fuente)
+        self.cmb_fuente.setFixedWidth(180)
+        self.cmb_fuente.setCurrentIndex(
+            {'HYSYS': 0, 'PVTSIM': 1, 'CHUEH': 2}.get(self._fuente(), 0))
+        self.cmb_fuente.currentIndexChanged.connect(self._on_fuente)
+        bot.addWidget(self.cmb_fuente)
         bot.addStretch()
         btn_r = QPushButton("Restaurar valores originales")
         btn_r.setFixedWidth(220)
