@@ -31,6 +31,7 @@ from ribbon import construir_ribbon, NavigatorPanel
 import iconos
 import edicion
 kij_user = copy.deepcopy(KIJ_DEFAULT)
+kij_fuente = 'HYSYS'      # fuente activa de los kij globales
 
 # ── Paleta ────────────────────────────────────────────────────
 WHITE    = "#FFFFFF"
@@ -806,6 +807,36 @@ class TabParametros(QWidget):
             return self._objetivo['kij']
         return kij_user
 
+    def _fuente(self):
+        """Fuente de kij activa ('HYSYS' / 'PVTSIM' / 'CHUEH')."""
+        global kij_fuente
+        if self._objetivo is not None:
+            return self._objetivo.get('kij_fuente', 'HYSYS')
+        return kij_fuente
+
+    def _on_fuente(self, idx):
+        """Cambia la fuente de los kij y recarga la matriz base."""
+        global kij_user, kij_fuente
+        fuente = ['HYSYS', 'PVTSIM', 'CHUEH'][max(0, min(idx, 2))]
+        nueva = _eng.kij_base(fuente, self._eos_ctx())
+        if self._objetivo is not None:
+            self._objetivo['kij_fuente'] = fuente
+            self._objetivo['kij'] = nueva
+        else:
+            kij_fuente = fuente
+            kij_user = nueva
+        self.refrescar_tabla()
+        self._nota_fuente()
+
+    def _nota_fuente(self):
+        notas = {
+            'HYSYS':  "kij propios de HYSYS (distintos para PR y SRK)",
+            'PVTSIM': "Knapp: HC-HC = 0; edite los pares con N2/CO2",
+            'CHUEH':  "calculados desde Vc; iguales para PR y SRK",
+        }
+        if hasattr(self, 'lbl_fuente'):
+            self.lbl_fuente.setText(notas.get(self._fuente(), ""))
+
     def _eos_ctx(self):
         if self._objetivo is not None:
             return self._objetivo.get('eos', 'PR')
@@ -866,6 +897,30 @@ class TabParametros(QWidget):
         # ─── Tabla kij (cabecera+datos en una sola tabla) ─────
         outer.addWidget(title_label("Coeficientes de interaccion binaria"))
 
+        # Selector de fuente de los kij.
+        fila_f = QHBoxLayout(); fila_f.setSpacing(6)
+        fila_f.setContentsMargins(2, 0, 2, 2)
+        lf = QLabel("Fuente de los kij:")
+        lf.setStyleSheet(f'background:transparent; color:{TEXT};'
+                         f' font-family:"{FONT_F}"; font-size:{FS}pt;')
+        fila_f.addWidget(lf)
+        self.cmb_fuente = QComboBox()
+        self.cmb_fuente.addItems(["HYSYS", "PVTsim (Knapp)",
+                                  "Chueh-Prausnitz (Vc)"])
+        _aplicar_estilo_combo(self.cmb_fuente)
+        self.cmb_fuente.setFixedWidth(190)
+        idx = {'HYSYS': 0, 'PVTSIM': 1, 'CHUEH': 2}.get(self._fuente(), 0)
+        self.cmb_fuente.setCurrentIndex(idx)
+        self.cmb_fuente.currentIndexChanged.connect(self._on_fuente)
+        fila_f.addWidget(self.cmb_fuente)
+        self.lbl_fuente = QLabel("")
+        self.lbl_fuente.setStyleSheet(
+            f'background:transparent; color:#555555;'
+            f' font-family:"{FONT_F}"; font-size:9pt;')
+        fila_f.addWidget(self.lbl_fuente)
+        fila_f.addStretch()
+        outer.addLayout(fila_f)
+
         self.tbl_k = QTableWidget(NC+1, NC+1)  # fila 0=cabecera
         self.tbl_k.horizontalHeader().hide()
         self.tbl_k.verticalHeader().hide()
@@ -901,6 +956,7 @@ class TabParametros(QWidget):
                 self.tbl_k.setItem(r,j+1, it)
 
         self.tbl_k.itemChanged.connect(self._on_kij)
+        self._nota_fuente()
         self.tbl_k.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tbl_k.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tbl_k.setFixedHeight(310)
@@ -954,10 +1010,8 @@ class TabParametros(QWidget):
         self.tbl_k.blockSignals(False)
 
     def _reset(self):
-        # Restaura al default de la EOS del contexto (global o del fluido).
-        base = (_eng.KIJ_DEFAULT_SRK if self._eos_ctx() == 'SRK'
-                else _eng.KIJ_DEFAULT_PR)
-        nuevo = copy.deepcopy(base)
+        # Restaura al default de la FUENTE y la EOS del contexto.
+        nuevo = _eng.kij_base(self._fuente(), self._eos_ctx())
         if self._objetivo is not None:
             self._objetivo['kij'] = nuevo
         else:
@@ -1218,7 +1272,8 @@ class TabFluidos(QWidget):
 
     def _nuevo(self):
         self.fluidos.append({'nombre': self._nombre_nuevo(), 'z': [0.0] * NC,
-                             'eos': 'PR', 'kij': copy.deepcopy(KIJ_DEFAULT)})
+                             'eos': 'PR', 'kij': copy.deepcopy(KIJ_DEFAULT),
+                             'kij_fuente': 'HYSYS'})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
@@ -1226,7 +1281,8 @@ class TabFluidos(QWidget):
         z = list(self._get_z_actual())
         self.fluidos.append({'nombre': self._nombre_nuevo("Cromatografia"),
                              'z': z, 'eos': 'PR',
-                             'kij': copy.deepcopy(KIJ_DEFAULT)})
+                             'kij': copy.deepcopy(KIJ_DEFAULT),
+                             'kij_fuente': 'HYSYS'})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
@@ -1493,6 +1549,7 @@ class MainWindow(QMainWindow):
                     pass
         return {
             'kij_user':   copy.deepcopy(kij_user),
+            'kij_fuente': kij_fuente,
             'eos_activa': _eng.get_eos(),
             'fluidos':    copy.deepcopy(self.fluidos),
             'fluido_estados': fluido_estados,
@@ -1508,8 +1565,9 @@ class MainWindow(QMainWindow):
         """Restaura el estado completo desde un dict (leído de .tpsim).
         El orden es importante: primero EOS y kij (afectan al resto),
         despues cada pestaña."""
-        global kij_user
+        global kij_user, kij_fuente
         import eos as _eng
+        kij_fuente = doc.get('kij_fuente', 'HYSYS')
 
         # 1. EOS activa (sin disparar señal para no resetear kij_user)
         eos = doc.get('eos_activa', 'PR')
@@ -1550,7 +1608,8 @@ class MainWindow(QMainWindow):
             try:
                 fl = {'nombre': str(f.get('nombre', 'Fluido')),
                       'z': [float(v) for v in f.get('z', [])],
-                      'eos': 'SRK' if f.get('eos') == 'SRK' else 'PR'}
+                      'eos': 'SRK' if f.get('eos') == 'SRK' else 'PR',
+                      'kij_fuente': f.get('kij_fuente', 'HYSYS')}
                 kij = f.get('kij')
                 fl['kij'] = ([[float(v) for v in fila] for fila in kij]
                              if kij else copy.deepcopy(KIJ_DEFAULT))
@@ -1873,9 +1932,7 @@ class MainWindow(QMainWindow):
         sw = self._subventanas.get(clave)
         if sw is None:
             widget, titulo, ic = self._defs_calc[clave]
-            # Propiedades termodinamicas usa siempre PR; el resto, la EOS
-            # principal (barra / Equilibrio principal).
-            prov = (lambda: 'PR') if clave == 'propiedades' else self._eos_main_code
+            prov = self._eos_main_code
             # Parametros tiene su propio tamaño (para que entre todo justo).
             tam = widget.tam_ideal() if clave == 'parametros' else None
             sw = self._montar_subventana(clave, widget, titulo, tam=tam,
@@ -1930,6 +1987,7 @@ class MainWindow(QMainWindow):
             return
         fluido.setdefault('eos', 'PR')
         fluido.setdefault('kij', copy.deepcopy(KIJ_DEFAULT))
+        fluido.setdefault('kij_fuente', 'HYSYS')
         subclave = f"{clave}@{fluido['nombre']}"
         sw = self._subventanas.get(subclave)
         if sw is None:
@@ -1945,9 +2003,8 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
             titulo = f"{etiquetas[clave]} - {fluido['nombre']}"
-            # Pie con la EOS del fluido (Propiedades siempre PR).
-            prov = ((lambda: 'PR') if clave == 'propiedades'
-                    else (lambda f=fluido: f.get('eos', 'PR')))
+            # Pie con la EOS del fluido.
+            prov = (lambda f=fluido: f.get('eos', 'PR'))
             tam = widget.tam_ideal() if clave == 'parametros' else None
             sw = self._montar_subventana(subclave, widget, titulo,
                                          tam=tam, eos_provider=prov)
@@ -2023,9 +2080,9 @@ class MainWindow(QMainWindow):
         la EOS del fluido; su kij se reinicia al default de esa EOS y se
         refrescan los pies y la ventana de Parametros del fluido si esta abierta."""
         fluido['eos'] = 'SRK' if w.cmb_eos.currentText() == 'SRK' else 'PR'
-        base = (_eng.KIJ_DEFAULT_SRK if fluido['eos'] == 'SRK'
-                else _eng.KIJ_DEFAULT_PR)
-        fluido['kij'] = copy.deepcopy(base)
+        # El kij se reinicia a la base de SU fuente para la nueva EOS.
+        fluido['kij'] = _eng.kij_base(fluido.get('kij_fuente', 'HYSYS'),
+                                      fluido['eos'])
         par = self._subventanas.get(f"parametros@{fluido['nombre']}")
         if par is not None and hasattr(par, 'widget'):
             # refrescar la tabla de Parametros del fluido si esta abierta
@@ -2109,8 +2166,7 @@ class MainWindow(QMainWindow):
         global kij_user
         import eos as _eng
         _eng.set_eos(eos)
-        base = _eng.KIJ_DEFAULT_SRK if eos == 'SRK' else _eng.KIJ_DEFAULT_PR
-        kij_user = copy.deepcopy(base)
+        kij_user = _eng.kij_base(kij_fuente, eos)
         # Refrescar tabla de kij en la pestaña Parametros
         if hasattr(self, 'tab_par'):
             self.tab_par.refrescar_tabla()

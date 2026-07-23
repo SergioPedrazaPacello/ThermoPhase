@@ -3,10 +3,17 @@ Pestaña Propiedades Termodinámicas para ThermoPhase.
 Calcula Entalpía y Entropía molar de la corriente y por fase,
 dada T y P, usando la composición global de la pestaña de Equilibrio.
 
-Método: PR EOS (ec. A.29/A.30 HYSYS) + polinomio Ideal Enthalpy interno
-de HYSYS + constantes del banco HYSYS (H_offset, S_offset validadas).
+Método según PVTsim (Method Documentation, "Thermal and Volumetric
+Properties"):
+    H = Σ zi H_id_i + H_res           S = Σ zi S_id_i + S_res
+con Cp° = polinomio de 3er grado (Reid et al., 1977), Tref = 273.15 K
+(0 °C / 32 °F) y Pref = 1 atm — sin offsets propios de HYSYS.
 
-Precisión validada: <0.001% en H, <0.001 en S vs HYSYS (puros y mezclas).
+Soporta Peng-Robinson y Soave-Redlich-Kwong (la función de partida es la
+misma; sólo cambian δ1, δ2 y los parámetros a, b, m de cada EOS).
+
+Unidades: H en Btu/lbmol, S en Btu/(lbmol·°F)  [= Btu/(lbmol·°R), pues un
+intervalo de 1 °F equivale a 1 °R].
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -33,25 +40,20 @@ LBL_SEC=(f'background:{GRAY_LBL};color:{TEXT};border:1px solid {BORDER};'
 class PropWorker(QThread):
     done  = pyqtSignal(dict)
     error = pyqtSignal(str)
-    def __init__(self, z, T_R, P):
+    def __init__(self, z, T_R, P, kij, eos):
         super().__init__()
-        self.z=z; self.T=T_R; self.P=P
+        self.z=z; self.T=T_R; self.P=P; self.kij=kij; self.eos=eos
     def run(self):
         try:
             import eos as eng
-            import entalpia_entropia as hs
-            # La calibración de entalpía y entropía es específica de PR:
-            # forzamos temporalmente esa EOS aunque el usuario haya
-            # elegido SRK en la pestaña de equilibrio.
-            eos_prev = eng.get_eos()
-            try:
-                eng.set_eos('PR')
-                res_flash = eng.calcular(self.z, self.T, self.P,
-                                         kij=eng.KIJ_DEFAULT_PR)
-                res_hs    = hs.calcular_HS(self.z, self.T, self.P, res_flash)
-                res_hs['modo'] = res_flash.get('modo', '?')
-            finally:
-                eng.set_eos(eos_prev)
+            import entalpia_entropia_gen as hs
+            # Entalpia/entropia GENERICAS con la EOS elegida (PR o SRK),
+            # metodo estandar (funcion de partida), sin ajustes de HYSYS.
+            eng.set_eos(self.eos)
+            res_flash = eng.calcular(self.z, self.T, self.P, kij=self.kij)
+            res_hs    = hs.calcular_HS(self.z, self.T, self.P, res_flash,
+                                       eos=self.eos)
+            res_hs['modo'] = res_flash.get('modo', '?')
             self.done.emit(res_hs)
         except Exception as e:
             import traceback
@@ -222,7 +224,11 @@ class TabPropiedades(QWidget):
         self.lbl_modo.setText("")
         self._clear_results()
 
-        self.worker=PropWorker(z, T, P)
+        import eos as eng
+        # get_z() ya fijo la EOS del contexto (principal o del fluido).
+        eos_ctx = eng.get_eos()
+        kij = self.get_kij()
+        self.worker=PropWorker(z, T, P, kij, eos_ctx)
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
         self.worker.start()

@@ -86,6 +86,60 @@ KIJ_DEFAULT_SRK = [
 KIJ_DEFAULT = KIJ_DEFAULT_PR
 
 # ═══════════════════════════════════════════════════════════════════
+# FUENTES ALTERNATIVAS DE kij  (HYSYS  /  PVTsim)
+# ═══════════════════════════════════════════════════════════════════
+# Volumenes criticos [cm3/mol] (Reid, Prausnitz & Sherwood). Coinciden
+# con los V* de COSTALD ya presentes en el motor dentro del 2.3%.
+VC = [89.8, 93.9, 99.2, 148.3, 200.0, 262.7, 255.0,
+      306.0, 313.0, 370.0, 428.0, 486.0, 544.0]
+
+
+def kij_chueh_prausnitz(n=1.0):
+    """Matriz kij por la correlacion de Chueh y Prausnitz (1967), calculada
+    SOLO a partir de volumenes criticos:
+
+        kij = 1 - [ 2 Vci^(1/3) Vcj^(1/3) / (Vci^(1/3) + Vcj^(1/3)) ]^n
+
+    Es la opcion generica que documenta PVTsim (exponente n, por defecto 1).
+    No depende de la EOS: la misma matriz sirve para PR y para SRK.
+    """
+    v13 = [v ** (1.0 / 3.0) for v in VC]
+    M = [[0.0] * NC for _ in range(NC)]
+    for i in range(NC):
+        for j in range(NC):
+            if i == j:
+                continue
+            M[i][j] = 1.0 - (2.0 * (v13[i] * v13[j]) ** 0.5 /
+                             (v13[i] + v13[j])) ** n
+    return M
+
+
+# PVTsim (Knapp et al., 1982): los pares hidrocarburo-hidrocarburo usan
+# kij = 0 por defecto; los valores no nulos corresponden a N2, CO2 y H2S
+# frente a hidrocarburos y estan en la base de datos interna de PVTsim
+# (no publicados en su Method Documentation). Se dejan en 0 para que el
+# usuario introduzca los suyos en la tabla, que es editable.
+KIJ_PVTSIM = [[0.0] * NC for _ in range(NC)]
+
+KIJ_CHUEH = kij_chueh_prausnitz(1.0)
+
+# Fuentes disponibles para la tabla de parametros.
+#   'HYSYS' -> matrices propias de HYSYS, DISTINTAS para PR y SRK
+#   'PVTSIM'-> Knapp: HC-HC = 0, IGUAL para PR y SRK
+#   'CHUEH' -> Chueh-Prausnitz desde Vc, IGUAL para PR y SRK
+FUENTES_KIJ = ['HYSYS', 'PVTSIM', 'CHUEH']
+
+
+def kij_base(fuente, eos):
+    """Devuelve la matriz kij base de la `fuente` para la EOS indicada."""
+    import copy as _c
+    if fuente == 'PVTSIM':
+        return _c.deepcopy(KIJ_PVTSIM)
+    if fuente == 'CHUEH':
+        return _c.deepcopy(KIJ_CHUEH)
+    return _c.deepcopy(KIJ_DEFAULT_SRK if eos == 'SRK' else KIJ_DEFAULT_PR)
+
+# ═══════════════════════════════════════════════════════════════════
 # ESTADO GLOBAL DE LA ECUACION DE ESTADO ACTIVA
 # ═══════════════════════════════════════════════════════════════════
 # La EOS activa determina que fórmulas de α(T), ai, bi, Z(A,B) y ln φi
