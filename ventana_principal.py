@@ -31,7 +31,23 @@ from ribbon import construir_ribbon, NavigatorPanel
 import iconos
 import edicion
 kij_user = copy.deepcopy(KIJ_DEFAULT)
-kij_fuente = 'HYSYS'      # fuente activa de los kij globales
+kij_fuente = 'PR'         # EOS-fuente activa de los kij globales (PR/SRK/PR_PVT/SRK_PVT)
+
+# Las 4 ecuaciones de estado, en el orden de los combos.
+EOS_ITEMS = ["Peng-Robinson (HYSYS)", "SRK (HYSYS)",
+             "Peng-Robinson (PVTsim)", "SRK (PVTsim)"]
+EOS_CODES = ['PR', 'SRK', 'PR_PVT', 'SRK_PVT']
+
+def _eos_code(idx):
+    return EOS_CODES[idx] if 0 <= idx < len(EOS_CODES) else 'PR'
+
+def _eos_idx(code):
+    return EOS_CODES.index(code) if code in EOS_CODES else 0
+
+def _eos_nombre(code):
+    return {'PR': "Peng-Robinson (HYSYS)", 'SRK': "SRK (HYSYS)",
+            'PR_PVT': "Peng-Robinson (PVTsim)",
+            'SRK_PVT': "SRK (PVTsim)"}.get(code, "Peng-Robinson (HYSYS)")
 
 # ── Paleta ────────────────────────────────────────────────────
 WHITE    = "#FFFFFF"
@@ -401,8 +417,8 @@ class TabEquilibrio(QWidget):
             f'padding:2px 6px;font-family:"{FONT_F}";font-size:{FS}pt;')
         eos_row.addWidget(lbl_eos, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.cmb_eos = QComboBox()
-        self.cmb_eos.addItems(["Peng-Robinson", "SRK"])
-        self.cmb_eos.setFixedHeight(22); self.cmb_eos.setFixedWidth(110)
+        self.cmb_eos.addItems(EOS_ITEMS)
+        self.cmb_eos.setFixedHeight(22); self.cmb_eos.setFixedWidth(190)
         _aplicar_estilo_combo(self.cmb_eos)
         # Emitir señal cuando el usuario cambia la EOS
         self.cmb_eos.currentIndexChanged.connect(self._on_eos_changed)
@@ -556,8 +572,7 @@ class TabEquilibrio(QWidget):
     # ── Handlers ─────────────────────────────────────────────
     def _on_eos_changed(self, idx):
         """Emite la señal para que MainWindow propague el cambio de EOS."""
-        eos = 'SRK' if idx == 1 else 'PR'
-        self.eos_changed.emit(eos)
+        self.eos_changed.emit(_eos_code(idx))
 
     # ── Guardar / restaurar estado (usado por Archivo > Guardar/Abrir) ──
     def get_estado(self):
@@ -570,7 +585,7 @@ class TabEquilibrio(QWidget):
                 'T_R':         float(self.sp_T.value()),
                 'P_psi':       float(self.sp_P.value()),
                 'densidad':    self.cmb_dens.currentText(),
-                'eos':         self.cmb_eos.currentText(),
+                'eos':         _eos_code(self.cmb_eos.currentIndex()),
                 'modo_masico': self.btn_frac.isChecked(),
             },
             'resultado': self.last_result,   # dict o None
@@ -600,12 +615,10 @@ class TabEquilibrio(QWidget):
         if idx >= 0:
             self.cmb_dens.setCurrentIndex(idx)
         # EOS (silencioso — MainWindow ya la habra aplicado antes)
-        eos_txt = e.get('eos', 'Peng-Robinson')
-        idx = self.cmb_eos.findText(eos_txt)
-        if idx >= 0:
-            self.cmb_eos.blockSignals(True)
-            self.cmb_eos.setCurrentIndex(idx)
-            self.cmb_eos.blockSignals(False)
+        eos_code = e.get('eos', 'PR')
+        self.cmb_eos.blockSignals(True)
+        self.cmb_eos.setCurrentIndex(_eos_idx(eos_code))
+        self.cmb_eos.blockSignals(False)
         # Modo masico / molar
         masico = bool(e.get('modo_masico', False))
         self.btn_frac.setChecked(masico)
@@ -675,7 +688,7 @@ class TabEquilibrio(QWidget):
             return
         self.btn.setEnabled(False); self.btn.setText("Calculando...")
         # Cada ventana de Equilibrio usa la EOS de su propio combo.
-        _set_eos('SRK' if self.cmb_eos.currentText() == 'SRK' else 'PR')
+        _set_eos(_eos_code(self.cmb_eos.currentIndex()))
         kij = self._kij_get() if self._kij_get is not None else kij_user
         self.worker = Worker(z, self.get_T(), self.get_P(), kij,
                              metodo_densidad=self.cmb_dens.currentText())
@@ -808,29 +821,52 @@ class TabParametros(QWidget):
         return kij_user
 
     def _fuente(self):
-        """Fuente de kij activa ('HYSYS' / 'PVTSIM' / 'CHUEH')."""
+        """EOS-fuente de los kij ('PR'/'SRK'/'PR_PVT'/'SRK_PVT')."""
         global kij_fuente
         if self._objetivo is not None:
-            return self._objetivo.get('kij_fuente', 'HYSYS')
+            return self._objetivo.get('kij_fuente', self._objetivo.get('eos', 'PR'))
         return kij_fuente
 
     def _on_fuente(self, idx):
-        """Cambia la fuente de los kij y recarga la matriz base."""
+        """Cambia la fuente de kij (una de las 4 EOS) y recarga la matriz."""
         global kij_user, kij_fuente
-        fuente = ['HYSYS', 'PVTSIM', 'CHUEH'][max(0, min(idx, 2))]
-        nueva = _eng.kij_base(fuente, self._eos_ctx())
+        code = _eos_code(idx)
+        nueva = _eng.kij_base(code)
         if self._objetivo is not None:
-            self._objetivo['kij_fuente'] = fuente
+            self._objetivo['kij_fuente'] = code
             self._objetivo['kij'] = nueva
         else:
-            kij_fuente = fuente
+            kij_fuente = code
             kij_user = nueva
         self.refrescar_tabla()
 
     def _eos_ctx(self):
+        """EOS del contexto (para las propiedades criticas): global o fluido."""
         if self._objetivo is not None:
             return self._objetivo.get('eos', 'PR')
         return _eng.get_eos()
+
+    def _llenar_criticas(self):
+        """Rellena la tabla de propiedades criticas segun la EOS del contexto
+        (HYSYS o PVTsim)."""
+        TCa, PCa, OMa, PMa = _eng.crit_props(self._eos_ctx())
+        for i in range(NC):
+            r = i + 1
+            self.tbl_p.setItem(r, 0, cell(NOMBRES[i], bg=GRAY_LBL,
+                align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter))
+            for c, v in enumerate([f"{TCa[i]:.4f}", f"{PCa[i]:.4f}",
+                                   f"{OMa[i]:.8f}", f"{PMa[i]}"]):
+                self.tbl_p.setItem(r, c+1, cell(v, bg=WHITE, color=TEXT_RES))
+
+    def _sync_desde_objetivo(self):
+        """Refresca kij, propiedades criticas y el desplegable de fuente
+        cuando cambia la EOS (global o del fluido)."""
+        self.refrescar_tabla()
+        self._llenar_criticas()
+        if hasattr(self, 'cmb_fuente'):
+            self.cmb_fuente.blockSignals(True)
+            self.cmb_fuente.setCurrentIndex(_eos_idx(self._fuente()))
+            self.cmb_fuente.blockSignals(False)
 
     def tam_ideal(self):
         """Tamaño (ancho, alto) que hace entrar todo el contenido justo, sin
@@ -870,14 +906,8 @@ class TabParametros(QWidget):
             self.tbl_p.setItem(0,c, cell(h, bg=GRAY_LBL,
                 align=Qt.AlignmentFlag.AlignCenter))
 
-        # Filas 1..NC: datos
-        for i in range(NC):
-            r = i+1
-            self.tbl_p.setItem(r,0, cell(NOMBRES[i], bg=GRAY_LBL,
-                align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
-            for c,v in enumerate([f"{TC[i]:.4f}",f"{PC[i]:.4f}",
-                                   f"{OMEGA[i]:.8f}",f"{PM[i]}"]):
-                self.tbl_p.setItem(r,c+1, cell(v, bg=WHITE, color=TEXT_RES))
+        # Filas 1..NC: datos (segun la EOS del contexto)
+        self._llenar_criticas()
 
         self.tbl_p.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tbl_p.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -934,12 +964,10 @@ class TabParametros(QWidget):
             f'background:transparent;')
         bot.addWidget(lf)
         self.cmb_fuente = QComboBox()
-        self.cmb_fuente.addItems(["HYSYS", "PVTsim (Knapp)",
-                                  "Chueh-Prausnitz (Vc)"])
+        self.cmb_fuente.addItems(EOS_ITEMS)
         _aplicar_estilo_combo(self.cmb_fuente)
-        self.cmb_fuente.setFixedWidth(180)
-        self.cmb_fuente.setCurrentIndex(
-            {'HYSYS': 0, 'PVTSIM': 1, 'CHUEH': 2}.get(self._fuente(), 0))
+        self.cmb_fuente.setFixedWidth(190)
+        self.cmb_fuente.setCurrentIndex(_eos_idx(self._fuente()))
         self.cmb_fuente.currentIndexChanged.connect(self._on_fuente)
         bot.addWidget(self.cmb_fuente)
         bot.addStretch()
@@ -983,8 +1011,8 @@ class TabParametros(QWidget):
         self.tbl_k.blockSignals(False)
 
     def _reset(self):
-        # Restaura al default de la FUENTE y la EOS del contexto.
-        nuevo = _eng.kij_base(self._fuente(), self._eos_ctx())
+        # Restaura al default de la EOS-fuente seleccionada.
+        nuevo = _eng.kij_base(self._fuente())
         if self._objetivo is not None:
             self._objetivo['kij'] = nuevo
         else:
@@ -1246,7 +1274,7 @@ class TabFluidos(QWidget):
     def _nuevo(self):
         self.fluidos.append({'nombre': self._nombre_nuevo(), 'z': [0.0] * NC,
                              'eos': 'PR', 'kij': copy.deepcopy(KIJ_DEFAULT),
-                             'kij_fuente': 'HYSYS'})
+                             'kij_fuente': 'PR'})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
@@ -1255,7 +1283,7 @@ class TabFluidos(QWidget):
         self.fluidos.append({'nombre': self._nombre_nuevo("Cromatografia"),
                              'z': z, 'eos': 'PR',
                              'kij': copy.deepcopy(KIJ_DEFAULT),
-                             'kij_fuente': 'HYSYS'})
+                             'kij_fuente': 'PR'})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
@@ -1540,15 +1568,16 @@ class MainWindow(QMainWindow):
         despues cada pestaña."""
         global kij_user, kij_fuente
         import eos as _eng
-        kij_fuente = doc.get('kij_fuente', 'HYSYS')
+        kij_fuente = doc.get('kij_fuente', 'PR')
 
         # 1. EOS activa (sin disparar señal para no resetear kij_user)
         eos = doc.get('eos_activa', 'PR')
+        if eos not in EOS_CODES:
+            eos = 'PR'
         _eng.set_eos(eos)
         # Reflejar en el combo sin re-emitir la señal
-        idx = 1 if eos == 'SRK' else 0
         self.tab_eq.cmb_eos.blockSignals(True)
-        self.tab_eq.cmb_eos.setCurrentIndex(idx)
+        self.tab_eq.cmb_eos.setCurrentIndex(_eos_idx(eos))
         self.tab_eq.cmb_eos.blockSignals(False)
 
         # 2. Matriz kij_user (mantiene la que el usuario habia editado)
@@ -1557,11 +1586,10 @@ class MainWindow(QMainWindow):
             try:
                 kij_user = [[float(v) for v in fila] for fila in kij]
             except Exception:
-                base = _eng.KIJ_DEFAULT_SRK if eos == 'SRK' else _eng.KIJ_DEFAULT_PR
-                kij_user = copy.deepcopy(base)
-        # Refrescar tabla de parametros
+                kij_user = _eng.kij_base(eos)
+        # Refrescar tabla de parametros (kij + criticas)
         if hasattr(self, 'tab_par'):
-            self.tab_par.refrescar_tabla()
+            self.tab_par._sync_desde_objetivo()
 
         # 3. Cada pestaña restaura inputs + resultados
         tabs = doc.get('tabs', {})
@@ -1581,8 +1609,8 @@ class MainWindow(QMainWindow):
             try:
                 fl = {'nombre': str(f.get('nombre', 'Fluido')),
                       'z': [float(v) for v in f.get('z', [])],
-                      'eos': 'SRK' if f.get('eos') == 'SRK' else 'PR',
-                      'kij_fuente': f.get('kij_fuente', 'HYSYS')}
+                      'eos': (f.get('eos') if f.get('eos') in EOS_CODES else 'PR'),
+                      'kij_fuente': f.get('kij_fuente', f.get('eos', 'PR'))}
                 kij = f.get('kij')
                 fl['kij'] = ([[float(v) for v in fila] for fila in kij]
                              if kij else copy.deepcopy(KIJ_DEFAULT))
@@ -1819,10 +1847,12 @@ class MainWindow(QMainWindow):
     # ── EOS principal / por fluido y pies de pagina ──────────
     @staticmethod
     def _nombre_eos(code):
-        return "Soave-Redlich-Kwong" if code == 'SRK' else "Peng-Robinson"
+        return {'PR': "Peng-Robinson (HYSYS)", 'SRK': "SRK (HYSYS)",
+                'PR_PVT': "Peng-Robinson (PVTsim)",
+                'SRK_PVT': "SRK (PVTsim)"}.get(code, "Peng-Robinson (HYSYS)")
 
     def _eos_main_code(self):
-        return 'SRK' if self.tab_eq.cmb_eos.currentText() == 'SRK' else 'PR'
+        return _eos_code(self.tab_eq.cmb_eos.currentIndex())
 
     def _getz_main(self):
         """get_z para las ventanas NO asignadas a un fluido: fija la EOS
@@ -1960,7 +1990,7 @@ class MainWindow(QMainWindow):
             return
         fluido.setdefault('eos', 'PR')
         fluido.setdefault('kij', copy.deepcopy(KIJ_DEFAULT))
-        fluido.setdefault('kij_fuente', 'HYSYS')
+        fluido.setdefault('kij_fuente', fluido.get('eos', 'PR'))
         subclave = f"{clave}@{fluido['nombre']}"
         sw = self._subventanas.get(subclave)
         if sw is None:
@@ -2010,7 +2040,7 @@ class MainWindow(QMainWindow):
             w = TabEquilibrio(kij_get=gk)
             w.set_z(fluido['z'])
             w.cmb_eos.blockSignals(True)
-            w.cmb_eos.setCurrentIndex(1 if fluido.get('eos') == 'SRK' else 0)
+            w.cmb_eos.setCurrentIndex(_eos_idx(fluido.get('eos', 'PR')))
             w.cmb_eos.blockSignals(False)
             w.cmb_dens.setCurrentIndex(self.tab_eq.cmb_dens.currentIndex())
             w.eos_changed.connect(
@@ -2050,17 +2080,16 @@ class MainWindow(QMainWindow):
 
     def _on_fluido_eos(self, fluido, w):
         """La EOS del combo de la ventana de Equilibrio del fluido pasa a ser
-        la EOS del fluido; su kij se reinicia al default de esa EOS y se
-        refrescan los pies y la ventana de Parametros del fluido si esta abierta."""
-        fluido['eos'] = 'SRK' if w.cmb_eos.currentText() == 'SRK' else 'PR'
-        # El kij se reinicia a la base de SU fuente para la nueva EOS.
-        fluido['kij'] = _eng.kij_base(fluido.get('kij_fuente', 'HYSYS'),
-                                      fluido['eos'])
+        la EOS del fluido; su kij y fuente se reinician al default de esa EOS
+        y se refrescan los pies y la ventana de Parametros del fluido."""
+        fluido['eos'] = _eos_code(w.cmb_eos.currentIndex())
+        # El kij sigue a la EOS: se carga la matriz por defecto de esa EOS.
+        fluido['kij_fuente'] = fluido['eos']
+        fluido['kij'] = _eng.kij_base(fluido['eos'])
         par = self._subventanas.get(f"parametros@{fluido['nombre']}")
-        if par is not None and hasattr(par, 'widget'):
-            # refrescar la tabla de Parametros del fluido si esta abierta
+        if par is not None:
             for tp in par.findChildren(TabParametros):
-                tp.refrescar_tabla()
+                tp._sync_desde_objetivo()
         self._refrescar_pies()
 
     def _cascada(self, sw=None):
@@ -2126,27 +2155,21 @@ class MainWindow(QMainWindow):
 
     def _on_eos_changed(self, eos):
         """Propaga el cambio de ecuación de estado a todo el sistema:
-           - Cambia la EOS activa del motor nucleo.eos.
-           - Reinicia kij_user a la matriz por defecto de la EOS elegida
-             (PR: matriz HYSYS; SRK: ceros hasta que se carguen valores).
-           - Refresca la tabla en la pestaña Parametros.
-           - Actualiza el mensaje del status bar.
-        Las pestañas Envolvente / Saturacion leen kij_user via callback y
-        el engine expone despachadores que ya usan la EOS activa, así que
-        no requieren tocarse. La pestaña Propiedades queda en PR (blindada
-        en pestana_propiedades.py) hasta nueva calibracion contra HYSYS-SRK.
-        """
-        global kij_user
+           - Cambia la EOS activa del motor (una de las 4).
+           - El kij sigue a la EOS: kij_user se recarga con la matriz por
+             defecto de esa EOS (PR HYSYS, SRK HYSYS, PR PVTsim, SRK PVTsim).
+           - Refresca la pestaña Parametros (kij + propiedades criticas).
+           - Actualiza el status bar y los pies.
+        La Envolvente/Saturacion leen kij_user y el engine usa la EOS activa,
+        asi que la siguen automaticamente."""
+        global kij_user, kij_fuente
         import eos as _eng
         _eng.set_eos(eos)
-        kij_user = _eng.kij_base(kij_fuente, eos)
-        # Refrescar tabla de kij en la pestaña Parametros
+        kij_fuente = eos
+        kij_user = _eng.kij_base(eos)
         if hasattr(self, 'tab_par'):
-            self.tab_par.refrescar_tabla()
-        # Actualizar el label permanente del status bar
-        nombre = "Soave-Redlich-Kwong" if eos == 'SRK' else "Peng-Robinson"
-        self._lbl_info.setText(f"{nombre} EOS")
-        # Refrescar el pie (EOS) de las ventanas NO asignadas a un fluido.
+            self.tab_par._sync_desde_objetivo()
+        self._lbl_info.setText(f"{_eos_nombre(eos)} EOS")
         self._refrescar_pies()
 
 def main():

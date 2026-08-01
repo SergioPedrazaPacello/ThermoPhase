@@ -52,7 +52,7 @@ class PropWorker(QThread):
             eng.set_eos(self.eos)
             res_flash = eng.calcular(self.z, self.T, self.P, kij=self.kij)
             res_hs    = hs.calcular_HS(self.z, self.T, self.P, res_flash,
-                                       eos=self.eos)
+                                       eos=self.eos, kij=self.kij)
             res_hs['modo'] = res_flash.get('modo', '?')
             self.done.emit(res_hs)
         except Exception as e:

@@ -145,26 +145,20 @@ def S_ideal_i(i, T_R, P):
 # ============================================================
 # 2) PARAMETROS DE LA EOS (a, b, da/dT) para PR o SRK
 # ============================================================
-def _params_eos(comp, T_R, eos):
+def _params_eos(comp, T_R, eos, kij=None):
     """Devuelve (am, bm, da_dT, d1, d2) en unidades internas del motor
-    (a: psi.ft6/lbmol2, b: ft3/lbmol) para la EOS pedida ('PR' o 'SRK')."""
+    (a: psi.ft6/lbmol2, b: ft3/lbmol) para la EOS pedida (una de las 4:
+    PR, SRK, PR_PVT, SRK_PVT). `kij` opcional: si es None se usa el kij por
+    defecto de esa EOS."""
     NC = eng.NC
-    if eos == 'SRK':
-        aa  = eng._ai_alpha_vec_srk(T_R)          # ai*alpha por componente
-        bi  = [eng.bi_srk(i) for i in range(NC)]
-        kij = eng.KIJ_DEFAULT_SRK
-        TC  = eng.TC_SRK
-        ai_ = [eng.ai_srk(i) for i in range(NC)]
-        mi_ = [eng.mi_srk(i) for i in range(NC)]
-        d1, d2 = 1.0, 0.0
-    else:
-        aa  = eng._ai_alpha_vec_pr(T_R)
-        bi  = [eng.bi_pr(i) for i in range(NC)]
-        kij = eng.KIJ_DEFAULT_PR
-        TC  = eng.TC
-        ai_ = [eng.ai_pr(i) for i in range(NC)]
-        mi_ = [eng.mi_pr(i) for i in range(NC)]
-        d1, d2 = 1.0 + SQRT2, 1.0 - SQRT2
+    aa  = eng.ai_alpha_vec_eos(eos, T_R)      # ai*alpha por componente
+    bi  = eng.bi_eos(eos)
+    ai_ = eng.ai_eos(eos)
+    mi_ = eng.mi_eos(eos)
+    TC  = eng.tc_eos(eos)
+    if kij is None:
+        kij = eng.kij_base(eos)
+    d1, d2 = (1.0, 0.0) if eng.es_srk(eos) else (1.0 + SQRT2, 1.0 - SQRT2)
 
     # d(ai*alpha)/dT = ai * dalpha/dT ;  dalpha/dT = -m*sqrt(alpha)/sqrt(T*Tc)
     daa = [0.0] * NC
@@ -212,14 +206,14 @@ def S_departure(T_R, P, Z, am, bm, da_dT, d1, d2):
 # ============================================================
 # 4) H y S de una FASE
 # ============================================================
-def H_fase(comp, T_R, P, Z, eos):
-    am, bm, da_dT, d1, d2 = _params_eos(comp, T_R, eos)
+def H_fase(comp, T_R, P, Z, eos, kij=None):
+    am, bm, da_dT, d1, d2 = _params_eos(comp, T_R, eos, kij)
     H_id = sum(comp[i] * H_ideal_i(i, T_R) for i in range(eng.NC) if comp[i] > 0)
     return H_id + H_departure(T_R, P, Z, am, bm, da_dT, d1, d2)
 
 
-def S_fase(comp, T_R, P, Z, eos):
-    am, bm, da_dT, d1, d2 = _params_eos(comp, T_R, eos)
+def S_fase(comp, T_R, P, Z, eos, kij=None):
+    am, bm, da_dT, d1, d2 = _params_eos(comp, T_R, eos, kij)
     S_id = sum(comp[i] * S_ideal_i(i, T_R, P) for i in range(eng.NC) if comp[i] > 0)
     S_mix = 0.0
     for i in range(eng.NC):
@@ -231,18 +225,19 @@ def S_fase(comp, T_R, P, Z, eos):
 # ============================================================
 # 5) INTERFAZ - a partir del resultado de un flash
 # ============================================================
-def _pick_Z(comp, T_R, P, kind, eos):
-    am, bm, da_dT, d1, d2 = _params_eos(comp, T_R, eos)
+def _pick_Z(comp, T_R, P, kind, eos, kij=None):
+    am, bm, da_dT, d1, d2 = _params_eos(comp, T_R, eos, kij)
     A, B = eng.AB(am, bm, T_R, P)
-    ZV, ZL = (eng.solve_Z_srk(A, B) if eos == 'SRK' else eng.solve_Z_pr(A, B))
+    ZV, ZL = (eng.solve_Z_srk(A, B) if eng.es_srk(eos) else eng.solve_Z_pr(A, B))
     if kind == 'V':
         return ZV if ZV is not None else ZL
     return ZL if ZL is not None else ZV
 
 
-def calcular_HS(z, T_R, P, res_flash, eos=None):
+def calcular_HS(z, T_R, P, res_flash, eos=None, kij=None):
     """H y S de la corriente y por fase a partir de un flash. `eos` fija la
-    ecuacion de estado ('PR'/'SRK'); si es None usa la activa del motor."""
+    ecuacion de estado (una de las 4); si es None usa la activa del motor.
+    `kij` opcional: el mismo que uso el flash (si None, el default de la EOS)."""
     if eos is None:
         eos = eng.get_eos()
     V  = res_flash.get('V', 0.0)
@@ -258,19 +253,19 @@ def calcular_HS(z, T_R, P, res_flash, eos=None):
            'H_stream': None, 'S_stream': None}
 
     if V >= 1.0 - 1e-10:
-        Z = ZV if ZV is not None else _pick_Z(z, T_R, P, 'V', eos)
-        H = H_fase(z, T_R, P, Z, eos); S = S_fase(z, T_R, P, Z, eos)
+        Z = ZV if ZV is not None else _pick_Z(z, T_R, P, 'V', eos, kij)
+        H = H_fase(z, T_R, P, Z, eos, kij); S = S_fase(z, T_R, P, Z, eos, kij)
         out.update(H_vapor=H, S_vapor=S, H_stream=H, S_stream=S)
         return out
     if V <= 1e-10:
-        Z = ZL if ZL is not None else _pick_Z(z, T_R, P, 'L', eos)
-        H = H_fase(z, T_R, P, Z, eos); S = S_fase(z, T_R, P, Z, eos)
+        Z = ZL if ZL is not None else _pick_Z(z, T_R, P, 'L', eos, kij)
+        H = H_fase(z, T_R, P, Z, eos, kij); S = S_fase(z, T_R, P, Z, eos, kij)
         out.update(H_liquido=H, S_liquido=S, H_stream=H, S_stream=S)
         return out
     if y is None or x is None:
         return out
-    Hv = H_fase(y, T_R, P, ZV, eos); Sv = S_fase(y, T_R, P, ZV, eos)
-    Hl = H_fase(x, T_R, P, ZL, eos); Sl = S_fase(x, T_R, P, ZL, eos)
+    Hv = H_fase(y, T_R, P, ZV, eos, kij); Sv = S_fase(y, T_R, P, ZV, eos, kij)
+    Hl = H_fase(x, T_R, P, ZL, eos, kij); Sl = S_fase(x, T_R, P, ZL, eos, kij)
     out.update(H_vapor=Hv, S_vapor=Sv, H_liquido=Hl, S_liquido=Sl,
                H_stream=V * Hv + L * Hl, S_stream=V * Sv + L * Sl)
     return out

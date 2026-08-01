@@ -114,30 +114,68 @@ def kij_chueh_prausnitz(n=1.0):
     return M
 
 
-# PVTsim (Knapp et al., 1982): los pares hidrocarburo-hidrocarburo usan
-# kij = 0 por defecto; los valores no nulos corresponden a N2, CO2 y H2S
-# frente a hidrocarburos y estan en la base de datos interna de PVTsim
-# (no publicados en su Method Documentation). Se dejan en 0 para que el
-# usuario introduzca los suyos en la tabla, que es editable.
-KIJ_PVTSIM = [[0.0] * NC for _ in range(NC)]
-
-KIJ_CHUEH = kij_chueh_prausnitz(1.0)
-
-# Fuentes disponibles para la tabla de parametros.
-#   'HYSYS' -> matrices propias de HYSYS, DISTINTAS para PR y SRK
-#   'PVTSIM'-> Knapp: HC-HC = 0, IGUAL para PR y SRK
-#   'CHUEH' -> Chueh-Prausnitz desde Vc, IGUAL para PR y SRK
-FUENTES_KIJ = ['HYSYS', 'PVTSIM', 'CHUEH']
+def _kij_desde_columnas(col_n2, col_co2):
+    """Construye la matriz simetrica 13x13 a partir de las columnas de N2 y
+    CO2 (los unicos pares no nulos en PVTsim; HC-HC = 0)."""
+    M = [[0.0] * NC for _ in range(NC)]
+    for i in range(NC):
+        M[i][0] = M[0][i] = col_n2[i]
+        M[i][1] = M[1][i] = col_co2[i]
+    M[0][0] = M[1][1] = 0.0
+    return M
 
 
-def kij_base(fuente, eos):
-    """Devuelve la matriz kij base de la `fuente` para la EOS indicada."""
+# PVTsim (Knapp et al., 1982) — valores provistos por el usuario desde la
+# base de datos de PVTsim. Solo N2 y CO2 frente a los demas; HC-HC = 0.
+_PVT_PR_N2  = [0, -0.017, 0.0311, 0.0515, 0.0852, 0.1033, 0.08,
+               0.0922, 0.1, 0.08, 0.08, 0.08, 0.08]
+_PVT_PR_CO2 = [-0.017, 0, 0.12, 0.12, 0.12, 0.12, 0.12,
+               0.12, 0.12, 0.12, 0.1, 0.1, 0.1]
+_PVT_SRK_N2  = [0, -0.0315, 0.0278, 0.0407, 0.0763, 0.0944, 0.07,
+                0.0867, 0.0878, 0.08, 0.08, 0.08, 0.08]
+_PVT_SRK_CO2 = [-0.0315, 0, 0.12, 0.12, 0.12, 0.12, 0.12,
+                0.12, 0.12, 0.12, 0.1, 0.1, 0.1]
+KIJ_PVTSIM_PR  = _kij_desde_columnas(_PVT_PR_N2,  _PVT_PR_CO2)
+KIJ_PVTSIM_SRK = _kij_desde_columnas(_PVT_SRK_N2, _PVT_SRK_CO2)
+
+# ── Las CUATRO ecuaciones de estado disponibles ─────────────────────
+#   'PR'      -> Peng-Robinson  (parametros HYSYS)
+#   'SRK'     -> Soave-Redlich-Kwong (parametros HYSYS)
+#   'PR_PVT'  -> Peng-Robinson  (parametros PVTsim / Reid 1977)
+#   'SRK_PVT' -> Soave-Redlich-Kwong (parametros PVTsim / Reid 1977)
+EOS_LISTA = ['PR', 'SRK', 'PR_PVT', 'SRK_PVT']
+
+# Etiquetas legibles para la interfaz.
+EOS_ETIQUETAS = {
+    'PR':      'Peng-Robinson (HYSYS)',
+    'SRK':     'SRK (HYSYS)',
+    'PR_PVT':  'Peng-Robinson (PVTsim)',
+    'SRK_PVT': 'SRK (PVTsim)',
+}
+
+# kij por defecto de cada EOS (una matriz por opcion).
+KIJ_POR_EOS = {
+    'PR':      KIJ_DEFAULT_PR,
+    'SRK':     KIJ_DEFAULT_SRK,
+    'PR_PVT':  KIJ_PVTSIM_PR,
+    'SRK_PVT': KIJ_PVTSIM_SRK,
+}
+
+
+def es_srk(eos):
+    """True si la EOS es del tipo Soave-Redlich-Kwong."""
+    return eos in ('SRK', 'SRK_PVT')
+
+
+def es_pvtsim(eos):
+    """True si la EOS usa parametros de PVTsim."""
+    return eos in ('PR_PVT', 'SRK_PVT')
+
+
+def kij_base(eos):
+    """Matriz kij por defecto de la EOS indicada (una de las 4)."""
     import copy as _c
-    if fuente == 'PVTSIM':
-        return _c.deepcopy(KIJ_PVTSIM)
-    if fuente == 'CHUEH':
-        return _c.deepcopy(KIJ_CHUEH)
-    return _c.deepcopy(KIJ_DEFAULT_SRK if eos == 'SRK' else KIJ_DEFAULT_PR)
+    return _c.deepcopy(KIJ_POR_EOS.get(eos, KIJ_DEFAULT_PR))
 
 # ═══════════════════════════════════════════════════════════════════
 # ESTADO GLOBAL DE LA ECUACION DE ESTADO ACTIVA
@@ -148,11 +186,12 @@ def kij_base(fuente, eos):
 # _srk. Las funciones con sufijo _pr son las originales (nunca cambian
 # de comportamiento) y las usan los módulos que deben seguir en PR pase
 # lo que pase (entalpia_entropia → propiedades termodinámicas).
-EOS_DISPONIBLES = ('PR', 'SRK')
+EOS_DISPONIBLES = ('PR', 'SRK', 'PR_PVT', 'SRK_PVT')
 _EOS_ACTIVA = 'PR'
 
 def set_eos(name):
-    """Cambia la EOS activa. Debe llamarse antes de cualquier cálculo."""
+    """Cambia la EOS activa. Debe llamarse antes de cualquier cálculo.
+    Opciones: PR, SRK (HYSYS) y PR_PVT, SRK_PVT (PVTsim)."""
     global _EOS_ACTIVA
     n = str(name).upper()
     if n not in EOS_DISPONIBLES:
@@ -211,6 +250,22 @@ OMEGA_SRK = [
 TC_SRK = list(TC)
 PC_SRK = list(PC)
 
+# ═══════════════════════════════════════════════════════════════════
+# PROPIEDADES CRITICAS DE PVTsim  (Reid, Prausnitz & Sherwood 1977)
+# ═══════════════════════════════════════════════════════════════════
+# Provistas por el usuario desde la base de datos de PVTsim.
+# Tc en °F (convertida a °R sumando 459.67), Pc en psia, factor acentrico
+# UNICO para PR y SRK (PVTsim no separa omega por EOS, a diferencia de HYSYS).
+_TC_PVT_F = [-232.51, 87.89, -116.59, 90.05, 205.97, 274.91, 305.69,
+             369.05, 385.61, 453.65, 506.009, 544.807, 588.07]
+TC_PVT = [t + 459.67 for t in _TC_PVT_F]                     # °R
+PC_PVT = [492.32, 1069.87, 667.2, 708.35, 615.76, 529.06, 551.1,
+          490.85, 489.38, 430.59, 427.16, 397.63, 363.54]    # psia
+OMEGA_PVT = [0.04, 0.225, 0.008, 0.098, 0.152, 0.176, 0.193,
+             0.227, 0.251, 0.296, 0.3374, 0.3743, 0.4205]
+PM_PVT = [28.014, 44.01, 16.043, 30.07, 44.097, 58.124, 58.124,
+          72.151, 72.151, 86.178, 96.0, 107.0, 121.0]
+
 # ── Parámetros individuales SRK (Soave-Redlich-Kwong 1972) ───────
 # Constantes EXACTAS derivadas de las condiciones criticas:
 #   Omega_a = 1 / (9 (2^(1/3) - 1))   = 0.4274802335...
@@ -225,9 +280,9 @@ def bi_srk(i):    return OMEGA_B_SRK*R_GAS*TC_SRK[i]/PC_SRK[i]
 
 # ── Despachadores ai/bi ─────────────────────────────────────────
 def ai(i):
-    return ai_srk(i) if _EOS_ACTIVA == 'SRK' else ai_pr(i)
+    return float(ai_eos(_EOS_ACTIVA)[i])
 def bi(i):
-    return bi_srk(i) if _EOS_ACTIVA == 'SRK' else bi_pr(i)
+    return float(bi_eos(_EOS_ACTIVA)[i])
 
 # NOTA sobre la traslacion volumetrica (Peneloux-Rauzy):
 # Aqui habia definidas Z_RA(i), ci(i) y cm(comp), pero NUNCA se usaban
@@ -446,9 +501,10 @@ def ai_alpha_pr(i,T):  return ai_pr(i) *alpha_pr(i,T)
 def ai_alpha_srk(i,T): return ai_srk(i)*alpha_srk(i,T)
 
 def mi(i):
-    return mi_srk(i) if _EOS_ACTIVA == 'SRK' else mi_pr(i)
+    return float(mi_eos(_EOS_ACTIVA)[i])
 def alpha(i,T):
-    return alpha_srk(i,T) if _EOS_ACTIVA == 'SRK' else alpha_pr(i,T)
+    m = mi_eos(_EOS_ACTIVA)[i]; TCa = tc_eos(_EOS_ACTIVA)[i]
+    return (1.0 + m*(1.0 - np.sqrt(T/TCa)))**2
 def ai_alpha(i,T):
     return ai(i)*alpha(i,T)
 
@@ -461,6 +517,53 @@ _BI_SRK = np.array([bi_srk(i) for i in range(NC)])
 _MI_SRK = np.array([mi_srk(i) for i in range(NC)])
 _TC     = np.array(TC)        # criticas de PR
 _TC_SRK = np.array(TC_SRK)    # criticas de SRK (banco HYSSRK)
+
+# ── Arreglos por EOS para las 4 opciones (HYSYS y PVTsim) ────────────
+# PVTsim usa las criticas de Reid (TC_PVT/PC_PVT) y un UNICO omega para PR
+# y SRK. La forma cubica (Omega_a/Omega_b y formula de m) es la misma que
+# en HYSYS; lo que cambia son Tc, Pc, omega y los kij.
+_OA_PR, _OB_PR   = 0.45724, 0.07780
+_OA_SRK, _OB_SRK = OMEGA_A_SRK, OMEGA_B_SRK
+_TC_PVT_A = np.array(TC_PVT)
+_PC_PVT_A = np.array(PC_PVT)
+_OM_PVT_A = np.array(OMEGA_PVT)
+
+def _mi_pr_arr(om):  return 0.37464 + 1.54226*om - 0.26992*om**2
+def _mi_srk_arr(om): return 0.480   + 1.574 *om - 0.176 *om**2
+
+_AI_PR_PVT  = _OA_PR *R_GAS**2*_TC_PVT_A**2/_PC_PVT_A
+_BI_PR_PVT  = _OB_PR *R_GAS*_TC_PVT_A/_PC_PVT_A
+_MI_PR_PVT  = _mi_pr_arr(_OM_PVT_A)
+_AI_SRK_PVT = _OA_SRK*R_GAS**2*_TC_PVT_A**2/_PC_PVT_A
+_BI_SRK_PVT = _OB_SRK*R_GAS*_TC_PVT_A/_PC_PVT_A
+_MI_SRK_PVT = _mi_srk_arr(_OM_PVT_A)
+
+# Tablas por codigo de EOS: (AI, BI, MI, TC)
+_PARAMS_EOS = {
+    'PR':      (_AI_PR,      _BI_PR,      _MI_PR,      _TC),
+    'SRK':     (_AI_SRK,     _BI_SRK,     _MI_SRK,     _TC_SRK),
+    'PR_PVT':  (_AI_PR_PVT,  _BI_PR_PVT,  _MI_PR_PVT,  _TC_PVT_A),
+    'SRK_PVT': (_AI_SRK_PVT, _BI_SRK_PVT, _MI_SRK_PVT, _TC_PVT_A),
+}
+
+def ai_alpha_vec_eos(eos, T):
+    """Vector ai·α(T) para la EOS indicada (una de las 4)."""
+    AI, _BIv, MI, TCa = _PARAMS_EOS.get(eos, _PARAMS_EOS['PR'])
+    al = (1.0 + MI*(1.0 - np.sqrt(T/TCa)))**2
+    return AI*al
+
+def ai_eos(eos):  return _PARAMS_EOS.get(eos, _PARAMS_EOS['PR'])[0]
+def bi_eos(eos):  return _PARAMS_EOS.get(eos, _PARAMS_EOS['PR'])[1]
+def mi_eos(eos):  return _PARAMS_EOS.get(eos, _PARAMS_EOS['PR'])[2]
+def tc_eos(eos):  return _PARAMS_EOS.get(eos, _PARAMS_EOS['PR'])[3]
+
+def crit_props(eos):
+    """(TC[°R], PC[psia], OMEGA, PM) de la EOS — para la tabla de parametros."""
+    if es_pvtsim(eos):
+        return TC_PVT, PC_PVT, OMEGA_PVT, PM_PVT
+    if es_srk(eos):
+        return TC_SRK, PC_SRK, OMEGA_SRK, PM
+    return TC, PC, OMEGA, PM
 
 # Retro-compatibilidad: nombres antiguos (usados por si algún módulo
 # externo los importaba) apuntan al bloque PR.
@@ -479,7 +582,7 @@ def _ai_alpha_vec_srk(T):
 
 def _ai_alpha_vec(T):
     """Vector ai·α(T) para todos los componentes (según EOS activa)."""
-    return _ai_alpha_vec_srk(T) if _EOS_ACTIVA == 'SRK' else _ai_alpha_vec_pr(T)
+    return ai_alpha_vec_eos(_EOS_ACTIVA, T)
 
 def aij(i,j,T,kij):
     return np.sqrt(ai_alpha(i,T)*ai_alpha(j,T))*(1-kij[i][j])
@@ -602,7 +705,7 @@ def fase_supercritica(z,T,P,Z,kij):
     # β = -(P/V)·(∂V/∂P)_T con derivada analítica exacta según EOS activa.
     # PR:  (∂P/∂V)_T = -RT/(V-b)² + 2a(V+b)/(V²+2bV-b²)²
     # SRK: (∂P/∂V)_T = -RT/(V-b)² + a(2V+b)/[V²(V+b)²]
-    if _EOS_ACTIVA == 'SRK':
+    if es_srk(_EOS_ACTIVA):
         dPdV = -R_GAS*T/(Vm-b)**2 + am_val*(2*Vm+b)/(Vm*Vm*(Vm+b)**2)
     else:
         D_pr = Vm*Vm + 2*b*Vm - b*b
@@ -664,14 +767,14 @@ def solve_Z_srk(A,B):
 
 def solve_Z(A,B):
     """Retorna (ZV, ZL) mediante Cardano según EOS activa."""
-    return solve_Z_srk(A,B) if _EOS_ACTIVA == 'SRK' else solve_Z_pr(A,B)
+    return solve_Z_srk(A,B) if es_srk(_EOS_ACTIVA) else solve_Z_pr(A,B)
 
 _SQRT2 = np.sqrt(2.0)
 
 def ln_phi_i_pr(i,z,T,P,Z,am_val,bm_val,kij):
     """Coef. de fugacidad PR (fórmula clásica con factor 2√2)."""
-    bi_=_BI_PR[i]; A,B=AB(am_val,bm_val,T,P)
-    aa = _ai_alpha_vec_pr(T)
+    bi_=bi_eos(_EOS_ACTIVA)[i]; A,B=AB(am_val,bm_val,T,P)
+    aa = ai_alpha_vec_eos(_EOS_ACTIVA, T)
     saa = np.sqrt(aa)
     w = np.asarray(z)*saa
     kij_arr = kij if isinstance(kij, np.ndarray) else np.asarray(kij)
@@ -691,8 +794,8 @@ def ln_phi_i_srk(i,z,T,P,Z,am_val,bm_val,kij):
     """Coef. de fugacidad SRK.
     ln φi = (bi/b)(Z-1) - ln(Z-B) - (A/B)[2 Σj xj·aij / am - bi/b] · ln[(Z+B)/Z]
     """
-    bi_=_BI_SRK[i]; A,B=AB(am_val,bm_val,T,P)
-    aa = _ai_alpha_vec_srk(T)
+    bi_=bi_eos(_EOS_ACTIVA)[i]; A,B=AB(am_val,bm_val,T,P)
+    aa = ai_alpha_vec_eos(_EOS_ACTIVA, T)
     saa = np.sqrt(aa)
     w = np.asarray(z)*saa
     kij_arr = kij if isinstance(kij, np.ndarray) else np.asarray(kij)
@@ -709,7 +812,7 @@ def ln_phi_i_srk(i,z,T,P,Z,am_val,bm_val,kij):
 
 def ln_phi_i(i,z,T,P,Z,am_val,bm_val,kij):
     """Coef. de fugacidad según EOS activa."""
-    if _EOS_ACTIVA == 'SRK':
+    if es_srk(_EOS_ACTIVA):
         return ln_phi_i_srk(i,z,T,P,Z,am_val,bm_val,kij)
     return ln_phi_i_pr(i,z,T,P,Z,am_val,bm_val,kij)
 
@@ -1103,8 +1206,7 @@ def calcular(z,T,P,kij=None,metodo_densidad='EOS'):
        (sea estable o inestable, como hace el usuario en el Excel)
     """
     if kij is None:
-        base = KIJ_DEFAULT_SRK if _EOS_ACTIVA == 'SRK' else KIJ_DEFAULT_PR
-        kij = copy.deepcopy(base)
+        kij = kij_base(_EOS_ACTIVA)
     estab=analisis_estabilidad(z,T,P,kij)
 
     # Réplica EXACTA de la macro AnalisisYFlash:

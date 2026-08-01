@@ -40,7 +40,8 @@ HDR_TXT    = "#000000"
 
 # ── Selectores globales de la barra: (clave, etiqueta, items) ─
 _SELECTORES = [
-    ("eos",        "Ecuación de estado:", ["Peng-Robinson", "SRK"]),
+    ("eos",        "Ecuación de estado:", ["Peng-Robinson (HYSYS)", "SRK (HYSYS)",
+                                           "Peng-Robinson (PVTsim)", "SRK (PVTsim)"]),
     ("densidad",   "Densidad:",           ["COSTALD", "EOS"]),
     ("envolvente", "Método envolvente:",  ["Ziervogel-Poling", "Michelsen"]),
 ]
