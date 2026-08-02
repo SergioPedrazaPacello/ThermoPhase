@@ -29,13 +29,27 @@ import math
 from eos import (
     NC, TC, PC, OMEGA, KIJ_DEFAULT,
     am, bm, AB, solve_Z, ln_phi_i,
-    get_eos,
+    get_eos, crit_props, es_srk,
 )
 
 R_GAS     = 10.7316
 WILSON_C  = np.log(10.0) * (7.0/3.0)
 kij_g     = None   # kij global, fijado en construir_envolvente
 _max = max  # alias para max escalar (legibilidad)
+
+# Criticas de la EOS ACTIVA (Tc, Pc, omega). Se fijan al inicio de
+# construir_envolvente con crit_props(get_eos()), de modo que la siembra de
+# Wilson use los parametros correctos de la EOS elegida (PR/SRK x HYSYS/PVTsim)
+# y no los de HYSYS-PR fijos. Este era el motivo de que la envolvente de SRK
+# PVTsim no trazara la cola de burbuja.
+_TCa = list(TC)
+_PCa = list(PC)
+_OMa = list(OMEGA)
+
+def _fijar_criticas_activas():
+    global _TCa, _PCa, _OMa
+    tc, pc, om, _pm = crit_props(get_eos())
+    _TCa = list(tc); _PCa = list(pc); _OMa = list(om)
 
 
 # ── Helpers de bajo nivel ────────────────────────────────────────────────────
@@ -50,7 +64,7 @@ def _cardano_Z(A, B):
     return solve_Z(A, B)
 
 def _Ki_wilson(i, T, P):
-    return (PC[i]/P) * np.exp(WILSON_C*(1+OMEGA[i])*(1-TC[i]/T))
+    return (_PCa[i]/P) * np.exp(WILSON_C*(1+_OMa[i])*(1-_TCa[i]/T))
 
 def _gibbs_dep_pr(Z, A, B):
     """Salida de Gibbs adimensional PR (sin constante)."""
@@ -76,7 +90,7 @@ def _gibbs_dep(Z, A, B):
     CRITICO: esta es la funcion que usa _ln_phi_full para elegir entre las
     raices ZV y ZL. Si se usa la formula PR con SRK activa, la eleccion
     invierte la raiz y la envolvente Michelsen se rompe entera."""
-    if get_eos() == 'SRK':
+    if es_srk(get_eos()):
         return _gibbs_dep_srk(Z, A, B)
     return _gibbs_dep_pr(Z, A, B)
 
@@ -244,11 +258,11 @@ def _tangente(X, z, act, t_prev=None, Gfun=_funciones):
 def _init_burbuja(z, act, P0):
     """Punto de burbuja a baja presion via Wilson. Retorna X o None."""
     m  = len(act)
-    T0 = float(np.sum(z*np.array(TC))) * 0.6
+    T0 = float(np.sum(z*np.array(_TCa))) * 0.6
     for _ in range(300):
         Kw = np.array([_Ki_wilson(i, T0, P0) for i in range(NC)])
         f  = np.sum(z*Kw) - 1.0
-        df = sum(z[i]*Kw[i]*(WILSON_C*(1+OMEGA[i])*TC[i]/T0**2) for i in range(NC))
+        df = sum(z[i]*Kw[i]*(WILSON_C*(1+_OMa[i])*_TCa[i]/T0**2) for i in range(NC))
         if abs(df) < 1e-30: break
         Tn = T0 - f/df
         if Tn <= 0: Tn = T0*0.5
@@ -271,7 +285,7 @@ def _semilla_rocio(z, act, P_try):
     la rama de rocío de esas mezclas está a temperaturas muy altas."""
     m = len(act)
     # Adaptar el rango inferior de T según la componente más volátil presente.
-    Tc_min_act = min(TC[i] for i in act)
+    Tc_min_act = min(_TCa[i] for i in act)
     Ta = max(50.0, 0.30 * Tc_min_act)   # cubre mezclas criogénicas
     Tb = 1600.0
     fa = sum(z[i]/_max(_Ki_wilson(i,Ta,P_try),1e-30) for i in range(NC)) - 1.0
@@ -298,7 +312,7 @@ def _semilla_burbuja(z, act, P_try):
     m = len(act)
     # Adaptar el rango inferior de T según la componente más volátil presente.
     # La envolvente puede estar a temperaturas muy bajas (p. ej. CO2/C2 ≈ -140°F).
-    Tc_min_act = min(TC[i] for i in act)
+    Tc_min_act = min(_TCa[i] for i in act)
     Ta = max(50.0, 0.30 * Tc_min_act)   # ~30% de Tc_min (criogénico)
     Tb = 1600.0
     fa = sum(z[i]*_Ki_wilson(i,Ta,P_try) for i in range(NC)) - 1.0
@@ -629,6 +643,7 @@ def construir_envolvente(z, kij=None, progress_cb=None,
     global kij_g
     if kij is None: kij = copy.deepcopy(KIJ_DEFAULT)
     kij_g = kij
+    _fijar_criticas_activas()
     z = np.array(z, dtype=float)
 
     act = [i for i in range(NC) if z[i] > 1e-8]
@@ -662,7 +677,7 @@ def construir_envolvente(z, kij=None, progress_cb=None,
     # divergir a P,T no físicas. Detectamos el caso por el spread de Tc de los
     # componentes activos y reducimos el paso SÓLO en ese caso (las mezclas
     # normales mantienen su paso y velocidad intactos).
-    Tc_act = [TC[i] for i in act]
+    Tc_act = [_TCa[i] for i in act]
     casi_ideal = (max(Tc_act) / max(min(Tc_act), 1e-9)) < 1.10
     if casi_ideal:
         paso_max = min(paso_max, 0.025)
@@ -959,6 +974,7 @@ def construir_isocalidad(z, beta, kij=None, P_ini=14.7, max_pts=3000,
     global kij_g
     if kij is None: kij = copy.deepcopy(KIJ_DEFAULT)
     kij_g = kij
+    _fijar_criticas_activas()
     z = np.array(z, dtype=float)
     beta = float(beta)
     if beta<=0.0: beta=1e-4
@@ -973,7 +989,7 @@ def construir_isocalidad(z, beta, kij=None, P_ini=14.7, max_pts=3000,
 
     # Arranque: igual que _init_burbuja (Wilson a baja P), pero resuelto
     # directamente con la ecuación de cierre a beta fijo.
-    T0 = float(np.sum(z*np.array(TC))) * 0.6
+    T0 = float(np.sum(z*np.array(_TCa))) * 0.6
     for _ in range(300):
         Kw = np.array([_Ki_wilson(i, T0, P_ini) for i in range(NC)])
         denom = 1.0+beta*(Kw-1.0)

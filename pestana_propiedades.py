@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 from eos import NC
+import idioma as _i18n
 
 # ── Estilo (mismo que las demás pestañas) ─────────────────────
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"
@@ -220,7 +221,7 @@ class TabPropiedades(QWidget):
                 "Ingrese Temperatura y Presion positivas.")
             return
 
-        self.btn.setEnabled(False); self.btn.setText("Calculando...")
+        self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.lbl_modo.setText("")
         self._clear_results()
 
@@ -248,7 +249,7 @@ class TabPropiedades(QWidget):
             return str(v)
 
     def _on_done(self, r):
-        self.btn.setEnabled(True); self.btn.setText("Calcular propiedades")
+        self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular propiedades"))
         self.last_result = r
         self._render(r)
 
@@ -280,7 +281,7 @@ class TabPropiedades(QWidget):
 
     def _on_error(self, msg):
         import dialogos as dialogos
-        self.btn.setEnabled(True); self.btn.setText("Calcular propiedades")
+        self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular propiedades"))
         self.lbl_modo.setText("")
         dialogos.error(self, msg)
 

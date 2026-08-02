@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 import numpy as np
+import idioma as _i18n
 import matplotlib
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -318,9 +319,15 @@ class TabEnvolvente(QWidget):
                                   QSizePolicy.Policy.Expanding)
         self.canvas.setVisible(False)   # oculto hasta calcular
         left_lay.addWidget(self.canvas)
-        # Cursor interactivo: muestra P y T en la posición del mouse
+        # Cursor interactivo: muestra P y T en la posición del mouse.
+        # Se usa BLITTING (redibuja solo el cursor sobre un fondo cacheado)
+        # para un seguimiento fluido sin redibujar toda la figura.
         self._hover_annot = None
+        self._cross_v = None
+        self._cross_h = None
+        self._bg = None
         self.canvas.mpl_connect('motion_notify_event', self._on_hover)
+        self.canvas.mpl_connect('draw_event', self._on_draw)
         # Cursor en forma de cruz al estar sobre el gráfico
         self.canvas.setCursor(Qt.CursorShape.CrossCursor)
         # Punto marcado por el usuario (P_psia, T_F) o None
@@ -514,7 +521,7 @@ class TabEnvolvente(QWidget):
         # líneas de isocalidad calculadas antes ya no corresponden y se
         # descartan (el usuario debe recalcularlas si las sigue necesitando).
         self._isocalidad = {}
-        self.btn.setEnabled(False); self.btn.setText("Calculando...")
+        self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.prog.setVisible(True)
         self.worker=EnvWorker(z,kij,metodo,max_pts=10000)
         self.worker.done.connect(self._on_done)
@@ -522,12 +529,12 @@ class TabEnvolvente(QWidget):
         self.worker.start()
 
     def _on_error(self,msg):
-        self.btn.setEnabled(True); self.btn.setText("Calcular Envolvente")
+        self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular Envolvente"))
         self.prog.setVisible(False)
         dialogos.error(self, msg)
 
     def _on_done(self,res):
-        self.btn.setEnabled(True); self.btn.setText("Calcular Envolvente")
+        self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular Envolvente"))
         self.prog.setVisible(False)
         self.result=res
         self.canvas.setVisible(True)   # mostrar el gráfico ya con datos
@@ -571,7 +578,7 @@ class TabEnvolvente(QWidget):
             return
 
         kij=self.get_kij()
-        self.btn_iso.setEnabled(False); self.btn_iso.setText("Calculando...")
+        self.btn_iso.setEnabled(False); self.btn_iso.setText(_i18n.t("Calculando..."))
         self.prog_iso.setVisible(True)
         # env_result=None fuerza al worker a recalcular la envolvente con
         # Michelsen desde la composición actual, en vez de reutilizar una
@@ -582,12 +589,12 @@ class TabEnvolvente(QWidget):
         self.iso_worker.start()
 
     def _on_iso_error(self,msg):
-        self.btn_iso.setEnabled(True); self.btn_iso.setText("Calcular Isocalidad")
+        self.btn_iso.setEnabled(True); self.btn_iso.setText(_i18n.t("Calcular Isocalidad"))
         self.prog_iso.setVisible(False)
         dialogos.error(self, msg)
 
     def _on_iso_done(self,res):
-        self.btn_iso.setEnabled(True); self.btn_iso.setText("Calcular Isocalidad")
+        self.btn_iso.setEnabled(True); self.btn_iso.setText(_i18n.t("Calcular Isocalidad"))
         self.prog_iso.setVisible(False)
         # La envolvente del worker es siempre fresca (recalculada con la
         # composición actual): se adopta como resultado principal vigente.
@@ -761,6 +768,9 @@ class TabEnvolvente(QWidget):
     def _plot(self,res):
         ax=self.ax; ax.clear()
         self._hover_annot = None   # se invalida al limpiar los ejes
+        self._cross_v = None
+        self._cross_h = None
+        self._bg = None
         ax.set_facecolor('#FFFFFF')
         ax.set_axisbelow(True)   # rejilla por detrás de los marcadores
 
@@ -962,18 +972,29 @@ class TabEnvolvente(QWidget):
         else:
             self._plot({'burbuja': [], 'rocio': []})
 
+    def _on_draw(self, event):
+        # Recaptura el fondo tras cada redibujo completo (plot, zoom, resize)
+        # para poder hacer blitting del cursor encima.
+        try:
+            self._bg = self.canvas.copy_from_bbox(self.ax.bbox)
+        except Exception:
+            self._bg = None
+
     def _on_hover(self, event):
         # Solo si hay datos y el cursor está dentro del área de trazado
         if not self.canvas.isVisible() or event.inaxes != self.ax:
-            if self._hover_annot is not None:
+            if self._hover_annot is not None and self._hover_annot.get_visible():
                 self._hover_annot.set_visible(False)
+                if self._cross_v is not None:
+                    self._cross_v.set_visible(False)
+                    self._cross_h.set_visible(False)
                 self.canvas.draw_idle()
             return
         T = event.xdata   # °F (eje X)
         P = event.ydata   # psia (eje Y)
         if T is None or P is None:
             return
-        # Crear o actualizar la anotación
+        # Crear anotación y cruz de referencia la primera vez
         if self._hover_annot is None:
             self._hover_annot = self.ax.annotate(
                 "", xy=(0,0), xytext=(12,12),
@@ -982,28 +1003,38 @@ class TabEnvolvente(QWidget):
                 bbox=dict(boxstyle="round,pad=0.4", fc=GRAY_PLOT_BG,
                           ec="#888888", lw=0.8),
                 zorder=10)
+        if self._cross_v is None:
+            self._cross_v = self.ax.axvline(T, color="#888888", lw=0.7,
+                                            ls=(0, (4, 3)), zorder=9, animated=True)
+            self._cross_h = self.ax.axhline(P, color="#888888", lw=0.7,
+                                            ls=(0, (4, 3)), zorder=9, animated=True)
+        self._hover_annot.set_animated(True)
 
         # ── Posicionamiento dinámico para no salirse del área ──────
-        # Decidir a qué lado del cursor mostrar el recuadro según en qué
-        # parte del eje está, para que nunca se pierda fuera del gráfico.
         xmin, xmax = self.ax.get_xlim()
         ymin, ymax = self.ax.get_ylim()
         fx = (T - xmin) / (xmax - xmin) if xmax != xmin else 0.5
         fy = (P - ymin) / (ymax - ymin) if ymax != ymin else 0.5
-        # Si está en la mitad derecha, mostrar el recuadro hacia la izquierda
         dx = -12 if fx > 0.5 else 12
-        # Si está en la mitad superior, mostrar el recuadro hacia abajo
         dy = -12 if fy > 0.5 else 12
-        ha = 'right' if dx < 0 else 'left'
-        va = 'top'   if dy < 0 else 'bottom'
-        self._hover_annot.set_ha(ha)
-        self._hover_annot.set_va(va)
+        self._hover_annot.set_ha('right' if dx < 0 else 'left')
+        self._hover_annot.set_va('top' if dy < 0 else 'bottom')
         self._hover_annot.set_position((dx, dy))
-
         self._hover_annot.xy = (T, P)
         self._hover_annot.set_text(f"T = {T:.1f} °F\nP = {P:.1f} psia")
         self._hover_annot.set_visible(True)
-        self.canvas.draw_idle()
+        self._cross_v.set_xdata([T, T]); self._cross_v.set_visible(True)
+        self._cross_h.set_ydata([P, P]); self._cross_h.set_visible(True)
+
+        # ── BLITTING: solo el cursor se redibuja sobre el fondo cacheado ──
+        if self._bg is None:
+            self.canvas.draw()
+            self._bg = self.canvas.copy_from_bbox(self.ax.bbox)
+        self.canvas.restore_region(self._bg)
+        self.ax.draw_artist(self._cross_v)
+        self.ax.draw_artist(self._cross_h)
+        self.ax.draw_artist(self._hover_annot)
+        self.canvas.blit(self.ax.bbox)
 
     def _update_results(self,res):
         burb=res.get('burbuja',[]); rocio=res.get('rocio',[])

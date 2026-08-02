@@ -13,6 +13,7 @@ from PyQt6.QtGui import QColor, QBrush
 
 from eos import NOMBRES, NC
 import dialogos as dialogos
+import idioma as _i18n
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"
 GRAY_RES="#E8E8E8"; BORDER="#888888"; TEXT="#000000"; TEXT_DIM="#555555"
 TEXT_RES="#000080"; FONT_F="Arial Narrow"; FS=10
@@ -342,8 +343,22 @@ class TabSaturacion(QWidget):
             h += 2*tbl.frameWidth() + 2
             tbl.setFixedHeight(h)
 
+    def _tipo_es(self):
+        """Clave ESPAÑOL del tipo seleccionado (robusto a la traduccion)."""
+        try:
+            import idioma
+            idx = self.cmb_tipo.currentIndex()
+            es = self.cmb_tipo.property(f"_i18n_es_{idx}")
+            if es and es in self.TIPOS:
+                return es
+            txt = self.cmb_tipo.currentText()
+            es2 = idioma._TRAD_INV.get(txt, txt)
+            return es2 if es2 in self.TIPOS else txt
+        except Exception:
+            return self.cmb_tipo.currentText()
+
     def _on_tipo_change(self, txt):
-        tipo, unidad, etiqueta, _ = self.TIPOS[txt]
+        tipo, unidad, etiqueta, _ = self.TIPOS[self._tipo_es()]
         self.lbl_cond.setText(etiqueta)
         if unidad=='P':
             self.sp_cond.setRange(0.0, 15000.0)
@@ -358,15 +373,14 @@ class TabSaturacion(QWidget):
                 "La suma de fracciones debe ser 1.0")
             return
         kij=self.get_kij()
-        txt=self.cmb_tipo.currentText()
-        tipo, unidad, etiqueta, res_unit = self.TIPOS[txt]
+        tipo, unidad, etiqueta, res_unit = self.TIPOS[self._tipo_es()]
         valor=self.sp_cond.value()
         if valor <= 0.0:
             dialogos.advertencia(self,
                 "Ingrese un valor de presion o temperatura.")
             return
 
-        self.btn.setEnabled(False); self.btn.setText("Calculando...")
+        self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.lbl_estado.setText("")
         self._res_unit=res_unit; self._tipo_txt=txt
         self.worker=SatWorker(tipo, valor, z, kij)
@@ -375,11 +389,11 @@ class TabSaturacion(QWidget):
         self.worker.start()
 
     def _on_error(self, msg):
-        self.btn.setEnabled(True); self.btn.setText("Calcular punto de saturacion")
+        self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular punto de saturacion"))
         dialogos.error(self, msg)
 
     def _on_done(self, res):
-        self.btn.setEnabled(True); self.btn.setText("Calcular punto de saturacion")
+        self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular punto de saturacion"))
         if not res or not res.get('exito'):
             self.lbl_estado.setText("No se encontro punto de saturacion")
             self.lbl_res_val.setText(""); self.lbl_res2_val.setText("")
@@ -437,7 +451,7 @@ class TabSaturacion(QWidget):
         """Devuelve inputs + resultado calculado (si existe)."""
         return {
             'entrada': {
-                'tipo':  self.cmb_tipo.currentText(),
+                'tipo':  self._tipo_es(),
                 'valor': float(self.sp_cond.value()),
             },
             'resultado': self.last_result,   # dict o None
@@ -448,6 +462,8 @@ class TabSaturacion(QWidget):
         e = datos.get('entrada', {}) or {}
         tipo = e.get('tipo', '')
         idx = self.cmb_tipo.findText(tipo)
+        if idx < 0 and tipo in self.TIPOS:
+            idx = list(self.TIPOS.keys()).index(tipo)
         if idx >= 0:
             self.cmb_tipo.setCurrentIndex(idx)
         try:

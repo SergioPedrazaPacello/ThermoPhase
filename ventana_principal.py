@@ -30,6 +30,7 @@ from rutas import ruta_recurso
 from ribbon import construir_ribbon, NavigatorPanel
 import iconos
 import edicion
+import idioma as _i18n
 kij_user = copy.deepcopy(KIJ_DEFAULT)
 kij_fuente = 'PR'         # EOS-fuente activa de los kij globales (PR/SRK/PR_PVT/SRK_PVT)
 
@@ -686,7 +687,7 @@ class TabEquilibrio(QWidget):
             dialogos.advertencia(self,
                 "La suma de fracciones debe ser 1.0")
             return
-        self.btn.setEnabled(False); self.btn.setText("Calculando...")
+        self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         # Cada ventana de Equilibrio usa la EOS de su propio combo.
         _set_eos(_eos_code(self.cmb_eos.currentIndex()))
         kij = self._kij_get() if self._kij_get is not None else kij_user
@@ -697,11 +698,11 @@ class TabEquilibrio(QWidget):
         self.worker.start()
 
     def _on_error(self, msg):
-        self.btn.setEnabled(True); self.btn.setText("Realizar Calculo")
+        self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
         dialogos.error(self, msg)
 
     def _on_result(self, r):
-        self.btn.setEnabled(True); self.btn.setText("Realizar Calculo")
+        self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
         self.last_result = r
         self._render(r)
 

@@ -164,6 +164,69 @@ TRAD = {
     "n-Pentano [nC5]": "n-Pentane [nC5]", "Hexano [C6]": "Hexane [C6]",
     "Heptano [C7]": "Heptane [C7]", "Octano [C8]": "Octane [C8]",
     "Nonano [C9]": "Nonane [C9]",
+
+    # ── Ampliacion: cadenas que faltaban al traducir ────────────────────
+    "Presion (psi):": "Pressure (psi):",
+    "Presion (psia):": "Pressure (psia):",
+    "Presión (psi):": "Pressure (psi):",
+    "Temperatura (°R):": "Temperature (°R):",
+    "Temperatura (°F):": "Temperature (°F):",
+    "Cricondentérmica (°F):": "Cricondentherm (°F):",
+    "Cricondenbárica (psi):": "Cricondenbar (psi):",
+    "Cricondentermica (°F):": "Cricondentherm (°F):",
+    "Cricondenbarica (psi):": "Cricondenbar (psi):",
+    "Línea de isocalidad N°1:": "Quality line No.1:",
+    "Línea de isocalidad N°2:": "Quality line No.2:",
+    "Línea de isocalidad N°3:": "Quality line No.3:",
+    "Línea de isocalidad N°4:": "Quality line No.4:",
+    "Línea de isocalidad N°5:": "Quality line No.5:",
+    "Temperatura de rocio (°F):": "Dew temperature (°F):",
+    "Temperatura de rocío (°F):": "Dew temperature (°F):",
+    "Temperatura de burbuja (°F):": "Bubble temperature (°F):",
+    "Entalpia molar [Btu/lbmol]:": "Molar enthalpy [Btu/lbmol]:",
+    "Entropia molar [Btu/lbmol-F]:": "Molar entropy [Btu/lbmol-F]:",
+    "Entalpía molar [Btu/lbmol]:": "Molar enthalpy [Btu/lbmol]:",
+    "Entropía molar [Btu/lbmol-F]:": "Molar entropy [Btu/lbmol-F]:",
+    "Abrir calculo del fluido seleccionado (ventana independiente):":
+        "Open calculation for the selected fluid (separate window):",
+    "Abrir cálculo del fluido seleccionado (ventana independiente):":
+        "Open calculation for the selected fluid (separate window):",
+    "Parámetros EOS": "EOS Parameters", "Parametros EOS": "EOS Parameters",
+    "Fraccion Molar": "Mole Fraction", "Fracción Molar": "Mole Fraction",
+    "Fraccion Masica": "Mass Fraction", "Fracción Másica": "Mass Fraction",
+    "Densidad masica [lb/ft3]": "Mass density [lb/ft3]",
+    "Densidad masica [lb/ft3]:": "Mass density [lb/ft3]:",
+    "Densidad másica [lb/ft3]": "Mass density [lb/ft3]",
+    "Densidad másica [lb/ft3]:": "Mass density [lb/ft3]:",
+    "Fase fraccion [molar]:": "Phase fraction [molar]:",
+    "Fase fraccion [masica]:": "Phase fraction [mass]:",
+    "Fase fracción [molar]:": "Phase fraction [molar]:",
+    "Fase fracción [másica]:": "Phase fraction [mass]:",
+    "Gravedad especifica": "Specific gravity",
+    "Gravedad especifica:": "Specific gravity:",
+    "Gravedad específica": "Specific gravity",
+    "Gravedad específica:": "Specific gravity:",
+    "Marcar punto:": "Mark point:",
+    "Presion Critica (psi)": "Critical Pressure (psi)",
+    "Presión Crítica (psi)": "Critical Pressure (psi)",
+    "Presion de Burbuja": "Bubble Pressure", "Presión de Burbuja": "Bubble Pressure",
+    "Presion de Rocío": "Dew Pressure", "Presión de Rocío": "Dew Pressure",
+    "Temperatura Critica (°R)": "Critical Temperature (°R)",
+    "Peso Molecular (lb/lb-mol)": "Molecular Weight (lb/lb-mol)",
+    "Peso Molecular": "Molecular Weight",
+    "Punto de burbuja": "Bubble point", "Punto de rocío": "Dew point",
+    "Punto de rocio": "Dew point",
+    "Presión": "Pressure", "Temperatura": "Temperature",
+    "Cargando...": "Loading...", "(cargando)": "(loading)",
+    "Peng-Robinson EOS": "Peng-Robinson EOS",
+    "Temperatura de Rocío": "Dew Temperature",
+    "Temperatura de Rocio": "Dew Temperature",
+    "Temperatura de Burbuja": "Bubble Temperature",
+    "% vapor": "% vapour", "% Vapor": "% Vapour",
+    "Fase Vapor": "Vapour Phase", "Fase Líquida": "Liquid Phase",
+    "Fase Liquida": "Liquid Phase", "Propiedad": "Property",
+    "Valor": "Value", "Unidad": "Unit", "Unidades": "Units",
+    "Cantidad": "Amount", "Total": "Total",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.
@@ -210,6 +273,26 @@ def retraducir(widget):
             es = _orig_es(w, txt); w.setText(_traducir_texto(es))
     for w in widget.findChildren(QGroupBox):
         es = _orig_es(w, w.title()); w.setTitle(_traducir_texto(es))
+    # Placeholders de campos de texto
+    from PyQt6.QtWidgets import QLineEdit, QTabWidget
+    for w in widget.findChildren(QLineEdit):
+        ph = w.placeholderText()
+        if ph:
+            prev = w.property("_i18n_es_ph")
+            es = prev if prev else _TRAD_INV.get(ph, ph)
+            if not prev:
+                w.setProperty("_i18n_es_ph", es)
+            w.setPlaceholderText(_traducir_texto(es))
+    # Pestañas (QTabWidget)
+    for w in widget.findChildren(QTabWidget):
+        for i in range(w.count()):
+            t = w.tabText(i)
+            key = f"_i18n_es_tab_{i}"
+            prev = w.property(key)
+            es = prev if prev else _TRAD_INV.get(t, t)
+            if not prev:
+                w.setProperty(key, es)
+            w.setTabText(i, _traducir_texto(es))
     for w in widget.findChildren(QComboBox):
         for i in range(w.count()):
             it = w.itemText(i)
@@ -226,6 +309,20 @@ def retraducir(widget):
             _tr_action(act)
     # Tablas (cabeceras y celdas de etiqueta que esten en el diccionario)
     for tb in widget.findChildren(QTableWidget):
+        # Cabeceras horizontales y verticales
+        for cab in ('h', 'v'):
+            cnt = tb.columnCount() if cab == 'h' else tb.rowCount()
+            for k in range(cnt):
+                it = (tb.horizontalHeaderItem(k) if cab == 'h'
+                      else tb.verticalHeaderItem(k))
+                if it is None:
+                    continue
+                txt = it.text()
+                es = it.data(Qt.ItemDataRole.UserRole + 99)
+                if es is None:
+                    es = _TRAD_INV.get(txt, txt)
+                    it.setData(Qt.ItemDataRole.UserRole + 99, es)
+                it.setText(_traducir_texto(es))
         for r in range(tb.rowCount()):
             for c in range(tb.columnCount()):
                 it = tb.item(r, c)

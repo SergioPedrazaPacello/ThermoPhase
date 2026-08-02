@@ -1234,13 +1234,22 @@ def fase_pvtsim(z, T, P, Z, kij):
         Liquido si  (P < Pc y T < T_burbuja)  o  (P >= Pc y T < Tc)
         Gas     si  (P < Pc y T > T_rocio)    o  (P >= Pc y T > Tc)
 
-    Se usa el punto (pseudo)critico de la mezcla por la regla de Kay con las
-    criticas de la EOS activa (PVTsim). Con una sola raiz real el fluido esta
-    fuera de la envolvente, de modo que la comparacion T vs Tc de la mezcla
-    resuelve ambos casos (P<Pc: gas sobrecalentado si T>Tc, liquido comprimido
-    si T<Tc;  P>=Pc: gas si T>Tc, liquido si T<Tc)."""
-    TCa, PCa, _om, _pm = crit_props(_EOS_ACTIVA)
-    Tcm = sum(z[i] * TCa[i] for i in range(NC))
+    Usa el PUNTO CRITICO REAL de la mezcla (Pc, Tc) calculado con la EOS
+    activa (no el pseudocritico de Kay, que erraba la frontera; p.ej. 90%
+    C1/10% C2 a 3000 psia cambia a -82 °F, no a -96 °F). Si el punto critico
+    no converge, cae al pseudocritico de Kay como respaldo."""
+    Tcm = Pcm = None
+    try:
+        import critico
+        c = critico.punto_critico(z, kij)
+        if c is not None:
+            Pcm, Tcm = c[0], c[1]
+    except Exception:
+        Tcm = Pcm = None
+    if Tcm is None:                     # respaldo: pseudocritico de Kay
+        TCa, PCa, _om, _pm = crit_props(_EOS_ACTIVA)
+        Tcm = sum(z[i] * TCa[i] for i in range(NC))
+        Pcm = sum(z[i] * PCa[i] for i in range(NC))
     return "liquido" if T < Tcm else "vapor"
 
 
