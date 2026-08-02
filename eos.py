@@ -114,29 +114,52 @@ def kij_chueh_prausnitz(n=1.0):
     return M
 
 
-def _kij_desde_columnas(col_n2, col_co2):
-    """Construye la matriz simetrica 13x13 a partir de las columnas de N2 y
-    CO2 (los unicos pares no nulos en PVTsim; HC-HC = 0)."""
+def _kij_desde_triangular(filas):
+    """Construye la matriz simetrica 13x13 desde su triangular inferior.
+    `filas[i]` = [kij(i,0), kij(i,1), ..., kij(i,i-1)] para i=1..NC-1."""
     M = [[0.0] * NC for _ in range(NC)]
-    for i in range(NC):
-        M[i][0] = M[0][i] = col_n2[i]
-        M[i][1] = M[1][i] = col_co2[i]
-    M[0][0] = M[1][1] = 0.0
+    for i in range(1, NC):
+        fila = filas[i - 1]
+        for j in range(len(fila)):
+            v = float(fila[j])
+            M[i][j] = v
+            M[j][i] = v
     return M
 
 
-# PVTsim (Knapp et al., 1982) — valores provistos por el usuario desde la
-# base de datos de PVTsim. Solo N2 y CO2 frente a los demas; HC-HC = 0.
-_PVT_PR_N2  = [0, -0.017, 0.0311, 0.0515, 0.0852, 0.1033, 0.08,
-               0.0922, 0.1, 0.08, 0.08, 0.08, 0.08]
-_PVT_PR_CO2 = [-0.017, 0, 0.12, 0.12, 0.12, 0.12, 0.12,
-               0.12, 0.12, 0.12, 0.1, 0.1, 0.1]
-_PVT_SRK_N2  = [0, -0.0315, 0.0278, 0.0407, 0.0763, 0.0944, 0.07,
-                0.0867, 0.0878, 0.08, 0.08, 0.08, 0.08]
-_PVT_SRK_CO2 = [-0.0315, 0, 0.12, 0.12, 0.12, 0.12, 0.12,
-                0.12, 0.12, 0.12, 0.1, 0.1, 0.1]
-KIJ_PVTSIM_PR  = _kij_desde_columnas(_PVT_PR_N2,  _PVT_PR_CO2)
-KIJ_PVTSIM_SRK = _kij_desde_columnas(_PVT_SRK_N2, _PVT_SRK_CO2)
+# PVTsim (Knapp et al., 1982) con los componentes pesados como n-alcanos
+# (n-heptano, n-octano, n-nonano). Triangular inferior, filas C(i) vs los
+# anteriores en orden: N2, CO2, C1, C2, C3, iC4, nC4, iC5, nC5, C6, C7, C8, C9.
+_PVT_PR_TRI = [
+    [-0.017],                                                          # CO2
+    [0.0311, 0.12],                                                    # C1
+    [0.0515, 0.12, 0],                                                 # C2
+    [0.0852, 0.12, 0, 0],                                              # C3
+    [0.1033, 0.12, 0, 0, 0],                                           # iC4
+    [0.08, 0.12, 0, 0, 0, 0],                                          # nC4
+    [0.0922, 0.12, 0, 0, 0, 0, 0],                                     # iC5
+    [0.1, 0.12, 0, 0, 0, 0, 0, 0],                                     # nC5
+    [0.1496, 0.12, 0, 0, 0, 0, 0, 0, 0],                              # C6
+    [0.1441, 0.1, 0.0352, 0.0067, 0.0056, 0, 0.0033, 0, 0.0074, -0.0078],  # C7
+    [0.08, 0.1, 0.0496, 0.0185, 0, 0, 0, 0, 0, 0, 0],                 # C8
+    [0.08, 0.1, 0.0474, 0, 0, 0, 0, 0, 0, 0, 0, 0],                   # C9
+]
+_PVT_SRK_TRI = [
+    [-0.0315],
+    [0.0278, 0.12],
+    [0.0407, 0.12, 0],
+    [0.0763, 0.12, 0, 0],
+    [0.0944, 0.12, 0, 0, 0],
+    [0.07, 0.12, 0, 0, 0, 0],
+    [0.0867, 0.12, 0, 0, 0, 0, 0],
+    [0.0878, 0.12, 0, 0, 0, 0, 0, 0],
+    [0.1496, 0.12, 0, 0, 0, 0, 0, 0, 0],
+    [0.1422, 0.11, 0.0307, 0.0041, 0.0044, 0, -0.0004, 0, 0.0019, -0.0011],
+    [0.08, 0.1, 0.0448, 0.017, 0, 0, 0, 0, -0.0022, 0, 0],
+    [0.08, 0.1, 0.0448, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+]
+KIJ_PVTSIM_PR  = _kij_desde_triangular(_PVT_PR_TRI)
+KIJ_PVTSIM_SRK = _kij_desde_triangular(_PVT_SRK_TRI)
 
 # ── Las CUATRO ecuaciones de estado disponibles ─────────────────────
 #   'PR'      -> Peng-Robinson  (parametros HYSYS)
@@ -257,14 +280,14 @@ PC_SRK = list(PC)
 # Tc en °F (convertida a °R sumando 459.67), Pc en psia, factor acentrico
 # UNICO para PR y SRK (PVTsim no separa omega por EOS, a diferencia de HYSYS).
 _TC_PVT_F = [-232.51, 87.89, -116.59, 90.05, 205.97, 274.91, 305.69,
-             369.05, 385.61, 453.65, 506.009, 544.807, 588.07]
+             369.05, 385.61, 453.65, 512.69, 564.17, 610.61]
 TC_PVT = [t + 459.67 for t in _TC_PVT_F]                     # °R
 PC_PVT = [492.32, 1069.87, 667.2, 708.35, 615.76, 529.06, 551.1,
-          490.85, 489.38, 430.59, 427.16, 397.63, 363.54]    # psia
+          490.85, 489.38, 430.59, 396.79, 360.05, 335.07]     # psia
 OMEGA_PVT = [0.04, 0.225, 0.008, 0.098, 0.152, 0.176, 0.193,
-             0.227, 0.251, 0.296, 0.3374, 0.3743, 0.4205]
+             0.227, 0.251, 0.296, 0.351, 0.394, 0.44]
 PM_PVT = [28.014, 44.01, 16.043, 30.07, 44.097, 58.124, 58.124,
-          72.151, 72.151, 86.178, 96.0, 107.0, 121.0]
+          72.151, 72.151, 86.178, 100.205, 114.232, 128.258]
 
 # ── Parámetros individuales SRK (Soave-Redlich-Kwong 1972) ───────
 # Constantes EXACTAS derivadas de las condiciones criticas:
@@ -1082,7 +1105,13 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
             # Una sola raíz real → fluido supercrítico genuino (no hay
             # segunda fase candidata con la que el test D188 pueda comparar
             # de forma confiable).
-            fase_sc=fase_supercritica(z,T,P,ZVg,kij)
+            # Identificacion de fase de la raiz unica:
+            #  - EOS PVTsim -> criterio de PVTsim (Tc/Pc de la mezcla)
+            #  - EOS HYSYS  -> algoritmo de HYSYS (umbrales Z/beta), intacto
+            if es_pvtsim(_EOS_ACTIVA):
+                fase_sc = fase_pvtsim(z, T, P, ZVg, kij)
+            else:
+                fase_sc = fase_supercritica(z, T, P, ZVg, kij)
             if fase_sc=="vapor" and modo!="vapor_unico":
                 x=[0.0]*NC; y=list(z); V=1.0; L=0.0; modo="vapor_unico"
             elif fase_sc=="liquido" and modo!="liquido_unico":
@@ -1198,6 +1227,23 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
     }
 
 # ══ Punto de entrada ═════════════════════════════════════════
+def fase_pvtsim(z, T, P, Z, kij):
+    """Identificacion de fase de una sola raiz real segun el criterio de
+    PVTsim (Method Documentation, "Phase Identification"):
+
+        Liquido si  (P < Pc y T < T_burbuja)  o  (P >= Pc y T < Tc)
+        Gas     si  (P < Pc y T > T_rocio)    o  (P >= Pc y T > Tc)
+
+    Se usa el punto (pseudo)critico de la mezcla por la regla de Kay con las
+    criticas de la EOS activa (PVTsim). Con una sola raiz real el fluido esta
+    fuera de la envolvente, de modo que la comparacion T vs Tc de la mezcla
+    resuelve ambos casos (P<Pc: gas sobrecalentado si T>Tc, liquido comprimido
+    si T<Tc;  P>=Pc: gas si T>Tc, liquido si T<Tc)."""
+    TCa, PCa, _om, _pm = crit_props(_EOS_ACTIVA)
+    Tcm = sum(z[i] * TCa[i] for i in range(NC))
+    return "liquido" if T < Tcm else "vapor"
+
+
 def calcular(z,T,P,kij=None,metodo_densidad='EOS'):
     """
     Réplica de Sub AnalisisYFlash():

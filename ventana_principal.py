@@ -1456,6 +1456,18 @@ class MainWindow(QMainWindow):
         m_win.addSeparator()
         m_win.addAction(_act("Cerrar &todas", self._cerrar_todas))
 
+        # ── Idioma ───────────────────────────────────────────
+        import idioma as _i18n
+        m_idi = menubar.addMenu("&Idioma")
+        self._act_es = QAction("Español", self, checkable=True)
+        self._act_en = QAction("Inglés", self, checkable=True)
+        self._act_es.setChecked(_i18n.get_idioma() == 'ES')
+        self._act_en.setChecked(_i18n.get_idioma() == 'EN')
+        self._act_es.triggered.connect(lambda: self._cambiar_idioma('ES'))
+        self._act_en.triggered.connect(lambda: self._cambiar_idioma('EN'))
+        m_idi.addAction(self._act_es)
+        m_idi.addAction(self._act_en)
+
         # ── Ayuda ────────────────────────────────────────────
         m_ayuda = menubar.addMenu("A&yuda")
         m_ayuda.addAction(_act("&Acerca de ThermoPhase...", self._menu_acerca))
@@ -1463,6 +1475,33 @@ class MainWindow(QMainWindow):
     def _toggle_nav(self, on):
         if hasattr(self, 'nav'):
             self.nav.setVisible(on)
+
+    def _cambiar_idioma(self, lang):
+        """Cambia el idioma de TODA la interfaz (principal + subventanas)."""
+        import idioma as _i18n
+        _i18n.set_idioma(lang)
+        self._act_es.setChecked(lang == 'ES')
+        self._act_en.setChecked(lang == 'EN')
+        # Ventana principal (menus, navegador, barra, status)
+        _i18n.retraducir(self)
+        if hasattr(self, 'ribbon'):
+            _i18n.retraducir(self.ribbon)
+        if hasattr(self, 'nav'):
+            _i18n.retraducir(self.nav)
+        # Todas las subventanas de funcionalidad (abiertas u ocultas)
+        for sw in self._subventanas.values():
+            _i18n.retraducir(sw)
+            es_tit = sw.property("_i18n_es_title")
+            if es_tit is None:
+                es_tit = _i18n._TRAD_INV.get(sw.windowTitle(), sw.windowTitle())
+                sw.setProperty("_i18n_es_title", es_tit)
+            # Titulos con sufijo " - Nombre" (por fluido): traducir solo la parte
+            base = es_tit.split(" - ")[0]
+            resto = es_tit[len(base):]
+            sw.setWindowTitle(_i18n._traducir_texto(base) + resto)
+        # Pie de pagina EOS y status
+        self._refrescar_pies()
+        self._lbl_info.setText(f"{_eos_nombre(self._eos_main_code())} EOS")
 
     # ── Exportacion a PDF ────────────────────────────────────
     def _menu_exportar_pdf(self):
