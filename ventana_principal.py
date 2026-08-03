@@ -1265,7 +1265,8 @@ class TabFluidos(QWidget):
                 self._on_comp_change(self.fluidos[self._idx])
 
     # ── Acciones de gestion ──────────────────────────────────
-    def _nombre_nuevo(self, base="Fluido"):
+    def _nombre_nuevo(self, base=None):
+        if base is None: base = _i18n.t("Fluido")
         existentes = {f['nombre'] for f in self.fluidos}
         i = 1
         while f"{base} {i}" in existentes:
@@ -1281,7 +1282,7 @@ class TabFluidos(QWidget):
 
     def _capturar(self):
         z = list(self._get_z_actual())
-        self.fluidos.append({'nombre': self._nombre_nuevo("Cromatografia"),
+        self.fluidos.append({'nombre': self._nombre_nuevo(_i18n.t("Cromatografia")),
                              'z': z, 'eos': 'PR',
                              'kij': copy.deepcopy(KIJ_DEFAULT),
                              'kij_fuente': 'PR'})
@@ -1525,16 +1526,16 @@ class MainWindow(QMainWindow):
 
         eos = estado.get('eos_activa', 'PR')
         base = (os.path.splitext(os.path.basename(self.current_path))[0]
-                if self.current_path else f"reporte_{eos.lower()}")
+                if self.current_path else f"{_i18n.t('reporte')}_{eos.lower()}")
         path, _ = QFileDialog.getSaveFileName(
-            self, "Exportar resultados a PDF", base + ".pdf",
-            "PDF (*.pdf);;Todos los archivos (*.*)")
+            self, _i18n.t("Exportar resultados a PDF"), base + ".pdf",
+            "PDF (*.pdf);;" + _i18n.t("Todos los archivos (*.*)"))
         if not path:
             return
         if not path.lower().endswith('.pdf'):
             path += '.pdf'
 
-        self._sb.showMessage("  Generando PDF...", 0)
+        self._sb.showMessage("  " + _i18n.t("Generando PDF..."), 0)
         self._pdf_worker = PdfWorker(estado, path)
         self._pdf_worker.done.connect(self._on_pdf_done)
         self._pdf_worker.start()
@@ -2022,9 +2023,13 @@ class MainWindow(QMainWindow):
         self._abrir_calculo('equilibrio')
 
     def _sync_nav_fluidos(self):
-        """Actualiza el arbol de fluidos del navegador."""
+        """Actualiza el arbol de fluidos del navegador. Si el idioma activo es
+        ingles, retraduce el arbol para que los nombres de las funcionalidades
+        del nuevo fluido salgan en ingles de inmediato."""
         if hasattr(self, 'nav'):
             self.nav.set_fluidos([f['nombre'] for f in self.fluidos])
+            if _i18n.get_idioma() == 'EN':
+                _i18n.retraducir(self.nav)
 
     def _abrir_calc_fluido_por_nombre(self, nombre, clave):
         """Abre un calculo de fluido desde el arbol del navegador."""

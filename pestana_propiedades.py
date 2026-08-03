@@ -208,9 +208,9 @@ class TabPropiedades(QWidget):
         # Validar composición
         z=self.get_z(); s=sum(z)
         if s<=0:
-            dialogos.advertencia(self,
+            dialogos.advertencia(self, _i18n.t(
                 "Composicion vacia. Ingrese la composicion en la "
-                "pestaña de Equilibrio de fases.")
+                "pestaña de Equilibrio de fases."))
             return
         # Normalizar
         z=[zi/s for zi in z]
@@ -218,7 +218,7 @@ class TabPropiedades(QWidget):
         T=self.sp_T.value(); P=self.sp_P.value()
         if T<=0 or P<=0:
             dialogos.advertencia(self,
-                "Ingrese Temperatura y Presion positivas.")
+                _i18n.t("Ingrese Temperatura y Presion positivas."))
             return
 
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
@@ -277,7 +277,7 @@ class TabPropiedades(QWidget):
             'bifasico':      'Sistema bifasico vapor-liquido.',
             'supercritico':  'Sistema en region supercritica.',
         }.get(modo, f'Modo: {modo}')
-        self.lbl_modo.setText(modo_txt)
+        self.lbl_modo.setText(_i18n.t(modo_txt))
 
     def _on_error(self, msg):
         import dialogos as dialogos

@@ -363,7 +363,7 @@ class TabSaturacion(QWidget):
 
     def _on_tipo_change(self, txt):
         tipo, unidad, etiqueta, _ = self.TIPOS[self._tipo_es()]
-        self.lbl_cond.setText(etiqueta)
+        self.lbl_cond.setText(_i18n.t(etiqueta))
         if unidad=='P':
             self.sp_cond.setRange(0.0, 15000.0)
         else:
@@ -415,15 +415,15 @@ class TabSaturacion(QWidget):
         if self._res_unit=='T':
             self.lbl_res_label.setText(f"{self._tipo_txt} (°F):")
             self.lbl_res_val.setText(f"{T-459.67:.2f}")
-            self.lbl_res2_label.setText("Equivalente (°R):")
+            self.lbl_res2_label.setText(_i18n.t("Equivalente (°R):"))
             self.lbl_res2_val.setText(f"{T:.2f}")
         else:
             self.lbl_res_label.setText(f"{self._tipo_txt} (psi):")
             self.lbl_res_val.setText(f"{P:.2f}")
-            self.lbl_res2_label.setText("Temperatura (°F):")
+            self.lbl_res2_label.setText(_i18n.t("Temperatura (°F):"))
             self.lbl_res2_val.setText(f"{T-459.67:.2f}")
 
-        self.lbl_estado.setText("Convergencia exitosa.")
+        self.lbl_estado.setText(_i18n.t("Convergencia exitosa."))
 
         # Llenar tabla de composiciones
         x=res.get('x',[0]*NC); y=res.get('y',[0]*NC)

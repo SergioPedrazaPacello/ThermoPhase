@@ -244,6 +244,41 @@ TRAD = {
     "¿Desea guardar los cambios?": "Do you want to save the changes?",
     "Cambios sin guardar": "Unsaved changes",
     "Archivo guardado correctamente.": "File saved successfully.",
+    # Acerca de ThermoPhase
+    "ThermoPhase 1.0\n\n"
+    "Software de equilibrio de fases y propiedades termodinamicas "
+    "para mezclas de hidrocarburos (13 componentes).\n"
+    "Ecuaciones de estado: Peng-Robinson y Soave-Redlich-Kwong.":
+        "ThermoPhase 1.0\n\n"
+        "Phase equilibrium and thermodynamic properties software "
+        "for hydrocarbon mixtures (13 components).\n"
+        "Equations of state: Peng-Robinson and Soave-Redlich-Kwong.",
+    # Reportes PDF (mensaje, titulo de dialogo, nombre por defecto)
+    "PDF exportado correctamente:": "PDF exported successfully:",
+    "Exportar resultados a PDF": "Export results to PDF",
+    "Todos los archivos (*.*)": "All files (*.*)",
+    "reporte": "report", "Generando PDF...": "Generating PDF...",
+    # Saturacion
+    "Equivalente (°R / psi):": "Equivalent (°R / psi):",
+    "Equivalente (°R):": "Equivalent (°R):",
+    "Equivalente (psi):": "Equivalent (psi):",
+    "Convergencia exitosa.": "Convergence successful.",
+    "Temperatura de rocio (°F):": "Dew temperature (°F):",
+    # Entalpia/Entropia: mensajes de modo y dialogos
+    "Sistema en fase vapor unica.": "Single vapour phase system.",
+    "Sistema en fase liquida unica.": "Single liquid phase system.",
+    "Sistema bifasico vapor-liquido.": "Two-phase vapour-liquid system.",
+    "Sistema en region supercritica.": "Supercritical region system.",
+    "Ingrese Temperatura y Presion positivas.":
+        "Enter positive Temperature and Pressure.",
+    "Composicion vacia. Ingrese la composicion en la "
+    "pestaña de Equilibrio de fases.":
+        "Empty composition. Enter the composition in the "
+        "Phase Equilibrium tab.",
+    "Fraccion molar de fase:": "Phase mole fraction:",
+    "Fase vapor": "Vapour phase", "Fase liquida": "Liquid phase",
+    # Nombres por defecto de fluidos / cromatografias
+    "Cromatografia": "Chromatography", "Cromatografía": "Chromatography",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

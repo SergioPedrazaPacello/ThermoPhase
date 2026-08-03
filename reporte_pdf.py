@@ -119,6 +119,18 @@ def _f(v, d=4):
 
 
 # ── API publica ──────────────────────────────────────────────────────────
+# Convierte subindices Unicode (N₂, CO₂) a marcado <sub> de ReportLab, que
+# funciona con CUALQUIER fuente (incluida Arial Narrow, que no trae el glifo
+# del subindice y lo dibujaba como un recuadro negro).
+_SUBS = {'\u2080':'0','\u2081':'1','\u2082':'2','\u2083':'3','\u2084':'4',
+         '\u2085':'5','\u2086':'6','\u2087':'7','\u2088':'8','\u2089':'9'}
+def _sub_markup(txt):
+    out = txt
+    for u, d in _SUBS.items():
+        out = out.replace(u, f'<sub>{d}</sub>')
+    return out
+
+
 def generar_pdf(estado, path):
     """
     Genera el reporte PDF del calculo flash (Equilibrio de fases).
@@ -269,7 +281,7 @@ def generar_pdf(estado, path):
             yi = y[i] if i < len(y) else 0.0
             xi = x[i] if i < len(x) else 0.0
             comp.append([
-                lab(NOMBRES[i]),      # NOMBRES ya incluye los dos puntos
+                lab(_sub_markup(NOMBRES[i])),  # <sub> para el subindice (N2, CO2)
                 val(zi),
                 val(yi) if V > 0 else vac(),
                 val(xi) if L > 0 else vac(),
@@ -280,7 +292,8 @@ def generar_pdf(estado, path):
         story.append(t)
 
         doc.build(story)
-        return True, f"PDF exportado correctamente:\n{os.path.basename(path)}"
+        import idioma as _i18n
+        return True, _i18n.t("PDF exportado correctamente:") + f"\n{os.path.basename(path)}"
 
     except Exception as ex:
         import traceback
