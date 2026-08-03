@@ -566,10 +566,10 @@ class TabEnvolvente(QWidget):
             try:
                 val=float(txt.replace(',', '.'))
             except ValueError:
-                dialogos.advertencia(self, f"Valor inválido en Línea de isocalidad N°{i+1}.")
+                dialogos.advertencia(self, _i18n.t("Valor inválido en Línea de isocalidad N°%d.") % (i+1))
                 return
             if not (0.0 < val < 100.0):
-                dialogos.advertencia(self, f"La calidad N°{i+1} debe estar entre 0 y 100 (%).")
+                dialogos.advertencia(self, _i18n.t("La calidad N°%d debe estar entre 0 y 100 (%%).") % (i+1))
                 return
             calidades[i]=val/100.0   # a fracción 0-1
 

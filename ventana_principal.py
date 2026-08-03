@@ -1316,8 +1316,9 @@ class TabFluidos(QWidget):
     def _cargar(self):
         if 0 <= self._idx < len(self.fluidos):
             self._cargar_principal(list(self.fluidos[self._idx]['z']))
-            dialogos.info(self, f"Fluido «{self.fluidos[self._idx]['nombre']}» "
-                                "cargado en la composicion principal.")
+            dialogos.info(self, _i18n.t(
+                "Fluido «%s» cargado en la composicion principal.")
+                % self.fluidos[self._idx]['nombre'])
 
     def _abrir(self, clave):
         if not (0 <= self._idx < len(self.fluidos)):

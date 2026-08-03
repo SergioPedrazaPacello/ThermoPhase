@@ -279,6 +279,36 @@ TRAD = {
     "Fase vapor": "Vapour phase", "Fase liquida": "Liquid phase",
     # Nombres por defecto de fluidos / cromatografias
     "Cromatografia": "Chromatography", "Cromatografía": "Chromatography",
+    # Ventanas emergentes restantes
+    "Fluido «%s» cargado en la composicion principal.":
+        "Fluid «%s» loaded into the main composition.",
+    "No hay resultados del calculo flash para exportar.\n"
+    "Ejecute el calculo en la pestaña de Equilibrio de fases.":
+        "No flash calculation results to export.\n"
+        "Run the calculation in the Phase Equilibrium tab.",
+    "No hay resultados del calculo flash para exportar":
+        "No flash calculation results to export",
+    "Valor inválido en Línea de isocalidad N°%d.":
+        "Invalid value in Quality line No.%d.",
+    "La calidad N°%d debe estar entre 0 y 100 (%%).":
+        "Quality No.%d must be between 0 and 100 (%%).",
+    "Ingrese al menos un valor de % de vapor en las celdas.":
+        "Enter at least one % vapour value in the cells.",
+    "CSV guardado:": "CSV saved:", "Operacion completada.": "Operation completed.",
+    "No se pudo completar la operacion:": "Could not complete the operation:",
+    "ThermoPhase": "ThermoPhase", "Guardado": "Saved",
+    "ThermoPhase — Información": "ThermoPhase — Information",
+    "ThermoPhase — Informacion": "ThermoPhase — Information",
+    # Reporte PDF (contenido)
+    "Reporte de Simulacion - ThermoPhase": "Simulation Report - ThermoPhase",
+    "Condiones de calculo:": "Calculation conditions:",
+    "Condiciones de calculo:": "Calculation conditions:",
+    "Modelo de calculo ocupado:": "Calculation model used:",
+    "Ecuacion de estado ocupada:": "Equation of state used:",
+    "Metodo de calculo de densidad:": "Density calculation method:",
+    "Composicion General": "Overall Composition",
+    "Composicion de las fases:": "Phase composition:",
+    "Resumen de los calculos:": "Calculation summary:",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

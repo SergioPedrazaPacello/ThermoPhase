@@ -39,6 +39,7 @@ from reportlab.platypus import (
 )
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+import idioma as _i18n
 
 
 # ── Registro de la tipografia Arial Narrow ───────────────────────────────
@@ -171,12 +172,12 @@ def generar_pdf(estado, path):
         story = []
 
         # ═══ Titulo ══════════════════════════════════════════════
-        story.append(Paragraph("Reporte de Simulacion - ThermoPhase",
+        story.append(Paragraph(_i18n.t("Reporte de Simulacion - ThermoPhase"),
                                E['titulo']))
         story.append(Spacer(1, 14))
 
         # ═══ Condiones de calculo ════════════════════════════════
-        story.append(Paragraph("Condiones de calculo:", E['seccion']))
+        story.append(Paragraph(_i18n.t("Condiones de calculo:"), E['seccion']))
         story.append(Spacer(1, 7))
 
         T_R = float(ent.get('T_R', 0) or 0)
@@ -184,9 +185,9 @@ def generar_pdf(estado, path):
         T_F = T_R - 459.67 if T_R > 0 else 0.0
 
         cond = [
-            [Paragraph("Presion (psi):", E['lbl']),
+            [Paragraph(_i18n.t("Presion (psi):"), E['lbl']),
              Paragraph(_f(P, 2), E['val_izq'])],
-            [Paragraph("Temperatura (°F):", E['lbl']),
+            [Paragraph(_i18n.t("Temperatura (°F):"), E['lbl']),
              Paragraph(_f(T_F, 2), E['val_izq'])],
         ]
         t = Table(cond, colWidths=[W*0.34, W*0.30], hAlign='LEFT')
@@ -195,13 +196,13 @@ def generar_pdf(estado, path):
         story.append(Spacer(1, 12))
 
         # ═══ Modelo de calculo ocupado ═══════════════════════════
-        story.append(Paragraph("Modelo de calculo ocupado:", E['seccion']))
+        story.append(Paragraph(_i18n.t("Modelo de calculo ocupado:"), E['seccion']))
         story.append(Spacer(1, 7))
 
         modelo = [
-            [Paragraph("Ecuacion de estado ocupada:", E['lbl']),
+            [Paragraph(_i18n.t("Ecuacion de estado ocupada:"), E['lbl']),
              Paragraph(ent.get('eos', 'Peng-Robinson'), E['val_izq'])],
-            [Paragraph("Metodo de calculo de densidad:", E['lbl']),
+            [Paragraph(_i18n.t("Metodo de calculo de densidad:"), E['lbl']),
              Paragraph(ent.get('densidad', 'COSTALD'), E['val_izq'])],
         ]
         t = Table(modelo, colWidths=[W*0.42, W*0.30], hAlign='LEFT')
@@ -210,7 +211,7 @@ def generar_pdf(estado, path):
         story.append(Spacer(1, 12))
 
         # ═══ Resumen de los calculos ═════════════════════════════
-        story.append(Paragraph("Resumen de los calculos:", E['seccion']))
+        story.append(Paragraph(_i18n.t("Resumen de los calculos:"), E['seccion']))
         story.append(Spacer(1, 7))
 
         V  = res.get('V')  or 0.0
@@ -241,19 +242,19 @@ def generar_pdf(estado, path):
         def vac():         return Paragraph("", E['val'])
 
         resumen = [
-            [lab(""), hdr("Composicion General"), hdr("Fase Vapor"),
-             hdr("Fase Liquida")],
-            [lab("Fase fraccion [molar]:"),      vac(),
+            [lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
+             hdr(_i18n.t("Fase Liquida"))],
+            [lab(_i18n.t("Fase fraccion [molar]:")),      vac(),
              val(V),  val(L)],
-            [lab("Fase fraccion [masica]:"),     vac(),
+            [lab(_i18n.t("Fase fraccion [masica]:")),     vac(),
              val(Vm), val(Lm)],
-            [lab("Gravedad especifica:"),        vac(),
+            [lab(_i18n.t("Gravedad especifica:")),        vac(),
              val(sg_v), val(sg_l)],
-            [lab("Densidad masica [lb/ft3]:"),   val(rho_z),
+            [lab(_i18n.t("Densidad masica [lb/ft3]:")),   val(rho_z),
              val(rho_v), val(rho_l)],
-            [lab("Factor de compresibilidad:"),  vac(),
+            [lab(_i18n.t("Factor de compresibilidad:")),  vac(),
              val(ZV), val(ZL)],
-            [lab("Peso molecular:"),             val(PM_z),
+            [lab(_i18n.t("Peso molecular:")),             val(PM_z),
              val(PM_v), val(PM_l)],
         ]
         t = Table(resumen, colWidths=[W*0.34, W*0.22, W*0.22, W*0.22],
@@ -263,7 +264,7 @@ def generar_pdf(estado, path):
         story.append(Spacer(1, 14))
 
         # ═══ Composicion de las fases ════════════════════════════
-        story.append(Paragraph("Composicion de las fases:", E['seccion']))
+        story.append(Paragraph(_i18n.t("Composicion de las fases:"), E['seccion']))
         story.append(Spacer(1, 7))
 
         z = list(ent.get('composicion') or [0.0]*NC)
@@ -271,17 +272,17 @@ def generar_pdf(estado, path):
         y = list(res.get('y') or [0.0]*NC)
 
         comp = [
-            [lab(""), hdr("Composicion General"), hdr("Fase Vapor"),
-             hdr("Fase Liquida")],
-            [lab(""), hdr("Fraccion Molar"), hdr("Fraccion Molar"),
-             hdr("Fraccion Molar")],
+            [lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
+             hdr(_i18n.t("Fase Liquida"))],
+            [lab(""), hdr(_i18n.t("Fraccion Molar")), hdr(_i18n.t("Fraccion Molar")),
+             hdr(_i18n.t("Fraccion Molar"))],
         ]
         for i in range(NC):
             zi = z[i] if i < len(z) else 0.0
             yi = y[i] if i < len(y) else 0.0
             xi = x[i] if i < len(x) else 0.0
             comp.append([
-                lab(_sub_markup(NOMBRES[i])),  # <sub> para el subindice (N2, CO2)
+                lab(_sub_markup(_i18n.t(NOMBRES[i]))),  # <sub> para el subindice (N2, CO2)
                 val(zi),
                 val(yi) if V > 0 else vac(),
                 val(xi) if L > 0 else vac(),
@@ -292,7 +293,6 @@ def generar_pdf(estado, path):
         story.append(t)
 
         doc.build(story)
-        import idioma as _i18n
         return True, _i18n.t("PDF exportado correctamente:") + f"\n{os.path.basename(path)}"
 
     except Exception as ex:
