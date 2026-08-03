@@ -28,7 +28,7 @@ import copy
 import math
 from eos import (
     NC, TC, PC, OMEGA, KIJ_DEFAULT,
-    am, bm, AB, solve_Z, ln_phi_i,
+    am, bm, AB, solve_Z, ln_phi_i, ln_phi_vec,
     get_eos, crit_props, es_srk,
 )
 
@@ -108,8 +108,7 @@ def _ln_phi_full(comp_full, T, P, vapor=None):
     gV = _gibbs_dep(ZV, A, B)
     gL = _gibbs_dep(ZL, A, B)
     Z  = ZV if gV <= gL else ZL
-    return np.array([ln_phi_i(i, comp_full, T, P, Z, am_, bm_, kij_g)
-                     for i in range(NC)])
+    return ln_phi_vec(comp_full, T, P, Z, am_, bm_, kij_g)
 
 
 # ── Sistema de Michelsen (subespacio activo) ─────────────────────────────────

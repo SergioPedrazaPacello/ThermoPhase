@@ -1492,6 +1492,11 @@ class MainWindow(QMainWindow):
         # Todas las subventanas de funcionalidad (abiertas u ocultas)
         for sw in self._subventanas.values():
             _i18n.retraducir(sw)
+            # Gráficos (envolvente, etc.): re-trazar en el idioma activo
+            w = getattr(sw, '_widget', None)
+            if w is not None and hasattr(w, 'retraducir_grafico'):
+                try: w.retraducir_grafico()
+                except Exception: pass
             es_tit = sw.property("_i18n_es_title")
             if es_tit is None:
                 es_tit = _i18n._TRAD_INV.get(sw.windowTitle(), sw.windowTitle())
@@ -1959,6 +1964,18 @@ class MainWindow(QMainWindow):
             tam = self._tam_sub
         win.setFixedSize(tam[0], tam[1] + alto_pie)
         self._subventanas[clave] = win
+        # La ventana nace en el idioma activo: si es ingles, traducir ya
+        # (antes solo se traducia al alternar idioma).
+        win.setProperty("_i18n_es_title", titulo)
+        if _i18n.get_idioma() == 'EN':
+            _i18n.retraducir(win)
+            base = titulo.split(" - ")[0]; resto = titulo[len(base):]
+            win.setWindowTitle(_i18n._traducir_texto(base) + resto)
+            # Traducir el grafico del widget si lo soporta
+            w = getattr(win, '_widget', None)
+            if w is not None and hasattr(w, 'retraducir_grafico'):
+                try: w.retraducir_grafico()
+                except Exception: pass
         return win
 
     def _mostrar_subventana(self, win):

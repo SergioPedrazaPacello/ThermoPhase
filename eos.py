@@ -462,8 +462,8 @@ def _Ps_burbuja_PR(comp, T, kij, max_iter=30, tol=1e-6):
         am_V = am(y,    T, kij); bm_V = bm(y)
         _, ZL_ = solve_Z(*AB(am_L, bm_L, T, P))
         ZV_, _ = solve_Z(*AB(am_V, bm_V, T, P))
-        phi_L = [phi_i(i, comp, T, P, ZL_, am_L, bm_L, kij) for i in range(NC)]
-        phi_V = [phi_i(i, y,    T, P, ZV_, am_V, bm_V, kij) for i in range(NC)]
+        phi_L = phi_vec(comp, T, P, ZL_, am_L, bm_L, kij)
+        phi_V = phi_vec(y,    T, P, ZV_, am_V, bm_V, kij)
         Kw_new = [phi_L[i]/phi_V[i] if (phi_V[i]>0 and comp[i]>0) else Kw[i]
                   for i in range(NC)]
         S = sum(comp[i]*Kw_new[i] for i in range(NC))
@@ -569,11 +569,21 @@ _PARAMS_EOS = {
     'SRK_PVT': (_AI_SRK_PVT, _BI_SRK_PVT, _MI_SRK_PVT, _TC_PVT_A),
 }
 
+_AA_CACHE = {'eos': None, 'T': None, 'val': None}
+
 def ai_alpha_vec_eos(eos, T):
-    """Vector ai·α(T) para la EOS indicada (una de las 4)."""
+    """Vector ai·α(T) para la EOS indicada (una de las 4).
+    Cacheado por (eos, T): dentro de un flash T es constante y esta funcion
+    se llama cientos de veces, asi que evita recalcular el mismo vector.
+    El resultado es identico bit a bit; no altera exactitud."""
+    c = _AA_CACHE
+    if c['eos'] == eos and c['T'] == T:
+        return c['val']
     AI, _BIv, MI, TCa = _PARAMS_EOS.get(eos, _PARAMS_EOS['PR'])
     al = (1.0 + MI*(1.0 - np.sqrt(T/TCa)))**2
-    return AI*al
+    val = AI*al
+    c['eos'] = eos; c['T'] = T; c['val'] = val
+    return val
 
 def ai_eos(eos):  return _PARAMS_EOS.get(eos, _PARAMS_EOS['PR'])[0]
 def bi_eos(eos):  return _PARAMS_EOS.get(eos, _PARAMS_EOS['PR'])[1]
@@ -620,7 +630,8 @@ def am(z,T,kij):
     return float(w.sum()**2 - w @ kij_arr @ w)
 
 def bm(z):
-    return sum(z[i]*bi(i) for i in range(NC))
+    # bm = sum_i z_i b_i, vectorizado (evita 13 llamadas a bi() por invocacion)
+    return float(np.asarray(z) @ bi_eos(_EOS_ACTIVA))
 
 # Variantes explícitas PR (usadas por entalpia_entropia para que la entalpía y
 # entropía siempre se calculen en modo Peng-Robinson, independientemente
@@ -833,6 +844,49 @@ def ln_phi_i_srk(i,z,T,P,Z,am_val,bm_val,kij):
     t4 = (2.0*sum_aij/am_val - bi_/bm_val)*t3
     return t1 + t2 - t4
 
+def ln_phi_vec(z, T, P, Z, am_val, bm_val, kij):
+    """Vector con los 13 ln(phi_i) de una sola vez. Matematicamente identico
+    a llamar ln_phi_i por cada componente, pero calcula las cantidades
+    compartidas (aa, saa, w, A, B, bi) UNA vez y resuelve sum_aij para todos
+    los componentes con un producto matriz-vector (kij @ w). Elimina el bucle
+    de Python por componente y las recomputaciones redundantes."""
+    z = np.asarray(z, dtype=float)
+    bi = bi_eos(_EOS_ACTIVA)
+    aa = ai_alpha_vec_eos(_EOS_ACTIVA, T)
+    saa = np.sqrt(aa)
+    w = z * saa
+    kij_arr = kij if isinstance(kij, np.ndarray) else np.asarray(kij)
+    A, B = AB(am_val, bm_val, T, P)
+    if Z <= B:
+        Z = B + 1e-12
+    # sum_aij_i = saa[i] * (sum_j w_j - sum_j kij[i,j] w_j)  para todo i
+    sum_aij = saa * (w.sum() - kij_arr @ w)
+    bi_bm = bi / bm_val
+    t1 = bi_bm * (Z - 1.0)
+    t2 = -np.log(Z - B)
+    if es_srk(_EOS_ACTIVA):
+        ratio = (Z + B) / Z
+        if ratio <= 0:
+            ratio = 1e-12
+        Bp = B if B > 0 else 1e-12
+        t3 = (A / Bp) * np.log(ratio)
+    else:
+        denom = Z + (1 - _SQRT2) * B
+        numer = Z + (1 + _SQRT2) * B
+        if denom <= 0:
+            denom = 1e-12
+        if numer <= 0:
+            numer = 1e-12
+        t3 = A / (2 * _SQRT2 * B) * np.log(numer / denom)
+    t4 = (2.0 * sum_aij / am_val - bi_bm) * t3
+    return t1 + t2 - t4
+
+
+def phi_vec(z, T, P, Z, am_val, bm_val, kij):
+    """exp(ln_phi_vec) con recorte para estabilidad numerica."""
+    return np.exp(np.clip(ln_phi_vec(z, T, P, Z, am_val, bm_val, kij), -500, 500))
+
+
 def ln_phi_i(i,z,T,P,Z,am_val,bm_val,kij):
     """Coef. de fugacidad según EOS activa."""
     if es_srk(_EOS_ACTIVA):
@@ -898,10 +952,10 @@ def analisis_estabilidad(z,T,P,kij,tol=1e-12,triv_tol=1e-4,tol_S=1e-4,max_iter=1
         ZV_v,_=solve_Z(*AB(am_v,bm_v,T,P))
         _,ZL_l=solve_Z(*AB(am_l,bm_l,T,P))
 
-        fug_v=[phi_i(i,Yv,T,P,ZV_v,am_v,bm_v,kij)*Yv[i]*P for i in range(NC)]
-        fug_l=[phi_i(i,Yl,T,P,ZL_l,am_l,bm_l,kij)*Yl[i]*P for i in range(NC)]
-        fug_zV=[phi_i(i,z,T,P,ZV_z,am_z,bm_z,kij)*z[i]*P for i in range(NC)]
-        fug_zL=[phi_i(i,z,T,P,ZL_z,am_z,bm_z,kij)*z[i]*P for i in range(NC)]
+        fug_v=phi_vec(Yv,T,P,ZV_v,am_v,bm_v,kij)*np.asarray(Yv)*P
+        fug_l=phi_vec(Yl,T,P,ZL_l,am_l,bm_l,kij)*np.asarray(Yl)*P
+        fug_zV=phi_vec(z,T,P,ZV_z,am_z,bm_z,kij)*np.asarray(z)*P
+        fug_zL=phi_vec(z,T,P,ZL_z,am_z,bm_z,kij)*np.asarray(z)*P
 
         Riv=[np.log(fug_v[i]/fug_zV[i]) if (fug_v[i]>0 and fug_zV[i]>0) else 0 for i in range(NC)]
         Ril=[np.log(fug_l[i]/fug_zL[i]) if (fug_l[i]>0 and fug_zL[i]>0) else 0 for i in range(NC)]
@@ -1021,14 +1075,14 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         if sy>1e-30:
             amv=am(y_n,T,kij); bmv=bm(y_n)
             ZVc,_=solve_Z(*AB(amv,bmv,T,P))
-            phi_v=[phi_i(i,y_n,T,P,ZVc,amv,bmv,kij) for i in range(NC)]
+            phi_v=phi_vec(y_n,T,P,ZVc,amv,bmv,kij)
         else:
             phi_v=[1.0]*NC      # vapor evanescente → φ_v = 1
 
         if sx>1e-30:
             aml=am(x_n,T,kij); bml=bm(x_n)
             _,ZLc=solve_Z(*AB(aml,bml,T,P))
-            phi_l=[phi_i(i,x_n,T,P,ZLc,aml,bml,kij) for i in range(NC)]
+            phi_l=phi_vec(x_n,T,P,ZLc,aml,bml,kij)
         else:
             phi_l=[1.0]*NC      # líquido evanescente → φ_l = 1
 

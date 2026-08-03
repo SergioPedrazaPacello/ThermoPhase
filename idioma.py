@@ -227,6 +227,23 @@ TRAD = {
     "Fase Liquida": "Liquid Phase", "Propiedad": "Property",
     "Valor": "Value", "Unidad": "Unit", "Unidades": "Units",
     "Cantidad": "Amount", "Total": "Total",
+    # Etiquetas de gráficos (matplotlib)
+    "Temperatura (°F)": "Temperature (°F)", "Presión (psia)": "Pressure (psia)",
+    "Presion (psia)": "Pressure (psia)", "Temperatura (°R)": "Temperature (°R)",
+    "Curva de Burbuja": "Bubble Curve", "Curva de Rocío": "Dew Curve",
+    "Curva de Rocio": "Dew Curve", "vapor": "vapour", "Punto": "Point",
+    "Punto crítico": "Critical point", "Punto critico": "Critical point",
+    # Diálogos emergentes (títulos y mensajes)
+    "ThermoPhase — Advertencia": "ThermoPhase — Warning",
+    "ThermoPhase — Error": "ThermoPhase — Error",
+    "Advertencia": "Warning", "Error": "Error",
+    "La suma de fracciones debe ser 1.0": "The sum of fractions must be 1.0",
+    "La suma de las fracciones debe ser 1.0": "The sum of fractions must be 1.0",
+    "No se pudo abrir el archivo:": "Could not open the file:",
+    "No se pudo guardar el archivo:": "Could not save the file:",
+    "¿Desea guardar los cambios?": "Do you want to save the changes?",
+    "Cambios sin guardar": "Unsaved changes",
+    "Archivo guardado correctamente.": "File saved successfully.",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

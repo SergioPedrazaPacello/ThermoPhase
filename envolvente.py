@@ -23,7 +23,7 @@ import numpy as np
 import copy
 from eos import (
     NC, TC, PC, OMEGA, KIJ_DEFAULT,
-    am, bm, AB, solve_Z, ln_phi_i
+    am, bm, AB, solve_Z, ln_phi_i, ln_phi_vec,
 )
 
 R_GAS = 10.7316
@@ -61,8 +61,7 @@ def _phi(z_ph, T, P, vapor, kij):
     am_ = am(z_ph, T, kij); bm_ = bm(z_ph)
     ZV, ZL = solve_Z(*AB(am_, bm_, T, P))
     Z = ZV if vapor else ZL
-    return [np.exp(np.clip(ln_phi_i(i,z_ph,T,P,Z,am_,bm_,kij),-500,500))
-            for i in range(NC)]
+    return np.exp(np.clip(ln_phi_vec(z_ph,T,P,Z,am_,bm_,kij),-500,500))
 
 def Ki_de_phi(x, y, T, P, kij):
     """Ki = phiL(x)/phiV(y)"""

@@ -765,6 +765,15 @@ class TabEnvolvente(QWidget):
         self._update_results(self.result)
         self._plot(self.result)
 
+    def retraducir_grafico(self):
+        """Re-dibuja el grafico aplicando el idioma activo (ejes, leyenda).
+        Barato: solo re-traza los puntos ya calculados, no recalcula."""
+        try:
+            self._plot(self.result if getattr(self, 'result', None) is not None
+                       else {'burbuja': [], 'rocio': []})
+        except Exception:
+            pass
+
     def _plot(self,res):
         ax=self.ax; ax.clear()
         self._hover_annot = None   # se invalida al limpiar los ejes
@@ -887,19 +896,19 @@ class TabEnvolvente(QWidget):
         if self._regiones is not None:
             if Tb and Pb:
                 ax.plot(Tb, Pb, linestyle='-', color='#a83218',
-                        linewidth=0.9, label='Curva de Burbuja', zorder=5)
+                        linewidth=0.9, label=_i18n.t('Curva de Burbuja'), zorder=5)
             if Td and Pd:
                 ax.plot(Td, Pd, linestyle='-', color='#1a4fa8',
-                        linewidth=0.9, label='Curva de Rocío', zorder=5)
+                        linewidth=0.9, label=_i18n.t('Curva de Rocío'), zorder=5)
         else:
             if Tb and Pb:
                 ax.plot(Tb,Pb,linestyle='none',marker='^',
                         color='#a83218',markersize=3,
-                        label='Curva de Burbuja')
+                        label=_i18n.t('Curva de Burbuja'))
             if Td and Pd:
                 ax.plot(Td,Pd,linestyle='none',marker='^',
                         color='#1a4fa8',markersize=3,
-                        label='Curva de Rocío')
+                        label=_i18n.t('Curva de Rocío'))
 
         # Líneas de isocalidad (finas, un color distinto por línea)
         for idx,pts in getattr(self,'_isocalidad',{}).items():
@@ -908,7 +917,7 @@ class TabEnvolvente(QWidget):
             Ti=[t-459.67 for _,t in pts]; Pi=[p for p,_ in pts]
             txt=self.ed_iso[idx].text().strip()
             ax.plot(Ti,Pi,linestyle='-',linewidth=0.7,
-                    color=color, label=f'{txt}% vapor', zorder=3)
+                    color=color, label=f'{txt}% '+_i18n.t('vapor'), zorder=3)
 
         # Punto marcado por el usuario (triángulo verde)
         if self._punto_usuario is not None:
@@ -916,10 +925,10 @@ class TabEnvolvente(QWidget):
             ax.plot([Tp_F],[Pp],linestyle='none',marker='^',
                     color='#2d9d2d',markersize=5,
                     markeredgecolor='#145214',markeredgewidth=0.5,
-                    label='Punto', zorder=5)
+                    label=_i18n.t('Punto'), zorder=5)
 
-        ax.set_xlabel("Temperatura (°F)", fontsize=10, color=TEXT)
-        ax.set_ylabel("Presión (psia)", fontsize=10, color=TEXT)
+        ax.set_xlabel(_i18n.t("Temperatura (°F)"), fontsize=10, color=TEXT)
+        ax.set_ylabel(_i18n.t("Presión (psia)"), fontsize=10, color=TEXT)
 
         # ── Estilo Modelo A (Win95 hundido) ───────────────────
         # Marco negro cerrado en los 4 lados, ticks hacia adentro

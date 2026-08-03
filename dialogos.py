@@ -49,7 +49,14 @@ _STYLE = (
 
 def _crear(parent, icon, titulo, texto):
     """Crea el QMessageBox con estilo unificado. El tamaño se calcula
-    automaticamente segun el contenido."""
+    automaticamente segun el contenido. El titulo y el texto se traducen
+    al idioma activo (las ventanas emergentes tambien cambian de idioma)."""
+    try:
+        import idioma as _i18n
+        titulo = _i18n.t(titulo)
+        texto = _i18n.t(texto)
+    except Exception:
+        pass
     mb = QMessageBox(parent)
     mb.setWindowTitle(titulo)
     mb.setText(texto)

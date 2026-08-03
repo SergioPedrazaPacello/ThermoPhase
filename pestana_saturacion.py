@@ -14,6 +14,7 @@ from PyQt6.QtGui import QColor, QBrush
 from eos import NOMBRES, NC
 import dialogos as dialogos
 import idioma as _i18n
+import eos as _eng
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"
 GRAY_RES="#E8E8E8"; BORDER="#888888"; TEXT="#000000"; TEXT_DIM="#555555"
 TEXT_RES="#000080"; FONT_F="Arial Narrow"; FS=10
@@ -98,11 +99,14 @@ LBL_RES=(f'background:{GRAY_LBL};border:1px solid {BORDER};color:{TEXT_RES};'
 class SatWorker(QThread):
     done  = pyqtSignal(dict)
     error = pyqtSignal(str)
-    def __init__(self, tipo, valor, z, kij):
+    def __init__(self, tipo, valor, z, kij, eos=None):
         super().__init__()
-        self.tipo=tipo; self.valor=valor; self.z=z; self.kij=kij
+        self.tipo=tipo; self.valor=valor; self.z=z; self.kij=kij; self.eos=eos
     def run(self):
         try:
+            import eos as _eng
+            if self.eos:
+                _eng.set_eos(self.eos)      # los puntos de saturacion obedecen la EOS elegida
             from envolvente import punto_saturacion
             res = punto_saturacion(self.tipo, self.valor, self.z, self.kij)
             self.done.emit(res if res else {})
@@ -382,8 +386,9 @@ class TabSaturacion(QWidget):
 
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.lbl_estado.setText("")
-        self._res_unit=res_unit; self._tipo_txt=txt
-        self.worker=SatWorker(tipo, valor, z, kij)
+        self._res_unit=res_unit; self._tipo_txt=self.cmb_tipo.currentText()
+        eos_ctx = _eng.get_eos()          # EOS activa (ya fijada por get_z)
+        self.worker=SatWorker(tipo, valor, z, kij, eos_ctx)
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
         self.worker.start()
@@ -395,7 +400,7 @@ class TabSaturacion(QWidget):
     def _on_done(self, res):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular punto de saturacion"))
         if not res or not res.get('exito'):
-            self.lbl_estado.setText("No se encontro punto de saturacion")
+            self.lbl_estado.setText(_i18n.t("No se encontro punto de saturacion"))
             self.lbl_res_val.setText(""); self.lbl_res2_val.setText("")
             self.last_result = None
             return
