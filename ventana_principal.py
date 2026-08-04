@@ -898,15 +898,29 @@ class TabParametros(QWidget):
 
     def _llenar_criticas(self):
         """Rellena la tabla de propiedades criticas segun la EOS del contexto
-        (HYSYS o PVTsim)."""
+        (HYSYS o PVTsim), convertidas al sistema de unidades activo."""
+        import unidades as _u
         TCa, PCa, OMa, PMa = _eng.crit_props(self._eos_ctx())
         for i in range(NC):
             r = i + 1
             self.tbl_p.setItem(r, 0, cell(NOMBRES[i], bg=GRAY_LBL,
                 align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter))
-            for c, v in enumerate([f"{TCa[i]:.4f}", f"{PCa[i]:.4f}",
+            tc = _u.abs_desde_R(TCa[i])       # °R -> °R/K
+            pc = _u.p_desde_psia(PCa[i])      # psi -> psi/kPa
+            for c, v in enumerate([f"{tc:.4f}", f"{pc:.4f}",
                                    f"{OMa[i]:.8f}", f"{PMa[i]}"]):
                 self.tbl_p.setItem(r, c+1, cell(v, bg=WHITE, color=TEXT_RES))
+        # Cabeceras de Tc y Pc con la unidad activa
+        self.tbl_p.setItem(0, 1, cell(
+            f"{_i18n.t('Temperatura Critica')} ({_u.u_abs()})", bg=GRAY_LBL,
+            align=Qt.AlignmentFlag.AlignCenter))
+        self.tbl_p.setItem(0, 2, cell(
+            f"{_i18n.t('Presion Critica')} ({_u.u('P')})", bg=GRAY_LBL,
+            align=Qt.AlignmentFlag.AlignCenter))
+
+    def aplicar_unidades(self, old=None):
+        """Reconvierte las propiedades criticas (Tc, Pc) al sistema activo."""
+        self._llenar_criticas()
 
     def _sync_desde_objetivo(self):
         """Refresca kij, propiedades criticas y el desplegable de fuente

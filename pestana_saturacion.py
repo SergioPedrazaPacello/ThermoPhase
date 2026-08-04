@@ -412,6 +412,10 @@ class TabSaturacion(QWidget):
             self.lbl_cond.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
         else:
             self.lbl_cond.setText(f"{_i18n.t('Temperatura')} ({_u.u_abs()}):")
+        # Etiqueta de densidad de la tabla de propiedades
+        it_d = self.tbl_prop.item(2, 0)
+        if it_d is not None:
+            it_d.setText(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:")
         # Re-render del ultimo resultado (internos °R/psia)
         if getattr(self, 'last_result', None) is not None:
             self._render(self.last_result)
@@ -435,6 +439,7 @@ class TabSaturacion(QWidget):
         (calculo nuevo) como desde set_estado (carga desde archivo)."""
 
         T=res['T']; P=res['P']   # internos: °R, psia
+        self._tipo_txt=self.cmb_tipo.currentText()   # nombre actual (traducido)
         if self._res_unit=='T':
             self.lbl_res_label.setText(f"{self._tipo_txt} ({_u.u('T')}):")
             self.lbl_res_val.setText(f"{_u.t_desde_R(T):.2f}")
@@ -463,16 +468,23 @@ class TabSaturacion(QWidget):
 
         # Llenar panel de propiedades
         p=res.get('props',{})
-        def setp(row, key_v, key_l, fmt="{:.4f}"):
+        def setp(row, key_v, key_l, fmt="{:.4f}", conv=None):
             vv=p.get(key_v); vl=p.get(key_l)
+            if conv is not None:
+                vv = conv(vv) if vv is not None else None
+                vl = conv(vl) if vl is not None else None
             self.tbl_prop.item(row,1).setText(fmt.format(vv) if vv is not None else "")
             self.tbl_prop.item(row,2).setText(fmt.format(vl) if vl is not None else "")
             self.tbl_prop.item(row,1).setForeground(QBrush(QColor(TEXT_RES)))
             self.tbl_prop.item(row,2).setForeground(QBrush(QColor(TEXT_RES)))
         setp(0,'PM_v','PM_l')
         setp(1,'ZV','ZL')
-        setp(2,'rho_v','rho_l')
+        setp(2,'rho_v','rho_l', conv=_u.dens_desde)   # densidad al sistema activo
         setp(3,'sg_v','sg_l')
+        # Etiqueta de densidad con la unidad activa
+        it_d=self.tbl_prop.item(2,0)
+        if it_d is not None:
+            it_d.setText(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:")
 
     # ── Guardar / restaurar estado ────────────────────────────
     def get_estado(self):

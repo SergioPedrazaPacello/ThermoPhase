@@ -180,15 +180,17 @@ def generar_pdf(estado, path):
         story.append(Paragraph(_i18n.t("Condiones de calculo:"), E['seccion']))
         story.append(Spacer(1, 7))
 
+        import unidades as _u
         T_R = float(ent.get('T_R', 0) or 0)
         P   = float(ent.get('P_psi', 0) or 0)
-        T_F = T_R - 459.67 if T_R > 0 else 0.0
+        T_disp = _u.t_desde_R(T_R) if T_R > 0 else 0.0   # °F o °C
+        P_disp = _u.p_desde_psia(P)                       # psi o kPa
 
         cond = [
-            [Paragraph(_i18n.t("Presion (psi):"), E['lbl']),
-             Paragraph(_f(P, 2), E['val_izq'])],
-            [Paragraph(_i18n.t("Temperatura (°F):"), E['lbl']),
-             Paragraph(_f(T_F, 2), E['val_izq'])],
+            [Paragraph(f"{_i18n.t('Presion')} ({_u.u('P')}):", E['lbl']),
+             Paragraph(_f(P_disp, 2), E['val_izq'])],
+            [Paragraph(f"{_i18n.t('Temperatura')} ({_u.u('T')}):", E['lbl']),
+             Paragraph(_f(T_disp, 2), E['val_izq'])],
         ]
         t = Table(cond, colWidths=[W*0.34, W*0.30], hAlign='LEFT')
         t.setStyle(_TBL)
@@ -236,6 +238,11 @@ def generar_pdf(estado, path):
             elif rho_v:
                 rho_z = rho_v
 
+        # Densidad al sistema de unidades activo (MW y Z no cambian)
+        rho_z = _u.dens_desde(rho_z) if rho_z is not None else None
+        rho_v = _u.dens_desde(rho_v) if rho_v is not None else None
+        rho_l = _u.dens_desde(rho_l) if rho_l is not None else None
+
         def hdr(s):        return Paragraph(s, E['hdr'])
         def lab(s):        return Paragraph(s, E['lbl'])
         def val(v, d=4):   return Paragraph(_f(v, d), E['val'])
@@ -250,7 +257,7 @@ def generar_pdf(estado, path):
              val(Vm), val(Lm)],
             [lab(_i18n.t("Gravedad especifica:")),        vac(),
              val(sg_v), val(sg_l)],
-            [lab(_i18n.t("Densidad masica [lb/ft3]:")),   val(rho_z),
+            [lab(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:"),   val(rho_z),
              val(rho_v), val(rho_l)],
             [lab(_i18n.t("Factor de compresibilidad:")),  vac(),
              val(ZV), val(ZL)],

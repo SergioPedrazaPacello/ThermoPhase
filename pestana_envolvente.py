@@ -410,12 +410,17 @@ class TabEnvolvente(QWidget):
             l.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             return l
 
-        rows=[("Cricondentérmica (°F):","cric_T"),
-              ("Cricondenbárica (psi):","cric_P")]
+        rows=[("Cricondentérmica","cric_T","T"),
+              ("Cricondenbárica","cric_P","P")]
         self.res_labels={}
-        for r,(txt,key) in enumerate(rows):
-            lbl=QLabel(txt); lbl.setStyleSheet(lbl_style); lbl.setWordWrap(True)
+        self.res_lbl_widgets={}
+        for r,(base,key,mag) in enumerate(rows):
+            import unidades as _u0
+            lbl=QLabel(f"{base} ({_u0.u(mag)}):")
+            lbl.setStyleSheet(lbl_style); lbl.setWordWrap(True)
+            lbl.setProperty("_mag", mag); lbl.setProperty("_base", base)
             grid.addWidget(lbl,r,0)
+            self.res_lbl_widgets[key]=lbl
             rv=res_val(); self.res_labels[key]=rv
             grid.addWidget(rv,r,1)
         vr.addLayout(grid)
@@ -776,12 +781,33 @@ class TabEnvolvente(QWidget):
             pass
 
     def aplicar_unidades(self, old=None):
-        """Actualiza etiquetas de marcado y re-dibuja el grafico en las
-        unidades activas (los datos internos estan en psia/°R)."""
+        """Actualiza etiquetas de marcado y puntos especiales, convierte los
+        valores escritos y re-dibuja el grafico en las unidades activas."""
+        # Etiquetas de marcado de punto
         if hasattr(self, 'lbl_ptP'):
             self.lbl_ptP.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
         if hasattr(self, 'lbl_ptT'):
             self.lbl_ptT.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
+        # Valores escritos en los campos de marcado (convertir P y T)
+        if old is not None:
+            try:
+                if self.ed_pP.text().strip():
+                    v = float(self.ed_pP.text().replace(',', '.'))
+                    self.ed_pP.setText(f"{_u.p_desde_psia(_u.p_a_psia(v, old)):.2f}")
+                if self.ed_pT.text().strip():
+                    v = float(self.ed_pT.text().replace(',', '.'))
+                    self.ed_pT.setText(f"{_u.t_desde_F(_u.t_a_F(v, old)):.2f}")
+            except Exception:
+                pass
+        # Etiquetas de puntos especiales (cricondentérmica / cricondenbárica)
+        for key, lbl in getattr(self, 'res_lbl_widgets', {}).items():
+            base = lbl.property("_base"); mag = lbl.property("_mag")
+            lbl.setText(f"{_i18n.t(base)} ({_u.u(mag)}):")
+        # Reconvertir los valores de los puntos especiales
+        if getattr(self, 'result', None) is not None:
+            try: self._update_results(self.result)
+            except Exception: pass
+        # Re-dibujar el grafico
         try:
             self._plot(self.result if getattr(self, 'result', None) is not None
                        else {'burbuja': [], 'rocio': []})
