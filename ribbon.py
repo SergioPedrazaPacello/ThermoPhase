@@ -83,50 +83,95 @@ _COMBO_QSS = (
 )
 
 
+class BarraSelectores(QFrame):
+    """Barra superior de selectores. Cuando la ventana se achica y no entran
+    todos, oculta los selectores de MENOR prioridad (los de la derecha) uno a
+    uno —el primero en desaparecer es 'Sistema de unidades'— y los vuelve a
+    mostrar al agrandar. Nunca se solapan ni aparece barra de desplazamiento."""
+    def __init__(self, grupos):
+        super().__init__()
+        self._grupos = grupos          # en orden de aparicion (izq->der)
+        self.setFixedHeight(34)
+        self.setStyleSheet(
+            f'QFrame#barraSel {{ background:{CARA};'
+            f' border-bottom:1px solid {SOMBRA}; }}')
+        self.setObjectName('barraSel')
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(8, 3, 8, 3)
+        lay.setSpacing(0)
+        lay.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        for g in grupos:
+            lay.addWidget(g)
+        lay.addStretch()
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._reflow()
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        self._reflow()
+
+    def _reflow(self):
+        avail = self.width() - 18
+        used = 0
+        ocultar = False
+        for g in self._grupos:
+            w = g.sizeHint().width()
+            if (not ocultar) and (used + w <= avail):
+                g.setVisible(True)
+                used += w
+            else:
+                ocultar = True
+                g.setVisible(False)
+
+
 def construir_ribbon(acciones=None):
     """Barra superior de selectores globales.
 
-    Devuelve (barra, {clave: QComboBox}). La barra es un area de scroll
-    horizontal: cuando la ventana principal es angosta y los selectores no
-    entran, aparece una barra de desplazamiento en lugar de solaparse."""
-    from PyQt6.QtWidgets import QScrollArea
-
-    # Contenido real (los selectores) dentro de un frame de tamaño natural
-    contenido = QFrame()
-    contenido.setStyleSheet(f'QFrame {{ background:{CARA}; }}')
-    lay = QHBoxLayout(contenido)
-    lay.setContentsMargins(8, 3, 8, 3)
-    lay.setSpacing(6)
-    lay.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+    Devuelve (barra, {clave: QComboBox}). La barra oculta progresivamente los
+    selectores de la derecha cuando la ventana se hace angosta (empezando por
+    'Sistema de unidades') y los restaura al agrandarla."""
+    from PyQt6.QtWidgets import QSizePolicy, QWidget
+    from PyQt6.QtCore import QSize
+    from iconos import icono
 
     def _lbl(txt):
         l = QLabel(txt)
         l.setStyleSheet(
             f'background:transparent; color:{TXT};'
             f' font-family:"{FUENTE_UI}"; font-size:10pt;')
-        # Evita que la etiqueta se comprima por debajo de su texto
-        from PyQt6.QtWidgets import QSizePolicy
         l.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         return l
 
-    combos = {}
-    # Icono a la izquierda de cada etiqueta (mismo estilo que el arbol)
-    from iconos import icono
-    from PyQt6.QtCore import QSize
     _ICONO = {"eos": "eos", "densidad": "densidad",
               "envolvente": "envolvente", "unidades": "unidades"}
+    combos = {}
+    grupos = []
     for i, (clave, etiqueta, items) in enumerate(_SELECTORES):
+        grupo = QWidget()
+        grupo.setStyleSheet('background:transparent;')
+        gl = QHBoxLayout(grupo)
+        gl.setContentsMargins(0, 0, 0, 0)
+        gl.setSpacing(6)
+        gl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        # Separador a la izquierda (excepto el primero)
+        if i > 0:
+            sep = QFrame()
+            sep.setFrameShape(QFrame.Shape.VLine)
+            sep.setStyleSheet(f'color:{SOMBRA}; background:{SOMBRA};')
+            sep.setFixedWidth(1)
+            gl.addSpacing(4); gl.addWidget(sep); gl.addSpacing(6)
+        # Icono
         nombre_ic = _ICONO.get(clave)
         if nombre_ic:
             ic_lbl = QLabel()
             ic_lbl.setPixmap(icono(nombre_ic, 18).pixmap(QSize(18, 18)))
             ic_lbl.setStyleSheet('background:transparent;')
-            from PyQt6.QtWidgets import QSizePolicy
-            ic_lbl.setSizePolicy(QSizePolicy.Policy.Fixed,
-                                 QSizePolicy.Policy.Preferred)
-            lay.addWidget(ic_lbl)
-            lay.addSpacing(2)
-        lay.addWidget(_lbl(etiqueta))
+            ic_lbl.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+            gl.addWidget(ic_lbl)
+            gl.addSpacing(1)
+        gl.addWidget(_lbl(etiqueta))
         cmb = QComboBox()
         cmb.addItems(items)
         vista = QListView()
@@ -143,31 +188,11 @@ def construir_ribbon(acciones=None):
         cmb.setFixedWidth(148)
         cmb.setCursor(Qt.CursorShape.PointingHandCursor)
         combos[clave] = cmb
-        lay.addWidget(cmb)
-        if i < len(_SELECTORES) - 1:
-            sep = QFrame()
-            sep.setFrameShape(QFrame.Shape.VLine)
-            sep.setStyleSheet(f'color:{SOMBRA}; background:{SOMBRA};')
-            sep.setFixedWidth(1)
-            lay.addSpacing(4); lay.addWidget(sep); lay.addSpacing(4)
-    lay.addStretch()
+        gl.addWidget(cmb)
+        grupo.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        grupos.append(grupo)
 
-    # Area de scroll horizontal que contiene la barra
-    barra = QScrollArea()
-    barra.setWidget(contenido)
-    barra.setWidgetResizable(True)     # el contenido llena a lo ancho pero
-                                       # respeta su ancho minimo (los selectores)
-    barra.setFrameShape(QFrame.Shape.NoFrame)
-    barra.setFixedHeight(38)           # 34 de contenido + espacio de scrollbar
-    barra.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-    barra.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-    barra.setStyleSheet(
-        f'QScrollArea {{ background:{CARA}; border-bottom:1px solid {SOMBRA}; }}'
-        f'QScrollBar:horizontal {{ height:8px; background:{CARA}; margin:0; }}'
-        f'QScrollBar::handle:horizontal {{ background:{SOMBRA};'
-        f' border-radius:4px; min-width:30px; }}'
-        f'QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal'
-        f' {{ width:0; }}')
+    barra = BarraSelectores(grupos)
     return barra, combos
 
 

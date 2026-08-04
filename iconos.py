@@ -530,66 +530,57 @@ def _corriente(p):
 
 # ── Iconos de la barra de herramientas (selectores globales) ─────────
 def _eos(p):
-    # Isoterma en diagrama P-V (como la construccion de Van der Waals):
-    # de mayor a menor volumen -> rama gaseosa suave, meseta bifasica
-    # horizontal y rama liquida empinada. Campana de dos fases + critico.
+    # Isoterma en diagrama P-V (construccion de Van der Waals): de mayor a
+    # menor volumen -> rama gaseosa suave, meseta bifasica horizontal y rama
+    # liquida empinada. Solo la isoterma (sin campana).
     p.setPen(_pen(QColor("#8A8A8A"), 1.4))
     p.drawLine(QPointF(6, 4), QPointF(6, 27))
     p.drawLine(QPointF(6, 27), QPointF(29, 27))
-    # Campana de dos fases (domo): relleno tenue + contorno punteado
-    dome = QPainterPath()
-    dome.moveTo(11, 25)
-    dome.quadTo(12, 14, 16.5, 10.5)
-    dome.quadTo(21, 14, 24, 25)
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#E9EEF3")))
-    p.drawPath(dome)
-    pen = QPen(QColor("#6E7378"), 1.1)
-    pen.setStyle(Qt.PenStyle.DashLine); pen.setDashPattern([2.5, 2.0])
-    p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
-    p.drawPath(dome)
-    # Isoterma subcritica: liquido (empinada) -> meseta -> gas (suave)
     iso = QPainterPath()
     iso.moveTo(10, 6)
-    iso.cubicTo(10.6, 10, 11.2, 14, 12, 17)  # rama liquida empinada (recta)
-    iso.lineTo(21, 17)                         # meseta bifasica horizontal
-    iso.cubicTo(23.5, 17.6, 25.5, 21, 28, 23) # rama gaseosa suave
+    iso.cubicTo(10.6, 10, 11.2, 14, 12, 17)   # rama liquida empinada
+    iso.lineTo(21, 17)                          # meseta bifasica horizontal
+    iso.cubicTo(23.5, 17.6, 25.5, 21, 28, 23)  # rama gaseosa suave
     p.setPen(_pen(QColor("#C0392B"), 2.3)); p.setBrush(Qt.BrushStyle.NoBrush)
     p.drawPath(iso)
-    # Punto critico en la cima de la campana
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#333333")))
-    p.drawEllipse(QRectF(14.9, 8.9, 3.2, 3.2))
 
 
 def _densidad(p):
-    # Probeta con liquido ambar y un hidrometro (densimetro) flotando.
-    OUT = QColor("#666666")
+    # Probeta con liquido (azul, buen contraste) y un hidrometro con peso rojo.
+    OUT = QColor("#4A4A4A")
     cil = QPainterPath()
     cil.moveTo(11, 5); cil.lineTo(11, 22)
     cil.quadTo(11, 26, 16, 26); cil.quadTo(21, 26, 21, 22); cil.lineTo(21, 5)
     p.setPen(_pen(OUT, 1.6)); p.setBrush(Qt.BrushStyle.NoBrush)
     p.drawPath(cil)
     liq = QPainterPath()
-    liq.moveTo(12, 14); liq.lineTo(12, 22)
-    liq.quadTo(12, 24.6, 16, 24.6); liq.quadTo(20, 24.6, 20, 22); liq.lineTo(20, 14)
+    liq.moveTo(12, 13.5); liq.lineTo(12, 22)
+    liq.quadTo(12, 24.6, 16, 24.6); liq.quadTo(20, 24.6, 20, 22); liq.lineTo(20, 13.5)
     liq.closeSubpath()
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#D9A441")))
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#5A86BE")))
     p.drawPath(liq)
-    p.setPen(_pen(QColor("#4A4A4A"), 1.0)); p.setBrush(QBrush(QColor("#F0F0F0")))
-    p.drawRoundedRect(QRectF(14.6, 7, 2.8, 12), 1.2, 1.2)
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#4A4A4A")))
+    p.setPen(_pen(QColor("#333333"), 1.0)); p.setBrush(QBrush(QColor("#FDFDFD")))
+    p.drawRoundedRect(QRectF(14.6, 6.5, 2.8, 12.5), 1.2, 1.2)
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#C0392B")))
     p.drawEllipse(QRectF(13.4, 18, 5.2, 5.2))
 
 
 def _unidades(p):
-    # Regla graduada (medicion / sistema de unidades).
-    p.setPen(_pen(QColor("#B8860B"), 1.3)); p.setBrush(QBrush(QColor("#EFD9A0")))
-    p.drawRoundedRect(QRectF(4, 12, 24, 8), 1.4, 1.4)
-    p.setPen(_pen(QColor("#7A5A10"), 1.0))
-    for x in (8, 14, 20, 26):
-        p.drawLine(QPointF(x, 12), QPointF(x, 17))
-    p.setPen(_pen(QColor("#7A5A10"), 0.9))
-    for x in (11, 17, 23):
-        p.drawLine(QPointF(x, 12), QPointF(x, 14.6))
+    # Manometro / dial de medicion (buen contraste: gris + aguja roja).
+    import math
+    cx, cy, r = 16.0, 17.0, 10.5
+    p.setPen(_pen(QColor("#4A4A4A"), 1.6)); p.setBrush(QBrush(QColor("#FDFDFD")))
+    p.drawEllipse(QRectF(cx - r, cy - r, 2 * r, 2 * r))
+    p.setPen(_pen(QColor("#4A4A4A"), 1.0))
+    for ang in (180, 135, 90, 45, 0):
+        rad = math.radians(ang)
+        ox, oy = cx + r * math.cos(rad), cy - r * math.sin(rad)
+        ix, iy = cx + (r - 2.4) * math.cos(rad), cy - (r - 2.4) * math.sin(rad)
+        p.drawLine(QPointF(ox, oy), QPointF(ix, iy))
+    p.setPen(_pen(QColor("#C0392B"), 1.9))
+    p.drawLine(QPointF(cx, cy), QPointF(cx + 5.5, cy - 5.8))
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#333333")))
+    p.drawEllipse(QRectF(cx - 1.7, cy - 1.7, 3.4, 3.4))
 
 
 # ── Registro nombre -> funcion de dibujo ─────────────────────

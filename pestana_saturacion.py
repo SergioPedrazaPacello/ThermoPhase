@@ -362,6 +362,18 @@ class TabSaturacion(QWidget):
         except Exception:
             return self.cmb_tipo.currentText()
 
+    def _actualizar_labels_resultado(self):
+        """Fija las etiquetas de resultado segun el tipo y las unidades activas
+        (funciona aunque todavia no se haya calculado)."""
+        tipo, unidad, etiqueta, res_unit = self.TIPOS[self._tipo_es()]
+        tipo_txt = self.cmb_tipo.currentText()
+        if res_unit == 'T':
+            self.lbl_res_label.setText(f"{tipo_txt} ({_u.u('T')}):")
+            self.lbl_res2_label.setText(f"{_i18n.t('Equivalente')} ({_u.u_abs()}):")
+        else:
+            self.lbl_res_label.setText(f"{tipo_txt} ({_u.u('P')}):")
+            self.lbl_res2_label.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
+
     def _on_tipo_change(self, txt):
         tipo, unidad, etiqueta, _ = self.TIPOS[self._tipo_es()]
         if unidad=='P':
@@ -370,6 +382,7 @@ class TabSaturacion(QWidget):
         else:
             self.lbl_cond.setText(f"{_i18n.t('Temperatura')} ({_u.u_abs()}):")
             self.sp_cond.setRange(0.0, 9999.0)
+        self._actualizar_labels_resultado()
         # No forzar valor — dejar lo que el usuario haya puesto o vacío
 
     def calcular(self):
@@ -416,6 +429,8 @@ class TabSaturacion(QWidget):
         it_d = self.tbl_prop.item(2, 0)
         if it_d is not None:
             it_d.setText(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:")
+        # Etiquetas de resultado (aunque no haya calculo aun)
+        self._actualizar_labels_resultado()
         # Re-render del ultimo resultado (internos °R/psia)
         if getattr(self, 'last_result', None) is not None:
             self._render(self.last_result)
