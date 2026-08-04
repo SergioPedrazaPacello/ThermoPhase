@@ -277,7 +277,8 @@ class TabEquilibrio(QWidget):
             l.setFixedHeight(22)
             return l
 
-        gl.addWidget(inp_lbl("Presion (psi):"), 0, 0)
+        self.lbl_P_in = inp_lbl("Presion (psi):")
+        gl.addWidget(self.lbl_P_in, 0, 0)
         self.sp_P = QDoubleSpinBox()
         self.sp_P.setRange(0,15000); self.sp_P.setDecimals(2)
         self.sp_P.setSpecialValueText(" "); self.sp_P.setValue(0)
@@ -288,7 +289,8 @@ class TabEquilibrio(QWidget):
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         gl.addWidget(self.sp_P, 0, 1)
 
-        gl.addWidget(inp_lbl("Temperatura (°R):"), 1, 0)
+        self.lbl_Tabs_in = inp_lbl("Temperatura (°R):")
+        gl.addWidget(self.lbl_Tabs_in, 1, 0)
         self.sp_T = QDoubleSpinBox()
         self.sp_T.setRange(0.0, 9999.99)
         self.sp_T.setDecimals(2)
@@ -297,7 +299,8 @@ class TabEquilibrio(QWidget):
         self.sp_T.setFixedHeight(22); self.sp_T.setFixedWidth(110)
         gl.addWidget(self.sp_T, 1, 1)
 
-        gl.addWidget(inp_lbl("Temperatura (°F):"), 2, 0)
+        self.lbl_Trel_in = inp_lbl("Temperatura (°F):")
+        gl.addWidget(self.lbl_Trel_in, 2, 0)
         self.sp_F = QDoubleSpinBox()
         self.sp_F.setRange(-459.67, 9540.32)
         self.sp_F.setDecimals(2)
@@ -324,22 +327,27 @@ class TabEquilibrio(QWidget):
         self._style_T = _style_T; self._style_F = _style_F
         _style_T(True); _style_F(False)
 
+        def _off():
+            import unidades as _u
+            return _u.offset_abs_rel()
         def _on_T_changed(v):
             if self._sync_lock: return
             self._sync_lock = True
+            off = _off()
             if v <= 0:
-                self.sp_F.setValue(-459.67)   # vacío
+                self.sp_F.setValue(-off)      # vacío
             else:
-                self.sp_F.setValue(v - 459.67)
+                self.sp_F.setValue(v - off)
             _style_T(True); _style_F(False)
             self._sync_lock = False
         def _on_F_changed(v):
             if self._sync_lock: return
             self._sync_lock = True
-            if v <= -459.67:
+            off = _off()
+            if v <= -off:
                 self.sp_T.setValue(0)         # vacío
             else:
-                self.sp_T.setValue(v + 459.67)
+                self.sp_T.setValue(v + off)
             _style_F(True); _style_T(False)
             self._sync_lock = False
         self.sp_T.valueChanged.connect(_on_T_changed)
@@ -559,16 +567,52 @@ class TabEquilibrio(QWidget):
 
     # ── Helpers de entrada ───────────────────────────────────
     def get_T(self):
-        """Lee la temperatura del QDoubleSpinBox."""
-        return self.sp_T.value()
+        """Temperatura en °R (interno del motor), convertida desde el campo
+        absoluto (°R en Field, K en SI/Metric)."""
+        import unidades as _u
+        return _u.R_desde_abs(self.sp_T.value())
 
     def get_P(self):
-        """Lee la presión del QLineEdit de forma segura."""
+        """Presión en psia (interno), convertida desde la unidad mostrada."""
+        import unidades as _u
         try:
             val = float(self.sp_P.text().replace(',', '.'))
-            return val if val > 0 else 200.0
         except ValueError:
-            return 200.0
+            val = 200.0
+        if val <= 0:
+            val = _u.p_desde_psia(200.0)
+        return _u.p_a_psia(val)
+
+    def aplicar_unidades(self, old):
+        """Reconfigura entradas, etiquetas y resultados al sistema activo.
+        `old` es el sistema anterior (para convertir los valores actuales)."""
+        import unidades as _u
+        # 1) Valores internos actuales (con el sistema anterior)
+        try:
+            P_int = _u.p_a_psia(float(self.sp_P.text().replace(',', '.')), old)
+        except Exception:
+            P_int = None
+        Tabs_old = self.sp_T.value()
+        T_int_R = _u.R_desde_abs(Tabs_old, old) if Tabs_old > 0 else None
+        # 2) Etiquetas de entrada con la unidad nueva
+        self.lbl_P_in.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
+        self.lbl_Tabs_in.setText(f"{_i18n.t('Temperatura')} ({_u.u_abs()}):")
+        self.lbl_Trel_in.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
+        # 3) Valores convertidos al sistema nuevo (sin disparar recursión)
+        self._sync_lock = True
+        if P_int is not None and P_int > 0:
+            self.sp_P.setValue(_u.p_desde_psia(P_int))
+        if T_int_R is not None:
+            self.sp_T.setValue(_u.abs_desde_R(T_int_R))
+            self.sp_F.setValue(_u.t_desde_R(T_int_R))
+        self._sync_lock = False
+        # 4) Etiqueta de densidad (fila 3 de la tabla de resultados)
+        it = self.tbl_res.item(3, 0)
+        if it is not None:
+            it.setText(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:")
+        # 5) Re-renderizar el último resultado en las nuevas unidades
+        if getattr(self, 'last_result', None) is not None:
+            self._render(self.last_result)
 
     # ── Handlers ─────────────────────────────────────────────
     def _on_eos_changed(self, idx):
@@ -577,14 +621,16 @@ class TabEquilibrio(QWidget):
 
     # ── Guardar / restaurar estado (usado por Archivo > Guardar/Abrir) ──
     def get_estado(self):
-        """Devuelve dict con inputs y resultado calculado (si existe)."""
-        # Leemos los valores crudos de los spinboxes (sp_T ya esta en °R,
-        # sp_P en psi). NO usamos get_T/get_P que tienen fallbacks de 200.
+        """Devuelve dict con inputs y resultado calculado (si existe).
+        T_R y P_psi se guardan SIEMPRE en unidades internas (°R, psia),
+        independientemente del sistema de unidades mostrado."""
+        Tabs = self.sp_T.value()
+        import unidades as _u
         return {
             'entrada': {
                 'composicion': self.get_z(),
-                'T_R':         float(self.sp_T.value()),
-                'P_psi':       float(self.sp_P.value()),
+                'T_R':         float(_u.R_desde_abs(Tabs)) if Tabs > 0 else 0.0,
+                'P_psi':       float(self.get_P()),
                 'densidad':    self.cmb_dens.currentText(),
                 'eos':         _eos_code(self.cmb_eos.currentIndex()),
                 'modo_masico': self.btn_frac.isChecked(),
@@ -603,13 +649,12 @@ class TabEquilibrio(QWidget):
             self.tbl_comp.item(i, 1).setText(f"{z[i] if i<len(z) else 0.0:.4f}")
         self.tbl_comp.blockSignals(False)
         self._upd_suma()
-        # T (en °R directo, el sp_T ya esta en °R). Al setear sp_T, el
-        # slot _on_T_changed sincroniza automaticamente sp_F.
-        T = float(e.get('T_R', 0.0) or 0.0)
-        self.sp_T.setValue(T if T > 0 else 0)
-        # P (psi directo)
-        P = float(e.get('P_psi', 0.0) or 0.0)
-        self.sp_P.setValue(P if P > 0 else 0)
+        # T y P se guardan en internas (°R, psia); convertir al sistema activo.
+        import unidades as _u
+        T = float(e.get('T_R', 0.0) or 0.0)          # °R interno
+        self.sp_T.setValue(_u.abs_desde_R(T) if T > 0 else 0)
+        P = float(e.get('P_psi', 0.0) or 0.0)        # psia interno
+        self.sp_P.setValue(_u.p_desde_psia(P) if P > 0 else 0)
         # Densidad
         d = e.get('densidad', 'COSTALD')
         idx = self.cmb_dens.findText(d)
@@ -716,6 +761,10 @@ class TabEquilibrio(QWidget):
         sg_v=r.get("sg_v"); sg_l=r.get("sg_l")
         Vm=r["Vm"]; Lm=r["Lm"]
         modo=r["modo"]
+        # Densidad al sistema de unidades activo (MW y Z no cambian)
+        import unidades as _u
+        rho_v = _u.dens_desde(rho_v) if rho_v else rho_v
+        rho_l = _u.dens_desde(rho_l) if rho_l else rho_l
 
         rho_z = None
         if rho_v and rho_l:
@@ -1487,17 +1536,29 @@ class MainWindow(QMainWindow):
         self._act_en.setChecked(lang == 'EN')
         # Ventana principal (menus, navegador, barra, status)
         _i18n.retraducir(self)
+        # Pestaña principal de equilibrio: reconstruir etiquetas con unidad
+        if hasattr(self, 'tab_eq') and hasattr(self.tab_eq, 'aplicar_unidades'):
+            import unidades as _u0
+            try: self.tab_eq.aplicar_unidades(_u0.sistema())
+            except Exception: pass
         if hasattr(self, 'ribbon'):
             _i18n.retraducir(self.ribbon)
         if hasattr(self, 'nav'):
             _i18n.retraducir(self.nav)
         # Todas las subventanas de funcionalidad (abiertas u ocultas)
+        import unidades as _u
+        _sis = _u.sistema()
         for sw in self._subventanas.values():
             _i18n.retraducir(sw)
             # Gráficos (envolvente, etc.): re-trazar en el idioma activo
             w = getattr(sw, '_widget', None)
             if w is not None and hasattr(w, 'retraducir_grafico'):
                 try: w.retraducir_grafico()
+                except Exception: pass
+            # Reconstruir etiquetas con unidad en el nuevo idioma (sin
+            # convertir valores: old = sistema actual).
+            if w is not None and hasattr(w, 'aplicar_unidades'):
+                try: w.aplicar_unidades(_sis)
                 except Exception: pass
             es_tit = sw.property("_i18n_es_title")
             if es_tit is None:
@@ -1883,6 +1944,39 @@ class MainWindow(QMainWindow):
             self.tab_env.cmb_metodo.currentIndexChanged.connect(
                 lambda i: self._sync_combo(cmbe, i))
 
+        # ── Sistema de unidades ──────────────────────────────
+        cmbu = self.selectores.get('unidades')
+        if cmbu is not None:
+            cmbu.currentIndexChanged.connect(self._on_unidades)
+
+    def _on_unidades(self, idx):
+        """Cambia el sistema de unidades de TODA la interfaz. El motor sigue
+        en unidades internas FIELD; solo cambia la entrada y el despliegue."""
+        import unidades as _u
+        old = _u.sistema()
+        nuevo = _u.SISTEMAS[idx] if 0 <= idx < len(_u.SISTEMAS) else 'FIELD'
+        if nuevo == old:
+            return
+        _u.set_sistema(nuevo)
+        # Reconfigurar todas las vistas de calculo: la pestaña principal de
+        # equilibrio y cada subventana abierta (calculos y fluidos).
+        vistas = []
+        if hasattr(self, 'tab_eq'):
+            vistas.append(self.tab_eq)
+        for sw in self._subventanas.values():
+            w = getattr(sw, '_widget', None)
+            if w is not None:
+                vistas.append(w)
+        hechos = set()
+        for w in vistas:
+            if id(w) in hechos:
+                continue
+            hechos.add(id(w))
+            if hasattr(w, 'aplicar_unidades'):
+                try: w.aplicar_unidades(old)
+                except Exception: pass
+        self._refrescar_pies()
+
     @staticmethod
     def _sync_combo(cmb, i):
         """Actualiza un combo evitando reentradas de señal."""
@@ -1977,6 +2071,13 @@ class MainWindow(QMainWindow):
             w = getattr(win, '_widget', None)
             if w is not None and hasattr(w, 'retraducir_grafico'):
                 try: w.retraducir_grafico()
+                except Exception: pass
+        # La ventana nace en el sistema de unidades activo
+        import unidades as _u
+        if _u.sistema() != 'FIELD':
+            w = getattr(win, '_widget', None)
+            if w is not None and hasattr(w, 'aplicar_unidades'):
+                try: w.aplicar_unidades('FIELD')
                 except Exception: pass
         return win
 

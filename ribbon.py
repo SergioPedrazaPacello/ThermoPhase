@@ -44,6 +44,7 @@ _SELECTORES = [
                                            "Peng-Robinson (PVTsim)", "SRK (PVTsim)"]),
     ("densidad",   "Densidad:",           ["COSTALD", "EOS"]),
     ("envolvente", "Método envolvente:",  ["Ziervogel-Poling", "Michelsen"]),
+    ("unidades",   "Sistema de unidades:", ["Field", "SI"]),
 ]
 
 # Items del arbol "Cálculos": (clave, texto). La clave abre la subventana MDI.

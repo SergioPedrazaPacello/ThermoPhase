@@ -20,6 +20,7 @@ from matplotlib import font_manager
 
 import mapa_densidad as rf
 import dialogos as dialogos
+import unidades as _u
 # Colores (mismos que ventana_principal.py)
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"; GRAY_RES="#E8E8E8"
 GRAY_PLOT_BG="#DCDCDC"   # fondo del recuadro de trazado y de la caja de leyendas
@@ -431,11 +432,11 @@ class TabEnvolvente(QWidget):
         ed_style=(f'QLineEdit {{ background:{WHITE};border:1px solid {BORDER};'
                   f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt;'
                   f'padding:1px 4px; }}')
-        lblP=QLabel("Presión (psia):"); lblP.setStyleSheet(lbl_style)
+        lblP=QLabel("Presion (psia):"); lblP.setStyleSheet(lbl_style); self.lbl_ptP=lblP
         self.ed_pP=QLineEdit(); self.ed_pP.setStyleSheet(ed_style)
         self.ed_pP.setFixedHeight(22)
         gp.addWidget(lblP,0,0); gp.addWidget(self.ed_pP,0,1)
-        lblT=QLabel("Temperatura (°F):"); lblT.setStyleSheet(lbl_style)
+        lblT=QLabel("Temperatura (°F):"); lblT.setStyleSheet(lbl_style); self.lbl_ptT=lblT
         self.ed_pT=QLineEdit(); self.ed_pT.setStyleSheet(ed_style)
         self.ed_pT.setFixedHeight(22)
         gp.addWidget(lblT,1,0); gp.addWidget(self.ed_pT,1,1)
@@ -774,6 +775,19 @@ class TabEnvolvente(QWidget):
         except Exception:
             pass
 
+    def aplicar_unidades(self, old=None):
+        """Actualiza etiquetas de marcado y re-dibuja el grafico en las
+        unidades activas (los datos internos estan en psia/°R)."""
+        if hasattr(self, 'lbl_ptP'):
+            self.lbl_ptP.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
+        if hasattr(self, 'lbl_ptT'):
+            self.lbl_ptT.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
+        try:
+            self._plot(self.result if getattr(self, 'result', None) is not None
+                       else {'burbuja': [], 'rocio': []})
+        except Exception:
+            pass
+
     def _plot(self,res):
         ax=self.ax; ax.clear()
         self._hover_annot = None   # se invalida al limpiar los ejes
@@ -879,15 +893,15 @@ class TabEnvolvente(QWidget):
             bar_y    = cont_y + 0.10 * cont_h
             cax = fig.add_axes([bar_x, bar_y, bar_w, bar_h])
             cbar = fig.colorbar(im, cax=cax)
-            cbar.set_label('ρ (lb/ft³)', fontsize=7, color=TEXT, labelpad=2)
+            cbar.set_label(f'ρ ({_u.u("dens")})', fontsize=7, color=TEXT, labelpad=2)
             cbar.ax.tick_params(labelsize=6, colors=TEXT, length=2,
                                 width=0.8, pad=1)
             cbar.outline.set_edgecolor('#000000')
             cbar.outline.set_linewidth(0.8)
 
         burb=res.get('burbuja',[]); rocio=res.get('rocio',[])
-        Tb=[t-459.67 for _,t in burb]; Pb=[p for p,_ in burb]
-        Td=[t-459.67 for _,t in rocio]; Pd=[p for p,_ in rocio]
+        Tb=[_u.t_desde_R(t) for _,t in burb]; Pb=[_u.p_desde_psia(p) for p,_ in burb]
+        Td=[_u.t_desde_R(t) for _,t in rocio]; Pd=[_u.p_desde_psia(p) for p,_ in rocio]
 
         # Estilo de las curvas de burbuja/rocío depende de si el mapa
         # está activo: con mapa → líneas continuas del mismo grosor que
@@ -914,7 +928,7 @@ class TabEnvolvente(QWidget):
         for idx,pts in getattr(self,'_isocalidad',{}).items():
             if not pts: continue
             color=self.ISO_COLORS[idx % len(self.ISO_COLORS)]
-            Ti=[t-459.67 for _,t in pts]; Pi=[p for p,_ in pts]
+            Ti=[_u.t_desde_R(t) for _,t in pts]; Pi=[_u.p_desde_psia(p) for p,_ in pts]
             txt=self.ed_iso[idx].text().strip()
             ax.plot(Ti,Pi,linestyle='-',linewidth=0.7,
                     color=color, label=f'{txt}% '+_i18n.t('vapor'), zorder=3)
@@ -922,13 +936,13 @@ class TabEnvolvente(QWidget):
         # Punto marcado por el usuario (triángulo verde)
         if self._punto_usuario is not None:
             Pp, Tp_F = self._punto_usuario
-            ax.plot([Tp_F],[Pp],linestyle='none',marker='^',
+            ax.plot([_u.t_desde_F(Tp_F)],[_u.p_desde_psia(Pp)],linestyle='none',marker='^',
                     color='#2d9d2d',markersize=5,
                     markeredgecolor='#145214',markeredgewidth=0.5,
                     label=_i18n.t('Punto'), zorder=5)
 
-        ax.set_xlabel(_i18n.t("Temperatura (°F)"), fontsize=10, color=TEXT)
-        ax.set_ylabel(_i18n.t("Presión (psia)"), fontsize=10, color=TEXT)
+        ax.set_xlabel(f"{_i18n.t('Temperatura')} ({_u.u('T')})", fontsize=10, color=TEXT)
+        ax.set_ylabel(f"{_i18n.t('Presion')} ({_u.u('P')})", fontsize=10, color=TEXT)
 
         # ── Estilo Modelo A (Win95 hundido) ───────────────────
         # Marco negro cerrado en los 4 lados, ticks hacia adentro
@@ -956,10 +970,10 @@ class TabEnvolvente(QWidget):
         self.canvas.draw_idle()
 
     def _colocar_punto(self):
-        """Lee P (psia) y T (°F) de los campos y marca un triángulo verde."""
+        """Lee P y T de los campos (en unidades activas) y marca el punto."""
         try:
-            Pp = float(self.ed_pP.text().replace(',', '.'))
-            Tp = float(self.ed_pT.text().replace(',', '.'))
+            Pp = _u.p_a_psia(float(self.ed_pP.text().replace(',', '.')))
+            Tp = _u.t_a_F(float(self.ed_pT.text().replace(',', '.')))
         except ValueError:
             dialogos.advertencia(self,
                 "Ingrese valores numéricos válidos de presión y temperatura.")
@@ -1030,7 +1044,7 @@ class TabEnvolvente(QWidget):
         self._hover_annot.set_va('top' if dy < 0 else 'bottom')
         self._hover_annot.set_position((dx, dy))
         self._hover_annot.xy = (T, P)
-        self._hover_annot.set_text(f"T = {T:.1f} °F\nP = {P:.1f} psia")
+        self._hover_annot.set_text(f"T = {T:.1f} {_u.u('T')}\nP = {P:.1f} {_u.u('P')}")
         self._hover_annot.set_visible(True)
         self._cross_v.set_xdata([T, T]); self._cross_v.set_visible(True)
         self._cross_h.set_ydata([P, P]); self._cross_h.set_visible(True)
@@ -1048,8 +1062,8 @@ class TabEnvolvente(QWidget):
     def _update_results(self,res):
         burb=res.get('burbuja',[]); rocio=res.get('rocio',[])
         def fv(v): return f"{v:.1f}" if v is not None else ""
-        Tb=[t-459.67 for _,t in burb]; Pb=[p for p,_ in burb]
-        Td=[t-459.67 for _,t in rocio]; Pd=[p for p,_ in rocio]
+        Tb=[_u.t_desde_R(t) for _,t in burb]; Pb=[_u.p_desde_psia(p) for p,_ in burb]
+        Td=[_u.t_desde_R(t) for _,t in rocio]; Pd=[_u.p_desde_psia(p) for p,_ in rocio]
         all_T=Tb+Td; all_P=Pb+Pd
         # Cricondentérmica = T máxima de la envolvente
         self.res_labels['cric_T'].setText(fv(max(all_T)) if all_T else "")

@@ -15,6 +15,7 @@ from eos import NOMBRES, NC
 import dialogos as dialogos
 import idioma as _i18n
 import eos as _eng
+import unidades as _u
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"
 GRAY_RES="#E8E8E8"; BORDER="#888888"; TEXT="#000000"; TEXT_DIM="#555555"
 TEXT_RES="#000080"; FONT_F="Arial Narrow"; FS=10
@@ -363,11 +364,12 @@ class TabSaturacion(QWidget):
 
     def _on_tipo_change(self, txt):
         tipo, unidad, etiqueta, _ = self.TIPOS[self._tipo_es()]
-        self.lbl_cond.setText(_i18n.t(etiqueta))
         if unidad=='P':
-            self.sp_cond.setRange(0.0, 15000.0)
+            self.lbl_cond.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
+            self.sp_cond.setRange(0.0, 999999.0)
         else:
-            self.sp_cond.setRange(0.0, 2000.0)
+            self.lbl_cond.setText(f"{_i18n.t('Temperatura')} ({_u.u_abs()}):")
+            self.sp_cond.setRange(0.0, 9999.0)
         # No forzar valor — dejar lo que el usuario haya puesto o vacío
 
     def calcular(self):
@@ -383,6 +385,8 @@ class TabSaturacion(QWidget):
             dialogos.advertencia(self,
                 "Ingrese un valor de presion o temperatura.")
             return
+        # Convertir al interno del motor: P->psia, T->°R
+        valor = _u.p_a_psia(valor) if unidad=='P' else _u.R_desde_abs(valor)
 
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.lbl_estado.setText("")
@@ -392,6 +396,25 @@ class TabSaturacion(QWidget):
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
         self.worker.start()
+
+    def aplicar_unidades(self, old):
+        """Convierte el valor de entrada, actualiza etiquetas y re-muestra el
+        resultado en el sistema de unidades activo."""
+        tipo, unidad, etiqueta, res_unit = self.TIPOS[self._tipo_es()]
+        v = self.sp_cond.value()
+        if v > 0:
+            if unidad == 'P':
+                v_int = _u.p_a_psia(v, old); self.sp_cond.setValue(_u.p_desde_psia(v_int))
+            else:
+                v_int = _u.R_desde_abs(v, old); self.sp_cond.setValue(_u.abs_desde_R(v_int))
+        # Etiqueta de condicion
+        if unidad == 'P':
+            self.lbl_cond.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
+        else:
+            self.lbl_cond.setText(f"{_i18n.t('Temperatura')} ({_u.u_abs()}):")
+        # Re-render del ultimo resultado (internos °R/psia)
+        if getattr(self, 'last_result', None) is not None:
+            self._render(self.last_result)
 
     def _on_error(self, msg):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular punto de saturacion"))
@@ -411,17 +434,17 @@ class TabSaturacion(QWidget):
         """Muestra el resultado en pantalla. Se llama tanto desde el worker
         (calculo nuevo) como desde set_estado (carga desde archivo)."""
 
-        T=res['T']; P=res['P']
+        T=res['T']; P=res['P']   # internos: °R, psia
         if self._res_unit=='T':
-            self.lbl_res_label.setText(f"{self._tipo_txt} (°F):")
-            self.lbl_res_val.setText(f"{T-459.67:.2f}")
-            self.lbl_res2_label.setText(_i18n.t("Equivalente (°R):"))
-            self.lbl_res2_val.setText(f"{T:.2f}")
+            self.lbl_res_label.setText(f"{self._tipo_txt} ({_u.u('T')}):")
+            self.lbl_res_val.setText(f"{_u.t_desde_R(T):.2f}")
+            self.lbl_res2_label.setText(f"{_i18n.t('Equivalente')} ({_u.u_abs()}):")
+            self.lbl_res2_val.setText(f"{_u.abs_desde_R(T):.2f}")
         else:
-            self.lbl_res_label.setText(f"{self._tipo_txt} (psi):")
-            self.lbl_res_val.setText(f"{P:.2f}")
-            self.lbl_res2_label.setText(_i18n.t("Temperatura (°F):"))
-            self.lbl_res2_val.setText(f"{T-459.67:.2f}")
+            self.lbl_res_label.setText(f"{self._tipo_txt} ({_u.u('P')}):")
+            self.lbl_res_val.setText(f"{_u.p_desde_psia(P):.2f}")
+            self.lbl_res2_label.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
+            self.lbl_res2_val.setText(f"{_u.t_desde_R(T):.2f}")
 
         self.lbl_estado.setText(_i18n.t("Convergencia exitosa."))
 

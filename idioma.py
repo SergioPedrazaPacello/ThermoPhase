@@ -309,6 +309,9 @@ TRAD = {
     "Composicion General": "Overall Composition",
     "Composicion de las fases:": "Phase composition:",
     "Resumen de los calculos:": "Calculation summary:",
+    "Presion": "Pressure", "Temperatura": "Temperature",
+    "Densidad masica": "Mass density", "Entalpia molar": "Molar enthalpy",
+    "Entropia molar": "Molar entropy", "Sistema de unidades:": "Unit system:", "Equivalente": "Equivalent",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

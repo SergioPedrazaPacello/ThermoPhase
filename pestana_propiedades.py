@@ -23,6 +23,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 from eos import NC
 import idioma as _i18n
+import unidades as _u
 
 # ── Estilo (mismo que las demás pestañas) ─────────────────────
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"
@@ -107,7 +108,8 @@ class TabPropiedades(QWidget):
         in_box.setStyleSheet('background:transparent;border:none;')
         gl=QGridLayout(in_box); gl.setContentsMargins(6,6,6,6); gl.setSpacing(6)
 
-        gl.addWidget(self._lbl("Temperatura (°R):", w=140), 0, 0)
+        self.lbl_T_in=self._lbl("Temperatura (°R):", w=140)
+        gl.addWidget(self.lbl_T_in, 0, 0)
         self.sp_T=QDoubleSpinBox()
         self.sp_T.setRange(0.0, 3000.0); self.sp_T.setDecimals(2)
         self.sp_T.setSpecialValueText(" "); self.sp_T.setValue(0.0)
@@ -118,7 +120,8 @@ class TabPropiedades(QWidget):
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         gl.addWidget(self.sp_T, 0, 1)
 
-        gl.addWidget(self._lbl("Presion (psia):", w=140), 1, 0)
+        self.lbl_P_in=self._lbl("Presion (psia):", w=140)
+        gl.addWidget(self.lbl_P_in, 1, 0)
         self.sp_P=QDoubleSpinBox()
         self.sp_P.setRange(0.0, 15000.0); self.sp_P.setDecimals(2)
         self.sp_P.setSpecialValueText(" "); self.sp_P.setValue(0.0)
@@ -159,7 +162,8 @@ class TabPropiedades(QWidget):
         rl.addWidget(h_liq,                                    0, 3)
 
         # Fila 1: Entalpía
-        rl.addWidget(self._lbl("Entalpia molar [Btu/lbmol]:", w=210), 1, 0)
+        self.lbl_H_out=self._lbl("Entalpia molar [Btu/lbmol]:", w=210)
+        rl.addWidget(self.lbl_H_out, 1, 0)
         self.h_stream=self._lbl("", res=True); self.h_stream.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         self.h_vap   =self._lbl("", res=True); self.h_vap.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         self.h_liq   =self._lbl("", res=True); self.h_liq.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
@@ -168,7 +172,8 @@ class TabPropiedades(QWidget):
         rl.addWidget(self.h_liq,    1, 3)
 
         # Fila 2: Entropía
-        rl.addWidget(self._lbl("Entropia molar [Btu/lbmol-F]:", w=210), 2, 0)
+        self.lbl_S_out=self._lbl("Entropia molar [Btu/lbmol-F]:", w=210)
+        rl.addWidget(self.lbl_S_out, 2, 0)
         self.s_stream=self._lbl("", res=True); self.s_stream.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         self.s_vap   =self._lbl("", res=True); self.s_vap.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         self.s_liq   =self._lbl("", res=True); self.s_liq.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
@@ -217,9 +222,14 @@ class TabPropiedades(QWidget):
 
         T=self.sp_T.value(); P=self.sp_P.value()
         if T<=0 or P<=0:
+            _fallo_TP=True
+        else:
+            _fallo_TP=False
+        if _fallo_TP:
             dialogos.advertencia(self,
                 _i18n.t("Ingrese Temperatura y Presion positivas."))
             return
+        T=_u.R_desde_abs(T); P=_u.p_a_psia(P)   # -> °R, psia internos
 
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.lbl_modo.setText("")
@@ -233,6 +243,20 @@ class TabPropiedades(QWidget):
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
         self.worker.start()
+
+    def aplicar_unidades(self, old):
+        """Convierte T/P de entrada, actualiza etiquetas y re-muestra H/S."""
+        T = self.sp_T.value(); P = self.sp_P.value()
+        if T > 0:
+            self.sp_T.setValue(_u.abs_desde_R(_u.R_desde_abs(T, old)))
+        if P > 0:
+            self.sp_P.setValue(_u.p_desde_psia(_u.p_a_psia(P, old)))
+        self.lbl_T_in.setText(f"{_i18n.t('Temperatura')} ({_u.u_abs()}):")
+        self.lbl_P_in.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
+        self.lbl_H_out.setText(f"{_i18n.t('Entalpia molar')} [{_u.u('H')}]:")
+        self.lbl_S_out.setText(f"{_i18n.t('Entropia molar')} [{_u.u('S')}]:")
+        if getattr(self, 'last_result', None) is not None:
+            self._render(self.last_result)
 
     def _clear_results(self):
         for lbl in (self.h_stream,self.h_vap,self.h_liq,
@@ -258,12 +282,17 @@ class TabPropiedades(QWidget):
         V=r.get('V',0.0); L=r.get('L',0.0)
         modo=r.get('modo','?')
 
-        self.h_stream.setText(self._fmt(r.get('H_stream'), 3))
-        self.s_stream.setText(self._fmt(r.get('S_stream'), 4))
-        self.h_vap.setText(self._fmt(r.get('H_vapor'), 3))
-        self.s_vap.setText(self._fmt(r.get('S_vapor'), 4))
-        self.h_liq.setText(self._fmt(r.get('H_liquido'), 3))
-        self.s_liq.setText(self._fmt(r.get('S_liquido'), 4))
+        def _H(v): return _u.H_desde(v) if v is not None else None
+        def _S(v): return _u.S_desde(v) if v is not None else None
+        self.h_stream.setText(self._fmt(_H(r.get('H_stream')), 3))
+        self.s_stream.setText(self._fmt(_S(r.get('S_stream')), 4))
+        self.h_vap.setText(self._fmt(_H(r.get('H_vapor')), 3))
+        self.s_vap.setText(self._fmt(_S(r.get('S_vapor')), 4))
+        self.h_liq.setText(self._fmt(_H(r.get('H_liquido')), 3))
+        self.s_liq.setText(self._fmt(_S(r.get('S_liquido')), 4))
+        # Etiquetas H/S con la unidad activa
+        self.lbl_H_out.setText(f"{_i18n.t('Entalpia molar')} [{_u.u('H')}]:")
+        self.lbl_S_out.setText(f"{_i18n.t('Entropia molar')} [{_u.u('S')}]:")
 
         self.vf_stream.setText("1.0000")
         self.vf_vap.setText(f"{V:.4f}" if r.get('H_vapor')   is not None else "")
