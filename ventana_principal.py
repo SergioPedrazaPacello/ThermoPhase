@@ -1536,6 +1536,8 @@ class MainWindow(QMainWindow):
 
         # ── Ayuda ────────────────────────────────────────────
         m_ayuda = menubar.addMenu("A&yuda")
+        m_ayuda.addAction(_act("&Documentación técnica", self._abrir_documentacion))
+        m_ayuda.addSeparator()
         m_ayuda.addAction(_act("&Acerca de ThermoPhase...", self._menu_acerca))
 
     def _toggle_nav(self, on):
@@ -1962,6 +1964,9 @@ class MainWindow(QMainWindow):
         cmbu = self.selectores.get('unidades')
         if cmbu is not None:
             cmbu.currentIndexChanged.connect(self._on_unidades)
+        # Boton de documentacion tecnica de la barra
+        if hasattr(self.ribbon, 'btn_doc'):
+            self.ribbon.btn_doc.clicked.connect(self._abrir_documentacion)
 
     def _on_unidades(self, idx):
         """Cambia el sistema de unidades de TODA la interfaz. El motor sigue
@@ -2322,6 +2327,18 @@ class MainWindow(QMainWindow):
             return
         nombres = {'componentes': "Componentes"}
         self._placeholder(nombres.get(clave, clave))
+
+    def _abrir_documentacion(self):
+        """Abre (o trae al frente) la ventana de Documentación técnica."""
+        clave = 'documentacion'
+        if clave in self._subventanas:
+            sw = self._subventanas[clave]
+            sw.show(); sw.raise_(); sw.activateWindow()
+            return
+        from documentacion import DocTecnica
+        widget = DocTecnica()
+        self._montar_subventana(clave, widget, "Documentación técnica",
+                                tam=(760, 560))
 
     def _menu_acerca(self):
         dialogos.info(self,

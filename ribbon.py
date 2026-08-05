@@ -103,6 +103,20 @@ class BarraSelectores(QFrame):
         for g in grupos:
             lay.addWidget(g)
         lay.addStretch()
+        # Boton de Documentacion tecnica: SIEMPRE visible, a la derecha
+        # (no forma parte de los grupos que se ocultan al achicar).
+        from PyQt6.QtWidgets import QToolButton
+        from PyQt6.QtCore import QSize
+        from iconos import icono
+        self.btn_doc = QToolButton()
+        self.btn_doc.setIcon(icono("documentacion", 22))
+        self.btn_doc.setIconSize(QSize(22, 22))
+        self.btn_doc.setToolTip("Documentación técnica")
+        self.btn_doc.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_doc.setStyleSheet(
+            'QToolButton { border:none; background:transparent; padding:3px; }'
+            'QToolButton:hover { background:#DCDCDC; border-radius:4px; }')
+        lay.addWidget(self.btn_doc)
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
@@ -113,7 +127,8 @@ class BarraSelectores(QFrame):
         self._reflow()
 
     def _reflow(self):
-        avail = self.width() - 18
+        # Reservamos ~34 px a la derecha para el boton de documentacion.
+        avail = self.width() - 18 - 34
         used = 0
         ocultar = False
         for g in self._grupos:

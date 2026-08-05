@@ -583,6 +583,16 @@ def _unidades(p):
     p.drawEllipse(QRectF(cx - 1.7, cy - 1.7, 3.4, 3.4))
 
 
+def _documentacion(p):
+    # Documentacion tecnica: signo de interrogacion blanco en circulo rojo.
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#C0392B")))
+    p.drawEllipse(QRectF(3, 3, 26, 26))
+    f = QFont("Arial", 17, QFont.Weight.Bold)
+    p.setFont(f); p.setPen(_pen(QColor("#FFFFFF"), 1))
+    p.setBrush(QBrush(QColor("#FFFFFF")))
+    p.drawText(QRectF(3, 2, 26, 26), Qt.AlignmentFlag.AlignCenter, "?")
+
+
 # ── Registro nombre -> funcion de dibujo ─────────────────────
 _REGISTRO = {
     # archivo
@@ -610,6 +620,7 @@ _REGISTRO = {
     "parametros": _parametros, "corriente": _corriente,
     # barra de herramientas
     "eos": _eos, "densidad": _densidad, "unidades": _unidades,
+    "documentacion": _documentacion,
 }
 
 # Cache: (nombre, tam) -> QIcon
