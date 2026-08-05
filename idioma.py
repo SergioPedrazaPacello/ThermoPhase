@@ -79,6 +79,9 @@ TRAD = {
     # Equilibrio
     "Presión (psia):": "Pressure (psia):", "Temperatura (°R):": "Temperature (°R):",
     "Temperatura (°F):": "Temperature (°F):", "Equivalente (°R):": "Equivalent (°R):",
+        "Propiedades...": "Properties...",
+    "Propiedades a mostrar": "Properties to show",
+    "Seleccione las propiedades a mostrar:": "Select the properties to show:",
     "Realizar Calculo": "Run Calculation", "Fraccion masica": "Mass fraction",
     "Fraccion molar": "Mole fraction", "Normalizar": "Normalize",
     "Densidad": "Density", "Ecuacion:": "Equation:",
@@ -90,6 +93,8 @@ TRAD = {
     "Composicion General": "Overall Composition", "Corriente global": "Overall stream",
     "Fase fraccion [molar]:": "Phase fraction [molar]:",
     "Fase fraccion [masica]:": "Phase fraction [mass]:",
+    "Fase fraccion [molar]": "Phase fraction [molar]",
+    "Fase fraccion [masica]": "Phase fraction [mass]",
     "Gravedad especifica:": "Specific gravity:", "Gravedad especifica": "Specific gravity",
     "Densidad masica [lb/ft3]:": "Mass density [lb/ft3]:",
     "Factor de compresibilidad:": "Compressibility factor:",

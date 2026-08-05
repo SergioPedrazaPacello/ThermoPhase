@@ -208,6 +208,21 @@ W_VAL  = 140   # columna de valor (Vapor o Líquido)
 W_COMP = 290   # columna nombre de componente
 ROW_H  = 22
 
+# Propiedades del resumen de resultados (selector). Orden canonico:
+# (key, etiqueta_base, unidad_mag_o_None, decimales, tiene_valor_de_mezcla)
+PROP_RESUMEN = [
+    ('frac_molar',  'Fase fraccion [molar]',      None,   4, False),
+    ('frac_masica', 'Fase fraccion [masica]',     None,   4, False),
+    ('sg',          'Gravedad especifica',         None,   4, False),
+    ('densidad',    'Densidad masica',             'dens', 4, True),
+    ('z',           'Factor de compresibilidad',   None,   4, False),
+    ('pm',          'Peso molecular',              None,   4, True),
+    ('entalpia',    'Entalpia molar',              'H',    2, True),
+    ('entropia',    'Entropia molar',              'S',    4, True),
+]
+PROP_DEFAULT = ['frac_molar', 'frac_masica', 'sg', 'densidad', 'z', 'pm']
+_PROP_DEF = {d[0]: d for d in PROP_RESUMEN}
+
 # ── Worker ────────────────────────────────────────────────────
 class Worker(QThread):
     done  = pyqtSignal(dict)
@@ -440,8 +455,20 @@ class TabEquilibrio(QWidget):
         root.addLayout(top)
 
         # ── BLOQUE RESUMEN ────────────────────────────────────
-        # Título de sección
-        root.addWidget(section_label("Resumen de los calculos:", left=True))
+        # Título de sección + botón para elegir qué propiedades mostrar
+        res_hdr_row = QHBoxLayout()
+        res_hdr_row.setContentsMargins(0, 0, 0, 0); res_hdr_row.setSpacing(6)
+        res_hdr_row.addWidget(section_label("Resumen de los calculos:", left=True), 1)
+        self.btn_props = QPushButton("Propiedades...")
+        self.btn_props.setFixedHeight(22); self.btn_props.setFixedWidth(120)
+        self.btn_props.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_props.setStyleSheet(
+            f'QPushButton {{ background:{GRAY_LBL}; border:1px solid {BORDER};'
+            f' font-family:"{FONT_F}"; font-size:9pt; padding:1px 6px; }}'
+            f'QPushButton:hover {{ background:#DCDCDC; }}')
+        self.btn_props.clicked.connect(self._abrir_selector_props)
+        res_hdr_row.addWidget(self.btn_props, 0)
+        root.addLayout(res_hdr_row)
 
         # Cabecera de columnas del resumen (plomo medio)
         # Anchos del resumen = mismos que composicion para alinear columnas
@@ -483,24 +510,9 @@ class TabEquilibrio(QWidget):
         self.tbl_res.setColumnWidth(2, W_VAL)
         self.tbl_res.setColumnWidth(3, W_VAL)
 
-        res_labels = [
-            "Fase fraccion [molar]:",
-            "Fase fraccion [masica]:",
-            "Gravedad especifica:",
-            "Densidad masica [lb/ft3]:",
-            "Factor de compresibilidad:",
-            "Peso molecular:",
-        ]
-        self.res_has_mix = {3, 5}   # Densidad y PM tienen valor de mezcla
-
-        for i, lbl_txt in enumerate(res_labels):
-            self.tbl_res.setItem(i, 0, cell(lbl_txt, bg=GRAY_LBL))
-            # Celdas de resultado: fondo plomo claro (GRAY_RES)
-            self.tbl_res.setItem(i, 1, cell("", bg=GRAY_RES))
-            self.tbl_res.setItem(i, 2, cell("", bg=GRAY_RES))
-            self.tbl_res.setItem(i, 3, cell("", bg=GRAY_RES))
-
-        fix_table_size(self.tbl_res)
+        # Propiedades seleccionadas (por defecto, las 6 clásicas)
+        self._props_sel = list(PROP_DEFAULT)
+        self._rebuild_resumen()      # arma filas/etiquetas iniciales
         root.addWidget(self.tbl_res)
 
         # ── BLOQUE COMPOSICIÓN ────────────────────────────────
@@ -606,13 +618,11 @@ class TabEquilibrio(QWidget):
             self.sp_T.setValue(_u.abs_desde_R(T_int_R))
             self.sp_F.setValue(_u.t_desde_R(T_int_R))
         self._sync_lock = False
-        # 4) Etiqueta de densidad (fila 3 de la tabla de resultados)
-        it = self.tbl_res.item(3, 0)
-        if it is not None:
-            it.setText(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:")
-        # 5) Re-renderizar el último resultado en las nuevas unidades
+        # 4) Reconstruir el resumen con las unidades nuevas (etiquetas + valores)
         if getattr(self, 'last_result', None) is not None:
             self._render(self.last_result)
+        else:
+            self._rebuild_resumen()
 
     # ── Handlers ─────────────────────────────────────────────
     def _on_eos_changed(self, idx):
@@ -734,8 +744,11 @@ class TabEquilibrio(QWidget):
             return
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         # Cada ventana de Equilibrio usa la EOS de su propio combo.
-        _set_eos(_eos_code(self.cmb_eos.currentIndex()))
+        eos_code = _eos_code(self.cmb_eos.currentIndex())
+        _set_eos(eos_code)
         kij = self._kij_get() if self._kij_get is not None else kij_user
+        # Contexto para calcular entalpia/entropia al recibir el resultado.
+        self._hs_ctx = (list(z), self.get_T(), self.get_P(), kij, eos_code)
         self.worker = Worker(z, self.get_T(), self.get_P(), kij,
                              metodo_densidad=self.cmb_dens.currentText())
         self.worker.done.connect(self._on_result)
@@ -748,8 +761,78 @@ class TabEquilibrio(QWidget):
 
     def _on_result(self, r):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
+        # Entalpia y entropia (para el selector de propiedades)
+        try:
+            import entalpia_entropia_gen as _hs
+            z, T_R, P, kij, eos = self._hs_ctx
+            o = _hs.calcular_HS(z, T_R, P, r, eos=eos, kij=kij)
+            for k in ('H_stream', 'S_stream', 'H_vapor', 'S_vapor',
+                      'H_liquido', 'S_liquido'):
+                r[k] = o.get(k)
+        except Exception:
+            pass
         self.last_result = r
         self._render(r)
+
+    def _paint_res(self, row, col, txt):
+        it = self.tbl_res.item(row, col)
+        if it is None:
+            it = cell("", bg=GRAY_RES); self.tbl_res.setItem(row, col, it)
+        it.setText(txt)
+        if txt:
+            it.setBackground(_brush(WHITE)); it.setForeground(_brush(TEXT_RES))
+        else:
+            it.setBackground(_brush(GRAY_RES)); it.setForeground(_brush(TEXT))
+
+    def _rebuild_resumen(self, valores=None):
+        """(Re)construye la tabla de resumen mostrando solo las propiedades
+        seleccionadas, en el orden canonico. `valores` es un dict
+        key -> (mezcla, vapor, liquido) con textos ya formateados; si es None
+        solo arma las etiquetas (sin valores)."""
+        import unidades as _u, idioma as _i18n
+        sel = [d for d in PROP_RESUMEN if d[0] in self._props_sel]
+        self.tbl_res.setRowCount(len(sel))
+        for i, (key, base, mag, fmt, has_mix) in enumerate(sel):
+            unidad = f" [{_u.u(mag)}]" if mag else ""
+            etq = f"{_i18n.t(base)}{unidad}:"
+            self.tbl_res.setItem(i, 0, cell(etq, bg=GRAY_LBL))
+            if valores is not None and key in valores:
+                mix, vap, liq = valores[key]
+            else:
+                mix = vap = liq = ""
+            self._paint_res(i, 1, mix if has_mix else "")
+            self._paint_res(i, 2, vap)
+            self._paint_res(i, 3, liq)
+        fix_table_size(self.tbl_res)
+
+    def _abrir_selector_props(self):
+        """Dialogo para elegir que propiedades mostrar en el resumen."""
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QCheckBox,
+                                     QDialogButtonBox, QLabel)
+        import idioma as _i18n, unidades as _u
+        dlg = QDialog(self)
+        dlg.setWindowTitle(_i18n.t("Propiedades a mostrar"))
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel(_i18n.t("Seleccione las propiedades a mostrar:")))
+        checks = {}
+        for key, base, mag, fmt, has_mix in PROP_RESUMEN:
+            unidad = f" [{_u.u(mag)}]" if mag else ""
+            cb = QCheckBox(f"{_i18n.t(base)}{unidad}")
+            cb.setChecked(key in self._props_sel)
+            lay.addWidget(cb); checks[key] = cb
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                              QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        lay.addWidget(bb)
+        if dlg.exec():
+            nuevos = [k for k, *_ in PROP_RESUMEN if checks[k].isChecked()]
+            if not nuevos:
+                nuevos = list(PROP_DEFAULT)   # nunca dejar la tabla vacia
+            self._props_sel = nuevos
+            if getattr(self, 'last_result', None) is not None:
+                self._render(self.last_result)
+            else:
+                self._rebuild_resumen()
 
     def _render(self, r):
         masa = self.btn_frac.isChecked()
@@ -785,44 +868,28 @@ class TabEquilibrio(QWidget):
                 item.setBackground(_brush(GRAY_RES))
                 item.setForeground(_brush(TEXT))
 
-        # Resumen — 6 filas × 3 cols (etiqueta, vapor, liquida)
-        # col 0 = etiqueta (plomo siempre)
-        # col 1 = Fase Vapor  → blanco si tiene valor
-        # col 2 = Fase Liquida→ blanco si tiene valor
-        #
-        # Filas dens (3) y PM (5) también usan col0 para valor de mezcla
-        data = [None]*6
-        if modo == "liquido_unico":
-            data[0] = ("", f(V) if V>0 else "", f(L) if L>0 else "")
-            data[1] = ("", f(Vm) if V>0 else "", f(Lm) if L>0 else "")
-            data[2] = ("", "", f(sg_l))
-            data[3] = (f(rho_z), "", f(rho_l))
-            data[4] = ("", "", f(ZL))
-            data[5] = (f(PM_z), "", f(PM_l))
-        elif modo == "vapor_unico":
-            data[0] = ("", f(V) if V>0 else "", "")
-            data[1] = ("", f(Vm) if V>0 else "", "")
-            data[2] = ("", f(sg_v), "")
-            data[3] = (f(rho_z), f(rho_v), "")
-            data[4] = ("", f(ZV), "")
-            data[5] = (f(PM_z), f(PM_v), "")
-        else:
-            data[0] = ("", f(V), f(L))
-            data[1] = ("", f(Vm), f(Lm))
-            data[2] = ("", f(sg_v), f(sg_l))
-            data[3] = (f(rho_z), f(rho_v), f(rho_l))
-            data[4] = ("", f(ZV), f(ZL))
-            data[5] = (f(PM_z), f(PM_v), f(PM_l))
-
-        for i, (mix, vap, liq) in enumerate(data):
-            # col0=etiqueta (plomo fijo), col1=mezcla, col2=vapor, col3=liquida
-            if i in self.res_has_mix:
-                paint(self.tbl_res.item(i,1), mix)
-            else:
-                self.tbl_res.item(i,1).setText("")
-                self.tbl_res.item(i,1).setBackground(_brush(GRAY_RES))
-            paint(self.tbl_res.item(i,2), vap)
-            paint(self.tbl_res.item(i,3), liq)
+        # ── Resumen: construir segun las propiedades seleccionadas ──
+        Hs = _u.H_desde(r.get('H_stream')) if r.get('H_stream') is not None else None
+        Hv = _u.H_desde(r.get('H_vapor'))  if r.get('H_vapor')  is not None else None
+        Hl = _u.H_desde(r.get('H_liquido'))if r.get('H_liquido')is not None else None
+        Ss = _u.S_desde(r.get('S_stream')) if r.get('S_stream') is not None else None
+        Sv = _u.S_desde(r.get('S_vapor'))  if r.get('S_vapor')  is not None else None
+        Sl = _u.S_desde(r.get('S_liquido'))if r.get('S_liquido')is not None else None
+        vap_ok = V > 1e-9
+        liq_ok = L > 1e-9
+        def cv(val, ok, d=4):
+            return f(val, d) if (val is not None and ok) else ""
+        valores = {
+            'frac_molar':  ("",          cv(V, vap_ok),  cv(L, liq_ok)),
+            'frac_masica': ("",          cv(Vm, vap_ok), cv(Lm, liq_ok)),
+            'sg':          ("",          cv(sg_v, vap_ok),cv(sg_l, liq_ok)),
+            'densidad':    (f(rho_z),    cv(rho_v, vap_ok),cv(rho_l, liq_ok)),
+            'z':           ("",          cv(ZV, vap_ok), cv(ZL, liq_ok)),
+            'pm':          (f(PM_z),     cv(PM_v, vap_ok),cv(PM_l, liq_ok)),
+            'entalpia':    (f(Hs, 2),    cv(Hv, vap_ok, 2),cv(Hl, liq_ok, 2)),
+            'entropia':    (f(Ss),       cv(Sv, vap_ok), cv(Sl, liq_ok)),
+        }
+        self._rebuild_resumen(valores)
 
         # ── Composiciones ─────────────────────────────────────
         sy = sx = 0
@@ -2110,6 +2177,18 @@ class MainWindow(QMainWindow):
         win.raise_()
         win.activateWindow()
 
+    def _tam_calculo(self, clave, widget):
+        """Tamaño fijo para la ventana de cada cálculo. Saturación necesita
+        mas alto (tiene entalpia/entropia en la tabla de propiedades)."""
+        if clave == 'parametros':
+            return widget.tam_ideal()
+        if not hasattr(self, '_tam_sub'):
+            h = self.tab_eq.sizeHint()
+            self._tam_sub = (h.width() + 26, h.height() + 12)
+        if clave == 'saturacion':
+            return (self._tam_sub[0], self._tam_sub[1] + 54)
+        return None
+
     def _abrir_calculo(self, clave):
         """Abre (o activa) la ventana del calculo pedido."""
         if clave not in self._defs_calc:
@@ -2118,8 +2197,7 @@ class MainWindow(QMainWindow):
         if sw is None:
             widget, titulo, ic = self._defs_calc[clave]
             prov = self._eos_main_code
-            # Parametros tiene su propio tamaño (para que entre todo justo).
-            tam = widget.tam_ideal() if clave == 'parametros' else None
+            tam = self._tam_calculo(clave, widget)
             sw = self._montar_subventana(clave, widget, titulo, tam=tam,
                                          eos_provider=prov)
         self._mostrar_subventana(sw)
@@ -2194,7 +2272,7 @@ class MainWindow(QMainWindow):
             titulo = f"{etiquetas[clave]} - {fluido['nombre']}"
             # Pie con la EOS del fluido.
             prov = (lambda f=fluido: f.get('eos', 'PR'))
-            tam = widget.tam_ideal() if clave == 'parametros' else None
+            tam = self._tam_calculo(clave, widget)
             sw = self._montar_subventana(subclave, widget, titulo,
                                          tam=tam, eos_provider=prov)
         self._mostrar_subventana(sw)

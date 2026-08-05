@@ -345,7 +345,7 @@ class TabSaturacion(QWidget):
     def _fit_table_heights(self):
         """Ajusta la altura de cada tabla a la suma real de sus filas,
         para mostrar todas sin scrollbar (robusto ante DPI/versión Windows)."""
-        for tbl, nrows in [(self.tbl, NC+1), (self.tbl_prop, 4)]:
+        for tbl, nrows in [(self.tbl, NC+1), (self.tbl_prop, 6)]:
             h = tbl.horizontalHeader().height()
             for r in range(nrows):
                 h += tbl.rowHeight(r)
