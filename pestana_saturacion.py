@@ -152,13 +152,16 @@ class TabSaturacion(QWidget):
         def lbl(txt, res=False):
             l=QLabel(txt)
             if res:
+                # Celda de RESULTADO: fondo blanco
                 l.setStyleSheet(
-                    f'background:transparent;border:1px solid {BORDER};'
+                    f'background:{WHITE};border:1px solid {BORDER};'
                     f'color:{TEXT_RES};padding:2px 6px;'
                     f'font-family:"{FONT_F}";font-size:{FS}pt;')
             else:
+                # Etiqueta: fondo gris un poco mas oscuro que el panel para
+                # diferenciarla del fondo
                 l.setStyleSheet(
-                    f'background:transparent;border:1px solid {BORDER};'
+                    f'background:#C2C2C2;border:1px solid {BORDER};'
                     f'padding:2px 6px;font-family:"{FONT_F}";font-size:{FS}pt;')
             l.setFixedHeight(24)
             return l
@@ -318,7 +321,8 @@ class TabSaturacion(QWidget):
         self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         _props=["Peso molecular","Factor de compresibilidad",
-                "Densidad masica [lb/ft3]","Gravedad especifica"]
+                "Densidad masica [lb/ft3]","Gravedad especifica",
+                "Entalpia molar [Btu/lbmol]","Entropia molar [Btu/lbmol-F]"]
         GRIS=QColor("#E8E8E8"); BLANCO_P=QColor(WHITE)
         for r,lbl_p in enumerate(_props):
             it=QTableWidgetItem(lbl_p)
@@ -330,7 +334,7 @@ class TabSaturacion(QWidget):
                 cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 cc.setBackground(QBrush(BLANCO_P))
                 self.tbl_prop.setItem(r,c,cc)
-        self.tbl_prop.setRowCount(4)
+        self.tbl_prop.setRowCount(6)
         root.addWidget(self.tbl_prop)
         root.addStretch()   # el espacio sobrante va al fondo, no entre tablas
 
@@ -429,6 +433,12 @@ class TabSaturacion(QWidget):
         it_d = self.tbl_prop.item(2, 0)
         if it_d is not None:
             it_d.setText(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:")
+        it_h=self.tbl_prop.item(4,0)
+        if it_h is not None:
+            it_h.setText(f"{_i18n.t('Entalpia molar')} [{_u.u('H')}]:")
+        it_s=self.tbl_prop.item(5,0)
+        if it_s is not None:
+            it_s.setText(f"{_i18n.t('Entropia molar')} [{_u.u('S')}]:")
         # Etiquetas de resultado (aunque no haya calculo aun)
         self._actualizar_labels_resultado()
         # Re-render del ultimo resultado (internos °R/psia)
@@ -496,10 +506,18 @@ class TabSaturacion(QWidget):
         setp(1,'ZV','ZL')
         setp(2,'rho_v','rho_l', conv=_u.dens_desde)   # densidad al sistema activo
         setp(3,'sg_v','sg_l')
+        setp(4,'H_v','H_l', fmt="{:.2f}", conv=_u.H_desde)   # entalpía molar
+        setp(5,'S_v','S_l', fmt="{:.4f}", conv=_u.S_desde)   # entropía molar
         # Etiqueta de densidad con la unidad activa
         it_d=self.tbl_prop.item(2,0)
         if it_d is not None:
             it_d.setText(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:")
+        it_h=self.tbl_prop.item(4,0)
+        if it_h is not None:
+            it_h.setText(f"{_i18n.t('Entalpia molar')} [{_u.u('H')}]:")
+        it_s=self.tbl_prop.item(5,0)
+        if it_s is not None:
+            it_s.setText(f"{_i18n.t('Entropia molar')} [{_u.u('S')}]:")
 
     # ── Guardar / restaurar estado ────────────────────────────
     def get_estado(self):

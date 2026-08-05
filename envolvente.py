@@ -500,6 +500,7 @@ def propiedades_punto(T, P, x, y, kij=None, metodo_densidad='COSTALD'):
     # Líquido — por COSTALD o EOS según método
     am_l = _am(x,T,kij); bm_l = _bm(x)
     _,ZL = _solveZ(*_AB(am_l,bm_l,T,P))
+    ZL_eos = ZL   # raíz EOS del líquido (para H/S de partida)
     if metodo_densidad == 'COSTALD':
         Vs = costald_Vs(x, T)
         if Vs and Vs > 0:
@@ -512,6 +513,18 @@ def propiedades_punto(T, P, x, y, kij=None, metodo_densidad='COSTALD'):
         out['rho_l'] = P*PM_l/(ZL*_R*T) if ZL>0 else None
         out['ZL'] = ZL
     out['sg_l'] = (out['rho_l']/62.4) if out.get('rho_l') else None
+
+    # Entalpía y entropía molar de cada fase (funciones de partida, misma EOS)
+    try:
+        import eos as _eng
+        from entalpia_entropia_gen import H_fase, S_fase
+        eos_act = _eng.get_eos()
+        out['H_v'] = H_fase(y, T, P, ZV, eos_act, kij) if ZV and ZV > 0 else None
+        out['S_v'] = S_fase(y, T, P, ZV, eos_act, kij) if ZV and ZV > 0 else None
+        out['H_l'] = H_fase(x, T, P, ZL_eos, eos_act, kij) if ZL_eos and ZL_eos > 0 else None
+        out['S_l'] = S_fase(x, T, P, ZL_eos, eos_act, kij) if ZL_eos and ZL_eos > 0 else None
+    except Exception:
+        out['H_v'] = out['S_v'] = out['H_l'] = out['S_l'] = None
 
     return out
 

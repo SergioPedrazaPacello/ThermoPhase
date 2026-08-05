@@ -1552,6 +1552,9 @@ class MainWindow(QMainWindow):
         self._act_en.setChecked(lang == 'EN')
         # Ventana principal (menus, navegador, barra, status)
         _i18n.retraducir(self)
+        # Tooltip del boton de documentacion de la barra
+        if hasattr(self.ribbon, 'btn_doc'):
+            self.ribbon.btn_doc.setToolTip(_i18n.t("Documentación técnica"))
         # Pestaña principal de equilibrio: reconstruir etiquetas con unidad
         if hasattr(self, 'tab_eq') and hasattr(self.tab_eq, 'aplicar_unidades'):
             import unidades as _u0

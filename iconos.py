@@ -584,13 +584,26 @@ def _unidades(p):
 
 
 def _documentacion(p):
-    # Documentacion tecnica: signo de interrogacion blanco en circulo rojo.
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#C0392B")))
-    p.drawEllipse(QRectF(3, 3, 26, 26))
-    f = QFont("Arial", 17, QFont.Weight.Bold)
-    p.setFont(f); p.setPen(_pen(QColor("#FFFFFF"), 1))
-    p.setBrush(QBrush(QColor("#FFFFFF")))
-    p.drawText(QRectF(3, 2, 26, 26), Qt.AlignmentFlag.AlignCenter, "?")
+    # Documentacion tecnica: documento con esquina doblada e insignia roja de
+    # interrogacion.
+    page = QPainterPath()
+    page.moveTo(7, 4); page.lineTo(19, 4); page.lineTo(25, 10)
+    page.lineTo(25, 28); page.lineTo(7, 28); page.closeSubpath()
+    p.setPen(_pen(QColor("#4A4A4A"), 1.5)); p.setBrush(QBrush(QColor("#FFFFFF")))
+    p.drawPath(page)
+    fold = QPainterPath(); fold.moveTo(19, 4); fold.lineTo(19, 10); fold.lineTo(25, 10)
+    p.setPen(_pen(QColor("#4A4A4A"), 1.3)); p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawPath(fold)
+    p.setPen(_pen(QColor("#9AA0A6"), 1.3))
+    p.drawLine(QPointF(10, 14), QPointF(22, 14))
+    p.drawLine(QPointF(10, 18), QPointF(20, 18))
+    p.drawLine(QPointF(10, 22), QPointF(16, 22))
+    # Insignia roja con signo de interrogacion
+    p.setPen(_pen(QColor("#FFFFFF"), 1.4)); p.setBrush(QBrush(QColor("#C0392B")))
+    p.drawEllipse(QRectF(17.5, 17.5, 13, 13))
+    f = QFont("Arial", 8, QFont.Weight.Bold); p.setFont(f)
+    p.setPen(_pen(QColor("#FFFFFF"), 1)); p.setBrush(QBrush(QColor("#FFFFFF")))
+    p.drawText(QRectF(17.5, 17.2, 13, 13), Qt.AlignmentFlag.AlignCenter, "?")
 
 
 # ── Registro nombre -> funcion de dibujo ─────────────────────
