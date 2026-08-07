@@ -136,7 +136,7 @@ class TabSaturacion(QWidget):
     def _build(self):
         self.setStyleSheet(f'background:{GRAY_LBL};')
         root=QVBoxLayout(self)
-        root.setContentsMargins(4,8,4,4); root.setSpacing(2)
+        root.setContentsMargins(4,9,4,5); root.setSpacing(3)
 
         # Título
         title=QLabel("ThermoPhase — Puntos de Saturación")

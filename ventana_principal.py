@@ -464,7 +464,7 @@ class TabEquilibrio(QWidget):
         self.btn_props.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_props.setStyleSheet(
             f'QPushButton {{ background:{GRAY_LBL}; border:1px solid {BORDER};'
-            f' font-family:"{FONT_F}"; font-size:9pt; padding:1px 6px; }}'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; padding:1px 8px; }}'
             f'QPushButton:hover {{ background:#DCDCDC; }}')
         self.btn_props.clicked.connect(self._abrir_selector_props)
         res_hdr_row.addWidget(self.btn_props, 0)
@@ -813,9 +813,11 @@ class TabEquilibrio(QWidget):
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QCheckBox,
                                      QDialogButtonBox, QLabel)
         import idioma as _i18n, unidades as _u
-        MAX = len(PROP_DEFAULT)   # numero de propiedades mostrables (6)
+        MAX = len(PROP_DEFAULT)   # numero exacto de propiedades a mostrar (6)
         dlg = QDialog(self)
         dlg.setWindowTitle(_i18n.t("Propiedades a mostrar"))
+        # Ventana de tamaño fijo (no se puede agrandar ni achicar)
+        dlg.setFixedSize(330, 320)
         lay = QVBoxLayout(dlg)
         lay.setContentsMargins(16, 14, 16, 12); lay.setSpacing(8)
         info = QLabel(_i18n.t("Seleccione las propiedades a mostrar:"))
@@ -843,20 +845,24 @@ class TabEquilibrio(QWidget):
             cb.setCursor(Qt.CursorShape.PointingHandCursor)
             lay.addWidget(cb); checks[key] = cb
 
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                              QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        lay.addWidget(bb)
+        _ok_btn = bb.button(QDialogButtonBox.StandardButton.Ok)
+
         def _actualizar_habilitado():
             n = sum(1 for c in checks.values() if c.isChecked())
             # Al llegar al maximo, deshabilita las NO marcadas
             for c in checks.values():
                 c.setEnabled(c.isChecked() or n < MAX)
+            # Aceptar solo cuando hay exactamente MAX seleccionadas
+            _ok_btn.setEnabled(n == MAX)
 
         for c in checks.values():
             c.stateChanged.connect(lambda _=0: _actualizar_habilitado())
         _actualizar_habilitado()
 
-        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
-                              QDialogButtonBox.StandardButton.Cancel)
-        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
-        lay.addWidget(bb)
         if dlg.exec():
             nuevos = [k for k, *_ in PROP_RESUMEN if checks[k].isChecked()]
             if not nuevos:
@@ -2446,7 +2452,7 @@ class MainWindow(QMainWindow):
         from documentacion import DocTecnica
         widget = DocTecnica()
         self._montar_subventana(clave, widget, "Documentación técnica",
-                                tam=(760, 560))
+                                tam=(880, 620))
 
     def _menu_acerca(self):
         dialogos.info(self,
