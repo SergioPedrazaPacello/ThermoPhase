@@ -15,23 +15,25 @@ from PyQt6.QtCore import Qt
 
 
 _CSS = """
-body   { font-family:'Segoe UI','Arial'; font-size:13px; color:#2B2B2B; }
-h2     { color:#1F5FA8; font-size:18px; margin:2px 0 10px 0; }
-h3     { color:#B0362A; font-size:14px; margin:16px 0 6px 0; }
-p      { line-height:150%; margin:8px 0; }
-li     { line-height:145%; margin:3px 0; }
-.eq    { background:#EEF3F8; padding:9px 12px; margin:11px 0;
-         font-size:14px; color:#12345A; }
-.nota  { background:#FBF4E4; padding:9px 12px; margin:11px 0; color:#5A4A22; }
-.fis   { background:#EAF4EC; padding:9px 12px; margin:11px 0; color:#234A30; }
-.var   { color:#B0362A; font-style:italic; }
-b      { color:#1F3A55; }
+body   { font-family:'Arial Narrow','Arial'; font-size:14px; color:#000000; }
+h2     { font-family:'Arial Narrow','Arial'; font-size:14px; font-weight:bold;
+         color:#000000; margin:2px 0 9px 0; }
+h3     { font-family:'Arial Narrow','Arial'; font-size:14px; font-weight:bold;
+         color:#000000; margin:13px 0 4px 0; }
+p      { font-size:14px; line-height:140%; margin:7px 0; color:#000000; }
+li     { font-size:14px; line-height:138%; margin:2px 0; color:#000000; }
+b      { font-weight:normal; color:#000000; }
+i      { font-style:normal; }
+.var   { color:#000000; font-style:normal; }
+.eq    { margin:8px 0 8px 26px; color:#000000; }
+.nota  { margin:7px 0; color:#000000; }
+.fis   { margin:7px 0; color:#000000; }
 """
 
 
 def _eq(txt):   return f'<div class="eq">{txt}</div>'
-def _nota(txt): return f'<div class="nota"><b>Nota &mdash;</b> {txt}</div>'
-def _fis(txt):  return f'<div class="fis"><b>Sentido físico &mdash;</b> {txt}</div>'
+def _nota(txt): return f'<p class="nota">{txt}</p>'
+def _fis(txt):  return f'<p class="fis">{txt}</p>'
 
 
 # ── SECCIÓN 1 ────────────────────────────────────────────────────────
@@ -448,72 +450,212 @@ SECCIONES = [
 ]
 
 
+import re
+from PyQt6.QtWidgets import (
+    QVBoxLayout, QTabWidget, QToolButton, QFrame as _QFrame,
+)
+from PyQt6.QtGui import (
+    QIcon, QPixmap, QPainter, QColor, QPen, QBrush, QPainterPath,
+)
+from PyQt6.QtCore import QSize, QRectF, QPointF
+
+
+def _sin_num(s):
+    """Quita el prefijo numerico ('1.4 ', '2. ') de un titulo."""
+    return re.sub(r'^\s*[\d]+(\.[\d]+)*\.?\s+', '', s)
+
+
+# ── Iconos (dibujados a mano, en el estilo del programa) ─────────────
+def _mk_icon(draw_fn, size=18):
+    px = QPixmap(size, size); px.fill(_transparent())
+    p = QPainter(px); p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.scale(size / 24.0, size / 24.0); draw_fn(p); p.end()
+    return QIcon(px)
+
+
+def _transparent():
+    from PyQt6.QtCore import Qt as _Qt
+    return _Qt.GlobalColor.transparent
+
+
+def _dib_seccion(p):
+    # Carpeta ambar (seccion)
+    p.setPen(QPen(QColor("#9A7A2A"), 1.3)); p.setBrush(QBrush(QColor("#E8C36A")))
+    tab = QPainterPath()
+    tab.moveTo(3, 7); tab.lineTo(3, 19); tab.lineTo(21, 19); tab.lineTo(21, 9)
+    tab.lineTo(11, 9); tab.lineTo(9, 7); tab.closeSubpath()
+    p.drawPath(tab)
+
+
+def _dib_tema(p):
+    # Pagina con esquina doblada (subseccion)
+    p.setPen(QPen(QColor("#5A5A5A"), 1.3)); p.setBrush(QBrush(QColor("#FFFFFF")))
+    pg = QPainterPath()
+    pg.moveTo(6, 3); pg.lineTo(15, 3); pg.lineTo(19, 7); pg.lineTo(19, 21)
+    pg.lineTo(6, 21); pg.closeSubpath()
+    p.drawPath(pg)
+    p.setPen(QPen(QColor("#5A5A5A"), 1.1)); p.setBrush(QBrush(_transparent()))
+    p.drawLine(QPointF(15, 3), QPointF(15, 7)); p.drawLine(QPointF(15, 7), QPointF(19, 7))
+    p.setPen(QPen(QColor("#8AA0C0"), 1.1))
+    p.drawLine(QPointF(8.5, 11), QPointF(16.5, 11))
+    p.drawLine(QPointF(8.5, 14), QPointF(16.5, 14))
+    p.drawLine(QPointF(8.5, 17), QPointF(13.5, 17))
+
+
+def _dib_ocultar(p):
+    p.setPen(QPen(QColor("#4A4A4A"), 1.4)); p.setBrush(QBrush(QColor("#FFFFFF")))
+    p.drawRect(QRectF(3, 5, 18, 14))
+    p.setBrush(QBrush(QColor("#C9D6E4")))
+    p.drawRect(QRectF(3, 5, 6, 14))
+
+
+def _dib_atras(p):
+    p.setPen(QPen(QColor("#2E6E3A"), 2.2)); p.setBrush(QBrush(_transparent()))
+    p.drawLine(QPointF(15, 5), QPointF(8, 12)); p.drawLine(QPointF(8, 12), QPointF(15, 19))
+
+
+def _dib_adelante(p):
+    p.setPen(QPen(QColor("#2E6E3A"), 2.2)); p.setBrush(QBrush(_transparent()))
+    p.drawLine(QPointF(9, 5), QPointF(16, 12)); p.drawLine(QPointF(16, 12), QPointF(9, 19))
+
+
 class DocTecnica(QWidget):
-    """Ventana de Documentación técnica: árbol de navegación + contenido."""
+    """Ventana de Documentación técnica: barra + árbol (pestaña Contenido) +
+    contenido, al estilo de un visor de ayuda."""
 
     def __init__(self):
         super().__init__()
         self.setStyleSheet("background:#FFFFFF;")
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0); lay.setSpacing(0)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0); root.setSpacing(0)
 
+        # ── Barra de herramientas superior ──────────────────────
+        barra = self._crear_barra()
+        root.addWidget(barra)
+        sep = _QFrame(); sep.setFrameShape(_QFrame.Shape.HLine)
+        sep.setStyleSheet("color:#C4C4C4; background:#C4C4C4;"); sep.setFixedHeight(1)
+        root.addWidget(sep)
+
+        # ── Cuerpo: árbol (pestañas) | contenido ────────────────
         split = QSplitter(Qt.Orientation.Horizontal)
+
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet(
+            'QTabWidget::pane { border:none; background:#F5F5F2; }'
+            'QTabBar::tab { font-family:"Arial Narrow","Arial"; font-size:13px;'
+            ' padding:4px 14px; background:#E4E4DE; border:1px solid #C8C8C2;'
+            ' border-bottom:none; }'
+            'QTabBar::tab:selected { background:#F5F5F2; }')
 
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
-        self.tree.setFixedWidth(280)
+        self.tree.setIconSize(QSize(18, 18))
         self.tree.setStyleSheet(
             'QTreeWidget { background:#F5F5F2; border:none;'
-            ' font-family:"Segoe UI","Arial"; font-size:12px; outline:0; }'
-            'QTreeWidget::item { padding:4px 2px; }'
-            'QTreeWidget::item:selected { background:#D6E3F0; color:#12345A; }'
+            ' font-family:"Arial Narrow","Arial"; font-size:14px; outline:0; }'
+            'QTreeWidget::item { padding:3px 2px; }'
+            'QTreeWidget::item:selected { background:#D6E3F0; color:#000000; }'
             'QTreeWidget::item:hover { background:#E8EEF5; }')
+
+        ic_sec = _mk_icon(_dib_seccion)
+        ic_tema = _mk_icon(_dib_tema)
         self._contenido = {}
+        self._orden = []          # lista lineal de subsecciones (para prev/next)
         for sec_titulo, subs in SECCIONES:
-            top = QTreeWidgetItem([sec_titulo])
-            f = top.font(0); f.setBold(True); top.setFont(0, f)
+            top = QTreeWidgetItem([_sin_num(sec_titulo)])
+            top.setIcon(0, ic_sec)
             self.tree.addTopLevelItem(top)
             for sub_titulo, html in subs:
-                child = QTreeWidgetItem([sub_titulo])
+                child = QTreeWidgetItem([_sin_num(sub_titulo)])
+                child.setIcon(0, ic_tema)
                 top.addChild(child)
                 self._contenido[id(child)] = html
+                self._orden.append(child)
             top.setExpanded(True)
         self.tree.itemClicked.connect(self._on_item)
+        self.tabs.addTab(self.tree, "Contenido")
 
         self.view = QTextBrowser()
         self.view.setOpenExternalLinks(False)
         self.view.document().setDefaultStyleSheet(_CSS)
         self.view.setStyleSheet(
             'QTextBrowser { background:#FFFFFF; border:none; padding:14px 20px; }')
-        self._mostrar_inicio()
 
-        split.addWidget(self.tree)
+        split.addWidget(self.tabs)
         split.addWidget(self.view)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setCollapsible(0, False)
-        lay.addWidget(split)
+        split.setSizes([270, 640])
+        root.addWidget(split, 1)
 
-        first_top = self.tree.topLevelItem(0)
-        if first_top and first_top.childCount():
-            first_child = first_top.child(0)
-            self.tree.setCurrentItem(first_child)
-            self._on_item(first_child, 0)
+        # Estado de navegacion
+        self._idx = -1
+        if self._orden:
+            self._mostrar_indice(0)
 
-    def _mostrar_inicio(self):
-        self.view.setHtml(
-            "<h2>Documentación técnica de ThermoPhase</h2>"
-            "<p>Seleccione un tema en el árbol de la izquierda. Cada sección "
-            "explica no sólo las ecuaciones implementadas, sino el "
-            "<b>sentido físico</b> detrás de cada una, a modo de guía de "
-            "aprendizaje.</p>")
+    # ── Barra ───────────────────────────────────────────────────
+    def _crear_barra(self):
+        barra = QWidget()
+        barra.setStyleSheet("background:#F0F0EE;")
+        lay = QHBoxLayout(barra)
+        lay.setContentsMargins(6, 4, 6, 4); lay.setSpacing(4)
+
+        def _btn(texto, icono, slot):
+            b = QToolButton()
+            b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+            b.setText(texto); b.setIcon(icono); b.setIconSize(QSize(18, 18))
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setStyleSheet(
+                'QToolButton { font-family:"Arial Narrow","Arial"; font-size:12px;'
+                ' color:#000000; border:1px solid transparent; padding:3px 8px; }'
+                'QToolButton:hover { background:#E0E6EE; border:1px solid #C0C8D2; }'
+                'QToolButton:disabled { color:#A8A8A8; }')
+            b.clicked.connect(slot)
+            return b
+
+        self.btn_ocultar = _btn("Ocultar", _mk_icon(_dib_ocultar), self._toggle_arbol)
+        self.btn_atras = _btn("Atrás", _mk_icon(_dib_atras), lambda: self._navegar(-1))
+        self.btn_adelante = _btn("Adelante", _mk_icon(_dib_adelante), lambda: self._navegar(1))
+        lay.addWidget(self.btn_ocultar)
+        sep = _QFrame(); sep.setFrameShape(_QFrame.Shape.VLine)
+        sep.setStyleSheet("color:#CFCFCF;"); sep.setFixedWidth(1)
+        lay.addWidget(sep)
+        lay.addWidget(self.btn_atras)
+        lay.addWidget(self.btn_adelante)
+        lay.addStretch()
+        return barra
+
+    # ── Navegacion ──────────────────────────────────────────────
+    def _toggle_arbol(self):
+        self._arbol_visible = not getattr(self, '_arbol_visible', True)
+        self.tabs.setVisible(self._arbol_visible)
+        self.btn_ocultar.setText("Ocultar" if self._arbol_visible else "Mostrar")
+
+    def _navegar(self, delta):
+        if not self._orden:
+            return
+        nuevo = self._idx + delta
+        if 0 <= nuevo < len(self._orden):
+            self._mostrar_indice(nuevo)
+
+    def _mostrar_indice(self, idx):
+        self._idx = idx
+        item = self._orden[idx]
+        self.tree.setCurrentItem(item)
+        html = self._contenido.get(id(item), "")
+        # el titulo (h2) va sin numero
+        html = re.sub(r'(<h2>)\s*[\d]+(\.[\d]+)*\.?\s+', r'\1', html)
+        self.view.setHtml(html)
+        self.view.verticalScrollBar().setValue(0)
+        self.btn_atras.setEnabled(idx > 0)
+        self.btn_adelante.setEnabled(idx < len(self._orden) - 1)
 
     def _on_item(self, item, _col=0):
-        html = self._contenido.get(id(item))
-        if html is None and item.childCount():
-            child = item.child(0)
-            self.tree.setCurrentItem(child)
-            html = self._contenido.get(id(child))
-        if html is not None:
-            self.view.setHtml(html)
-            self.view.verticalScrollBar().setValue(0)
+        if id(item) in self._contenido:
+            self._mostrar_indice(self._orden.index(item))
+        else:
+            # Es una seccion: expandir/colapsar y mostrar su primera subseccion
+            item.setExpanded(not item.isExpanded())
+            if item.childCount():
+                self._mostrar_indice(self._orden.index(item.child(0)))

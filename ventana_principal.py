@@ -816,10 +816,8 @@ class TabEquilibrio(QWidget):
         MAX = len(PROP_DEFAULT)   # numero exacto de propiedades a mostrar (6)
         dlg = QDialog(self)
         dlg.setWindowTitle(_i18n.t("Propiedades a mostrar"))
-        # Ventana de tamaño fijo (no se puede agrandar ni achicar)
-        dlg.setFixedSize(330, 320)
         lay = QVBoxLayout(dlg)
-        lay.setContentsMargins(16, 14, 16, 12); lay.setSpacing(8)
+        lay.setContentsMargins(14, 12, 14, 10); lay.setSpacing(6)
         info = QLabel(_i18n.t("Seleccione las propiedades a mostrar:"))
         lay.addWidget(info)
         # Estilo de casillas: indicador claramente visible (verde al marcar)
@@ -862,6 +860,10 @@ class TabEquilibrio(QWidget):
         for c in checks.values():
             c.stateChanged.connect(lambda _=0: _actualizar_habilitado())
         _actualizar_habilitado()
+
+        # Tamaño compacto ajustado al contenido, y fijo (no redimensionable)
+        dlg.adjustSize()
+        dlg.setFixedSize(dlg.sizeHint())
 
         if dlg.exec():
             nuevos = [k for k, *_ in PROP_RESUMEN if checks[k].isChecked()]
@@ -2138,10 +2140,12 @@ class MainWindow(QMainWindow):
                 pie.setText(f"  {self._nombre_eos(prov())} EOS")
 
     # ── Gestion de ventanas de funcionalidad (top-level) ─────
-    def _montar_subventana(self, clave, widget, titulo, tam=None, eos_provider=None):
+    def _montar_subventana(self, clave, widget, titulo, tam=None,
+                           eos_provider=None, redimensionable=False):
         """Envuelve un widget en una ventana top-level nativa de Windows
-        (marco del sistema) de TAMAÑO FIJO y la registra. `tam` da un tamaño
-        propio; `eos_provider` agrega un pie con la EOS que usa la ventana."""
+        (marco del sistema) y la registra. `tam` da un tamaño propio;
+        `eos_provider` agrega un pie con la EOS; `redimensionable` permite
+        maximizar/redimensionar (por defecto las ventanas son de tamaño fijo)."""
         cont = QWidget()
         cont.setAutoFillBackground(True)
         cont.setStyleSheet('background:#E6E6E6;')
@@ -2186,7 +2190,11 @@ class MainWindow(QMainWindow):
                 h = self.tab_eq.sizeHint()
                 self._tam_sub = (h.width() + 26, h.height() + 12)
             tam = self._tam_sub
-        win.setFixedSize(tam[0], tam[1] + alto_pie)
+        if redimensionable:
+            win.resize(tam[0], tam[1] + alto_pie)
+            win.setMinimumSize(480, 360)
+        else:
+            win.setFixedSize(tam[0], tam[1] + alto_pie)
         self._subventanas[clave] = win
         # La ventana nace en el idioma activo: si es ingles, traducir ya
         # (antes solo se traducia al alternar idioma).
@@ -2452,7 +2460,7 @@ class MainWindow(QMainWindow):
         from documentacion import DocTecnica
         widget = DocTecnica()
         self._montar_subventana(clave, widget, "Documentación técnica",
-                                tam=(880, 620))
+                                tam=(900, 640), redimensionable=True)
 
     def _menu_acerca(self):
         dialogos.info(self,
