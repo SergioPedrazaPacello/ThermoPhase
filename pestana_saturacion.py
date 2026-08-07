@@ -136,7 +136,7 @@ class TabSaturacion(QWidget):
     def _build(self):
         self.setStyleSheet(f'background:{GRAY_LBL};')
         root=QVBoxLayout(self)
-        root.setContentsMargins(4,10,4,4); root.setSpacing(3)
+        root.setContentsMargins(4,8,4,4); root.setSpacing(2)
 
         # Título
         title=QLabel("ThermoPhase — Puntos de Saturación")
@@ -147,7 +147,7 @@ class TabSaturacion(QWidget):
         # ── Panel de entrada ──────────────────────────────────
         in_box=QFrame()
         in_box.setStyleSheet('background:transparent;border:none;')
-        gl=QGridLayout(in_box); gl.setContentsMargins(6,6,6,6); gl.setSpacing(6)
+        gl=QGridLayout(in_box); gl.setContentsMargins(6,4,6,4); gl.setSpacing(4)
 
         def lbl(txt, res=False):
             l=QLabel(txt)
@@ -193,7 +193,7 @@ class TabSaturacion(QWidget):
 
         # Botón calcular
         self.btn=QPushButton("Calcular punto de saturacion")
-        self.btn.setStyleSheet(BTN_STYLE); self.btn.setFixedHeight(26)
+        self.btn.setStyleSheet(BTN_STYLE); self.btn.setFixedHeight(24)
         self.btn.clicked.connect(self.calcular)
         gl.addWidget(self.btn, 2, 0, 1, 2)
 
@@ -202,12 +202,12 @@ class TabSaturacion(QWidget):
         # ── Panel de resultados (a la derecha de la entrada) ──
         res_outer=QVBoxLayout(); res_outer.setSpacing(3)
         res_title=QLabel("Resultado:")
-        res_title.setStyleSheet(LBL_SEC); res_title.setFixedHeight(22)
+        res_title.setStyleSheet(LBL_SEC); res_title.setFixedHeight(20)
         res_outer.addWidget(res_title)
 
         res_box=QFrame()
         res_box.setStyleSheet('background:transparent;border:none;')
-        rl=QGridLayout(res_box); rl.setContentsMargins(6,4,6,4); rl.setSpacing(4)
+        rl=QGridLayout(res_box); rl.setContentsMargins(6,3,6,3); rl.setSpacing(3)
 
         self.lbl_res_label=lbl("Temperatura de rocio (°F):")
         rl.addWidget(self.lbl_res_label, 0, 0)
@@ -236,7 +236,7 @@ class TabSaturacion(QWidget):
         top_row=QHBoxLayout(); top_row.setSpacing(10)
         in_wrap=QVBoxLayout(); in_wrap.setSpacing(3)
         in_title=QLabel("Datos de entrada:")
-        in_title.setStyleSheet(LBL_SEC); in_title.setFixedHeight(22)
+        in_title.setStyleSheet(LBL_SEC); in_title.setFixedHeight(20)
         in_wrap.addWidget(in_title)
         in_wrap.addWidget(in_box)
         top_row.addLayout(in_wrap, 1)      # entrada ocupa mitad
@@ -246,7 +246,7 @@ class TabSaturacion(QWidget):
 
         # ── Tabla de composiciones de las fases ───────────────
         comp_title=QLabel("Composicion de las fases en equilibrio:")
-        comp_title.setStyleSheet(LBL_SEC); comp_title.setFixedHeight(22)
+        comp_title.setStyleSheet(LBL_SEC); comp_title.setFixedHeight(20)
         root.addWidget(comp_title)
 
         self.tbl=QTableWidget(NC+1, 3)
@@ -296,7 +296,7 @@ class TabSaturacion(QWidget):
 
         # ── Panel de propiedades del punto de saturación ──────
         prop_title=QLabel("Propiedades del punto de saturacion:")
-        prop_title.setStyleSheet(LBL_SEC); prop_title.setFixedHeight(22)
+        prop_title.setStyleSheet(LBL_SEC); prop_title.setFixedHeight(20)
         root.addWidget(prop_title)
 
         self.tbl_prop=QTableWidget(6, 3)

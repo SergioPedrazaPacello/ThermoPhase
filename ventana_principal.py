@@ -459,7 +459,7 @@ class TabEquilibrio(QWidget):
         res_hdr_row = QHBoxLayout()
         res_hdr_row.setContentsMargins(0, 0, 0, 0); res_hdr_row.setSpacing(6)
         res_hdr_row.addWidget(section_label("Resumen de los calculos:", left=True), 1)
-        self.btn_props = QPushButton("Propiedades...")
+        self.btn_props = QPushButton("Propiedades")
         self.btn_props.setFixedHeight(22); self.btn_props.setFixedWidth(120)
         self.btn_props.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_props.setStyleSheet(
@@ -793,6 +793,7 @@ class TabEquilibrio(QWidget):
         sel = [d for d in PROP_RESUMEN if d[0] in self._props_sel]
         self.tbl_res.setRowCount(len(sel))
         for i, (key, base, mag, fmt, has_mix) in enumerate(sel):
+            self.tbl_res.setRowHeight(i, ROW_H)   # mismo alto que las demas
             unidad = f" [{_u.u(mag)}]" if mag else ""
             etq = f"{_i18n.t(base)}{unidad}:"
             self.tbl_res.setItem(i, 0, cell(etq, bg=GRAY_LBL))
@@ -806,20 +807,52 @@ class TabEquilibrio(QWidget):
         fix_table_size(self.tbl_res)
 
     def _abrir_selector_props(self):
-        """Dialogo para elegir que propiedades mostrar en el resumen."""
+        """Dialogo para elegir que propiedades mostrar en el resumen.
+        Se puede mostrar como maximo el numero actual de propiedades; para
+        agregar una hay que deseleccionar otra primero."""
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QCheckBox,
                                      QDialogButtonBox, QLabel)
         import idioma as _i18n, unidades as _u
+        MAX = len(PROP_DEFAULT)   # numero de propiedades mostrables (6)
         dlg = QDialog(self)
         dlg.setWindowTitle(_i18n.t("Propiedades a mostrar"))
         lay = QVBoxLayout(dlg)
-        lay.addWidget(QLabel(_i18n.t("Seleccione las propiedades a mostrar:")))
+        lay.setContentsMargins(16, 14, 16, 12); lay.setSpacing(8)
+        info = QLabel(_i18n.t("Seleccione las propiedades a mostrar:"))
+        lay.addWidget(info)
+        # Estilo de casillas: indicador claramente visible (verde al marcar)
+        qss = (
+            'QCheckBox { font-family:"%s"; font-size:10pt; spacing:8px;'
+            ' padding:1px 0; }'
+            'QCheckBox::indicator { width:15px; height:15px;'
+            ' border:1.5px solid #7A7A7A; border-radius:3px; background:#FFFFFF; }'
+            'QCheckBox::indicator:checked { background:#2E8B57;'
+            ' border:1.5px solid #256F46; image:url(none); }'
+            'QCheckBox::indicator:checked:disabled { background:#A9C9B5;'
+            ' border:1.5px solid #A9C9B5; }'
+            'QCheckBox::indicator:unchecked:disabled { background:#ECECEC;'
+            ' border:1.5px solid #C4C4C4; }'
+            'QCheckBox:disabled { color:#A0A0A0; }'
+        ) % FONT_F
         checks = {}
         for key, base, mag, fmt, has_mix in PROP_RESUMEN:
             unidad = f" [{_u.u(mag)}]" if mag else ""
             cb = QCheckBox(f"{_i18n.t(base)}{unidad}")
             cb.setChecked(key in self._props_sel)
+            cb.setStyleSheet(qss)
+            cb.setCursor(Qt.CursorShape.PointingHandCursor)
             lay.addWidget(cb); checks[key] = cb
+
+        def _actualizar_habilitado():
+            n = sum(1 for c in checks.values() if c.isChecked())
+            # Al llegar al maximo, deshabilita las NO marcadas
+            for c in checks.values():
+                c.setEnabled(c.isChecked() or n < MAX)
+
+        for c in checks.values():
+            c.stateChanged.connect(lambda _=0: _actualizar_habilitado())
+        _actualizar_habilitado()
+
         bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                               QDialogButtonBox.StandardButton.Cancel)
         bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
@@ -2178,16 +2211,10 @@ class MainWindow(QMainWindow):
         win.activateWindow()
 
     def _tam_calculo(self, clave, widget):
-        """Tamaño fijo para la ventana de cada cálculo. Saturación necesita
-        mas alto (tiene entalpia/entropia en la tabla de propiedades)."""
+        """Tamaño fijo para la ventana de cada cálculo."""
         if clave == 'parametros':
             return widget.tam_ideal()
-        if not hasattr(self, '_tam_sub'):
-            h = self.tab_eq.sizeHint()
-            self._tam_sub = (h.width() + 26, h.height() + 12)
-        if clave == 'saturacion':
-            return (self._tam_sub[0], self._tam_sub[1] + 54)
-        return None
+        return None   # el resto usa el tamaño estandar (igual que Equilibrio)
 
     def _abrir_calculo(self, clave):
         """Abre (o activa) la ventana del calculo pedido."""
