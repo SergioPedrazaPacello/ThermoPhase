@@ -1,17 +1,18 @@
 """
 documentacion.py — Ventana de Documentación técnica de ThermoPhase.
 
-Dos paneles: a la izquierda un árbol con las secciones y subsecciones; a la
-derecha el desarrollo de cada una. El objetivo es doble: dejar constancia de
-las ecuaciones y la configuración técnica implementada, y servir como guía de
-aprendizaje explicando el sentido físico de cada concepto.
+Dos paneles: a la izquierda un árbol (pestaña Contenido) con las secciones y
+subsecciones; a la derecha el desarrollo de cada una. Explica las ecuaciones
+implementadas y su sentido físico, siguiendo la forma en que ThermoPhase
+realiza los cálculos. Las ecuaciones se renderizan como imágenes matemáticas
+(fracciones apiladas y tipografía de ecuación).
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QTextBrowser,
-    QSplitter,
+    QWidget, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSplitter,
 )
 from PyQt6.QtCore import Qt
+import base64 as _b64
 
 
 _CSS = """
@@ -19,403 +20,668 @@ body   { font-family:'Arial Narrow','Arial'; font-size:14px; color:#000000; }
 h2     { font-family:'Arial Narrow','Arial'; font-size:14px; font-weight:bold;
          color:#000000; margin:2px 0 9px 0; }
 h3     { font-family:'Arial Narrow','Arial'; font-size:14px; font-weight:bold;
-         color:#000000; margin:13px 0 4px 0; }
-p      { font-size:14px; line-height:140%; margin:7px 0; color:#000000; }
-li     { font-size:14px; line-height:138%; margin:2px 0; color:#000000; }
+         color:#000000; margin:14px 0 4px 0; }
+p      { font-size:14px; line-height:142%; margin:7px 0; color:#000000; }
+li     { font-size:14px; line-height:140%; margin:3px 0; color:#000000; }
 b      { font-weight:normal; color:#000000; }
 i      { font-style:normal; }
-.var   { color:#000000; font-style:normal; }
-.eq    { margin:8px 0 8px 26px; color:#000000; }
-.nota  { margin:7px 0; color:#000000; }
-.fis   { margin:7px 0; color:#000000; }
 """
 
 
-def _eq(txt):   return f'<div class="eq">{txt}</div>'
-def _nota(txt): return f'<p class="nota">{txt}</p>'
-def _fis(txt):  return f'<p class="fis">{txt}</p>'
+# ── Renderizado de ecuaciones (matplotlib -> imagen, diferido y cacheado) ──
+_EQ_CACHE = {}
 
 
-# ── SECCIÓN 1 ────────────────────────────────────────────────────────
+def _eq(latex):
+    """Devuelve un marcador con la ecuación (se renderiza al mostrarla)."""
+    return f'@@EQ:{_b64.b64encode(latex.encode()).decode()}@@'
+
+
+def _render_eq_latex(latex, fontsize=15):
+    if latex in _EQ_CACHE:
+        return _EQ_CACHE[latex]
+    try:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import io
+        fig = plt.figure(figsize=(0.01, 0.01))
+        fig.text(0, 0, f'${latex}$', fontsize=fontsize, color='#1A1A1A')
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=130, bbox_inches='tight',
+                    pad_inches=0.06, transparent=True)
+        plt.close(fig)
+        data = buf.getvalue()
+        import struct
+        w_px = struct.unpack('>I', data[16:20])[0]
+        h_px = struct.unpack('>I', data[20:24])[0]
+        b = _b64.b64encode(data).decode()
+        MAXW = 560
+        if w_px > MAXW:
+            dw = MAXW; dh = int(h_px * MAXW / w_px)
+            dim = f' width="{dw}" height="{dh}"'
+        else:
+            dim = ''
+        html = (f'<p align="center" style="margin:13px 0">'
+                f'<img src="data:image/png;base64,{b}"{dim}></p>')
+    except Exception:
+        html = '<p align="center">[ecuación]</p>'
+    _EQ_CACHE[latex] = html
+    return html
+
+
+def _procesar_eqs(html):
+    import re as _re
+    return _re.sub(
+        r'@@EQ:([A-Za-z0-9+/=]+)@@',
+        lambda m: _render_eq_latex(_b64.b64decode(m.group(1)).decode()),
+        html)
+
+
+# ═════════════════════════════════════════════════════════════════════
+#  SECCIÓN 1 — Fundamentos de las EOS cúbicas
+# ═════════════════════════════════════════════════════════════════════
 S1_1 = """
 <h2>1.1 ¿Qué es una ecuación de estado?</h2>
-<p>Una <b>ecuación de estado</b> (EOS, por <i>Equation of State</i>) es una
-relación matemática que vincula las tres variables que describen el estado de
-un fluido: la <b>presión</b> (P), el <b>volumen</b> molar V y la
-<b>temperatura</b> (T). Conocidas dos de ellas, la EOS entrega la tercera.</p>
-<p>El objetivo práctico en ingeniería de yacimientos y de gas es responder:
-<i>a estas condiciones de P y T, ¿mi mezcla de hidrocarburos es líquido, gas o
-coexisten ambas fases?, ¿qué densidad tiene?, ¿cuánta energía hay que quitarle
-o agregarle?</i> Todo eso se deriva de una buena ecuación de estado.</p>
-<p>El punto de partida es el <b>gas ideal</b>:</p>
-""" + _eq("P &middot; V = R &middot; T") + """
-<p>donde <span class="var">R</span> es la constante universal de los gases. El
-motor de ThermoPhase trabaja en unidades de campo:
-<span class="var">R</span> = 10.7316 psi&middot;ft&sup3;/(lb-mol&middot;&deg;R).</p>
-""" + _fis("El gas ideal supone dos cosas que la realidad no cumple: (1) que "
-"las moléculas no ocupan volumen (son puntos), y (2) que no se atraen ni se "
-"repelen. A bajas presiones y altas temperaturas es razonable, pero en un "
-"yacimiento —altas presiones, moléculas empaquetadas— falla por completo. "
-"Corregir esas dos deficiencias es lo que hacen las EOS cúbicas.")
+<p>Una ecuación de estado (EOS, por <i>Equation of State</i>) es una relación
+matemática que vincula las tres variables que describen el estado de un fluido:
+la presión (P), el volumen molar (V) y la temperatura (T). Conocidas dos de
+ellas, la EOS entrega la tercera, y a partir de ella todas las propiedades
+termodinámicas derivadas.</p>
+<p>El objetivo práctico es responder: a estas condiciones de presión y
+temperatura, ¿mi mezcla de hidrocarburos es líquido, gas o coexisten ambas
+fases? Todo eso se deriva de una buena ecuación de estado.</p>
+<p>El punto de partida es el gas ideal, la ecuación de estado más simple:</p>
+""" + _eq(r"P\,V = R\,T") + """
+<p>donde R es la constante universal de los gases. El motor de ThermoPhase
+trabaja internamente en unidades de campo, por lo que emplea el valor
+R = 10.7316 psi·ft³/(lb-mol·°R).</p>
+<p>El gas ideal supone dos cosas que la realidad no cumple:</p>
+<ul>
+<li>que las moléculas no ocupan volumen propio (se tratan como puntos), y</li>
+<li>que no ejercen fuerzas entre sí (ni se atraen ni se repelen).</li>
+</ul>
+<p>A bajas presiones y altas temperaturas esa idealización es razonable, porque
+las moléculas están muy separadas y su tamaño e interacciones son
+despreciables. Pero en un yacimiento (altas presiones, moléculas muy
+empaquetadas) ambas suposiciones fallan por completo. Corregir esas dos
+deficiencias es exactamente lo que hacen las ecuaciones de estado cúbicas, y
+por eso son la herramienta central de este programa.</p>
+"""
 
 S1_2 = """
 <h2>1.2 Del gas ideal a los fluidos reales</h2>
-<p>Se introducen dos correcciones sobre el gas ideal, cada una atacando una de
-las suposiciones falsas:</p>
-<h3>Corrección por volumen propio (repulsión)</h3>
-<p>Las moléculas <b>sí ocupan espacio</b>. El volumen disponible no es V, sino
-V menos un volumen mínimo que ocupan las propias moléculas: el
-<b>covolumen</b> <span class="var">b</span>. El término repulsivo pasa a:</p>
-""" + _eq("P<sub>rep</sub> = R&middot;T / (V &minus; b)") + """
-<p>Cuando V se acerca a b, la presión se dispara al infinito: es imposible
-comprimir el fluido más allá del volumen de sus moléculas. Ese es el límite
-físico de la fase líquida.</p>
-<h3>Corrección por fuerzas atractivas</h3>
-<p>Las moléculas <b>se atraen</b> (fuerzas de dispersión). Esa atracción
-<b>reduce</b> la presión respecto de un gas ideal, por lo que se resta un
-término:</p>
-""" + _eq("P = R&middot;T / (V &minus; b) &minus; (término atractivo)") + """
-""" + _fis("Una molécula a punto de golpear la pared es 'frenada' por la "
-"atracción de las que quedan atrás; ese tirón hacia adentro baja la presión. "
-"El término atractivo es la traducción matemática de ese tirón, y es lo que "
-"hace posible que exista fase líquida: sin atracción, nada mantendría unidas "
-"a las moléculas.")
+<p>Para acercar el modelo a la realidad se introducen dos correcciones sobre la
+ecuación del gas ideal, cada una atacando una de las suposiciones falsas.</p>
+<h3>Corrección por volumen propio (corrección por repulsión)</h3>
+<p>Las moléculas sí ocupan espacio. Por lo tanto, el volumen realmente
+disponible para que se muevan no es V, sino V menos un volumen mínimo que
+ocupan las propias moléculas. A ese volumen excluido se le llama covolumen (b),
+y el término de presión se corrige reemplazando V por (V menos b):</p>
+""" + _eq(r"P_{\mathrm{rep}} = \frac{R\,T}{V - b}") + """
+<p>Cuando V se aproxima a b, el denominador tiende a cero y la presión se
+dispara hacia el infinito. Físicamente esto expresa que es imposible comprimir
+el fluido más allá del volumen que ocupan sus propias moléculas: ese es el
+límite duro de la fase líquida. Se le llama repulsión porque, a distancias muy
+cortas, las nubes electrónicas de las moléculas se repelen con fuerza y actúan
+como esferas casi rígidas.</p>
+<h3>Corrección por fuerzas atractivas (corrección por atracción)</h3>
+<p>Las moléculas también se atraen entre sí mediante fuerzas de atracción
+intermolecular. Esa atracción tiende a juntarlas y, en consecuencia, reduce la
+presión que ejercen sobre las paredes del recipiente respecto de la que
+ejercería un gas ideal. Por eso al término repulsivo se le resta un término
+atractivo:</p>
+""" + _eq(r"P = \frac{R\,T}{V - b}\; -\; \left(\text{término atractivo}\right)") + """
+<p>Una forma intuitiva de verlo: una molécula que está a punto de golpear la
+pared del recipiente es frenada por la atracción de las moléculas que quedan
+detrás de ella. Ese tirón hacia adentro disminuye la fuerza del impacto y, por
+lo tanto, la presión medida. El término atractivo es la traducción matemática
+de ese tirón, y es lo que hace posible que exista una fase líquida: sin
+atracción, nada mantendría a las moléculas unidas.</p>
+"""
 
 S1_3 = """
 <h2>1.3 El término de repulsión y el covolumen b</h2>
-<p>El covolumen <span class="var">b</span> es el volumen molar mínimo al que se
-puede comprimir la sustancia. Se calcula de las propiedades <b>críticas</b>,
-donde la EOS debe cumplir una condición geométrica exacta (sección 2.1):</p>
-""" + _eq("b = &Omega;<sub>b</sub> &middot; R&middot;T<sub>c</sub> / P<sub>c</sub>") + """
-<p><span class="var">&Omega;<sub>b</sub></span> es una constante que depende de
-la ecuación (PR o SRK).</p>
-""" + _nota("b depende sólo de las propiedades críticas del componente, no de "
-"la temperatura de operación: es una constante para cada sustancia.")
+<p>El covolumen b representa el volumen molar mínimo al que se puede comprimir
+una sustancia; es, en esencia, el espacio que las propias moléculas ocupan y
+del que ningún otro cuerpo puede disponer. Su papel en la ecuación es doble:
+por un lado impone el límite físico de compresibilidad (la presión diverge
+cuando V tiende a b), y por otro fija la escala de la rama líquida de la
+isoterma, es decir, qué tan denso puede llegar a ser el fluido.</p>
+<p>El valor de b no se ajusta empíricamente, sino que se deduce imponiendo que
+la ecuación reproduzca de forma exacta el punto crítico de la sustancia (esta
+condición geométrica se detalla en la sección de propiedades críticas). El
+resultado es que b queda determinado por la temperatura y la presión críticas
+del componente:</p>
+""" + _eq(r"b = \Omega_b\;\frac{R\,T_c}{P_c}") + """
+<p>donde el número adimensional Ω_b depende únicamente de la forma de la
+ecuación elegida (toma un valor para Peng-Robinson y otro para SRK). Conviene
+resaltar una consecuencia importante: b depende sólo de las propiedades
+críticas del componente y no de la temperatura de operación. Es, por lo tanto,
+una constante para cada sustancia, que ThermoPhase calcula una sola vez a
+partir de la base de datos de propiedades.</p>
+<p>Cuando se trabaja con una mezcla y no con un componente puro, el covolumen
+de la mezcla se obtiene sumando linealmente los aportes de cada componente,
+ponderados por su fracción molar. Ésta es la regla de mezclado que el programa
+aplica en la función que evalúa b_m:</p>
+""" + _eq(r"b_m = \sum_{i} z_i\, b_i") + """
+<p>La linealidad tiene sentido físico directo: el volumen que ocupan las
+moléculas de una mezcla es simplemente la suma de los volúmenes que ocupa cada
+especie, sin efectos cruzados apreciables. Esto contrasta con el término de
+atracción, que sí requiere una regla más elaborada porque involucra
+interacciones entre pares de moléculas distintas.</p>
+"""
 
 S1_4 = """
-<h2>1.4 El término de atracción a y la función &alpha;(T)</h2>
-<p>El término de atracción es el corazón de una EOS cúbica. Se escribe como el
-producto de dos factores:</p>
-""" + _eq("a(T) = a<sub>c</sub> &middot; &alpha;(T)") + """
-<p><b>El factor a<sub>c</sub></b> fija la <i>magnitud</i> de la atracción y se
-obtiene de las críticas:</p>
-""" + _eq("a<sub>c</sub> = &Omega;<sub>a</sub> &middot; "
-"R&sup2;&middot;T<sub>c</sub>&sup2; / P<sub>c</sub>") + """
-<p><b>La función &alpha;(T)</b> introduce la <i>dependencia con la
-temperatura</i>. Vale 1 en el punto crítico y crece al bajar T:</p>
-""" + _eq("&alpha;(T) = [ 1 + m&middot;( 1 &minus; "
-"&radic;(T/T<sub>c</sub>) ) ]&sup2;") + """
-<p>El coeficiente <span class="var">m</span> es función del factor acéntrico
-&omega; (sección 2.3) y difiere entre PR y SRK.</p>
-""" + _fis("Al enfriar un fluido las moléculas se mueven más despacio y pasan "
-"más tiempo 'sintiéndose' mutuamente: la atracción efectiva aumenta. "
-"&alpha;(T) captura eso. En el punto crítico (&alpha; = 1) líquido y gas son "
-"indistinguibles; por debajo, la atracción crece lo suficiente para permitir "
-"la condensación. Sin la dependencia con T, la EOS no reproduciría las "
-"presiones de vapor.")
+<h2>1.4 El término de atracción a y la función α(T)</h2>
+<p>El término de atracción es el corazón de una ecuación de estado cúbica y el
+que más influye en la calidad de las predicciones de equilibrio. Se construye
+como el producto de dos factores, uno que fija su magnitud y otro que introduce
+la dependencia con la temperatura:</p>
+""" + _eq(r"a(T) = a_c\;\alpha(T)") + """
+<p>El primer factor, a_c, establece cuán intensa es la atracción de la
+sustancia y, al igual que el covolumen, se obtiene de las condiciones críticas
+imponiendo que la isoterma tenga en el punto crítico su inflexión característica:</p>
+""" + _eq(r"a_c = \Omega_a\;\frac{R^{2}\,T_c^{\,2}}{P_c}") + """
+<p>El segundo factor, α(T), es una función adimensional de la temperatura que
+vale exactamente 1 en el punto crítico y crece a medida que la temperatura
+disminuye. Su forma, propuesta por Soave y adoptada también por Peng-Robinson,
+es:</p>
+""" + _eq(r"\alpha(T) = \left[\,1 + m\left(1 - \sqrt{\tfrac{T}{T_c}}\,\right)\right]^{2}") + """
+<p>El coeficiente m es una función del factor acéntrico ω (se detalla más
+adelante) y toma expresiones distintas para Peng-Robinson y para SRK. Es el
+parámetro que ajusta cuán rápido crece la atracción al enfriar el fluido.</p>
+<p>El sentido físico de que la atracción dependa de la temperatura es el
+siguiente: al enfriar un fluido, las moléculas se mueven más lentamente y pasan
+más tiempo cerca unas de otras, de modo que la atracción efectiva entre ellas
+aumenta. La función α(T) captura ese efecto. En el punto crítico (α igual a 1)
+la agitación térmica es tan alta que la distinción entre líquido y gas
+desaparece; por debajo de él, la atracción crece lo suficiente como para
+permitir que el fluido condense. Sin esta dependencia con la temperatura, la
+ecuación no podría reproducir correctamente las presiones de vapor de los
+componentes, que son precisamente el dato que ancla todo el equilibrio de
+fases.</p>
+<p>En una mezcla, la magnitud de la atracción se obtiene con la regla de
+mezclado cuadrática, que suma las interacciones entre todos los pares de
+moléculas. ThermoPhase evalúa a_m con esta expresión cada vez que necesita las
+propiedades de una fase:</p>
+""" + _eq(r"a_m = \sum_{i}\sum_{j} z_i\,z_j\,\sqrt{a_i\,a_j}\,\left(1 - k_{ij}\right)") + """
+<p>donde el factor (1 menos k_ij) corrige la atracción entre moléculas de
+especies distintas. Esta regla y el significado de los coeficientes k_ij se
+desarrollan en la sección de parámetros.</p>
+"""
 
 S1_5 = """
 <h2>1.5 La ecuación de Peng-Robinson (PR)</h2>
-<p>Publicada por Peng y Robinson (1976), es hoy la EOS más usada en petróleo y
-gas:</p>
-""" + _eq("P = R&middot;T/(V &minus; b) &minus; "
-"a&middot;&alpha;(T) / [ V(V+b) + b(V &minus; b) ]") + """
-<p>El denominador <span class="var">V(V+b)+b(V&minus;b)</span> es lo que le da
-su buena predicción de <b>densidades de líquido</b>. Sus constantes:</p>
-""" + _eq("&Omega;<sub>a</sub> = 0.45724 &nbsp;&nbsp; "
-"&Omega;<sub>b</sub> = 0.07780") + """
-""" + _eq("m = 0.37464 + 1.54226&middot;&omega; &minus; 0.26992&middot;&omega;&sup2;") + """
-""" + _nota("PR predice muy bien el equilibrio L-V de hidrocarburos y da "
-"densidades de líquido más realistas que SRK; es la opción por defecto en "
-"ThermoPhase.")
+<p>Publicada por Ding-Yu Peng y Donald Robinson en 1976, la ecuación de
+Peng-Robinson es hoy la más utilizada en la industria del petróleo y el gas, y
+es la opción por defecto de ThermoPhase. Su forma completa es:</p>
+""" + _eq(r"P = \frac{R\,T}{V - b} \;-\; \frac{a\,\alpha(T)}{V(V+b) + b(V-b)}") + """
+<p>Lo que distingue a Peng-Robinson de ecuaciones anteriores es el denominador
+del término atractivo. Su estructura fue elegida deliberadamente para mejorar
+la predicción de las densidades de la fase líquida, que en modelos previos
+resultaban poco realistas. Las constantes que la definen son:</p>
+""" + _eq(r"\Omega_a = 0.45724 \qquad \Omega_b = 0.07780") + """
+<p>y el coeficiente m de la función α(T) se calcula a partir del factor
+acéntrico mediante el polinomio ajustado por sus autores:</p>
+""" + _eq(r"m = 0.37464 + 1.54226\,\omega - 0.26992\,\omega^{2}") + """
+<p>La combinación de un buen ajuste del equilibrio líquido-vapor de
+hidrocarburos con densidades de líquido más realistas es la razón por la cual
+Peng-Robinson se ha vuelto el estándar de la industria.</p>
+"""
 
 S1_6 = """
 <h2>1.6 La ecuación de Soave-Redlich-Kwong (SRK)</h2>
-<p>Propuesta por Soave (1972), fue la primera EOS cúbica en reproducir bien las
-presiones de vapor de hidrocarburos:</p>
-""" + _eq("P = R&middot;T/(V &minus; b) &minus; "
-"a&middot;&alpha;(T) / [ V(V + b) ]") + """
-<p>Difiere de PR en el denominador atractivo (aquí <span class="var">V(V+b)"
-</span>) y en las constantes:</p>
-""" + _eq("&Omega;<sub>a</sub> = 0.42748 &nbsp;&nbsp; "
-"&Omega;<sub>b</sub> = 0.08664") + """
-""" + _eq("m = 0.480 + 1.574&middot;&omega; &minus; 0.176&middot;&omega;&sup2;") + """
-""" + _fis("SRK y PR comparten filosofía (repulsión + atracción dependiente de "
-"T); difieren en la forma del denominador atractivo, que cambia cómo se "
-"reparte el volumen. SRK tiende a sobrestimar el volumen de líquido; PR lo "
-"corrige mejor. Ambas dan composiciones de equilibrio muy parecidas.")
+<p>Propuesta por Giorgio Soave en 1972 como mejora de la ecuación de
+Redlich-Kwong de 1949, la ecuación SRK fue la primera EOS cúbica capaz de
+reproducir con buena precisión las presiones de vapor de los hidrocarburos, al
+introducir la función α(T) dependiente del factor acéntrico. Su forma es:</p>
+""" + _eq(r"P = \frac{R\,T}{V - b} \;-\; \frac{a\,\alpha(T)}{V(V+b)}") + """
+<p>La diferencia respecto de Peng-Robinson está en el denominador del término
+atractivo, que aquí es simplemente V(V+b), y en el valor de las constantes:</p>
+""" + _eq(r"\Omega_a = 0.42748 \qquad \Omega_b = 0.08664") + """
+<p>El coeficiente m de SRK tiene su propia correlación con el factor
+acéntrico:</p>
+""" + _eq(r"m = 0.480 + 1.574\,\omega - 0.176\,\omega^{2}") + """
+<p>SRK y Peng-Robinson comparten la misma filosofía (repulsión más atracción
+dependiente de la temperatura) y difieren sólo en la forma del denominador
+atractivo, que cambia la manera en que se reparte el volumen entre las fases.
+En la práctica, SRK tiende a sobrestimar el volumen de la fase líquida,
+mientras que Peng-Robinson lo corrige mejor. Sin embargo, ambas producen
+composiciones de equilibrio muy similares, por lo que la elección entre una y
+otra suele depender de con qué software de referencia se desee comparar.</p>
+"""
 
 S1_7 = """
 <h2>1.7 Forma cúbica en el factor de compresibilidad Z</h2>
-<p>Resolver para el volumen es incómodo; se prefiere el <b>factor de
-compresibilidad</b>:</p>
-""" + _eq("Z = P&middot;V / (R&middot;T)") + """
-<p>que mide el alejamiento del gas ideal (Z = 1). Con dos grupos
-adimensionales</p>
-""" + _eq("A = a&middot;&alpha;&middot;P / (R&middot;T)&sup2; &nbsp;&nbsp; "
-"B = b&middot;P / (R&middot;T)") + """
-<p>la EOS se convierte en un <b>polinomio cúbico</b> en Z. Para PR:</p>
-""" + _eq("Z&sup3; &minus; (1&minus;B)&middot;Z&sup2; + "
-"(A &minus; 3B&sup2; &minus; 2B)&middot;Z &minus; "
-"(A&middot;B &minus; B&sup2; &minus; B&sup3;) = 0") + """
-<p>De ahí el nombre de ecuaciones <b>cúbicas</b>.</p>
-""" + _fis("Un cúbico tiene una o tres raíces reales. Con tres, la <b>mayor</b> "
-"es el vapor (mayor volumen, menor densidad) y la <b>menor</b> el líquido; la "
-"intermedia es inestable y no tiene sentido físico. Que existan tres raíces "
-"es la señal matemática de que el fluido puede separarse en dos fases.")
+<p>Resolver la ecuación de estado directamente para el volumen es incómodo. Es
+mucho más práctico trabajar con el factor de compresibilidad, que es una medida
+adimensional de cuánto se aleja el fluido del comportamiento ideal:</p>
+""" + _eq(r"Z = \frac{P\,V}{R\,T}") + """
+<p>Un gas ideal tiene Z igual a 1; un líquido comprimido tiene Z pequeño, y un
+gas real a alta presión puede tener Z mayor o menor que 1 según dominen la
+repulsión o la atracción. Para reescribir la ecuación en términos de Z se
+definen dos grupos adimensionales que concentran toda la información de la
+sustancia y del estado:</p>
+""" + _eq(r"A = \frac{a\,\alpha\,P}{(R\,T)^{2}} \qquad B = \frac{b\,P}{R\,T}") + """
+<p>Sustituyendo, la ecuación de estado se transforma en un polinomio de tercer
+grado en Z. Para Peng-Robinson toma la forma:</p>
+""" + _eq(r"Z^{3} - (1-B)\,Z^{2} + \left(A - 3B^{2} - 2B\right)Z - \left(AB - B^{2} - B^{3}\right) = 0") + """
+<p>De aquí proviene el nombre de ecuaciones cúbicas: siempre conducen a un
+polinomio de tercer grado, que ThermoPhase resuelve de forma analítica (no
+iterativa) mediante las funciones internas de solución del cúbico, una para
+Peng-Robinson y otra para SRK.</p>
+<p>Un polinomio cúbico puede tener una o tres raíces reales. Cuando hay tres,
+la raíz mayor corresponde a la fase vapor (mayor volumen, menor densidad) y la
+raíz menor a la fase líquida (menor volumen, mayor densidad); la raíz
+intermedia carece de significado físico porque corresponde a una región
+mecánicamente inestable. Que aparezcan tres raíces reales es precisamente la
+señal matemática de que, a esas condiciones, el fluido puede separarse en dos
+fases. Cómo se elige entre ellas se trata en la subsección siguiente.</p>
+"""
 
 S1_8 = """
-<h2>1.8 Selección de la raíz (líquido vs vapor)</h2>
-<p>Con tres raíces reales, ThermoPhase elige según el rol de la fase:</p>
-<ul>
-<li>Para el <b>vapor</b>, la raíz <b>mayor</b> (Z<sub>V</sub>).</li>
-<li>Para el <b>líquido</b>, la raíz <b>menor</b> (Z<sub>L</sub>).</li>
-</ul>
-<p>Con una sola raíz real, esa es la solución; la fase se clasifica por su
-volumen o por el criterio de mínima energía de Gibbs.</p>
-""" + _nota("Un error clásico —corregido en ThermoPhase— es usar la raíz "
-"equivocada al trazar la envolvente: si en la rama de burbuja se toma la raíz "
-"de vapor, la curva no cierra. La selección debe ser coherente con la EOS "
-"activa (PR o SRK).")
+<h2>1.8 Selección de la raíz por energía de Gibbs</h2>
+<p>Cuando el polinomio cúbico entrega tres raíces reales, hay que decidir cuál
+usar. El criterio físico correcto es siempre el mismo: de las raíces
+candidatas, la fase real es la que tiene menor energía libre de Gibbs, porque
+un sistema a temperatura y presión fijas evoluciona espontáneamente hacia el
+estado de mínima energía de Gibbs.</p>
+<p>Para una fase de composición dada, a la misma presión y temperatura, la
+energía de Gibbs molar adimensional se puede expresar a través de los
+coeficientes de fugacidad. Comparar dos raíces (por ejemplo la de vapor y la de
+líquido de un mismo fluido) equivale a comparar la cantidad:</p>
+""" + _eq(r"\frac{g}{R\,T} = \sum_{i} x_i \,\ln\!\left(\phi_i\, x_i\, P\right)") + """
+<p>Como la composición, la presión y la temperatura son idénticas para ambas
+raíces, la comparación se reduce a evaluar cuál raíz produce el menor valor de
+la suma de x_i por el logaritmo de su coeficiente de fugacidad. La raíz que
+minimiza esa suma es la estable, y es la que debe emplearse.</p>
+<p>En la práctica, cuando ThermoPhase sabe de antemano el rol de la fase, aplica
+directamente la consecuencia de este criterio: para las propiedades del vapor
+utiliza la raíz mayor del cúbico (Z_V), y para el líquido la raíz menor (Z_L),
+porque en cada caso ésa es la raíz que minimiza la energía de Gibbs de esa
+fase. El criterio de mínima energía de Gibbs se vuelve indispensable en las
+situaciones ambiguas: cuando existe una sola raíz real, o cuando se debe
+clasificar un fluido monofásico como líquido o como vapor, el programa evalúa y
+compara la energía de Gibbs de las raíces disponibles y se queda con la de
+menor valor.</p>
+<p>El sentido físico es transparente. La energía de Gibbs se puede imaginar
+como un paisaje de valles a P y T fijas; el estado de equilibrio es el fondo
+del valle más profundo. Cada raíz del cúbico es un estado candidato, y la
+naturaleza siempre escoge el de menor energía. Elegir la raíz por este criterio
+es, por lo tanto, dejar que sea la termodinámica y no una regla arbitraria la
+que decida qué fase es la real.</p>
+"""
 
 S1_9 = """
-<h2>1.9 Las cuatro variantes: PR/SRK &times; HYSYS/PVTsim</h2>
-<p>ThermoPhase implementa <b>cuatro</b> EOS, combinando las dos ecuaciones con
-dos <b>conjuntos de parámetros</b> según el simulador de referencia:</p>
+<h2>1.9 Las cuatro variantes PR/SRK con parámetros HYSYS/PVTsim</h2>
+<p>ThermoPhase implementa cuatro ecuaciones de estado seleccionables, que
+surgen de combinar las dos formas cúbicas con dos conjuntos de parámetros,
+según el simulador comercial que se tome como referencia para la validación:</p>
 <ul>
-<li><b>Peng-Robinson (HYSYS)</b></li>
-<li><b>SRK (HYSYS)</b></li>
-<li><b>Peng-Robinson (PVTsim)</b></li>
-<li><b>SRK (PVTsim)</b></li>
+<li>Peng-Robinson con parámetros HYSYS</li>
+<li>SRK con parámetros HYSYS</li>
+<li>Peng-Robinson con parámetros PVTsim</li>
+<li>SRK con parámetros PVTsim</li>
 </ul>
-<p>La <i>forma</i> de la ecuación es la misma dentro de cada familia; lo que
-cambia entre HYSYS y PVTsim son las propiedades críticas tabuladas, los
-factores acéntricos y sobre todo los k<sub>ij</sub> (sección 2.5).</p>
-""" + _nota("HYSYS usa para SRK un conjunto de factores acéntricos propio "
-"(OMHSRK) distinto del de PR; usar el &omega; de PR en el flash de SRK era un "
-"error. Las Tc y Pc, en cambio, son idénticas entre PR y SRK.")
+<p>Dentro de cada familia (Peng-Robinson o SRK) la forma de la ecuación es la
+misma; lo que cambia entre HYSYS y PVTsim son los valores tabulados de las
+propiedades críticas, los factores acéntricos y, sobre todo, los coeficientes
+de interacción binaria. Estas pequeñas diferencias en los datos de entrada se
+traducen en diferencias apreciables en la envolvente de fases, en especial
+cerca del punto crítico de la mezcla, y por eso poder alternar entre conjuntos
+de parámetros es útil para reproducir fielmente cada simulador de referencia.</p>
+<p>Un detalle que ThermoPhase respeta cuidadosamente es que HYSYS emplea para
+SRK un conjunto de factores acéntricos propio, distinto del que usa para
+Peng-Robinson, mientras que las temperaturas y presiones críticas son idénticas
+entre ambas. El programa enruta cada conjunto de factores acéntricos a la
+ecuación que corresponde, de modo que el flash de SRK usa los factores
+acéntricos de SRK y no los de Peng-Robinson.</p>
+"""
 
 
-# ── SECCIÓN 2 ────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════
+#  SECCIÓN 2 — Parámetros de la EOS
+# ═════════════════════════════════════════════════════════════════════
 S2_1 = """
-<h2>2.1 Propiedades críticas (T<sub>c</sub>, P<sub>c</sub>)</h2>
-<p>El <b>punto crítico</b> es el par (T<sub>c</sub>, P<sub>c</sub>) por encima
-del cual desaparece la distinción entre líquido y gas: por más que se comprima,
-no condensa. Es la piedra angular de toda EOS cúbica, porque a y b se calibran
-para reproducirlo exactamente.</p>
-<p>En el punto crítico la isoterma tiene un <b>punto de inflexión con tangente
-horizontal</b>:</p>
-""" + _eq("(&part;P/&part;V)<sub>T</sub> = 0 &nbsp;y&nbsp; "
-"(&part;&sup2;P/&part;V&sup2;)<sub>T</sub> = 0 &nbsp; en el crítico") + """
-<p>Imponer esas dos condiciones fija los valores de &Omega;<sub>a</sub> y
-&Omega;<sub>b</sub> (secciones 1.5 y 1.6).</p>
-""" + _fis("Esas derivadas nulas significan que la isoterma es localmente "
-"plana en el crítico: comprimir no cambia la presión. Líquido y vapor se han "
-"vuelto idénticos, y por eso la 'campana' de dos fases se cierra justo ahí "
-"(es la isoterma del ícono de la barra de herramientas).")
+<h2>2.1 Propiedades críticas (Tc, Pc)</h2>
+<p>El punto crítico de una sustancia es el par de temperatura y presión
+(Tc, Pc) por encima del cual desaparece la distinción entre líquido y gas: por
+más que se comprima el fluido, ya no condensa. Es la piedra angular de toda
+ecuación de estado cúbica, porque los parámetros a y b se calibran justamente
+para que la ecuación reproduzca ese punto de manera exacta.</p>
+<p>Matemáticamente, en el punto crítico la isoterma presenta un punto de
+inflexión con tangente horizontal en el diagrama presión-volumen. Es decir, la
+primera y la segunda derivada de la presión respecto del volumen se anulan
+simultáneamente:</p>
+""" + _eq(r"\left(\frac{\partial P}{\partial V}\right)_{T} = 0 \qquad \left(\frac{\partial^{2} P}{\partial V^{2}}\right)_{T} = 0") + """
+<p>Imponer estas dos condiciones a la ecuación de estado es lo que fija los
+valores numéricos de Ω_a y Ω_b vistos en las secciones anteriores, y lo que
+liga a_c y b directamente a Tc y Pc. En otras palabras, las propiedades
+críticas no son un dato accesorio: son las que determinan por completo los
+parámetros de la ecuación para cada sustancia.</p>
+<p>El sentido físico de que ambas derivadas se anulen es que, en el punto
+crítico, la isoterma se vuelve localmente plana: comprimir el fluido no cambia
+su presión. Líquido y vapor han igualado su densidad y todas sus propiedades, y
+se han vuelto indistinguibles. Por eso la campana de dos fases se cierra
+exactamente en ese punto, que es también el vértice de la isoterma que aparece
+en el ícono de la barra de herramientas del programa.</p>
+"""
 
 S2_2 = """
-<h2>2.2 El factor acéntrico &omega;</h2>
-<p>Dos sustancias con parecidas Tc y Pc pueden comportarse distinto porque sus
-moléculas tienen <b>formas</b> diferentes. El <b>factor acéntrico</b>
-<span class="var">&omega;</span> (Pitzer) mide cuánto se aleja una molécula de
-ser esférica (argón: &omega; &asymp; 0). Se define con la presión de vapor a
-T/T<sub>c</sub> = 0.7:</p>
-""" + _eq("&omega; = &minus;log<sub>10</sub>( P<sub>vap</sub>/P<sub>c</sub> ) "
-"&minus; 1 &nbsp; en T/T<sub>c</sub> = 0.7") + """
-<p>Cadenas más largas de hidrocarburos tienen mayor &omega;: metano &asymp; "
-"0.011, nonano &gt; 0.44.</p>
-""" + _fis("&omega; es el 'tercer parámetro' que corrige la forma molecular. "
-"Entra en la EOS por el coeficiente m de &alpha;(T): moléculas más acéntricas "
-"tienen una atracción que varía más con la temperatura. Sin &omega;, todas "
-"las sustancias con iguales Tc y Pc se comportarían igual, lo cual es falso.")
+<h2>2.2 El factor acéntrico ω</h2>
+<p>Dos sustancias pueden tener temperaturas y presiones críticas parecidas y,
+sin embargo, comportarse de manera distinta, porque sus moléculas tienen formas
+diferentes. El factor acéntrico ω, introducido por Pitzer, cuantifica cuánto se
+aleja una molécula de ser una esfera perfecta. Una molécula esférica y simple
+como el argón tiene un factor acéntrico cercano a cero, mientras que las
+cadenas largas de hidrocarburos tienen valores crecientes.</p>
+<p>Se define a partir de la presión de vapor de la sustancia evaluada a una
+temperatura reducida de 0.7, comparada con su presión crítica:</p>
+""" + _eq(r"\omega = -\log_{10}\!\left(\frac{P_{\mathrm{vap}}}{P_c}\right)_{T/T_c = 0.7} - 1") + """
+<p>El valor 0.7 no es casual: a esa temperatura reducida, las sustancias
+esféricas simples tienen una presión de vapor reducida de aproximadamente 0.1,
+lo que hace que su factor acéntrico sea cero por construcción. Cualquier
+desviación de ese comportamiento (moléculas más alargadas o complejas) produce
+un factor acéntrico positivo. A modo de referencia, el metano tiene ω cercano a
+0.011 y el nonano supera 0.44.</p>
+<p>El factor acéntrico es el tercer parámetro que corrige el efecto de la forma
+molecular, y entra en la ecuación de estado a través del coeficiente m de la
+función α(T): las moléculas más acéntricas tienen una atracción que varía más
+fuertemente con la temperatura. Sin este parámetro, todas las sustancias con
+iguales Tc y Pc se comportarían de manera idéntica, lo cual contradice la
+experiencia.</p>
+"""
 
 S2_3 = """
-<h2>2.3 El coeficiente m y la función &alpha;(T)</h2>
-<p>La dependencia de la atracción con T se concentra en &alpha;(T), vía un
-coeficiente m función del factor acéntrico. Cada EOS tiene su correlación:</p>
-""" + _eq("PR:&nbsp; m = 0.37464 + 1.54226&middot;&omega; &minus; "
-"0.26992&middot;&omega;&sup2;") + """
-""" + _eq("SRK: m = 0.480 + 1.574&middot;&omega; &minus; "
-"0.176&middot;&omega;&sup2;") + """
-<p>Fueron ajustadas por sus autores para reproducir presiones de vapor de
-hidrocarburos. Es el eslabón que conecta un dato macroscópico y medible
-(&omega;) con el término de atracción.</p>
-""" + _nota("El manual de Aspen especifica para SRK 0.480 + 1.574&middot;&omega; "
-"&minus; 0.176&middot;&omega;&sup2;. Es un punto a vigilar: versiones antiguas "
-"usaban 1.574 como constante fija.")
+<h2>2.3 El coeficiente m y la función α(T)</h2>
+<p>Como se anticipó, la dependencia de la atracción con la temperatura se
+concentra en la función α(T), y ésta depende de un coeficiente m que a su vez es
+función del factor acéntrico. Cada forma cúbica tiene su propia correlación,
+ajustada por sus autores para reproducir las presiones de vapor de una serie de
+hidrocarburos.</p>
+<p>Para Peng-Robinson:</p>
+""" + _eq(r"m = 0.37464 + 1.54226\,\omega - 0.26992\,\omega^{2}") + """
+<p>Para SRK:</p>
+""" + _eq(r"m = 0.480 + 1.574\,\omega - 0.176\,\omega^{2}") + """
+<p>Este coeficiente es, por lo tanto, el eslabón que conecta un dato
+macroscópico y fácil de tabular (el factor acéntrico) con el comportamiento
+microscópico del término de atracción. Un m mayor implica una α(T) que crece más
+rápido al enfriar, es decir, una atracción que se refuerza más al bajar la
+temperatura, lo cual es propio de las moléculas más pesadas y alargadas.</p>
+"""
 
 S2_4 = """
-<h2>2.4 Reglas de mezclado (mixing rules)</h2>
-<p>Lo anterior describe un componente <b>puro</b>. Un fluido de yacimiento es
-una <b>mezcla</b> (13 componentes en ThermoPhase). ¿Qué a y b usar? Las
-<b>reglas de mezclado</b>. Para el covolumen, lineal:</p>
-""" + _eq("b<sub>m</sub> = &Sigma;<sub>i</sub> z<sub>i</sub> &middot; b<sub>i</sub>") + """
-<p>Para la atracción, la <b>regla cuadrática</b> (interacciones por pares):</p>
-""" + _eq("a<sub>m</sub> = &Sigma;<sub>i</sub> &Sigma;<sub>j</sub> "
-"z<sub>i</sub> z<sub>j</sub> &radic;(a<sub>i</sub> a<sub>j</sub>) &middot; "
-"(1 &minus; k<sub>ij</sub>)") + """
-""" + _fis("La atracción entre dos moléculas <i>distintas</i> no es exactamente "
-"la media geométrica de sus atracciones: (1 &minus; k<sub>ij</sub>) es la "
-"corrección. Un k<sub>ij</sub> positivo reduce la atracción cruzada (las "
-"moléculas 'se llevan peor' de lo esperado), típico entre parejas dispares "
-"como CO&sub2; y un hidrocarburo.")
+<h2>2.4 Reglas de mezclado</h2>
+<p>Todo lo anterior describe un componente puro. Pero un fluido de yacimiento es
+una mezcla de muchos componentes (ThermoPhase trabaja con trece). Surge entonces
+la pregunta de qué valores de a y de b usar para la mezcla, y la respuesta son
+las reglas de mezclado.</p>
+<p>Para el covolumen, la regla es lineal, porque el volumen ocupado por las
+moléculas de la mezcla es simplemente la suma de los volúmenes de cada especie:</p>
+""" + _eq(r"b_m = \sum_{i} z_i\, b_i") + """
+<p>Para el término de atracción se emplea una regla cuadrática, que considera
+las interacciones entre todos los pares de moléculas i y j, incluidos los pares
+mixtos:</p>
+""" + _eq(r"a_m = \sum_{i}\sum_{j} z_i\,z_j\,\sqrt{a_i\,a_j}\,\left(1 - k_{ij}\right)") + """
+<p>La raíz del producto de a_i por a_j es la media geométrica, que estima la
+atracción entre dos moléculas distintas a partir de las atracciones de cada una.
+El sentido físico del factor (1 menos k_ij) es que esa media geométrica no es
+exacta: la atracción real entre moléculas de especies diferentes puede ser algo
+menor o mayor que el promedio, y el coeficiente k_ij corrige esa desviación. Un
+k_ij positivo reduce la atracción cruzada, es decir, indica que las dos especies
+se llevan peor de lo que sugeriría la media geométrica, situación típica entre
+parejas químicamente dispares como el dióxido de carbono y un hidrocarburo.</p>
+"""
 
 S2_5 = """
-<h2>2.5 Coeficientes de interacción binaria k<sub>ij</sub></h2>
-<p>Los <span class="var">k<sub>ij</sub></span> forman una <b>matriz
-simétrica</b> (k<sub>ij</sub> = k<sub>ji</sub>, k<sub>ii</sub> = 0). Aunque
-pequeños, tienen un efecto desproporcionado sobre la envolvente cerca del punto
-crítico. Su magnitud sigue un patrón físico:</p>
+<h2>2.5 Coeficientes de interacción binaria kij</h2>
+<p>Los coeficientes de interacción binaria k_ij forman una matriz simétrica: el
+coeficiente entre i y j es igual al que hay entre j e i, y el de un componente
+consigo mismo es cero. Aunque suelen ser números pequeños, tienen un efecto
+desproporcionado sobre la forma de la envolvente de fases, sobre todo en las
+cercanías del punto crítico de la mezcla, donde pequeños cambios en la atracción
+cruzada desplazan de manera notable las curvas de burbuja y de rocío.</p>
+<p>Su magnitud sigue un patrón físico claro:</p>
 <ul>
-<li><b>HC&ndash;HC:</b> k<sub>ij</sub> &asymp; 0 (moléculas similares, mezcla
-casi ideal; confirmado por Calsep/PVTsim).</li>
-<li><b>CO&sub2;&ndash;HC:</b> &asymp; 0.08&ndash;0.12.</li>
-<li><b>N&sub2;&ndash;HC:</b> intermedios, 0.03&ndash;0.08.</li>
+<li>Entre hidrocarburo e hidrocarburo, k_ij es prácticamente cero, porque son
+moléculas químicamente similares que se mezclan casi de forma ideal.</li>
+<li>Entre dióxido de carbono e hidrocarburo, k_ij ronda 0.08 a 0.12, reflejando
+que el dióxido de carbono interactúa de manera apreciablemente distinta con las
+cadenas de hidrocarburos.</li>
+<li>Entre nitrógeno e hidrocarburo, los valores son intermedios, del orden de
+0.03 a 0.08 según la pareja.</li>
 </ul>
-""" + _nota("Principio de ThermoPhase: <b>no se fabrican datos</b>. Si una tabla "
-"autorizada no está disponible, se deja k<sub>ij</sub> = 0 con respaldo "
-"documental en vez de inventar valores.")
+<p>Un principio de diseño de ThermoPhase es que no se fabrican datos. Cuando una
+tabla autorizada no está disponible en las fuentes accesibles, no se inventan
+valores: se deja el coeficiente en cero con respaldo documental, en lugar de
+rellenarlo con un número arbitrario que degradaría la confiabilidad del
+modelo.</p>
+"""
 
 S2_6 = """
-<h2>2.6 Las tres fuentes de k<sub>ij</sub></h2>
-<p>Se puede elegir el origen de la matriz entre tres opciones:</p>
-<h3>1. HYSYS</h3>
-<p>Valores que replican los de Aspen HYSYS (benchmark histórico).</p>
-<h3>2. PVTsim &ndash; Knapp</h3>
-<p>Basados en Knapp et al. y la convención de Calsep (HC&ndash;HC = 0).</p>
-<h3>3. Chueh-Prausnitz (calculados)</h3>
-<p>Se <b>calculan</b> de los volúmenes críticos de cada par:</p>
-""" + _eq("1 &minus; k<sub>ij</sub> = "
-"[ 2&middot;(V<sub>ci</sub><sup>1/3</sup>&middot;V<sub>cj</sub><sup>1/3</sup>)"
-"<sup>1/2</sup> / (V<sub>ci</sub><sup>1/3</sup> + "
-"V<sub>cj</sub><sup>1/3</sup>) ]<sup>n</sup>") + """
-""" + _fis("Chueh-Prausnitz dice que la 'incompatibilidad' entre dos moléculas "
-"depende sobre todo de la <b>diferencia de tamaños</b> (vía volúmenes "
-"críticos), no de la polaridad. Por eso reproduce muy bien los pares "
-"HC&ndash;HC (k<sub>ij</sub> casi idéntico a HYSYS) pero difiere en pares "
-"como N&sub2;&ndash;C1, donde la química importa.")
+<h2>2.6 Las tres fuentes de kij</h2>
+<p>ThermoPhase permite elegir el origen de la matriz de coeficientes binarios
+entre tres opciones, lo que hace posible comparar y validar contra distintos
+simuladores.</p>
+<h3>Parámetros de HYSYS</h3>
+<p>Valores tabulados que replican los del simulador Aspen HYSYS, que ha sido el
+punto de comparación histórico del proyecto.</p>
+<h3>Parámetros de PVTsim (Knapp)</h3>
+<p>Basados en la recopilación de Knapp y colaboradores y en la convención de
+Calsep, empleada por PVTsim, que fija en cero los pares hidrocarburo con
+hidrocarburo.</p>
+<h3>Correlación de Chueh-Prausnitz (calculados)</h3>
+<p>En lugar de tabularse, estos coeficientes se calculan a partir de los
+volúmenes críticos de cada par de componentes mediante la correlación de
+Chueh-Prausnitz:</p>
+""" + _eq(r"1 - k_{ij} = \left[\frac{2\,\sqrt{\,V_{c,i}^{1/3}\;V_{c,j}^{1/3}}}{V_{c,i}^{1/3} + V_{c,j}^{1/3}}\right]^{\,n}") + """
+<p>La idea física de esta correlación es que la incompatibilidad entre dos
+moléculas depende sobre todo de la diferencia de tamaños, representada por sus
+volúmenes críticos, y no tanto de su naturaleza química. Por eso reproduce muy
+bien los pares de hidrocarburos de tamaños graduales, en los que el coeficiente
+resulta casi idéntico al de HYSYS, pero difiere más en pares como
+nitrógeno con metano, donde la química (y no sólo el tamaño) juega un papel
+importante.</p>
+"""
 
 
-# ── SECCIÓN 3 ────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════
+#  SECCIÓN 3 — El cálculo flash
+# ═════════════════════════════════════════════════════════════════════
 S3_1 = """
 <h2>3.1 El problema del equilibrio de fases</h2>
-<p>El <b>cálculo flash</b> responde: dada una mezcla de composición global
-<span class="var">z</span> a P y T, ¿en cuánto vapor y líquido se separa y cuál
-es la composición de cada fase? Definimos:</p>
+<p>El cálculo flash responde la pregunta central de la termodinámica de fases:
+dada una mezcla de composición global z a una presión y temperatura fijas, ¿en
+cuánto vapor y cuánto líquido se separa, y cuál es la composición de cada
+fase? Para plantearlo se definen las siguientes cantidades:</p>
 <ul>
-<li><span class="var">z<sub>i</sub></span>: fracción molar de i en la
-alimentación.</li>
-<li><span class="var">y<sub>i</sub></span>: fracción de i en el vapor.</li>
-<li><span class="var">x<sub>i</sub></span>: fracción de i en el líquido.</li>
-<li><span class="var">V</span>: fracción de mezcla que resulta vapor (0 a 1).</li>
+<li>z_i, la fracción molar del componente i en la alimentación (lo que entra).</li>
+<li>y_i, la fracción molar de i en la fase vapor.</li>
+<li>x_i, la fracción molar de i en la fase líquida.</li>
+<li>V, la fracción de la mezcla total que resulta vapor, entre 0 y 1.</li>
 </ul>
-<p>La condición que gobierna todo es el <b>equilibrio termodinámico</b>: cada
-componente tiene la misma <b>fugacidad</b> en ambas fases.</p>
-""" + _eq("f<sub>i</sub><sup>V</sup> = f<sub>i</sub><sup>L</sup> "
-"&nbsp; para todo i") + """
-""" + _fis("Si un componente 'prefiere' el vapor, migrará hacia él hasta que ya "
-"no haya ganancia en seguir migrando. Ese punto es la igualdad de fugacidades. "
-"La fugacidad es la 'presión de escape efectiva' de un componente: mide sus "
-"ganas de abandonar la fase en la que está.")
+<p>La condición que gobierna todo el problema es el equilibrio termodinámico: en
+el equilibrio, cada componente tiene la misma fugacidad en ambas fases.</p>
+""" + _eq(r"f_i^{\,V} = f_i^{\,L} \qquad \text{para todo componente } i") + """
+<p>La fugacidad se puede entender como la presión de escape efectiva de un
+componente, es decir, una medida de sus ganas de abandonar la fase en la que se
+encuentra. Si un componente tiene mayor fugacidad en el líquido que en el vapor,
+migrará del líquido al vapor; el proceso continúa hasta que las fugacidades se
+igualan y ya no hay ganancia en seguir migrando. Ese estado de equilibrio, en el
+que las ganas de escapar se han igualado en ambas fases para cada componente, es
+lo que el cálculo flash busca encontrar.</p>
+"""
 
 S3_2 = """
 <h2>3.2 Fugacidad y coeficiente de fugacidad</h2>
-<p>La <b>fugacidad</b> es una presión corregida que mide el potencial químico.
-Se usa el <b>coeficiente de fugacidad</b> &phi;<sub>i</sub>, que la compara con
-la de un gas ideal:</p>
-""" + _eq("f<sub>i</sub> = &phi;<sub>i</sub> &middot; y<sub>i</sub> &middot; P") + """
-<p>&phi;<sub>i</sub> es lo que aporta la <b>EOS</b>: tiene forma cerrada en
-función de A, B, Z y de los k<sub>ij</sub>. La condición de equilibrio se
-vuelve:</p>
-""" + _eq("&phi;<sub>i</sub><sup>V</sup> y<sub>i</sub> P = "
-"&phi;<sub>i</sub><sup>L</sup> x<sub>i</sub> P") + """
-""" + _fis("La EOS traduce 'P, T y composición' en 'ganas de escapar' (&phi;) de "
-"cada componente en cada fase. El trabajo pesado de un flash es calcular estos "
-"coeficientes una y otra vez.")
+<p>Trabajar con la fugacidad en términos absolutos es incómodo, por lo que se
+usa el coeficiente de fugacidad φ_i, que compara la fugacidad real de un
+componente con la que tendría en un gas ideal a la misma presión y composición:</p>
+""" + _eq(r"f_i = \phi_i\; y_i\; P") + """
+<p>El coeficiente de fugacidad es precisamente lo que la ecuación de estado
+permite calcular. Para las ecuaciones cúbicas tiene una forma cerrada que
+depende de los grupos adimensionales A y B, de la raíz Z de la fase, de la
+composición y de los coeficientes de interacción binaria. Para Peng-Robinson,
+la expresión que ThermoPhase evalúa (de forma vectorizada para los trece
+componentes a la vez) es:</p>
+""" + _eq(r"\ln\phi_i = \frac{b_i}{b_m}\,(Z-1) - \ln(Z-B) - \frac{A}{2\sqrt{2}\,B}\left(\frac{2\sum_j z_j a_{ij}}{a_m} - \frac{b_i}{b_m}\right)\ln\!\left[\frac{Z+(1+\sqrt{2})B}{Z+(1-\sqrt{2})B}\right]") + """
+<p>Cada término tiene un significado: el primero recoge el efecto del tamaño
+relativo de la molécula (a través de la relación entre su covolumen y el de la
+mezcla), el segundo proviene de la corrección por volumen excluido (la
+repulsión), y el tercero, el más elaborado, condensa toda la contribución de la
+atracción y de las interacciones cruzadas. La condición de equilibrio de
+fugacidades se escribe entonces en términos de los coeficientes de fugacidad de
+cada fase:</p>
+""" + _eq(r"\phi_i^{\,V}\, y_i\, P = \phi_i^{\,L}\, x_i\, P") + """
+<p>Aquí se ve por qué la ecuación de estado es imprescindible: es la que
+traduce presión, temperatura y composición en las ganas de escapar de cada
+componente en cada fase. El grueso del trabajo de cómputo de un flash consiste
+en evaluar estos coeficientes de fugacidad una y otra vez.</p>
+"""
 
 S3_3 = """
 <h2>3.3 La constante de equilibrio K</h2>
-<p>De la igualdad de fugacidades surge la <b>constante de equilibrio</b>:</p>
-""" + _eq("K<sub>i</sub> = y<sub>i</sub> / x<sub>i</sub> = "
-"&phi;<sub>i</sub><sup>L</sup> / &phi;<sub>i</sub><sup>V</sup>") + """
-<p>K<sub>i</sub> &gt; 1: el componente se concentra en el vapor (ligero, como
-el metano). K<sub>i</sub> &lt; 1: se queda en el líquido (pesado, como el
-nonano).</p>
-""" + _nota("Como los &phi; dependen de x e y, y éstas de los K, el problema es "
-"<b>implícito</b>: hay que iterar. Por eso el flash no es una fórmula directa.")
+<p>De la igualdad de fugacidades surge de forma natural la constante de
+equilibrio, o relación de reparto, que indica cuánto prefiere un componente la
+fase vapor frente a la líquida:</p>
+""" + _eq(r"K_i = \frac{y_i}{x_i} = \frac{\phi_i^{\,L}}{\phi_i^{\,V}}") + """
+<p>Un valor de K_i mayor que 1 significa que el componente se concentra
+preferentemente en el vapor: es un componente ligero y volátil, como el metano.
+Un valor menor que 1 indica que el componente tiende a quedarse en el líquido:
+es un componente pesado, como el nonano.</p>
+<p>Conviene notar que los coeficientes de fugacidad dependen de las
+composiciones x e y, que a su vez dependen de los K. El problema es, por lo
+tanto, implícito: los K definen las composiciones y las composiciones redefinen
+los K. Ésta es la razón por la cual el cálculo del equilibrio no es una fórmula
+directa, sino un proceso iterativo.</p>
+"""
 
 S3_4 = """
 <h2>3.4 Estimación inicial: la correlación de Wilson</h2>
-<p>Toda iteración necesita arranque. Para los K<sub>i</sub> se usa la
-<b>correlación de Wilson</b>, con sólo críticas y factor acéntrico:</p>
-""" + _eq("K<sub>i</sub> &asymp; (P<sub>ci</sub>/P) &middot; "
-"exp[ 5.373&middot;(1 + &omega;<sub>i</sub>)&middot;"
-"(1 &minus; T<sub>ci</sub>/T) ]") + """
-<p>No es exacta, pero pone a cada componente del lado correcto y acelera la
-convergencia del flash riguroso.</p>
-""" + _fis("Wilson es una ley de Raoult corregida por acentricidad. Es la "
-"'brújula' inicial: no da la respuesta final, pero apunta bien para que las "
-"iteraciones con la EOS completa converjan rápido y sin oscilar.")
+<p>Todo procedimiento iterativo necesita un punto de partida. Para los
+coeficientes de reparto K_i, ThermoPhase emplea la correlación de Wilson, que
+entrega una primera aproximación razonable usando únicamente las propiedades
+críticas y el factor acéntrico de cada componente:</p>
+""" + _eq(r"K_i = \frac{P_{c,i}}{P}\,\exp\!\left[\,5.373\,(1 + \omega_i)\left(1 - \frac{T_{c,i}}{T}\right)\right]") + """
+<p>La correlación de Wilson no es exacta, pero coloca a cada componente del lado
+correcto (los ligeros con K mayor que 1 y los pesados con K menor que 1) y
+proporciona un arranque estable. En ThermoPhase, estos valores de Wilson no se
+usan directamente para el flash, sino que sirven como semilla del análisis de
+estabilidad, que es el paso que decide si hay una o dos fases y que refina los
+coeficientes de reparto. Recién los coeficientes que salen del análisis de
+estabilidad se emplean para iniciar el flash propiamente dicho, como se detalla
+en las subsecciones siguientes.</p>
+"""
 
 S3_5 = """
 <h2>3.5 La ecuación de Rachford-Rice</h2>
-<p>Con los K<sub>i</sub> estimados, hay que hallar V. Se parte del balance por
-componente:</p>
-""" + _eq("z<sub>i</sub> = V&middot;y<sub>i</sub> + "
-"(1&minus;V)&middot;x<sub>i</sub>") + """
-<p>Combinando con y<sub>i</sub> = K<sub>i</sub>x<sub>i</sub> y exigiendo que
-cada fase sume 1, se llega a la <b>ecuación de Rachford-Rice</b>:</p>
-""" + _eq("&Sigma;<sub>i</sub> z<sub>i</sub>&middot;(K<sub>i</sub> &minus; 1) / "
-"[ 1 + V&middot;(K<sub>i</sub> &minus; 1) ] = 0") + """
-<p>Una sola ecuación en V, resuelta por bisección o Newton. Es <b>monótona</b>
-en el intervalo físico, así que converge de forma estable.</p>
-""" + _fis("Rachford-Rice es contabilidad: todo lo que entra (z<sub>i</sub>) se "
-"reparte entre vapor y líquido. Su forma garantiza una única solución física "
-"entre burbuja y rocío; fuera de ese rango, V se sale de [0,1] y la mezcla es "
-"monofásica.")
+<p>Una vez que se dispone de un conjunto de coeficientes de reparto K_i, hace
+falta determinar cuánta mezcla se vaporiza, es decir, el valor de V. Se parte
+del balance de materia por componente, que reparte lo que entra entre las dos
+fases:</p>
+""" + _eq(r"z_i = V\,y_i + (1 - V)\,x_i") + """
+<p>Combinando este balance con la definición de los coeficientes de reparto
+(y_i igual a K_i por x_i) y exigiendo que las fracciones molares de cada fase
+sumen 1, se llega a la ecuación de Rachford-Rice, que es una única ecuación en
+la incógnita V:</p>
+""" + _eq(r"\sum_{i} \frac{z_i\,(K_i - 1)}{1 + V\,(K_i - 1)} = 0") + """
+<p>Esta ecuación tiene la ventaja de ser monótona en el intervalo físico de V,
+lo que garantiza una solución única y una convergencia estable. ThermoPhase la
+resuelve numéricamente por el método de Newton acotado al intervalo válido.
+Cuando la solución de V cae dentro del intervalo entre 0 y 1, el sistema es
+bifásico; cuando V se sale de ese intervalo, la mezcla es monofásica. El sentido
+físico de Rachford-Rice es simple contabilidad: todo lo que entra en la
+alimentación debe repartirse exactamente entre el vapor y el líquido.</p>
+"""
 
 S3_6 = """
-<h2>3.6 Análisis de estabilidad: &iquest;una o dos fases?</h2>
-<p>Conviene saber si la mezcla realmente se separa. Es el <b>análisis de
-estabilidad</b> (Michelsen), vía la distancia al <b>plano tangente de
-Gibbs</b> (TPD):</p>
-""" + _eq("TPD(w) = &Sigma;<sub>i</sub> w<sub>i</sub>&middot;"
-"[ ln w<sub>i</sub> + ln &phi;<sub>i</sub>(w) &minus; "
-"ln z<sub>i</sub> &minus; ln &phi;<sub>i</sub>(z) ] &ge; 0 &rArr; estable") + """
-<p>Si alguna composición de prueba w hace TPD &lt; 0, la mezcla es inestable y
-se separará en dos fases.</p>
-""" + _fis("La energía de Gibbs es un paisaje de valles. Una fase es estable si "
-"está en el fondo de su valle y no hay atajo a un valle más profundo "
-"mezclándose de otra manera. El análisis busca ese atajo: si lo halla, "
-"aparece una segunda fase. Es lo que evita reportar 'una fase' cuando hay dos.")
+<h2>3.6 Análisis de estabilidad</h2>
+<p>Antes de resolver el flash es necesario saber si la mezcla realmente se
+separa en dos fases o si permanece como una sola. De esto se encarga el análisis
+de estabilidad, que en ThermoPhase reproduce fielmente el procedimiento
+implementado y validado en la referencia del proyecto. La idea de fondo,
+formalizada por Michelsen, es la del plano tangente a la energía de Gibbs: una
+fase es estable si ninguna fase incipiente de otra composición tiene menor
+energía de Gibbs; si se encuentra una composición de prueba que baja por debajo
+del plano tangente, la mezcla es inestable y se separará.</p>
+<p>El procedimiento concreto que sigue el programa es el siguiente. Se parte de
+dos juegos de coeficientes de reparto, ambos inicializados con la correlación de
+Wilson: uno para ensayar una fase vapor incipiente (K^V) y otro para una fase
+líquida incipiente (K^L). Con ellos se construyen las composiciones normalizadas
+de esas fases de prueba:</p>
+""" + _eq(r"Y_i^{V} = \frac{z_i\,K_i^{V}}{\sum_j z_j\,K_j^{V}} \qquad Y_i^{L} = \frac{z_i / K_i^{L}}{\sum_j z_j / K_j^{L}}") + """
+<p>Para cada fase de prueba y para la alimentación se evalúan las fugacidades
+con la ecuación de estado, seleccionando la raíz de vapor o de líquido según
+corresponda. A partir de la comparación de esas fugacidades se actualizan los
+coeficientes de reparto, con un esquema normalizado por las sumas de cada fase
+incipiente:</p>
+""" + _eq(r"S_V = \sum_i z_i\,K_i^{V} \qquad S_L = \sum_i \frac{z_i}{K_i^{L}}") + """
+<p>La normalización por S_V y S_L es lo que evita que la búsqueda diverja: en un
+sistema monofásico hace que los coeficientes converjan de manera controlada
+hacia la solución trivial, en la que todos los K tienden a 1, en lugar de
+dispararse hacia los límites numéricos. Al terminar la iteración, el programa
+decide la estabilidad con dos criterios. Por un lado, si alguna de las sumas
+S_V o S_L supera la unidad, existe una fase incipiente con menor energía de
+Gibbs y la mezcla es inestable, es decir, bifásica. Por otro, para distinguir la
+solución trivial de una genuina, se evalúa la suma de los logaritmos de los
+coeficientes al cuadrado, considerando sólo los componentes presentes:</p>
+""" + _eq(r"\sum_{i:\,z_i > 0} \left(\ln K_i\right)^{2} < \varepsilon \;\Rightarrow\; \text{solución trivial (fase estable)}") + """
+<p>El punto clave, y lo que caracteriza al procedimiento de ThermoPhase, es qué
+coeficientes de reparto quedan para el flash. Cuando el análisis concluye que la
+mezcla es inestable, los coeficientes que se pasan al flash no son los de
+Wilson, sino el producto de los dos juegos refinados durante la propia búsqueda
+de estabilidad:</p>
+""" + _eq(r"K_i^{\text{flash}} = K_i^{V}\cdot K_i^{L}") + """
+<p>De este modo el flash arranca desde una estimación mucho más cercana a la
+solución que la de Wilson, lo que acelera y estabiliza su convergencia. Si en
+cambio el análisis concluye que la mezcla es estable, no hace falta flash: se
+reporta directamente una sola fase, clasificada como tendiente a vapor o a
+líquido según cuál de las dos búsquedas haya dado la solución trivial.</p>
+"""
 
 S3_7 = """
-<h2>3.7 El algoritmo iterativo completo del flash</h2>
-<p>El flash isotérmico-isobárico (T y P fijas) de ThermoPhase sigue estos
-pasos:</p>
+<h2>3.7 El algoritmo completo del flash</h2>
+<p>Reuniendo todas las piezas, el cálculo de equilibrio a presión y temperatura
+fijas que ejecuta ThermoPhase sigue este orden, que refleja exactamente la
+implementación del programa:</p>
 <ol>
-<li><b>Estimación inicial</b> de K<sub>i</sub> con Wilson (3.4).</li>
-<li><b>Resolver Rachford-Rice</b> (3.5) para V y las composiciones
-x<sub>i</sub>, y<sub>i</sub>.</li>
-<li><b>Calcular fugacidades</b> &phi;<sub>i</sub><sup>V</sup> y
-&phi;<sub>i</sub><sup>L</sup> con la EOS, resolviendo el cúbico en Z y eligiendo
-la raíz correcta de cada fase (1.7&ndash;1.8).</li>
-<li><b>Actualizar K<sub>i</sub></b> = &phi;<sub>i</sub><sup>L</sup>/
-&phi;<sub>i</sub><sup>V</sup> (3.3).</li>
-<li><b>Convergencia</b>: si los K<sub>i</sub> ya no cambian (fugacidades
-iguales en ambas fases), terminar; si no, volver al paso 2.</li>
-<li><b>Clasificar</b>: V en (0,1) &rArr; dos fases; V &rarr; 0 o 1 &rArr;
-monofásico (confirmado con estabilidad, 3.6).</li>
+<li>Se estiman los coeficientes de reparto iniciales con la correlación de
+Wilson, a partir de las propiedades críticas y el factor acéntrico.</li>
+<li>Con esos valores como semilla se ejecuta el análisis de estabilidad, que
+itera sus propios coeficientes de fase vapor y de fase líquida y determina si la
+mezcla es de una o de dos fases.</li>
+<li>Si el análisis concluye que la mezcla es estable, se reporta una sola fase y
+el cálculo termina. Si concluye que es inestable, se construyen los coeficientes
+de reparto para el flash como el producto de los dos juegos refinados en la
+estabilidad.</li>
+<li>Con esos coeficientes se entra al flash. El programa primero aplica dos
+verificaciones rápidas de fase única, que son la forma que toma el balance en
+los extremos:</li>
 </ol>
-""" + _nota("Este esquema de sustitución sucesiva es el que usa ThermoPhase. "
-"Cerca del crítico o en mezclas casi azeotrópicas puede acelerarse o "
-"estabilizarse con métodos adicionales, pero la lógica —igualar fugacidades "
-"iterando— es siempre la misma.") + """
-""" + _fis("Todo el flash es un lazo que ajusta el reparto de componentes hasta "
-"que cada uno tiene las mismas 'ganas de escapar' en líquido y vapor. La EOS "
-"aporta las fugacidades; Rachford-Rice, la contabilidad; Wilson, el arranque; "
-"y la estabilidad, la certeza del número de fases.")
+""" + _eq(r"\sum_i K_i\,z_i \le 1 \;\Rightarrow\; \text{líquido} \qquad \sum_i \frac{z_i}{K_i} \le 1 \;\Rightarrow\; \text{vapor}") + """
+<ol start="5">
+<li>Si ninguna de esas condiciones se cumple, la mezcla es bifásica y se resuelve
+la ecuación de Rachford-Rice para hallar la fracción vaporizada V y, con ella,
+las composiciones x_i e y_i de cada fase.</li>
+<li>Con esas composiciones se recalculan los coeficientes de fugacidad de ambas
+fases mediante la ecuación de estado, resolviendo el polinomio cúbico en Z y
+tomando la raíz correcta para cada fase, y se actualizan los coeficientes de
+reparto con la relación entre los coeficientes de fugacidad del líquido y del
+vapor.</li>
+<li>Se repiten los pasos anteriores hasta que los coeficientes de reparto ya no
+cambian, es decir, hasta que las fugacidades de cada componente coinciden en
+ambas fases dentro de la tolerancia. En ese momento se tiene la solución del
+equilibrio.</li>
+</ol>
+<p>Todo el cálculo es, en el fondo, un lazo que ajusta el reparto de los
+componentes hasta que cada uno tiene las mismas ganas de escapar en el líquido
+y en el vapor. La ecuación de estado aporta las fugacidades; Rachford-Rice
+aporta la contabilidad del reparto; la correlación de Wilson aporta el arranque;
+y el análisis de estabilidad aporta tanto la certeza sobre el número de fases
+como una estimación afinada de los coeficientes con la que el flash converge de
+manera rápida y robusta.</p>
+"""
 
 
 SECCIONES = [
@@ -427,8 +693,8 @@ SECCIONES = [
         ("1.5 Ecuación de Peng-Robinson (PR)", S1_5),
         ("1.6 Ecuación de Soave-Redlich-Kwong (SRK)", S1_6),
         ("1.7 Forma cúbica en Z", S1_7),
-        ("1.8 Selección de la raíz (líquido/vapor)", S1_8),
-        ("1.9 Las cuatro variantes PR/SRK × HYSYS/PVTsim", S1_9),
+        ("1.8 Selección de la raíz por energía de Gibbs", S1_8),
+        ("1.9 Las cuatro variantes PR/SRK", S1_9),
     ]),
     ("2. Parámetros de la ecuación de estado", [
         ("2.1 Propiedades críticas (Tc, Pc)", S2_1),
@@ -448,8 +714,6 @@ SECCIONES = [
         ("3.7 Algoritmo completo del flash", S3_7),
     ]),
 ]
-
-
 import re
 from PyQt6.QtWidgets import (
     QVBoxLayout, QTabWidget, QToolButton, QFrame as _QFrame,
@@ -479,8 +743,8 @@ def _transparent():
 
 
 def _dib_seccion(p):
-    # Carpeta ambar (seccion)
-    p.setPen(QPen(QColor("#9A7A2A"), 1.3)); p.setBrush(QBrush(QColor("#E8C36A")))
+    # Carpeta gris (seccion)
+    p.setPen(QPen(QColor("#6E6E6E"), 1.3)); p.setBrush(QBrush(QColor("#C8C8C8")))
     tab = QPainterPath()
     tab.moveTo(3, 7); tab.lineTo(3, 19); tab.lineTo(21, 19); tab.lineTo(21, 9)
     tab.lineTo(11, 9); tab.lineTo(9, 7); tab.closeSubpath()
@@ -488,15 +752,15 @@ def _dib_seccion(p):
 
 
 def _dib_tema(p):
-    # Pagina con esquina doblada (subseccion)
-    p.setPen(QPen(QColor("#5A5A5A"), 1.3)); p.setBrush(QBrush(QColor("#FFFFFF")))
+    # Pagina gris con esquina doblada (subseccion)
+    p.setPen(QPen(QColor("#6E6E6E"), 1.3)); p.setBrush(QBrush(QColor("#FFFFFF")))
     pg = QPainterPath()
     pg.moveTo(6, 3); pg.lineTo(15, 3); pg.lineTo(19, 7); pg.lineTo(19, 21)
     pg.lineTo(6, 21); pg.closeSubpath()
     p.drawPath(pg)
-    p.setPen(QPen(QColor("#5A5A5A"), 1.1)); p.setBrush(QBrush(_transparent()))
+    p.setPen(QPen(QColor("#6E6E6E"), 1.1)); p.setBrush(QBrush(_transparent()))
     p.drawLine(QPointF(15, 3), QPointF(15, 7)); p.drawLine(QPointF(15, 7), QPointF(19, 7))
-    p.setPen(QPen(QColor("#8AA0C0"), 1.1))
+    p.setPen(QPen(QColor("#9A9A9A"), 1.1))
     p.drawLine(QPointF(8.5, 11), QPointF(16.5, 11))
     p.drawLine(QPointF(8.5, 14), QPointF(16.5, 14))
     p.drawLine(QPointF(8.5, 17), QPointF(13.5, 17))
@@ -539,23 +803,32 @@ class DocTecnica(QWidget):
         # ── Cuerpo: árbol (pestañas) | contenido ────────────────
         split = QSplitter(Qt.Orientation.Horizontal)
 
+        # Panel izquierdo: fondo gris; dentro, un recuadro blanco con la
+        # pestaña "Contenido" + el árbol (igual que el navegador principal).
+        izq = QWidget()
+        izq.setStyleSheet("background:#D4D4D4;")
+        izq_lay = QVBoxLayout(izq)
+        izq_lay.setContentsMargins(6, 6, 6, 6); izq_lay.setSpacing(0)
+
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet(
-            'QTabWidget::pane { border:none; background:#F5F5F2; }'
+            'QTabWidget::pane { border:1px solid #7F7F7F; background:#FFFFFF;'
+            ' top:-1px; }'
             'QTabBar::tab { font-family:"Arial Narrow","Arial"; font-size:13px;'
-            ' padding:4px 14px; background:#E4E4DE; border:1px solid #C8C8C2;'
-            ' border-bottom:none; }'
-            'QTabBar::tab:selected { background:#F5F5F2; }')
+            ' color:#000000; padding:3px 14px; background:#D4D4D4;'
+            ' border:1px solid #7F7F7F; border-bottom:none; }'
+            'QTabBar::tab:selected { background:#FFFFFF; }')
 
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
-        self.tree.setIconSize(QSize(18, 18))
+        self.tree.setIndentation(14)
+        self.tree.setIconSize(QSize(16, 16))
         self.tree.setStyleSheet(
-            'QTreeWidget { background:#F5F5F2; border:none;'
+            'QTreeWidget { background:#FFFFFF; border:none;'
             ' font-family:"Arial Narrow","Arial"; font-size:14px; outline:0; }'
-            'QTreeWidget::item { padding:3px 2px; }'
-            'QTreeWidget::item:selected { background:#D6E3F0; color:#000000; }'
-            'QTreeWidget::item:hover { background:#E8EEF5; }')
+            'QTreeWidget::item { height:22px; padding-left:2px; }'
+            'QTreeWidget::item:selected { background:#DCDCDC; color:#000000; }'
+            'QTreeWidget::item:hover { background:#EDEDED; }')
 
         ic_sec = _mk_icon(_dib_seccion)
         ic_tema = _mk_icon(_dib_tema)
@@ -574,6 +847,7 @@ class DocTecnica(QWidget):
             top.setExpanded(True)
         self.tree.itemClicked.connect(self._on_item)
         self.tabs.addTab(self.tree, "Contenido")
+        izq_lay.addWidget(self.tabs)
 
         self.view = QTextBrowser()
         self.view.setOpenExternalLinks(False)
@@ -581,12 +855,12 @@ class DocTecnica(QWidget):
         self.view.setStyleSheet(
             'QTextBrowser { background:#FFFFFF; border:none; padding:14px 20px; }')
 
-        split.addWidget(self.tabs)
+        split.addWidget(izq)
         split.addWidget(self.view)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setCollapsible(0, False)
-        split.setSizes([270, 640])
+        split.setSizes([272, 640])
         root.addWidget(split, 1)
 
         # Estado de navegacion
@@ -597,26 +871,26 @@ class DocTecnica(QWidget):
     # ── Barra ───────────────────────────────────────────────────
     def _crear_barra(self):
         barra = QWidget()
-        barra.setStyleSheet("background:#F0F0EE;")
+        barra.setStyleSheet("background:#E4E4E4;")
         lay = QHBoxLayout(barra)
         lay.setContentsMargins(6, 4, 6, 4); lay.setSpacing(4)
 
-        def _btn(texto, icono, slot):
+        def _btn(texto, slot):
             b = QToolButton()
-            b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
-            b.setText(texto); b.setIcon(icono); b.setIconSize(QSize(18, 18))
+            b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+            b.setText(texto)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(
-                'QToolButton { font-family:"Arial Narrow","Arial"; font-size:12px;'
-                ' color:#000000; border:1px solid transparent; padding:3px 8px; }'
-                'QToolButton:hover { background:#E0E6EE; border:1px solid #C0C8D2; }'
+                'QToolButton { font-family:"Arial Narrow","Arial"; font-size:13px;'
+                ' color:#000000; border:1px solid transparent; padding:5px 12px; }'
+                'QToolButton:hover { background:#E0E0E0; border:1px solid #B8B8B8; }'
                 'QToolButton:disabled { color:#A8A8A8; }')
             b.clicked.connect(slot)
             return b
 
-        self.btn_ocultar = _btn("Ocultar", _mk_icon(_dib_ocultar), self._toggle_arbol)
-        self.btn_atras = _btn("Atrás", _mk_icon(_dib_atras), lambda: self._navegar(-1))
-        self.btn_adelante = _btn("Adelante", _mk_icon(_dib_adelante), lambda: self._navegar(1))
+        self.btn_ocultar = _btn("Ocultar", self._toggle_arbol)
+        self.btn_atras = _btn("Atrás", lambda: self._navegar(-1))
+        self.btn_adelante = _btn("Adelante", lambda: self._navegar(1))
         lay.addWidget(self.btn_ocultar)
         sep = _QFrame(); sep.setFrameShape(_QFrame.Shape.VLine)
         sep.setStyleSheet("color:#CFCFCF;"); sep.setFixedWidth(1)
@@ -646,6 +920,8 @@ class DocTecnica(QWidget):
         html = self._contenido.get(id(item), "")
         # el titulo (h2) va sin numero
         html = re.sub(r'(<h2>)\s*[\d]+(\.[\d]+)*\.?\s+', r'\1', html)
+        # renderizar las ecuaciones a imagen
+        html = _procesar_eqs(html)
         self.view.setHtml(html)
         self.view.verticalScrollBar().setValue(0)
         self.btn_atras.setEnabled(idx > 0)
