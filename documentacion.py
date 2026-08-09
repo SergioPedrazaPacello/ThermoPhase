@@ -869,7 +869,7 @@ class DocTecnica(QWidget):
         izq.setStyleSheet("background:#D4D4D4;")
         self.izq = izq
         izq_lay = QVBoxLayout(izq)
-        izq_lay.setContentsMargins(4, 3, 4, 4); izq_lay.setSpacing(2)
+        izq_lay.setContentsMargins(6, 3, 4, 4); izq_lay.setSpacing(2)
 
         # Etiqueta de sección "Contenido" + línea (fuera del recuadro)
         self.lbl_contenido = QLabel("Contenido")
@@ -944,8 +944,8 @@ class DocTecnica(QWidget):
         split.setCollapsible(0, False)
         split.setSizes([250, 660])
         # Margen (asa gris) que separa el arbol del area de redaccion
-        split.setHandleWidth(8)
-        split.setStyleSheet("QSplitter::handle { background:#D4D4D4; }")
+        split.setHandleWidth(6)
+        split.setStyleSheet("QSplitter::handle { background:#ADADAD; }")
         root.addWidget(split, 1)
 
         # Estado de navegacion
@@ -968,7 +968,7 @@ class DocTecnica(QWidget):
             b.setText(texto)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(
-                'QToolButton { font-family:"Arial Narrow","Arial"; font-size:9pt;'
+                'QToolButton { font-family:"Arial Narrow","Arial"; font-size:10pt;'
                 ' color:#000000; border:none; padding:1px 9px; }'
                 'QToolButton:hover { background:#C4C4C4; }'
                 'QToolButton:disabled { color:#9A9A9A; }')
