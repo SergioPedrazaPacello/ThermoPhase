@@ -21,7 +21,8 @@ h2     { font-family:'Arial Narrow','Arial'; font-size:14px; font-weight:bold;
          color:#000000; margin:2px 0 9px 0; }
 h3     { font-family:'Arial Narrow','Arial'; font-size:14px; font-weight:bold;
          color:#000000; margin:14px 0 4px 0; }
-p      { font-size:14px; line-height:142%; margin:7px 0; color:#000000; }
+p      { font-size:14px; line-height:142%; margin:7px 0; color:#000000;
+         text-align:justify; }
 li     { font-size:14px; line-height:140%; margin:3px 0; color:#000000; }
 b      { font-weight:normal; color:#000000; }
 i      { font-style:normal; }
@@ -43,26 +44,27 @@ def _render_eq_latex(latex, fontsize=15):
     try:
         import matplotlib
         matplotlib.use('Agg')
+        matplotlib.rcParams['mathtext.fontset'] = 'cm'   # una sola tipografía
         import matplotlib.pyplot as plt
-        import io
+        import io, struct
         fig = plt.figure(figsize=(0.01, 0.01))
-        fig.text(0, 0, f'${latex}$', fontsize=fontsize, color='#1A1A1A')
+        fig.text(0, 0, f'${latex}$', fontsize=fontsize, color='#000000')
         buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=130, bbox_inches='tight',
-                    pad_inches=0.06, transparent=True)
+        fig.savefig(buf, format='png', dpi=140, bbox_inches='tight',
+                    pad_inches=0.05, transparent=True)
         plt.close(fig)
         data = buf.getvalue()
-        import struct
         w_px = struct.unpack('>I', data[16:20])[0]
         h_px = struct.unpack('>I', data[20:24])[0]
         b = _b64.b64encode(data).decode()
-        MAXW = 560
+        # A tamaño nativo (1:1) queda nítido; solo se escalan las muy anchas.
+        MAXW = 540
         if w_px > MAXW:
-            dw = MAXW; dh = int(h_px * MAXW / w_px)
-            dim = f' width="{dw}" height="{dh}"'
+            dh = int(h_px * MAXW / w_px)
+            dim = f' width="{MAXW}" height="{dh}"'
         else:
             dim = ''
-        html = (f'<p align="center" style="margin:13px 0">'
+        html = (f'<p align="center" style="margin:12px 0">'
                 f'<img src="data:image/png;base64,{b}"{dim}></p>')
     except Exception:
         html = '<p align="center">[ecuación]</p>'
@@ -438,7 +440,9 @@ S2_5 = """
 <h2>2.5 Coeficientes de interacción binaria kij</h2>
 <p>Los coeficientes de interacción binaria k_ij forman una matriz simétrica: el
 coeficiente entre i y j es igual al que hay entre j e i, y el de un componente
-consigo mismo es cero. Aunque suelen ser números pequeños, tienen un efecto
+consigo mismo es cero.</p>
+""" + _eq(r"k_{ij} = k_{ji} \qquad k_{ii} = 0") + """
+<p>Aunque suelen ser números pequeños, tienen un efecto
 desproporcionado sobre la forma de la envolvente de fases, sobre todo en las
 cercanías del punto crítico de la mezcla, donde pequeños cambios en la atracción
 cruzada desplazan de manera notable las curvas de burbuja y de rocío.</p>
@@ -743,24 +747,26 @@ def _transparent():
 
 
 def _dib_seccion(p):
-    # Carpeta gris (seccion)
-    p.setPen(QPen(QColor("#6E6E6E"), 1.3)); p.setBrush(QBrush(QColor("#C8C8C8")))
+    # Carpeta ambar (seccion) — paleta del programa
+    p.setPen(QPen(QColor("#9A7A2A"), 1.3)); p.setBrush(QBrush(QColor("#E8C36A")))
     tab = QPainterPath()
     tab.moveTo(3, 7); tab.lineTo(3, 19); tab.lineTo(21, 19); tab.lineTo(21, 9)
     tab.lineTo(11, 9); tab.lineTo(9, 7); tab.closeSubpath()
     p.drawPath(tab)
+    p.setPen(QPen(QColor("#B8942F"), 1.0)); p.setBrush(QBrush(_transparent()))
+    p.drawLine(QPointF(3, 12), QPointF(21, 12))
 
 
 def _dib_tema(p):
-    # Pagina gris con esquina doblada (subseccion)
-    p.setPen(QPen(QColor("#6E6E6E"), 1.3)); p.setBrush(QBrush(QColor("#FFFFFF")))
+    # Pagina con esquina doblada y renglones azules (subseccion)
+    p.setPen(QPen(QColor("#4A4A4A"), 1.3)); p.setBrush(QBrush(QColor("#FFFFFF")))
     pg = QPainterPath()
     pg.moveTo(6, 3); pg.lineTo(15, 3); pg.lineTo(19, 7); pg.lineTo(19, 21)
     pg.lineTo(6, 21); pg.closeSubpath()
     p.drawPath(pg)
-    p.setPen(QPen(QColor("#6E6E6E"), 1.1)); p.setBrush(QBrush(_transparent()))
+    p.setPen(QPen(QColor("#4A4A4A"), 1.1)); p.setBrush(QBrush(_transparent()))
     p.drawLine(QPointF(15, 3), QPointF(15, 7)); p.drawLine(QPointF(15, 7), QPointF(19, 7))
-    p.setPen(QPen(QColor("#9A9A9A"), 1.1))
+    p.setPen(QPen(QColor("#1F5FA8"), 1.1))
     p.drawLine(QPointF(8.5, 11), QPointF(16.5, 11))
     p.drawLine(QPointF(8.5, 14), QPointF(16.5, 14))
     p.drawLine(QPointF(8.5, 17), QPointF(13.5, 17))
@@ -800,32 +806,38 @@ class DocTecnica(QWidget):
         sep.setStyleSheet("color:#C4C4C4; background:#C4C4C4;"); sep.setFixedHeight(1)
         root.addWidget(sep)
 
-        # ── Cuerpo: árbol (pestañas) | contenido ────────────────
+        # ── Cuerpo: árbol | contenido ───────────────────────────
         split = QSplitter(Qt.Orientation.Horizontal)
 
-        # Panel izquierdo: fondo gris; dentro, un recuadro blanco con la
-        # pestaña "Contenido" + el árbol (igual que el navegador principal).
+        from PyQt6.QtWidgets import QScrollArea, QLabel
+        # Panel izquierdo: fondo gris; el label "Contenido" va FUERA del
+        # recuadro (como "Cálculos"/"Datos"), y el árbol es un recuadro blanco
+        # que crece o disminuye con la cantidad de opciones.
         izq = QWidget()
         izq.setStyleSheet("background:#D4D4D4;")
+        self.izq = izq
         izq_lay = QVBoxLayout(izq)
-        izq_lay.setContentsMargins(6, 6, 6, 6); izq_lay.setSpacing(0)
+        izq_lay.setContentsMargins(4, 3, 4, 4); izq_lay.setSpacing(2)
 
-        self.tabs = QTabWidget()
-        self.tabs.setStyleSheet(
-            'QTabWidget::pane { border:1px solid #7F7F7F; background:#FFFFFF;'
-            ' top:-1px; }'
-            'QTabBar::tab { font-family:"Arial Narrow","Arial"; font-size:13px;'
-            ' color:#000000; padding:3px 14px; background:#D4D4D4;'
-            ' border:1px solid #7F7F7F; border-bottom:none; }'
-            'QTabBar::tab:selected { background:#FFFFFF; }')
+        # Etiqueta de sección "Contenido" + línea (fuera del recuadro)
+        lbl = QLabel("Contenido")
+        lbl.setStyleSheet(
+            'background:transparent; color:#404040;'
+            ' font-family:"Arial Narrow","Arial"; font-size:10pt;')
+        izq_lay.addWidget(lbl)
+        linea = _QFrame(); linea.setFixedHeight(1)
+        linea.setStyleSheet('background:#C4C4C4; border:none;')
+        izq_lay.addWidget(linea)
 
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setIndentation(14)
         self.tree.setIconSize(QSize(16, 16))
+        self.tree.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tree.setStyleSheet(
-            'QTreeWidget { background:#FFFFFF; border:none;'
-            ' font-family:"Arial Narrow","Arial"; font-size:14px; outline:0; }'
+            'QTreeWidget { background:#FFFFFF; border:1px solid #7F7F7F;'
+            ' font-family:"Arial Narrow","Arial"; font-size:10pt; outline:0; }'
             'QTreeWidget::item { height:22px; padding-left:2px; }'
             'QTreeWidget::item:selected { background:#DCDCDC; color:#000000; }'
             'QTreeWidget::item:hover { background:#EDEDED; }')
@@ -846,21 +858,42 @@ class DocTecnica(QWidget):
                 self._orden.append(child)
             top.setExpanded(True)
         self.tree.itemClicked.connect(self._on_item)
-        self.tabs.addTab(self.tree, "Contenido")
-        izq_lay.addWidget(self.tabs)
+        self.tree.itemExpanded.connect(lambda *_: self._ajustar_alto_arbol())
+        self.tree.itemCollapsed.connect(lambda *_: self._ajustar_alto_arbol())
+        self._ajustar_alto_arbol()
+
+        # Contenedor gris que aloja el árbol arriba (el resto queda gris)
+        izq_cont = QWidget(); izq_cont.setStyleSheet("background:#D4D4D4;")
+        cont_lay = QVBoxLayout(izq_cont)
+        cont_lay.setContentsMargins(0, 0, 0, 0); cont_lay.setSpacing(0)
+        cont_lay.addWidget(self.tree)
+        cont_lay.addStretch(1)
+
+        # Scroll (sin barra visible; se navega con la rueda del mouse)
+        izq_scroll = QScrollArea()
+        izq_scroll.setWidget(izq_cont)
+        izq_scroll.setWidgetResizable(True)
+        izq_scroll.setFrameShape(_QFrame.Shape.NoFrame)
+        izq_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        izq_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        izq_scroll.setStyleSheet("QScrollArea { background:#D4D4D4; border:none; }")
+        izq_lay.addWidget(izq_scroll, 1)
 
         self.view = QTextBrowser()
         self.view.setOpenExternalLinks(False)
         self.view.document().setDefaultStyleSheet(_CSS)
+        self.view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.view.setStyleSheet(
-            'QTextBrowser { background:#FFFFFF; border:none; padding:14px 20px; }')
+            'QTextBrowser { background:#FFFFFF; border:none; padding:14px 22px; }')
 
         split.addWidget(izq)
         split.addWidget(self.view)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setCollapsible(0, False)
-        split.setSizes([272, 640])
+        split.setSizes([250, 660])
+        split.setHandleWidth(6)
         root.addWidget(split, 1)
 
         # Estado de navegacion
@@ -871,9 +904,10 @@ class DocTecnica(QWidget):
     # ── Barra ───────────────────────────────────────────────────
     def _crear_barra(self):
         barra = QWidget()
-        barra.setStyleSheet("background:#E4E4E4;")
+        barra.setStyleSheet("background:#D4D4D4;")
+        barra.setFixedHeight(24)
         lay = QHBoxLayout(barra)
-        lay.setContentsMargins(6, 4, 6, 4); lay.setSpacing(4)
+        lay.setContentsMargins(4, 0, 4, 0); lay.setSpacing(2)
 
         def _btn(texto, slot):
             b = QToolButton()
@@ -881,10 +915,10 @@ class DocTecnica(QWidget):
             b.setText(texto)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setStyleSheet(
-                'QToolButton { font-family:"Arial Narrow","Arial"; font-size:13px;'
-                ' color:#000000; border:1px solid transparent; padding:5px 12px; }'
-                'QToolButton:hover { background:#E0E0E0; border:1px solid #B8B8B8; }'
-                'QToolButton:disabled { color:#A8A8A8; }')
+                'QToolButton { font-family:"Arial Narrow","Arial"; font-size:11pt;'
+                ' color:#000000; border:none; padding:2px 10px; }'
+                'QToolButton:hover { background:#C4C4C4; }'
+                'QToolButton:disabled { color:#9A9A9A; }')
             b.clicked.connect(slot)
             return b
 
@@ -901,9 +935,19 @@ class DocTecnica(QWidget):
         return barra
 
     # ── Navegacion ──────────────────────────────────────────────
+    def _ajustar_alto_arbol(self):
+        """El recuadro del árbol crece o disminuye según las opciones visibles."""
+        n = 0
+        for i in range(self.tree.topLevelItemCount()):
+            top = self.tree.topLevelItem(i)
+            n += 1
+            if top.isExpanded():
+                n += top.childCount()
+        self.tree.setFixedHeight(8 + 22 * n)
+
     def _toggle_arbol(self):
         self._arbol_visible = not getattr(self, '_arbol_visible', True)
-        self.tabs.setVisible(self._arbol_visible)
+        self.izq.setVisible(self._arbol_visible)
         self.btn_ocultar.setText("Ocultar" if self._arbol_visible else "Mostrar")
 
     def _navegar(self, delta):
