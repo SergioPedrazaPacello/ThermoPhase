@@ -1698,6 +1698,14 @@ class MainWindow(QMainWindow):
         # Pie de pagina EOS y status
         self._refrescar_pies()
         self._lbl_info.setText(f"{_eos_nombre(self._eos_main_code())} EOS")
+        # Ventana de documentacion tecnica (barra, arbol, pie)
+        sw_doc = self._subventanas.get('documentacion')
+        if sw_doc is not None:
+            if hasattr(sw_doc._widget, 'retraducir'):
+                sw_doc._widget.retraducir()
+            if hasattr(sw_doc, '_pie'):
+                sw_doc._pie.setText(f"  {_i18n.t('Documentación técnica')}")
+            sw_doc.setWindowTitle(_i18n.t('Documentación técnica'))
 
     # ── Exportacion a PDF ────────────────────────────────────
     def _menu_exportar_pdf(self):
@@ -2141,7 +2149,8 @@ class MainWindow(QMainWindow):
 
     # ── Gestion de ventanas de funcionalidad (top-level) ─────
     def _montar_subventana(self, clave, widget, titulo, tam=None,
-                           eos_provider=None, redimensionable=False):
+                           eos_provider=None, redimensionable=False,
+                           pie_texto=None):
         """Envuelve un widget en una ventana top-level nativa de Windows
         (marco del sistema) y la registra. `tam` da un tamaño propio;
         `eos_provider` agrega un pie con la EOS; `redimensionable` permite
@@ -2168,7 +2177,18 @@ class MainWindow(QMainWindow):
 
         # Pie de pagina con la EOS que ocupa esta ventana.
         alto_pie = 0
-        if eos_provider is not None:
+        if pie_texto is not None:
+            pie = QLabel(f"  {pie_texto}")
+            pie.setFixedHeight(20)
+            pie.setStyleSheet(
+                f'QLabel {{ background:#D4D4D4; color:{TEXT};'
+                f' font-family:"{FONT_F}"; font-size:9pt; padding:1px 6px;'
+                f' border-top:1px solid #B4B4B4; }}')
+            lay.addWidget(pie)
+            win._pie = pie
+            win._pie_fijo = True
+            alto_pie = 20
+        elif eos_provider is not None:
             pie = QLabel(f"  {self._nombre_eos(eos_provider())} EOS")
             pie.setFixedHeight(20)
             pie.setStyleSheet(
@@ -2459,8 +2479,9 @@ class MainWindow(QMainWindow):
             return
         from documentacion import DocTecnica
         widget = DocTecnica()
-        self._montar_subventana(clave, widget, "Documentación técnica",
-                                tam=(900, 640), redimensionable=True)
+        self._montar_subventana(clave, widget, _i18n.t("Documentación técnica"),
+                                tam=(900, 640), redimensionable=True,
+                                pie_texto=_i18n.t("Documentación técnica"))
 
     def _menu_acerca(self):
         dialogos.info(self,

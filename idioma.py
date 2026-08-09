@@ -29,6 +29,8 @@ def set_idioma(lang):
 
 # ── Diccionario ES -> EN ─────────────────────────────────────────────
 TRAD = {
+    "Ocultar": "Hide", "Mostrar": "Show", "Atrás": "Back", "Adelante": "Forward",
+    "Contenido": "Contents",
     # Menus (con & de mnemonico)
     "&Archivo": "&File", "&Editar": "&Edit", "&Ver": "&View",
     "&Herramientas": "&Tools", "&Exportar": "E&xport", "Ve&ntana": "&Window",
