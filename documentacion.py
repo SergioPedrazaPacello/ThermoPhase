@@ -944,8 +944,8 @@ class DocTecnica(QWidget):
         split.setCollapsible(0, False)
         split.setSizes([250, 660])
         # Margen (asa gris) que separa el arbol del area de redaccion
-        split.setHandleWidth(6)
-        split.setStyleSheet("QSplitter::handle { background:#ADADAD; }")
+        split.setHandleWidth(1)
+        split.setStyleSheet("QSplitter::handle { background:#7F7F7F; }")
         root.addWidget(split, 1)
 
         # Estado de navegacion
