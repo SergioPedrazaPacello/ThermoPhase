@@ -559,8 +559,7 @@ composición:</p>
 permite calcular. Para las ecuaciones cúbicas tiene una forma cerrada que
 depende de los grupos adimensionales A y B, de la raíz Z de la fase, de la
 composición y de los coeficientes de interacción binaria. Para Peng-Robinson,
-la expresión que ThermoPhase evalúa (de forma vectorizada para los trece
-componentes a la vez) es:</p>
+la expresión que ThermoPhase evalúa (de forma vectorizada para todos los componentes a la vez) es:</p>
 """ + _eq(r"\ln\phi_i = \frac{b_i}{b_m}(Z-1) - \ln(Z-B) - \frac{A}{2\sqrt{2}\,B}\left(\frac{2\sum_j z_j a_{ij}}{a_m} - \frac{b_i}{b_m}\right)\ln\!\left[\frac{Z+(1+\sqrt{2})B}{Z+(1-\sqrt{2})B}\right]") + """
 <p>Para SRK, como el término atractivo tiene otra forma, el coeficiente de
 fugacidad cambia en su último término, que pasa a depender de ln[(Z+B)/Z] en
@@ -727,6 +726,224 @@ bifásicos.</p>
 """
 
 
+
+# ═════════════════════════════════════════════════════════════════════
+#  SECCIÓN 4 — Envolvente de fases
+# ═════════════════════════════════════════════════════════════════════
+S4_1 = """
+<h2>4.1 Envolvente de fases</h2>
+<p>La envolvente de fases es la curva que delimita, en el plano presión-temperatura,
+la región donde una mezcla de composición fija coexiste como líquido y como vapor
+simultáneamente. Dentro de esa curva el sistema es bifásico; fuera de ella, a la
+izquierda o debajo, es monofásico líquido o vapor según el caso.</p>
+<p>La curva tiene dos ramas que parten del mismo punto a baja presión y se cierran
+en el punto crítico de la mezcla:</p>
+<ul>
+<li>La <b>curva de burbuja</b> representa las condiciones en las que el líquido
+está a punto de comenzar a vaporizarse: la fracción de vapor es prácticamente
+cero y una burbuja incipiente acaba de aparecer.</li>
+<li>La <b>curva de rocío</b> representa las condiciones en las que el vapor está
+a punto de comenzar a condensar: la fracción de líquido es prácticamente cero y
+una gota incipiente acaba de aparecer.</li>
+</ul>
+<p>En ambos casos la condición matemática es la misma que la del flash monofásico
+fronterizo:</p>
+""" + _eq(r"\text{burbuja:}\quad \sum_i K_i\,z_i = 1 \qquad \text{rocio:}\quad \sum_i \frac{z_i}{K_i} = 1") + """
+<p>La envolvente es uno de los resultados más valiosos de la termodinámica de
+mezclas porque permite conocer, de un solo vistazo, si una mezcla producida en
+un yacimiento estará en una o dos fases en cualquier punto del sistema de
+producción, desde la presión del yacimiento hasta las condiciones de la
+superficie, o en cualquier equipo de proceso.</p>
+"""
+
+S4_2 = """
+<h2>4.2 El método de Ziervogel (GoalSeek con continuación de curva)</h2>
+<p>El método que ThermoPhase emplea como base para trazar la envolvente sigue el
+esquema de Ziervogel. La idea central es que cada punto de la curva de burbuja
+o de rocío se obtiene resolviendo un GoalSeek de una sola variable, alternando
+entre temperatura y presión como variable de búsqueda, mientras la otra se
+impone desde el punto anterior.</p>
+<h3>La condición de saturación y la composición fija</h3>
+<p>En un punto de burbuja, el líquido tiene la composición global de la mezcla
+(x_i = z_i) y el vapor incipiente tiene una composición que hay que calcular.
+La condición de saturación exige que las fracciones molares del vapor sumen la
+unidad, lo que equivale a la ecuación:</p>
+""" + _eq(r"F_{\text{burbuja}} = \sum_i K_i\,z_i - 1 = 0") + """
+<p>En un punto de rocío el rol se invierte: el vapor tiene la composición global
+(y_i = z_i) y el líquido incipiente es el que se calcula:</p>
+""" + _eq(r"F_{\text{rocio}} = \sum_i \frac{z_i}{K_i} - 1 = 0") + """
+<p>El detalle clave de la implementación es que la composición de la fase
+incipiente se mantiene <b>fija</b> durante cada GoalSeek: solo la variable de
+búsqueda (temperatura o presión) se mueve, mientras la composición de la fase
+incipiente permanece constante. Solo después de que el GoalSeek
+converge se actualiza la composición de la fase incipiente con los K_i
+recién calculados, y el proceso se repite hasta que esa composición ya no
+cambia entre una iteración y la siguiente.</p>
+<h3>Inicio de la curva con la correlación de Wilson</h3>
+<p>Para arrancar el trazado, el programa necesita un primer punto de saturación.
+Fija la presión en un valor bajo (10 psia) y busca la temperatura de burbuja
+inicial resolviendo por Newton-Raphson la ecuación de Wilson, que es una
+aproximación analítica de los K_i válida lejos del punto crítico:</p>
+""" + _eq(r"\sum_i z_i\,K_i^{\text{Wilson}}(T,P) = 1 \qquad K_i^{\text{Wilson}} = \frac{P_{c,i}}{P}\,\exp\!\left[5.373\,(1+\omega_i)\left(1-\frac{T_{c,i}}{T}\right)\right]") + """
+<p>Con esa temperatura inicial se evalúan los K_i de Wilson, se construye la
+composición de la fase incipiente (vapor para burbuja, líquido para rocío) y
+se ejecuta el primer GoalSeek, que refina la temperatura usando ya los
+coeficientes de fugacidad de la ecuación de estado en lugar de la aproximación
+de Wilson.</p>
+<h3>Continuación de la curva punto a punto</h3>
+<p>Con el primer punto convergido, el algoritmo avanza a lo largo de la curva
+usando un esquema de predictor simple: da un pequeño paso en temperatura o en
+presión (el que resulte más adecuado según la pendiente local de la curva) y
+usa el resultado anterior como punto de partida para el GoalSeek del siguiente.
+La elección de qué variable mover en cada tramo se basa en el parámetro β, que
+mide la inclinación local de la curva en escala logarítmica:</p>
+""" + _eq(r"\beta = \left|\frac{\Delta\ln P}{\Delta\ln T}\right|") + """
+<p>Cuando β es grande (la curva es casi vertical, la presión cambia mucho con
+poca variación de temperatura), se avanza fijando temperatura y buscando
+presión; cuando β es pequeño (la curva es casi horizontal), se avanza fijando
+presión y buscando temperatura. Este ajuste automático permite seguir la curva
+de manera estable en todas las zonas, incluidas las regiones de alta pendiente
+cerca del cricondenterm (temperatura máxima) y la cricondenbar (presión máxima).</p>
+<h3>Cercanía al punto crítico y cambio de solucionador</h3>
+<p>A medida que la curva se aproxima al punto crítico de la mezcla, los K_i
+tienden a 1 y las fases se vuelven casi indistinguibles. En esa zona el
+GoalSeek con el método secante (que usa derivadas) puede diverger porque la
+función se vuelve muy plana. Para detectar esta situación el programa evalúa en
+cada punto el criterio de Gallardo:</p>
+""" + _eq(r"\varpi = |Z_L - Z_V|") + """
+<p>Cuando ϖ cae por debajo de 0.2, las fases son casi idénticas y el programa
+cambia automáticamente el solucionador del GoalSeek: abandona el método de la
+secante y pasa a <b>bisección</b>, que no usa derivadas y nunca diverge,
+aunque converge más lentamente. Cuando ϖ vuelve a crecer, se retoma la secante.
+El trazado se detiene cuando todos los K_i se acercan suficientemente a 1,
+señal de que se ha alcanzado el punto crítico.</p>
+"""
+
+S4_3 = """
+<h2>4.3 El método de Michelsen (continuación por pseudo-longitud de arco)</h2>
+<p>El método de Michelsen (1980) es un algoritmo de continuación mucho más
+sofisticado que el GoalSeek punto a punto. En lugar de resolver una ecuación
+escalar en una variable, plantea un sistema de ecuaciones no lineales que incluye
+todas las condiciones de equilibrio simultáneamente, junto con una ecuación
+adicional de restricción de arco que fija cuánto avanza el trazado en cada paso.
+ThermoPhase lo usa como complemento cuando el método de Ziervogel no logra cerrar
+la envolvente en la zona del punto crítico.</p>
+<h3>Variables y sistema de ecuaciones</h3>
+<p>El método trabaja en el espacio logarítmico de las variables de estado. Para
+una mezcla con m componentes presentes (z_i mayor que cero), el vector de
+incógnitas en cada punto de la curva es:</p>
+""" + _eq(r"X = \left(\ln K_1,\;\ldots,\;\ln K_m,\;\ln T,\;\ln P\right)") + """
+<p>El sistema de ecuaciones que debe satisfacerse en cada punto de la envolvente
+consta de m ecuaciones de igualdad de fugacidades (una por componente presente),
+una ecuación de saturación y una restricción de pseudo-longitud de arco:</p>
+""" + _eq(r"g_i = \ln K_i + \ln\phi_i^V - \ln\phi_i^L = 0 \quad (i = 1\ldots m)") + """
+""" + _eq(r"g_{m+1} = \sum_i K_i\,z_i - 1 = 0") + """
+""" + _eq(r"g_{m+2} = t\cdot(X - X_{\text{ref}}) - \Delta s = 0") + """
+<p>La última ecuación es la restricción de arco: el vector tangente t (calculado
+en el punto anterior) proyectado sobre el desplazamiento desde el punto de
+referencia debe ser igual al tamaño de paso Δs. Esto garantiza que el trazado
+avance una distancia controlada a lo largo de la curva, sin que el algoritmo
+pueda retroceder ni saltar a una solución distante.</p>
+<h3>Newton-Raphson con Jacobiano analítico</h3>
+<p>El sistema anterior se resuelve con Newton-Raphson multivariable. La clave de
+la eficiencia y la robustez del método está en que el Jacobiano (la matriz de
+derivadas parciales del sistema respecto a las incógnitas) se calcula de forma
+analítica a partir de las derivadas de los coeficientes de fugacidad respecto a
+temperatura, presión y composición. Eso hace que cada iteración de Newton
+converja cuadráticamente cuando está cerca de la solución.</p>
+<h3>El vector tangente y la predicción del siguiente punto</h3>
+<p>El vector tangente al arco en cada punto convergido se obtiene como el vector
+nulo del Jacobiano del sistema (sin la restricción de arco), calculado por
+descomposición en valores singulares (SVD). Ese vector tangente actúa como
+predictor del siguiente punto: la solución del paso anterior, desplazada en la
+dirección del tangente una distancia Δs, sirve como punto de partida para el
+Newton-Raphson del paso siguiente. La magnitud de Δs se ajusta automáticamente:
+se agranda cuando Newton converge en pocas iteraciones (zona suave de la curva)
+y se reduce cuando le cuesta más (zona compleja, cerca del crítico).</p>
+<h3>Estrategia bidireccional para la cola de rocío</h3>
+<p>Un problema frecuente en gases livianos es que la rama de rocío a bajas
+presiones forma una cola larga y con pendiente pronunciada que el trazado
+unidireccional puede perder. ThermoPhase lo resuelve con una estrategia
+bidireccional: traza la envolvente desde un punto de burbuja de baja presión
+en sentido ascendente, rodea el punto crítico y desciende por la rama de rocío
+superior; luego arranca un segundo trazado desde un punto de rocío de baja
+presión en sentido ascendente hasta conectarse con el primero. Los dos tramos
+se combinan para formar la envolvente completa, incluida la cola inferior de
+rocío que el trazado simple habría omitido.</p>
+<h3>Subespaciado activo</h3>
+<p>Para mejorar la eficiencia, el sistema de ecuaciones se construye únicamente
+con los componentes que tienen fracción molar positiva (z_i mayor que cero).
+Esto reduce el Jacobiano de (NC+2) filas y columnas a (m+2), donde m es el
+número de componentes presentes, lo que es especialmente ventajoso en mezclas de
+producción donde varios componentes de la base de datos tienen fracción nula.</p>
+"""
+
+S4_4 = """
+<h2>4.4 Flujo de cálculo: Ziervogel con fallback a Michelsen</h2>
+<p>Cuando se solicita el trazado de la envolvente completa, ThermoPhase sigue
+un flujo de decisión automático que combina los dos métodos para obtener siempre
+la mejor envolvente posible con el menor tiempo de cómputo:</p>
+<ol>
+<li>Se trazan las curvas de burbuja y de rocío por el método de Ziervogel,
+que es rápido y robusto para la gran mayoría de mezclas.</li>
+<li>Se mide el hueco que queda entre las últimas puntas de las dos curvas
+(la distancia geométrica en el plano P-T entre el último punto de burbuja y el
+último punto de rocío). Si ese hueco es menor que la tolerancia de cierre
+(15 unidades en el plano adimensional), Ziervogel ha cerrado bien y la
+envolvente se devuelve directamente.</li>
+<li>Si el hueco es mayor, Michelsen entra como complemento: traza el arco del
+ápice que Ziervogel no pudo cerrar, extrae de él el tramo comprendido entre
+las dos puntas de Ziervogel, lo divide por la cricondenbar (el punto de máxima
+presión del arco) en lado-burbuja y lado-rocío, y empalma ese tramo con los
+extremos de Ziervogel para completar la envolvente.</li>
+</ol>
+<p>Esta estrategia combina lo mejor de ambos métodos: la fidelidad al modelo de
+referencia de Ziervogel y la robustez en la zona crítica de Michelsen. En la
+gran mayoría de las mezclas típicas de producción, Ziervogel cierra por sí solo
+y Michelsen no llega a ejecutarse.</p>
+<h3>Caso especial: mezclas casi azeotrópicas</h3>
+<p>Cuando todos los componentes presentes tienen temperaturas críticas muy
+similares (razón Tc_max/Tc_min menor que 1.10, como ocurre en mezclas de CO2
+con etano o de isopentano con pentano normal), la envolvente es muy estrecha y
+los coeficientes de interacción binaria cruzados dificultan la convergencia de
+Ziervogel. En ese caso el programa anula internamente los coeficientes k_ij del
+par casi ideal, ejecuta el trazado con k_ij = 0 (que converge con facilidad),
+y restaura los k_ij originales en el resultado. Los puntos (P, T) trazados con
+k_ij = 0 son prácticamente idénticos a los que se obtendrían con los k_ij
+originales, porque para pares casi ideales esos coeficientes son ya muy
+cercanos a cero.</p>
+"""
+
+S4_5 = """
+<h2>4.5 Punto crítico y líneas de calidad</h2>
+<p>Además de las curvas de burbuja y de rocío, ThermoPhase calcula y muestra
+sobre la envolvente información adicional que enriquece su interpretación.</p>
+<h3>Punto crítico de la mezcla</h3>
+<p>El punto crítico es el vértice donde las dos ramas se unen. En él las fases
+líquida y vapor se vuelven idénticas: sus densidades, composiciones y todas sus
+propiedades coinciden. Matemáticamente corresponde al límite en el que todos los
+coeficientes de reparto K_i tienden simultáneamente a 1. El programa lo
+identifica como el punto de la envolvente donde se cumple el criterio:</p>
+""" + _eq(r"\sum_i (K_i - 1)^2 < \varepsilon_{\text{crit}}") + """
+<h3>Cricondenterm y cricondenbar</h3>
+<p>Dos puntos especiales de la envolvente tienen nombre propio. La
+<b>cricondenterm</b> es la temperatura máxima de la envolvente: por encima de
+ella, la mezcla no puede condensar a ninguna presión. La <b>cricondenbar</b> es
+la presión máxima de la envolvente: por encima de ella no puede existir una
+mezcla bifásica a ninguna temperatura. Ambos puntos se identifican
+automáticamente como los extremos de la curva en cada coordenada.</p>
+<h3>Líneas de calidad</h3>
+<p>Las líneas de calidad son curvas interiores de la envolvente que unen los
+puntos con la misma fracción de vapor (la calidad del vapor, Q). La línea Q = 0
+es la curva de burbuja y la línea Q = 1 es la de rocío; las intermedias (Q =
+0.1, 0.2, ..., 0.9) muestran cómo cambia la proporción de vapor dentro de la
+región bifásica. Para calcular cada punto interior de una línea de calidad, el
+programa ejecuta un flash isotérmico a la fracción de vapor deseada,
+determinando las condiciones de presión y composición de cada fase a esa calidad
+fija sobre la isoterma correspondiente.</p>
+"""
+
+
 SECCIONES = [
     ("1. Fundamentos de las EOS cúbicas", [
         ("1.1 Ecuación de estado", S1_1),
@@ -755,6 +972,13 @@ SECCIONES = [
         ("3.5 La ecuación de Rachford-Rice", S3_5),
         ("3.6 Análisis de estabilidad", S3_6),
         ("3.7 Algoritmo completo del flash", S3_7),
+    ]),
+    ("4. Envolvente de fases", [
+        ("4.1 Envolvente de fases", S4_1),
+        ("4.2 Método de Ziervogel", S4_2),
+        ("4.3 Método de Michelsen", S4_3),
+        ("4.4 Flujo de cálculo combinado", S4_4),
+        ("4.5 Punto crítico y líneas de calidad", S4_5),
     ]),
 ]
 import re
@@ -910,7 +1134,7 @@ class DocTecnica(QWidget):
                 top.addChild(child)
                 self._contenido[id(child)] = html
                 self._orden.append(child)
-            top.setExpanded(True)
+            top.setExpanded(False)
         self.tree.itemClicked.connect(self._on_item)
         self.tree.itemExpanded.connect(lambda *_: self._ajustar_alto_arbol())
         self.tree.itemCollapsed.connect(lambda *_: self._ajustar_alto_arbol())
@@ -952,10 +1176,9 @@ class DocTecnica(QWidget):
         split.setStyleSheet("QSplitter::handle { background:#7F7F7F; }")
         root.addWidget(split, 1)
 
-        # Estado de navegacion
+        # Estado de navegacion — sin seleccion inicial (vista en blanco)
         self._idx = -1
-        if self._orden:
-            self._mostrar_indice(0)
+        self.view.setHtml("")
 
     # ── Barra ───────────────────────────────────────────────────
     def _crear_barra(self):
