@@ -614,21 +614,24 @@ flash provienen de ese análisis.</p>
 
 S3_5 = """
 <h2>3.5 La ecuación de Rachford-Rice</h2>
-<p>Una vez que se dispone de un conjunto de coeficientes de reparto K_i, hace
-falta determinar cuánta mezcla se vaporiza, es decir, el valor de V. Se parte
-del balance de materia por componente, que reparte lo que entra entre las dos
-fases:</p>
+<p>Una vez que se sabe que la mezcla es bifásica, hace falta determinar cuánta
+mezcla se vaporiza, es decir, el valor de V. Se parte del balance de materia
+por componente, que reparte lo que entra entre las dos fases:</p>
 """ + _eq(r"z_i = V\,y_i + (1 - V)\,x_i") + """
 <p>Combinando este balance con la definición de los coeficientes de reparto
 (y_i igual a K_i por x_i) y exigiendo que las fracciones molares de cada fase
 sumen 1, se llega a la ecuación de Rachford-Rice, que es una única ecuación en
 la incógnita V:</p>
 """ + _eq(r"\sum_{i} \frac{z_i\,(K_i - 1)}{1 + V\,(K_i - 1)} = 0") + """
-<p>Esta ecuación tiene la ventaja de ser monótona en el intervalo físico de V,
-lo que garantiza una solución única y una convergencia estable. ThermoPhase la
-resuelve numéricamente por el método de Newton acotado al intervalo válido. El
-sentido físico de Rachford-Rice es simple contabilidad: todo lo que entra en la
-alimentación debe repartirse exactamente entre el vapor y el líquido.</p>
+<p>Esta ecuación no es un método de flash por sí sola; es una herramienta
+matemática que permite resolver V de forma eficiente dado un conjunto de K_i.
+Tiene la ventaja de ser estrictamente monótona en el intervalo físico de V
+(entre cero y uno), lo que garantiza una solución única y una convergencia
+estable. ThermoPhase la resuelve numéricamente por el método de Newton acotado
+al intervalo válido. Su sentido físico es simple contabilidad: todo lo que entra
+en la alimentación debe repartirse exactamente entre el vapor y el líquido. El
+algoritmo que la invoca, y que constituye el verdadero cálculo del equilibrio, se
+describe en la subsección siguiente.</p>
 """
 
 S3_6 = """
@@ -676,50 +679,51 @@ subsección siguiente, el flash siempre se ejecuta a continuación.</p>
 
 S3_7 = """
 <h2>3.7 El algoritmo completo del flash</h2>
-<p>El cálculo de equilibrio a presión y temperatura fijas de ThermoPhase
-reproduce exactamente la secuencia de la referencia del proyecto, que se ejecuta
-siempre en el mismo orden: primero un análisis de estabilidad y, a
-continuación, un flash que se corre en todos los casos, sea la mezcla estable o
-inestable.</p>
-<h3>Preparación de los coeficientes de reparto</h3>
-<p>Se estiman los coeficientes iniciales con la correlación de Wilson y se
-ejecuta el análisis de estabilidad. Si éste concluye que la mezcla es inestable,
-el flash arrancará con el producto de los dos juegos de coeficientes refinados en
-la estabilidad (K^V por K^L); si concluye que es estable, el flash arrancará
-directamente con los coeficientes de Wilson. En ambos casos el flash se ejecuta;
-la clasificación final en una o dos fases la produce el propio flash.</p>
-<h3>El flash de Muskat-McDowell</h3>
-<p>El flash es un lazo iterativo. En cada iteración, con los coeficientes de
-reparto vigentes, se calculan dos sumatorios que actúan como criterio de fase:</p>
+<p>El método que ThermoPhase implementa para el cálculo del equilibrio
+líquido-vapor es el de Muskat-McDowell, un esquema iterativo de sustitución
+sucesiva que actualiza los coeficientes de reparto hasta que las fugacidades se
+igualan en ambas fases. A diferencia de Rachford-Rice, que es únicamente una
+ecuación para resolver V dados los K_i, el método de Muskat-McDowell es el
+algoritmo completo que envuelve ese paso como una herramienta interna.</p>
+<h3>Preparación de los coeficientes de reparto iniciales</h3>
+<p>Antes de entrar al flash, se ejecuta el análisis de estabilidad descrito en la
+subsección anterior. Si la mezcla resulta inestable, el flash arrancará con el
+producto de los dos juegos de coeficientes refinados en la estabilidad (K^V por
+K^L), que es una estimación mucho más cercana a la solución que la de Wilson.
+Si la mezcla resulta estable, el flash arrancará con los coeficientes de Wilson.
+En ambos casos el flash siempre se ejecuta; la clasificación final en una o dos
+fases la produce el propio algoritmo.</p>
+<h3>El bucle de Muskat-McDowell</h3>
+<p>Con los coeficientes de reparto del paso anterior, el algoritmo entra en un
+lazo iterativo. En cada iteración se evalúan primero dos sumatorios que actúan
+como criterio de fase:</p>
 """ + _eq(r"\sum_i K_i\,z_i \leq 1 \;\Rightarrow\; \text{liquido} \qquad \sum_i \frac{z_i}{K_i} \leq 1 \;\Rightarrow\; \text{vapor}") + """
-<p>Si el primer sumatorio no supera la unidad, toda la mezcla es líquida
-(x_i = z_i, no hay vapor); si el segundo no supera la unidad, toda la mezcla es
-vapor (y_i = z_i, no hay líquido); y si ninguno de los dos se cumple, la mezcla
-es bifásica y se resuelve la ecuación de Rachford-Rice para hallar V y, con
-ella, las composiciones de cada fase:</p>
+<p>Si el primer sumatorio no supera la unidad, toda la mezcla es líquida y se
+asigna x_i = z_i; si el segundo no supera la unidad, toda la mezcla es vapor y
+se asigna y_i = z_i. Cuando ninguno de los dos criterios se cumple, la mezcla es
+bifásica: en ese caso se invoca la ecuación de Rachford-Rice para resolver la
+fracción vaporizada V, y con ella se calculan las composiciones de cada fase:</p>
 """ + _eq(r"x_i = \frac{z_i}{1 + V\,(K_i - 1)} \qquad y_i = K_i\,x_i") + """
 <p>Con las composiciones de cada fase se evalúan los coeficientes de fugacidad
 mediante la ecuación de estado, resolviendo el cúbico en Z y tomando la raíz que
-corresponde a cada fase. Aquí aparece un detalle importante de la
-implementación: cuando una de las fases es evanescente (su composición es
-prácticamente cero, como ocurre en las regiones de fase única), su coeficiente
-de fugacidad se fija en 1 para todos los componentes, en lugar de evaluarlo con
-la composición de la otra fase. Esto reproduce el comportamiento de la referencia
-y evita que los coeficientes de reparto colapsen artificialmente a la solución
-trivial, de modo que la clasificación de fase la sostienen únicamente los
-sumatorios anteriores.</p>
-<p>Con los coeficientes de fugacidad de ambas fases se calculan las fugacidades
-y se mide su discrepancia; luego se actualizan los coeficientes de reparto como
-el cociente entre el coeficiente de fugacidad del líquido y el del vapor:</p>
+corresponde a cada fase. Cuando una de las fases es evanescente (composición
+prácticamente cero), su coeficiente de fugacidad se fija en 1 para todos los
+componentes: esto evita que los coeficientes de reparto colapsen a la solución
+trivial y deja que la clasificación de fase dependa únicamente de los sumatorios
+anteriores, tal como lo hace la referencia del proyecto.</p>
+<p>A partir de las fugacidades de cada fase se actualizan los coeficientes de
+reparto como el cociente entre el coeficiente de fugacidad del líquido y el del
+vapor:</p>
 """ + _eq(r"K_i = \frac{\phi_i^{\,L}}{\phi_i^{\,V}}") + """
 <p>El lazo se repite hasta que las fugacidades de cada componente coinciden en
-ambas fases dentro de la tolerancia, momento en el que se tiene la solución del
-equilibrio: la fracción vaporizada, las composiciones de cada fase y el número
-de fases presentes. En el fondo, todo el flash es un procedimiento que ajusta el
-reparto de los componentes hasta que cada uno tiene las mismas ganas de escapar
-en el líquido y en el vapor, apoyándose en la ecuación de estado para las
-fugacidades, en Rachford-Rice para la contabilidad del reparto y en el análisis
-de estabilidad para el arranque y para la certeza sobre el número de fases.</p>
+ambas fases dentro de la tolerancia. Cuando converge, se tiene la solución del
+equilibrio: la fracción vaporizada V, las composiciones x e y de cada fase y el
+número de fases presentes. En el fondo, el método de Muskat-McDowell es un
+proceso que ajusta iterativamente el reparto de los componentes hasta que cada
+uno tiene las mismas ganas de escapar en el líquido y en el vapor, usando la
+ecuación de estado para calcular fugacidades y la ecuación de Rachford-Rice
+como herramienta interna para resolver el balance de materia en los casos
+bifásicos.</p>
 """
 
 
