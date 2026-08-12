@@ -944,6 +944,138 @@ fija sobre la isoterma correspondiente.</p>
 """
 
 
+
+# ═════════════════════════════════════════════════════════════════════
+#  SECCIÓN 5 — Identificación de fase monofásica
+# ═════════════════════════════════════════════════════════════════════
+S5_1 = """
+<h2>5.1 El problema de la identificación de fase</h2>
+<p>Cuando el cálculo flash converge a una sola fase, la ecuación de estado
+produce un único factor de compresibilidad Z. A partir de ese resultado es
+necesario determinar si el fluido monofásico tiene carácter líquido o
+carácter vapor, porque los modelos de densidad, viscosidad y conductividad
+térmica aplican correlaciones distintas según la fase.</p>
+<p>Esta determinación es directa cuando el fluido está claramente fuera de
+la envolvente de fases: un gas a baja presión tiene Z cercano a 1 y baja
+densidad; un líquido comprimido tiene Z pequeño y alta densidad. La
+dificultad aparece en la región densa, donde la presión supera la
+cricondenbar de la mezcla y el fluido no puede existir como dos fases a
+ninguna temperatura. En esa región el fluido es termodinámicamente único,
+pero puede tener comportamiento más cercano al líquido o al vapor, y el
+programa necesita decidir qué conjunto de modelos de propiedades lo
+representa mejor.</p>
+<p>ThermoPhase aplica un algoritmo de tres criterios en cascada para las
+variantes PR y SRK (y sus homólogas con parámetros PVTsim). Los criterios
+se evalúan en orden de prioridad: el primero se basa en los parámetros de
+la ecuación de estado, el segundo en la compresibilidad isotérmica, y el
+tercero en la composición de la mezcla.</p>
+"""
+
+S5_2 = """
+<h2>5.2 Compresibilidad isotérmica</h2>
+<p>La compresibilidad isotérmica mide la variación relativa del volumen
+molar con la presión a temperatura constante:</p>
+""" + _eq(r"\kappa = -\frac{1}{V}\left(\frac{\partial V}{\partial P}\right)_T") + """
+<p>Para el gas ideal κ = 1/P. Para trabajar con una magnitud adimensional
+independiente de las unidades de presión se define el factor de
+compresibilidad isotérmica β:</p>
+""" + _eq(r"\beta = P\,\kappa = -\frac{P}{V}\left(\frac{\partial V}{\partial P}\right)_T") + """
+<p>Para el gas ideal β = 1; para un líquido β es mucho menor que 1. El
+umbral β = 0.75 separa estados con comportamiento predominantemente gaseoso
+de estados con comportamiento líquido.</p>
+<h3>Cálculo analítico</h3>
+<p>ThermoPhase calcula β mediante la derivada analítica de la ecuación de
+estado. Para Peng-Robinson:</p>
+""" + _eq(r"\left(\frac{\partial P}{\partial V}\right)_T^{PR} = -\frac{RT}{(V-b)^2} + \frac{2\,a_m(V+b)}{(V^2+2bV-b^2)^2}") + """
+<p>Para Soave-Redlich-Kwong:</p>
+""" + _eq(r"\left(\frac{\partial P}{\partial V}\right)_T^{SRK} = -\frac{RT}{(V-b)^2} + \frac{a_m(2V+b)}{V^2(V+b)^2}") + """
+<p>La compresibilidad adimensional resulta:</p>
+""" + _eq(r"\beta = -\frac{P}{V\,(\partial P/\partial V)_T}") + """
+<p>Esta expresión es algebraicamente equivalente a la forma cerrada en
+función de A = aₘP/(RT)² y B = bₘP/(RT):</p>
+""" + _eq(r"\beta = \frac{1}{P}\left(1 - \frac{2AB + zB + 2B^2z - Az}{z\,(3z^2-2z+A-B-B^2)}\right)") + """
+<p>donde z es el factor de compresibilidad de la mezcla. La diferencia
+numérica entre ambas formas es del orden de 10⁻¹⁶, confirmando que son
+la misma expresión.</p>
+"""
+
+S5_3 = """
+<h2>5.3 Criterio de la relación A/B</h2>
+<p>A presiones superiores a la cricondenbar de la mezcla, el factor Z
+permanece por encima de 0.75 en todo el rango de temperatura y los criterios
+de compresibilidad y composición no producen ninguna frontera. Sin embargo,
+el fluido puede ser un líquido comprimido si su temperatura está por debajo
+de un valor característico que no depende de la presión: en el plano P-T
+esta frontera es una línea vertical.</p>
+<p>La cantidad que determina esa línea es la razón de parámetros
+adimensionales de la EOS:</p>
+""" + _eq(r"\frac{A}{B} = \frac{a_m P/(RT)^2}{b_m P/(RT)} = \frac{a_m}{b_m R T}") + """
+<p>El factor P se cancela en la razón, lo que explica directamente que la
+frontera sea independiente de la presión. La transición ocurre cuando A/B
+iguala la razón de las constantes universales de la ecuación de estado,
+Ω_a/Ω_b:</p>
+""" + _eq(r"\frac{A}{B} = \frac{\Omega_a}{\Omega_b} \quad\Longrightarrow\quad T_{\text{frontera}} = \frac{a_m(T)}{b_m\,R\,(\Omega_a/\Omega_b)}") + """
+<p>Cuando A/B supera el umbral Ω_a/Ω_b, el término atractivo de la mezcla
+domina sobre la energía cinética y el fluido tiene carácter líquido; por
+debajo del umbral el término repulsivo prevalece y el fluido puede ser
+vapor. Los valores para cada EOS son:</p>
+""" + _eq(r"\left.\frac{\Omega_a}{\Omega_b}\right|_{PR} = \frac{0.45724}{0.07780} \approx 5.877") + """
+""" + _eq(r"\left.\frac{\Omega_a}{\Omega_b}\right|_{SRK} = \frac{0.42748}{0.08664} \approx 4.934") + """
+<p>Estos valores son consecuencia directa de las constantes de Peng y
+Robinson (1976) y de Soave (1972); no son parámetros ajustados a datos
+experimentales.</p>
+"""
+
+S5_4 = """
+<h2>5.4 Algoritmo completo</h2>
+<p>Los tres criterios se evalúan en cascada. En cuanto uno produce una
+clasificación definitiva, los restantes no se evalúan.</p>
+<ol>
+<li><b>Criterio A/B.</b> Si A/B = aₘ/(bₘRT) supera Ω_a/Ω_b de la EOS
+activa, el fluido se clasifica como <b>líquido</b> comprimido. Esta
+condición cubre la región de alta presión sin necesidad del punto
+crítico de la mezcla.</li>
+<li><b>Compresibilidad isotérmica.</b> Si Z &gt; 0.3 y β &gt; 0.75
+simultáneamente, el fluido se clasifica como <b>vapor</b>. La condición
+Z &gt; 0.3 descarta líquidos muy comprimidos donde β puede ser elevado.</li>
+<li><b>Composición de ligeros.</b> Si Z &gt; 0.75 y la suma de fracciones
+molares de los compuestos con punto normal de ebullición menor a 230 K
+supera la de los pesados, el fluido se clasifica como <b>vapor</b>; en
+caso contrario como <b>líquido</b>.</li>
+</ol>
+<p>El criterio β tiene prioridad sobre el criterio A/B porque β &gt; 0.75
+es condición suficiente de comportamiento gaseoso incluso a alta presión
+(por ejemplo, cerca del punto crítico de la mezcla). El criterio A/B
+tiene prioridad sobre la regla de composición porque sin esa compuerta,
+en la región densa donde Z permanece por encima de 0.75, la regla de
+composición devolvería vapor en todo el rango de temperatura.</p>
+<p>Los compuestos con NBP &lt; 230 K en el sistema de ThermoPhase son
+N₂ (77 K), metano (111 K), etano (185 K) y CO₂ (195 K). El propano
+(NBP ≈ 231 K) y los restantes quedan clasificados como pesados.</p>
+"""
+
+S5_5 = """
+<h2>5.5 Variante con parámetros PVTsim</h2>
+<p>Las variantes PR_PVT y SRK_PVT aplican el mismo algoritmo de
+identificación. Las constantes Ω_a/Ω_b son idénticas porque la forma
+cúbica de las EOS no varía entre bases de datos.</p>
+<p>Los valores de aₘ y bₘ sí dependen de los parámetros de componente.
+PVTsim sigue las tablas de Pedersen y Christensen (2007), que para los
+componentes puros ligeros difieren ligeramente de las propiedades de la
+base de datos de HYSYS, principalmente en Tc y ω del metano y el etano.
+Esas diferencias desplazan la temperatura de frontera en la misma magnitud
+que el error en los parámetros de componente.</p>
+<h3>Referencias</h3>
+<p>Peng, D.Y. y Robinson, D.B. (1976). A Two-Constant Equation of State.
+<em>Industrial and Engineering Chemistry Fundamentals</em>, 15(1), 59-64.</p>
+<p>Soave, G. (1972). Equilibrium constants from a modified Redlich-Kwong
+equation of state. <em>Chemical Engineering Science</em>, 27(6), 1197-1203.</p>
+<p>Pedersen, K.S. y Christensen, P.L. (2007). <em>Phase Behavior of
+Petroleum Reservoir Fluids</em>. CRC Press.</p>
+"""
+
+
+
 SECCIONES = [
     ("1. Fundamentos de las EOS cúbicas", [
         ("1.1 Ecuación de estado", S1_1),
@@ -979,6 +1111,13 @@ SECCIONES = [
         ("4.3 Método de Michelsen", S4_3),
         ("4.4 Flujo de cálculo combinado", S4_4),
         ("4.5 Punto crítico y líneas de calidad", S4_5),
+    ]),
+    ("5. Identificación de fase monofásica", [
+        ("5.1 El problema monofásico", S5_1),
+        ("5.2 Compresibilidad isotérmica", S5_2),
+        ("5.3 Criterio de alta presión (A/B)", S5_3),
+        ("5.4 Algoritmo completo", S5_4),
+        ("5.5 Variante PVTsim", S5_5),
     ]),
 ]
 import re
