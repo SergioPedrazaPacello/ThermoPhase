@@ -331,8 +331,11 @@ def bi(i):
 # Orden: N2, CO2, C1, C2, C3, iC4, nC4, iC5, nC5, C6, C7, C8, C9
 # Valores exactos extraídos de HYSYS (Characteristic Volume).
 # COSTALD usa el factor acentrico SRK (OMEGA_SRK), definido arriba.
-VSTAR_COSTALD = [1.44406, 1.50301, 1.59207, 2.33469, 3.20497, 4.11402, 4.07494,
-                 4.95916, 4.98687, 5.89800, 6.89499, 7.85577, 8.85661]
+VSTAR_COSTALD = [1.44406259610429, 1.50301050037563, 1.59207474108040,
+                 2.33469056218594, 3.20497359396994, 4.11402119133174,
+                 4.07493606017590, 4.95915522098005, 4.98686707688451,
+                 5.89799703768849, 6.89498606080413, 7.85577337211072,
+                 8.85660679522634]
 
 def costald_Vs(comp, T):
     """Volumen molar de líquido saturado por COSTALD (ft3/lbmol).
