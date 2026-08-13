@@ -65,21 +65,38 @@ def _rho_kgm3_en_punto(z, T, P, kij, PM):
         mix = e._costald_mix_params(z)
         if mix is not None:
             Tcm = mix[0]
-            V_liq = e.V_liq_costald_smooth(z, T, P, kij=kij)
-            if V_liq is not None and V_liq > 0:
-                Tr = T/Tcm
-                rho_CP = PM/V_liq
-                if Tr < 0.90:
-                    rho_lbft3 = rho_CP
-                else:
-                    Z_L = ZL if dos_raices else ZV
-                    rho_EOS = P*PM/(Z_L*R*T)
-                    t = min(max((Tr - 0.90)/0.10, 0.0), 1.0)
-                    w_EOS = t*t
-                    rho_lbft3 = (1.0 - w_EOS)*rho_CP + w_EOS*rho_EOS
-            else:
+            Tr = T/Tcm
+            if Tr >= 1.0:
+                # Región supercrítica en T: densidad por la EOS
                 Z_use = ZL if dos_raices else ZV
                 rho_lbft3 = P*PM/(Z_use*R*T)
+            elif Tr <= 0.95:
+                # COSTALD con corrección de líquido comprimido
+                V_liq = e.V_liq_costald_smooth(z, T, P, kij=kij)
+                if V_liq is not None and V_liq > 0:
+                    rho_lbft3 = PM/V_liq
+                else:
+                    Z_use = ZL if dos_raices else ZV
+                    rho_lbft3 = P*PM/(Z_use*R*T)
+            else:
+                # Banda de transición 0.95 < Tr < 1.0: interpolación lineal
+                # entre la densidad de líquido en Tr=0.95 (COSTALD) y la
+                # densidad de vapor en Tr=1.05 (EOS), tal como en el método
+                # de suavizado de densidad líquida.
+                T95 = 0.95*Tcm
+                V95 = e.V_liq_costald_smooth(z, T95, P, kij=kij)
+                if V95 is not None and V95 > 0:
+                    rho95 = PM/V95
+                else:
+                    am95 = e.am(z, T95, kij); bm95 = e.bm(z)
+                    _, ZL95 = e.solve_Z(*e.AB(am95, bm95, T95, P))
+                    rho95 = P*PM/(ZL95*R*T95)
+                T105 = 1.05*Tcm
+                am105 = e.am(z, T105, kij); bm105 = e.bm(z)
+                ZV105, _ = e.solve_Z(*e.AB(am105, bm105, T105, P))
+                rho105 = P*PM/(ZV105*R*T105)
+                frac = (Tr - 0.95)/(1.05 - 0.95)
+                rho_lbft3 = rho95 + (rho105 - rho95)*frac
         else:
             Z_use = ZL if dos_raices else ZV
             rho_lbft3 = P*PM/(Z_use*R*T)

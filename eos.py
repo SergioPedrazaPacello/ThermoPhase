@@ -426,7 +426,10 @@ def _costald_mix_params(comp):
                 VSTAR_COSTALD[i]*TC[i]*VSTAR_COSTALD[j]*TC[j])
     Tcm = num/Vm_star
     om  = sum(comp[i]*OMEGA_SRK[i] for i in range(NC))
-    Pcm = sum(comp[i]*PC[i] for i in range(NC))  # Pc pseudocrítica Kay
+    # Presión pseudocrítica de la mezcla (Thomson, Brobst y Hankinson):
+    #   Zcm = 0.291 − 0.080·ω_SRK,m ;  Pcm = Zcm·R·Tcm/V*m
+    Zcm = 0.291 - 0.080*om
+    Pcm = Zcm*R_GAS*Tcm/Vm_star
     return Tcm, om, Pcm
 
 def _Ps_wilson(comp, T):
@@ -476,19 +479,52 @@ def _Ps_burbuja_PR(comp, T, kij, max_iter=30, tol=1e-6):
         Kw = Kw_new
     return P if (P > 0 and np.isfinite(P)) else _Ps_wilson(comp, T)
 
+def _Ps_riedel_costald(Tr, om, Pcm):
+    """Presión de saturación de la mezcla por la ecuación de Riedel
+    (Hankinson, Estes y Coker), usada por la corrección de líquido
+    comprimido de COSTALD.
+
+        log₁₀(PRs) = PR⁰ + ω_SRK·PR¹
+        PR⁰ = 5.8031817·log₁₀(TR) + 0.07608141·F
+        PR¹ = 4.86601·G
+        F   = 35.0 − 36.0/TR − 96.376·log₁₀(TR) + TR⁶
+        G   = log₁₀(TR) + 0.03721754·F
+        Ps  = PRs·Pcm
+
+    Válida para 0 < TR < 1.  Devuelve la presión en las mismas unidades
+    que Pcm (psia).
+    """
+    if Tr <= 0.0 or Tr >= 1.0:
+        return None
+    log10Tr = np.log10(Tr)
+    F   = 35.0 - 36.0/Tr - 96.376*log10Tr + Tr**6
+    G   = log10Tr + 0.03721754*F
+    PR0 = 5.8031817*log10Tr + 0.07608141*F
+    PR1 = 4.86601*G
+    PRs = 10.0**(PR0 + om*PR1)
+    return PRs*Pcm
+
+
 def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
-    """Volumen molar de líquido según algoritmo HYSYS "Smooth Liquid Density"
-    (COSTALD saturado + corrección Chueh-Prausnitz + interpolación EOS).
+    """Volumen molar de líquido por el método COSTALD con corrección de
+    presión para líquido comprimido (ecuación tipo Tait generalizada).
 
     Retorna None si la mezcla no admite estado líquido en (T,P) por COSTALD
-    (Vs no calculable). El caller debe entonces caer a la EOS.
+    (Vs no calculable, Tr ≥ 1). El caller debe entonces caer a la EOS.
+
+        V = Vs·(1 − C·ln((B+P)/(B+Ps)))
+        B = Pcm·(−1 − 9.070217·τ^⅓ + 62.45326·τ^⅔ − 135.1102·τ + e₁·τ^(4/3))
+        e₁ = exp(4.79594 + 0.250047·ω_SRK + 1.14188·ω_SRK²)
+        C  = 0.0861488 + 0.0344483·ω_SRK
+        τ  = 1 − Tr
+
+    donde Pcm es la presión pseudocrítica de la mezcla y Ps la presión de
+    saturación de la mezcla por la ecuación de Riedel.
 
     Argumentos:
         Ps  — presión de saturación de la mezcla a T (psia).  Si es None,
-              se calcula internamente por bubble-point PR (más preciso
-              cerca del crítico que Wilson).  Pasarla explícitamente
-              cuando el caller ya la conoce para evitar recomputarla.
-        kij — matriz de kij; requerida sólo si Ps es None.
+              se calcula por la ecuación de Riedel de COSTALD.
+        kij — no usado (se mantiene por compatibilidad de interfaz).
     """
     mix = _costald_mix_params(comp)
     if mix is None: return None
@@ -497,21 +533,20 @@ def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
     if Vs is None or Vs <= 0: return None
     Tr = T/Tcm
     if Ps is None:
-        if kij is None: kij = KIJ_DEFAULT
-        Ps = _Ps_burbuja_PR(comp, T, kij)
+        Ps = _Ps_riedel_costald(Tr, om, Pcm)
+        if Ps is None or Ps <= 0:
+            return Vs                 # sin Ps válida, mantener saturado
     if P <= Ps:
         return Vs                     # COSTALD saturado tal cual
-    # Chueh-Prausnitz compressed-liquid correction
+    # Corrección de líquido comprimido (Tait generalizada)
     tau = 1.0 - Tr
-    a, b, d = -9.070217, 62.45326, -135.1102
-    f, g, h = 4.79594, 0.250047, 1.14188
-    e_val = np.exp(f + g*om + h*om*om)
-    beta = Pcm*(-1.0 + a*tau**(1/3.0) + b*tau**(2/3.0)
-                    + d*tau + e_val*tau**(4/3.0))
-    c_CP = 0.0894
-    if beta + Ps <= 0 or beta + P <= 0:
+    e1  = np.exp(4.79594 + 0.250047*om + 1.14188*om*om)
+    B   = Pcm*(-1.0 - 9.070217*tau**(1/3.0) + 62.45326*tau**(2/3.0)
+               - 135.1102*tau + e1*tau**(4/3.0))
+    C   = 0.0861488 + 0.0344483*om
+    if B + Ps <= 0 or B + P <= 0:
         return Vs                     # fuera del rango, mantener saturado
-    V_CP = Vs*(1.0 - c_CP*np.log((beta + P)/(beta + Ps)))
+    V_CP = Vs*(1.0 - C*np.log((B + P)/(B + Ps)))
     return V_CP if V_CP > 0 else Vs
 # ── m, alpha, ai·alpha para cada EOS ───────────────────────────
 # PR: m = 0.37464 + 1.54226 ω − 0.26992 ω²
