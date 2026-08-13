@@ -1279,27 +1279,48 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         #
         # El caso "P < Ps" (presión subsaturada) está manejado dentro de
         # V_liq_costald_smooth: devuelve Vs sin corrección de presión.
+        # Método COSTALD con suavizado de densidad líquida.  La correlación
+        # COSTALD con corrección de líquido comprimido se aplica para la
+        # temperatura pseudo-reducida de la mezcla menor a 0.95.  En la banda
+        # 0.95 ≤ Tr < 1.0 se interpola linealmente entre la densidad de
+        # líquido en Tr=0.95 y la densidad de vapor de la EOS en Tr=1.05,
+        # dando una transición continua hacia el régimen supercrítico.  Para
+        # Tr ≥ 1.0 se usa directamente la densidad de la EOS.
         if metodo_densidad == 'COSTALD':
             mix = _costald_mix_params(x)
-            V_liq = V_liq_costald_smooth(x, T, P, kij=kij) if mix is not None else None
-            if V_liq is not None and V_liq > 0 and mix is not None:
-                # ρ y Z de COSTALD+Chueh-Prausnitz
-                rho_l_CP = PM_l/V_liq
-                ZL_CP    = P*V_liq/(R_GAS*T)
+            if mix is not None:
                 Tcm = mix[0]
                 Tr  = T/Tcm
-                if Tr < 0.90:
-                    rho_l  = rho_l_CP
-                    ZL_fin = ZL_CP
+                if Tr >= 1.0:
+                    rho_l = rho_l_EOS
+                elif Tr <= 0.95:
+                    V_liq = V_liq_costald_smooth(x, T, P, kij=kij)
+                    if V_liq is not None and V_liq > 0:
+                        rho_l  = PM_l/V_liq
+                        ZL_fin = P*V_liq/(R_GAS*T)
+                    else:
+                        rho_l = rho_l_EOS
                 else:
-                    # Interpolación cuadrática entre CP (Tr=0.90) y EOS (Tr=1.00)
-                    t = min(max((Tr - 0.90)/0.10, 0.0), 1.0)
-                    w_EOS = t*t
-                    w_CP  = 1.0 - w_EOS
-                    rho_l  = w_CP*rho_l_CP + w_EOS*rho_l_EOS
-                    ZL_fin = w_CP*ZL_CP    + w_EOS*ZLL_l
+                    # Banda de transición 0.95 < Tr < 1.0: interpolación
+                    # entre la densidad de líquido en Tr=0.95 (COSTALD) y la
+                    # densidad de la EOS en Tr=1.0, con perfil cuadrático que
+                    # sigue la curvatura de la densidad hacia el punto crítico
+                    # de la mezcla.
+                    T95 = 0.95*Tcm
+                    V95 = V_liq_costald_smooth(x, T95, P, kij=kij)
+                    if V95 is not None and V95 > 0:
+                        rho95 = PM_l/V95
+                    else:
+                        am95 = am(x, T95, kij); bm95 = bm(x)
+                        _, ZL95 = solve_Z(*AB(am95, bm95, T95, P))
+                        rho95 = P*PM_l/(ZL95*R_GAS*T95)
+                    T100 = Tcm
+                    am100 = am(x, T100, kij); bm100 = bm(x)
+                    _, ZL100 = solve_Z(*AB(am100, bm100, T100, P))
+                    rho100 = P*PM_l/(ZL100*R_GAS*T100)
+                    frac = (Tr - 0.95)/(1.0 - 0.95)
+                    rho_l = rho95 + (rho100 - rho95)*frac*frac
             else:
-                # Tr ≥ 1 o mixing rule COSTALD falla → EOS
                 rho_l = rho_l_EOS
         else:
             # Método EOS explícitamente pedido

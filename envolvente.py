@@ -502,13 +502,38 @@ def propiedades_punto(T, P, x, y, kij=None, metodo_densidad='COSTALD'):
     _,ZL = _solveZ(*_AB(am_l,bm_l,T,P))
     ZL_eos = ZL   # raíz EOS del líquido (para H/S de partida)
     if metodo_densidad == 'COSTALD':
-        Vs = costald_Vs(x, T)
-        if Vs and Vs > 0:
-            out['rho_l'] = PM_l/Vs
-            out['ZL'] = P*Vs/(_R*T)
+        from eos import (V_liq_costald_smooth as _Vcost,
+                         _costald_mix_params as _cmix)
+        mix = _cmix(x)
+        rho_eos_l = P*PM_l/(ZL*_R*T) if ZL>0 else None
+        if mix is not None:
+            Tcm = mix[0]; Tr = T/Tcm
+            if Tr >= 1.0:
+                out['rho_l'] = rho_eos_l; out['ZL'] = ZL
+            elif Tr <= 0.95:
+                V_liq = _Vcost(x, T, P, kij=kij)
+                if V_liq and V_liq > 0:
+                    out['rho_l'] = PM_l/V_liq
+                    out['ZL'] = P*V_liq/(_R*T)
+                else:
+                    out['rho_l'] = rho_eos_l; out['ZL'] = ZL
+            else:
+                # Banda de transición 0.95 < Tr < 1.0 (perfil cuadrático)
+                T95 = 0.95*Tcm
+                V95 = _Vcost(x, T95, P, kij=kij)
+                if V95 and V95 > 0:
+                    rho95 = PM_l/V95
+                else:
+                    _,ZL95 = _solveZ(*_AB(_am(x,T95,kij),_bm(x),T95,P))
+                    rho95 = P*PM_l/(ZL95*_R*T95)
+                T100 = Tcm
+                _,ZL100 = _solveZ(*_AB(_am(x,T100,kij),_bm(x),T100,P))
+                rho100 = P*PM_l/(ZL100*_R*T100)
+                frac = (Tr - 0.95)/(1.0 - 0.95)
+                out['rho_l'] = rho95 + (rho100 - rho95)*frac*frac
+                out['ZL'] = P*(PM_l/out['rho_l'])/(_R*T)
         else:
-            out['rho_l'] = P*PM_l/(ZL*_R*T) if ZL>0 else None
-            out['ZL'] = ZL
+            out['rho_l'] = rho_eos_l; out['ZL'] = ZL
     else:
         out['rho_l'] = P*PM_l/(ZL*_R*T) if ZL>0 else None
         out['ZL'] = ZL

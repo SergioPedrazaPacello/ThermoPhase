@@ -79,10 +79,9 @@ def _rho_kgm3_en_punto(z, T, P, kij, PM):
                     Z_use = ZL if dos_raices else ZV
                     rho_lbft3 = P*PM/(Z_use*R*T)
             else:
-                # Banda de transición 0.95 < Tr < 1.0: interpolación lineal
-                # entre la densidad de líquido en Tr=0.95 (COSTALD) y la
-                # densidad de vapor en Tr=1.05 (EOS), tal como en el método
-                # de suavizado de densidad líquida.
+                # Banda de transición 0.95 < Tr < 1.0: interpolación con
+                # perfil cuadrático entre la densidad de líquido en Tr=0.95
+                # (COSTALD) y la densidad de la EOS en Tr=1.0.
                 T95 = 0.95*Tcm
                 V95 = e.V_liq_costald_smooth(z, T95, P, kij=kij)
                 if V95 is not None and V95 > 0:
@@ -91,12 +90,12 @@ def _rho_kgm3_en_punto(z, T, P, kij, PM):
                     am95 = e.am(z, T95, kij); bm95 = e.bm(z)
                     _, ZL95 = e.solve_Z(*e.AB(am95, bm95, T95, P))
                     rho95 = P*PM/(ZL95*R*T95)
-                T105 = 1.05*Tcm
-                am105 = e.am(z, T105, kij); bm105 = e.bm(z)
-                ZV105, _ = e.solve_Z(*e.AB(am105, bm105, T105, P))
-                rho105 = P*PM/(ZV105*R*T105)
-                frac = (Tr - 0.95)/(1.05 - 0.95)
-                rho_lbft3 = rho95 + (rho105 - rho95)*frac
+                T100 = Tcm
+                am100 = e.am(z, T100, kij); bm100 = e.bm(z)
+                _, ZL100 = e.solve_Z(*e.AB(am100, bm100, T100, P))
+                rho100 = P*PM/(ZL100*R*T100)
+                frac = (Tr - 0.95)/(1.0 - 0.95)
+                rho_lbft3 = rho95 + (rho100 - rho95)*frac*frac
         else:
             Z_use = ZL if dos_raices else ZV
             rho_lbft3 = P*PM/(Z_use*R*T)
