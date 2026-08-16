@@ -857,9 +857,17 @@ class TabEnvolvente(QWidget):
         reg = self._regiones
         if reg is not None:
             import matplotlib.cm as _cm
-            Tg_F = reg['Tg'] - 459.67
-            Pg   = reg['Pg']
-            rho  = reg['rho_map']
+            # Las mallas se almacenan en unidades internas (°R, psia).  El
+            # extent del imshow y el polígono del fill deben convertirse al
+            # sistema de unidades activo, igual que las curvas de burbuja y
+            # rocío, para que el fondo coloreado y el sombreado se muevan con
+            # el resto del gráfico al cambiar de sistema.
+            Tg_F = np.array([_u.t_desde_R(t) for t in reg['Tg']])
+            Pg   = np.array([_u.p_desde_psia(p) for p in reg['Pg']])
+            # rho_map se guarda en unidades internas (lb/ft³); se convierte
+            # a la unidad de densidad activa para que la barra de color y su
+            # etiqueta sean coherentes con el sistema seleccionado.
+            rho  = _u.dens_desde(reg['rho_map'])
             try:
                 cmap = matplotlib.colormaps.get_cmap('RdYlGn').copy()
             except (AttributeError, KeyError):
@@ -880,7 +888,9 @@ class TabEnvolvente(QWidget):
             # de recorrido natural (sin invertir la rocío)
             poly = reg.get('poly_env_TP')
             if poly is not None and len(poly) >= 3:
-                poly_F = np.column_stack([poly[:,0] - 459.67, poly[:,1]])
+                poly_T = np.array([_u.t_desde_R(t) for t in poly[:,0]])
+                poly_P = np.array([_u.p_desde_psia(p) for p in poly[:,1]])
+                poly_F = np.column_stack([poly_T, poly_P])
                 ax.fill(poly_F[:,0], poly_F[:,1],
                         color='#E8E8E8', alpha=1.0, zorder=1,
                         edgecolor='none')
@@ -986,8 +996,8 @@ class TabEnvolvente(QWidget):
         # Cuando hay regiones monofásicas activas, forzar los límites al rango
         # extendido (imshow no siempre los ajusta al inflar el gráfico)
         if self._regiones is not None:
-            Tg_F = self._regiones['Tg'] - 459.67
-            Pg   = self._regiones['Pg']
+            Tg_F = np.array([_u.t_desde_R(t) for t in self._regiones['Tg']])
+            Pg   = np.array([_u.p_desde_psia(p) for p in self._regiones['Pg']])
             ax.set_xlim(float(Tg_F[0]),  float(Tg_F[-1]))
             ax.set_ylim(float(Pg[0]),    float(Pg[-1]))
         # Nota: set_position() se aplicó al inicio de _plot para que las
