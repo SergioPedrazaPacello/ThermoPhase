@@ -490,7 +490,7 @@ def _Ps_riedel_costald(Tr, om, Pcm):
         log₁₀(PRs) = PR⁰ + ω_SRK·PR¹
         PR⁰ = 5.8031817·log₁₀(TR) + 0.07608141·F
         PR¹ = 4.86601·G
-        F   = 35.0 − 36.0/TR − 96.376·log₁₀(TR) + TR⁶
+        F   = 35.0 − 36.0/TR − 96.736·log₁₀(TR) + TR⁶
         G   = log₁₀(TR) + 0.03721754·F
         Ps  = PRs·Pcm
 
@@ -500,7 +500,7 @@ def _Ps_riedel_costald(Tr, om, Pcm):
     if Tr <= 0.0 or Tr >= 1.0:
         return None
     log10Tr = np.log10(Tr)
-    F   = 35.0 - 36.0/Tr - 96.376*log10Tr + Tr**6
+    F   = 35.0 - 36.0/Tr - 96.736*log10Tr + Tr**6
     G   = log10Tr + 0.03721754*F
     PR0 = 5.8031817*log10Tr + 0.07608141*F
     PR1 = 4.86601*G
