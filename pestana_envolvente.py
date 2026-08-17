@@ -222,10 +222,11 @@ class RegionesWorker(QThread):
     done  = pyqtSignal(dict)
     error = pyqtSignal(str)
 
-    def __init__(self, z, kij, n_grid=100, n_curva=40):
+    def __init__(self, z, kij, n_grid=100, n_curva=40, metodo='COSTALD'):
         super().__init__()
         self.z = z; self.kij = kij
         self.n_grid = n_grid; self.n_curva = n_curva
+        self.metodo = metodo
 
     def run(self):
         try:
@@ -269,16 +270,20 @@ class RegionesWorker(QThread):
             # 2) Mapa de densidad con esa envolvente
             reg_res = rf.calcular_mapa_densidad(
                 self.z, self.kij, env_res,
-                n_grid=self.n_grid, n_curva=self.n_curva)
+                n_grid=self.n_grid, n_curva=self.n_curva, metodo=self.metodo)
             self.done.emit({'envolvente': env_res, 'regiones': reg_res})
         except Exception as e:
             self.error.emit(str(e))
 
 
 class TabEnvolvente(QWidget):
-    def __init__(self, get_z, get_kij):
+    def __init__(self, get_z, get_kij, get_metodo_densidad=None):
         super().__init__()
         self.get_z=get_z; self.get_kij=get_kij
+        # Callback opcional que devuelve el método de densidad a usar en el
+        # mapa ('COSTALD', 'EOS' o 'Peneloux').  Permite que el mapa respete
+        # la corrección de volumen elegida en el equilibrio correspondiente.
+        self.get_metodo_densidad = get_metodo_densidad
         self.worker=None; self.result=None
         self.iso_worker=None
         self.regiones_worker=None
@@ -646,8 +651,12 @@ class TabEnvolvente(QWidget):
         kij = self.get_kij()
         self.chk_reg.setEnabled(False)
         self.lbl_reg_cargando.setText("(cargando)")
+        metodo = 'COSTALD'
+        if self.get_metodo_densidad is not None:
+            try: metodo = self.get_metodo_densidad() or 'COSTALD'
+            except Exception: metodo = 'COSTALD'
         self.regiones_worker = RegionesWorker(
-            z, kij, n_grid=100, n_curva=40)
+            z, kij, n_grid=100, n_curva=40, metodo=metodo)
         self.regiones_worker.done.connect(self._on_regiones_done)
         self.regiones_worker.error.connect(self._on_regiones_error)
         self.regiones_worker.finished.connect(self._on_regiones_finished)
@@ -857,17 +866,9 @@ class TabEnvolvente(QWidget):
         reg = self._regiones
         if reg is not None:
             import matplotlib.cm as _cm
-            # Las mallas se almacenan en unidades internas (°R, psia).  El
-            # extent del imshow y el polígono del fill deben convertirse al
-            # sistema de unidades activo, igual que las curvas de burbuja y
-            # rocío, para que el fondo coloreado y el sombreado se muevan con
-            # el resto del gráfico al cambiar de sistema.
-            Tg_F = np.array([_u.t_desde_R(t) for t in reg['Tg']])
-            Pg   = np.array([_u.p_desde_psia(p) for p in reg['Pg']])
-            # rho_map se guarda en unidades internas (lb/ft³); se convierte
-            # a la unidad de densidad activa para que la barra de color y su
-            # etiqueta sean coherentes con el sistema seleccionado.
-            rho  = _u.dens_desde(reg['rho_map'])
+            Tg_F = reg['Tg'] - 459.67
+            Pg   = reg['Pg']
+            rho  = reg['rho_map']
             try:
                 cmap = matplotlib.colormaps.get_cmap('RdYlGn').copy()
             except (AttributeError, KeyError):
@@ -888,9 +889,7 @@ class TabEnvolvente(QWidget):
             # de recorrido natural (sin invertir la rocío)
             poly = reg.get('poly_env_TP')
             if poly is not None and len(poly) >= 3:
-                poly_T = np.array([_u.t_desde_R(t) for t in poly[:,0]])
-                poly_P = np.array([_u.p_desde_psia(p) for p in poly[:,1]])
-                poly_F = np.column_stack([poly_T, poly_P])
+                poly_F = np.column_stack([poly[:,0] - 459.67, poly[:,1]])
                 ax.fill(poly_F[:,0], poly_F[:,1],
                         color='#E8E8E8', alpha=1.0, zorder=1,
                         edgecolor='none')
@@ -996,8 +995,8 @@ class TabEnvolvente(QWidget):
         # Cuando hay regiones monofásicas activas, forzar los límites al rango
         # extendido (imshow no siempre los ajusta al inflar el gráfico)
         if self._regiones is not None:
-            Tg_F = np.array([_u.t_desde_R(t) for t in self._regiones['Tg']])
-            Pg   = np.array([_u.p_desde_psia(p) for p in self._regiones['Pg']])
+            Tg_F = self._regiones['Tg'] - 459.67
+            Pg   = self._regiones['Pg']
             ax.set_xlim(float(Tg_F[0]),  float(Tg_F[-1]))
             ax.set_ylim(float(Pg[0]),    float(Pg[-1]))
         # Nota: set_position() se aplicó al inicio de _plot para que las

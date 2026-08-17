@@ -32,8 +32,12 @@ import eos as e
 
 
 # ── Densidad en un punto ────────────────────────────────────────
-def _rho_kgm3_en_punto(z, T, P, kij, PM):
+def _rho_kgm3_en_punto(z, T, P, kij, PM, metodo='COSTALD'):
     """Densidad kg/m³ de la fase estable en (T,P) para la composición z.
+
+    El parámetro `metodo` selecciona la ruta de densidad de líquido:
+    'COSTALD' (estados correspondientes con suavizado), 'Peneloux'
+    (traslado de volumen sobre la EOS) o 'EOS' (ecuación de estado).
 
     En puntos con dos raíces reales de PR (dentro y cerca de la
     envolvente), elige la raíz de Gibbs mínimo, que corresponde al
@@ -62,43 +66,54 @@ def _rho_kgm3_en_punto(z, T, P, kij, PM):
         liquido = (e.fase_supercritica(z, T, P, ZV, kij) == "liquido")
 
     if liquido:
-        mix = e._costald_mix_params(z)
-        if mix is not None:
-            Tcm = mix[0]
-            Tr = T/Tcm
-            if Tr >= 1.0:
-                # Región supercrítica en T: densidad por la EOS
-                Z_use = ZL if dos_raices else ZV
-                rho_lbft3 = P*PM/(Z_use*R*T)
-            elif Tr <= 0.95:
-                # COSTALD con corrección de líquido comprimido
-                V_liq = e.V_liq_costald_smooth(z, T, P, kij=kij)
-                if V_liq is not None and V_liq > 0:
-                    rho_lbft3 = PM/V_liq
-                else:
-                    Z_use = ZL if dos_raices else ZV
-                    rho_lbft3 = P*PM/(Z_use*R*T)
-            else:
-                # Banda de transición 0.95 < Tr < 1.0: interpolación con
-                # perfil cuadrático entre la densidad de líquido en Tr=0.95
-                # (COSTALD) y la densidad de la EOS en Tr=1.0.
-                T95 = 0.95*Tcm
-                V95 = e.V_liq_costald_smooth(z, T95, P, kij=kij)
-                if V95 is not None and V95 > 0:
-                    rho95 = PM/V95
-                else:
-                    am95 = e.am(z, T95, kij); bm95 = e.bm(z)
-                    _, ZL95 = e.solve_Z(*e.AB(am95, bm95, T95, P))
-                    rho95 = P*PM/(ZL95*R*T95)
-                T100 = Tcm
-                am100 = e.am(z, T100, kij); bm100 = e.bm(z)
-                _, ZL100 = e.solve_Z(*e.AB(am100, bm100, T100, P))
-                rho100 = P*PM/(ZL100*R*T100)
-                frac = (Tr - 0.95)/(1.0 - 0.95)
-                rho_lbft3 = rho95 + (rho100 - rho95)*frac*frac
-        else:
+        # EOS puro: densidad de la ecuación de estado
+        if metodo == 'EOS':
             Z_use = ZL if dos_raices else ZV
             rho_lbft3 = P*PM/(Z_use*R*T)
+        # Peneloux: traslado de volumen sobre el volumen de la EOS
+        elif metodo == 'Peneloux':
+            Z_use = ZL if dos_raices else ZV
+            V_eos = Z_use*R*T/P
+            V_pen = e.V_liq_peneloux(z, V_eos)
+            rho_lbft3 = PM/V_pen if V_pen > 0 else P*PM/(Z_use*R*T)
+        else:
+            mix = e._costald_mix_params(z)
+            if mix is not None:
+                Tcm = mix[0]
+                Tr = T/Tcm
+                if Tr >= 1.0:
+                    # Región supercrítica en T: densidad por la EOS
+                    Z_use = ZL if dos_raices else ZV
+                    rho_lbft3 = P*PM/(Z_use*R*T)
+                elif Tr <= 0.95:
+                    # COSTALD con corrección de líquido comprimido
+                    V_liq = e.V_liq_costald_smooth(z, T, P, kij=kij)
+                    if V_liq is not None and V_liq > 0:
+                        rho_lbft3 = PM/V_liq
+                    else:
+                        Z_use = ZL if dos_raices else ZV
+                        rho_lbft3 = P*PM/(Z_use*R*T)
+                else:
+                    # Banda de transición 0.95 < Tr < 1.0: interpolación con
+                    # perfil cuadrático entre la densidad de líquido en Tr=0.95
+                    # (COSTALD) y la densidad de la EOS en Tr=1.0.
+                    T95 = 0.95*Tcm
+                    V95 = e.V_liq_costald_smooth(z, T95, P, kij=kij)
+                    if V95 is not None and V95 > 0:
+                        rho95 = PM/V95
+                    else:
+                        am95 = e.am(z, T95, kij); bm95 = e.bm(z)
+                        _, ZL95 = e.solve_Z(*e.AB(am95, bm95, T95, P))
+                        rho95 = P*PM/(ZL95*R*T95)
+                    T100 = Tcm
+                    am100 = e.am(z, T100, kij); bm100 = e.bm(z)
+                    _, ZL100 = e.solve_Z(*e.AB(am100, bm100, T100, P))
+                    rho100 = P*PM/(ZL100*R*T100)
+                    frac = (Tr - 0.95)/(1.0 - 0.95)
+                    rho_lbft3 = rho95 + (rho100 - rho95)*frac*frac
+            else:
+                Z_use = ZL if dos_raices else ZV
+                rho_lbft3 = P*PM/(Z_use*R*T)
     else:
         Z_use = ZV
         rho_lbft3 = P*PM/(Z_use*R*T)
@@ -164,7 +179,7 @@ def _envolvente_polygon_TP(resultado_env):
 
 # ── Función principal ───────────────────────────────────────────
 def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
-                           progress_cb=None):
+                           progress_cb=None, metodo='COSTALD'):
     """Genera el mapa de densidad + polígono envolvente + curva de
     transición.  Todo en un solo paso para minimizar el ida-y-vuelta
     con el worker.
@@ -211,7 +226,7 @@ def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
     for j, P in enumerate(Pg):
         for i, T in enumerate(Tg):
             try:
-                rho_map[j, i] = _rho_kgm3_en_punto(z, float(T), float(P), kij, PM)
+                rho_map[j, i] = _rho_kgm3_en_punto(z, float(T), float(P), kij, PM, metodo)
             except Exception:
                 rho_map[j, i] = np.nan
             N_done += 1

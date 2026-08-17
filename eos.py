@@ -551,6 +551,53 @@ def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
         return Vs                     # fuera del rango, mantener saturado
     V_CP = Vs*(1.0 - C*np.log((B + P)/(B + Ps)))
     return V_CP if V_CP > 0 else Vs
+
+
+# ── Corrección de volumen de Peneloux ──────────────────────────
+# Traslado de volumen (volume shift) que mejora la densidad de líquido
+# predicha por la ecuación de estado sin alterar el equilibrio de fases.
+# Formulación de PVTsim (Pedersen y Christensen):
+#
+#   V_corregido = V_EOS − c_m        c_m = Σ xᵢ·cᵢ
+#
+# El parámetro de traslado de cada componente se estima a partir de las
+# propiedades críticas y del factor de compresibilidad de Rackett:
+#
+#   Z_RA,i = 0.29056 − 0.08775·ωᵢ
+#
+#   SRK:  cᵢ = 0.40768·(R·Tcᵢ/Pcᵢ)·(0.29441 − Z_RA,i)
+#   PR :  cᵢ = 0.50033·(R·Tcᵢ/Pcᵢ)·(0.25969 − Z_RA,i)
+#
+# El traslado de volumen es algebraicamente neutro en el cálculo del
+# equilibrio (el término c se cancela en la relación de fugacidades),
+# por lo que solo se aplica a la densidad reportada.
+
+def c_peneloux_i(i, eos=None):
+    """Parámetro de traslado de volumen de Peneloux del componente i
+    [ft³/lbmol], según la EOS indicada (SRK o PR)."""
+    if eos is None:
+        eos = _EOS_ACTIVA
+    Z_RA = 0.29056 - 0.08775*OMEGA[i]
+    RTc_Pc = R_GAS*TC[i]/PC[i]
+    if es_srk(eos):
+        return 0.40768*RTc_Pc*(0.29441 - Z_RA)
+    return 0.50033*RTc_Pc*(0.25969 - Z_RA)
+
+
+def c_peneloux_mezcla(comp, eos=None):
+    """Parámetro de traslado de volumen de la mezcla [ft³/lbmol]:
+    c_m = Σ xᵢ·cᵢ (regla de mezclado clásica)."""
+    if eos is None:
+        eos = _EOS_ACTIVA
+    return sum(comp[i]*c_peneloux_i(i, eos) for i in range(NC) if comp[i] != 0)
+
+
+def V_liq_peneloux(comp, V_eos, eos=None):
+    """Volumen molar de líquido corregido por Peneloux [ft³/lbmol]:
+    V = V_EOS − c_m.  V_eos es el volumen molar de la ecuación de estado."""
+    c_m = c_peneloux_mezcla(comp, eos)
+    V = V_eos - c_m
+    return V if V > 0 else V_eos
 # ── m, alpha, ai·alpha para cada EOS ───────────────────────────
 # PR: m = 0.37464 + 1.54226 ω − 0.26992 ω²
 # SRK: m = 0.480 + 1.574 ω − 0.176 ω²  (Soave 1972 original)
@@ -1253,43 +1300,21 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         # la correlación COSTALD no es aplicable en el estado (T,P) actual.
         rho_l_EOS = P*PM_l/(ZL_fin*R_GAS*T)
 
-        # Algoritmo HYSYS "Smooth Liquid Density" (activado por default con
-        # COSTALD).  El criterio de aplicabilidad de COSTALD+Chueh-Prausnitz
-        # NO es el número de raíces de PR sino la temperatura reducida de
-        # la mezcla (documentado literalmente en el manual, sec. A.4.1):
+        # Ruta de cálculo de la densidad de líquido según el método pedido:
+        #   'EOS'      → densidad de la ecuación de estado
+        #   'Peneloux' → densidad de la EOS con traslado de volumen
+        #   'COSTALD'  → estados correspondientes con suavizado de densidad
         #
-        #   "It is used to predict the density for all systems whose
-        #    pseudo-reduced temperature is below 1.0.  Above this
-        #    temperature, the equation of state compressibility factor is
-        #    used to calculate the liquid density."
-        #
-        # Con Smooth Liquid Density activo, HYSYS suaviza la transición
-        # interpolando en la banda Tr ∈ [0.90, 1.00] con perfil CUADRÁTICO
-        # w = t², donde t = (Tr−0.90)/0.10.  Los valores 0.90 y "cuadrático"
-        # se identificaron por backward-fitting contra cuatro puntos HYSYS
-        # verificados (C1/C2 90/10 a T=300°R,P=4000/6000; y T=350°R,
-        # P=2000/5000), que quedan con error < 1% en densidad y factor Z
-        # con esa combinación — la interpolación lineal en [0.95,1.00] que
-        # documenta un manual antiguo de Aspen deja error residual de ~2%.
-        # Las cotas Tr y la forma cuadrática son constantes universales
-        # (identificadas del comportamiento observado de HYSYS), no
-        # calibradas por composición ni por punto.
-        #
-        # Ramas:
-        #   Tr < 0.90         → COSTALD saturado + Chueh-Prausnitz
-        #   0.90 ≤ Tr ≤ 1.00  → interpolación cuadrática COSTALD_CP ↔ EOS
-        #   Tr > 1.00         → EOS  (V_liq_costald_smooth retorna None)
-        #
-        # El caso "P < Ps" (presión subsaturada) está manejado dentro de
-        # V_liq_costald_smooth: devuelve Vs sin corrección de presión.
-        # Método COSTALD con suavizado de densidad líquida.  La correlación
-        # COSTALD con corrección de líquido comprimido se aplica para la
-        # temperatura pseudo-reducida de la mezcla menor a 0.95.  En la banda
-        # 0.95 ≤ Tr < 1.0 se interpola linealmente entre la densidad de
-        # líquido en Tr=0.95 y la densidad de vapor de la EOS en Tr=1.05,
-        # dando una transición continua hacia el régimen supercrítico.  Para
-        # Tr ≥ 1.0 se usa directamente la densidad de la EOS.
-        if metodo_densidad == 'COSTALD':
+        # Para COSTALD, la correlación con corrección de líquido comprimido
+        # se aplica cuando la temperatura pseudo-reducida de la mezcla es
+        # menor a 0.95.  En la banda 0.95 ≤ Tr < 1.0 se interpola con perfil
+        # cuadrático entre la densidad de líquido en Tr=0.95 y la densidad
+        # de la EOS en Tr=1.0.  Para Tr ≥ 1.0 se usa la densidad de la EOS.
+        if metodo_densidad == 'Peneloux':
+            V_pen = V_liq_peneloux(x, ZL_fin*R_GAS*T/P)
+            rho_l = PM_l/V_pen if V_pen > 0 else rho_l_EOS
+            ZL_fin = P*V_pen/(R_GAS*T)
+        elif metodo_densidad == 'COSTALD':
             mix = _costald_mix_params(x)
             if mix is not None:
                 Tcm = mix[0]

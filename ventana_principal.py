@@ -430,6 +430,29 @@ class TabEquilibrio(QWidget):
 
         rp.addSpacing(4)
 
+        # Fila selector Corrección de volumen (misma estetica que Densidad).
+        # Propio de esta ventana de equilibrio: para la composición principal
+        # se sincroniza con la barra; para un fluido es independiente.
+        vol_row = QHBoxLayout(); vol_row.setSpacing(4)
+        vol_row.addStretch()
+        lbl_vol = QLabel("Corrección de volumen:")
+        lbl_vol.setFixedHeight(22); lbl_vol.setFixedWidth(150)
+        lbl_vol.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        lbl_vol.setStyleSheet(
+            f'background:{GRAY_LBL};border:1px solid {BORDER};'
+            f'padding:2px 6px;font-family:"{FONT_F}";font-size:{FS}pt;')
+        vol_row.addWidget(lbl_vol, alignment=Qt.AlignmentFlag.AlignVCenter)
+        self.cmb_vol = QComboBox()
+        self.cmb_vol.addItems(["Ninguna", "Peneloux"])
+        self.cmb_vol.setFixedHeight(22); self.cmb_vol.setFixedWidth(110)
+        _aplicar_estilo_combo(self.cmb_vol)
+        vol_row.addWidget(self.cmb_vol, alignment=Qt.AlignmentFlag.AlignVCenter)
+        rp.addLayout(vol_row)
+        # Switch local: Peneloux fuerza densidad a EOS y la bloquea.
+        self.cmb_vol.currentIndexChanged.connect(self._on_vol_local)
+
+        rp.addSpacing(4)
+
         # Fila selector Ecuación de estado (misma estetica que Densidad).
         eos_row = QHBoxLayout(); eos_row.setSpacing(4)
         eos_row.addStretch()
@@ -642,6 +665,7 @@ class TabEquilibrio(QWidget):
                 'T_R':         float(_u.R_desde_abs(Tabs)) if Tabs > 0 else 0.0,
                 'P_psi':       float(self.get_P()),
                 'densidad':    self.cmb_dens.currentText(),
+                'correccion_volumen': self.cmb_vol.currentText(),
                 'eos':         _eos_code(self.cmb_eos.currentIndex()),
                 'modo_masico': self.btn_frac.isChecked(),
             },
@@ -670,6 +694,11 @@ class TabEquilibrio(QWidget):
         idx = self.cmb_dens.findText(d)
         if idx >= 0:
             self.cmb_dens.setCurrentIndex(idx)
+        # Corrección de volumen (restaurar y aplicar switch)
+        cv = e.get('correccion_volumen', 'Ninguna')
+        iv = self.cmb_vol.findText(cv)
+        if iv >= 0:
+            self.cmb_vol.setCurrentIndex(iv)
         # EOS (silencioso — MainWindow ya la habra aplicado antes)
         eos_code = e.get('eos', 'PR')
         self.cmb_eos.blockSignals(True)
@@ -732,8 +761,26 @@ class TabEquilibrio(QWidget):
         self.tbl_comp.blockSignals(False)
         self._upd_suma()  # actualiza fila sumatorias
 
+    def _on_vol_local(self, idx):
+        """Switch local de corrección de volumen de esta ventana de
+        equilibrio.  Peneloux corrige la densidad de la EOS, por lo que es
+        incompatible con COSTALD: al activarlo se fuerza la densidad a EOS y
+        se bloquea el selector; al volver a Ninguna se rehabilita."""
+        es_peneloux = (self.cmb_vol.currentText() == 'Peneloux')
+        if es_peneloux:
+            self._densidad_previa_local = self.cmb_dens.currentText()
+            iEOS = self.cmb_dens.findText('EOS')
+            if iEOS >= 0:
+                self.cmb_dens.setCurrentIndex(iEOS)
+            self.cmb_dens.setEnabled(False)
+        else:
+            self.cmb_dens.setEnabled(True)
+            prev = getattr(self, '_densidad_previa_local', 'COSTALD')
+            iPrev = self.cmb_dens.findText(prev)
+            if iPrev >= 0:
+                self.cmb_dens.setCurrentIndex(iPrev)
+
     def calcular(self):
-        z = self.get_z()
         if self.get_P() <= 0 or self.get_T() <= 0:
             dialogos.advertencia(self,
                 "Ingrese la presion y la temperatura.")
@@ -749,8 +796,17 @@ class TabEquilibrio(QWidget):
         kij = self._kij_get() if self._kij_get is not None else kij_user
         # Contexto para calcular entalpia/entropia al recibir el resultado.
         self._hs_ctx = (list(z), self.get_T(), self.get_P(), kij, eos_code)
+        # Método de densidad efectivo.  Cada ventana de equilibrio tiene su
+        # propio selector de corrección de volumen: si está en Peneloux,
+        # prevalece sobre el selector de densidad (bloqueado en EOS); si no,
+        # se usa el método de densidad elegido (COSTALD o EOS).
+        if self.cmb_vol.currentText() == 'Peneloux':
+            metodo_dens = 'Peneloux'
+        else:
+            metodo_dens = self.cmb_dens.currentText()
+        self._metodo_densidad_actual = metodo_dens
         self.worker = Worker(z, self.get_T(), self.get_P(), kij,
-                             metodo_densidad=self.cmb_dens.currentText())
+                             metodo_densidad=metodo_dens)
         self.worker.done.connect(self._on_result)
         self.worker.error.connect(self._on_error)
         self.worker.start()
@@ -1666,6 +1722,7 @@ class MainWindow(QMainWindow):
         # Pestaña principal de equilibrio: reconstruir etiquetas con unidad
         if hasattr(self, 'tab_eq') and hasattr(self.tab_eq, 'aplicar_unidades'):
             import unidades as _u0
+            _i18n.retraducir(self.tab_eq)   # traduce etiquetas y combos propios
             try: self.tab_eq.aplicar_unidades(_u0.sistema())
             except Exception: pass
         if hasattr(self, 'ribbon'):
@@ -1955,7 +2012,8 @@ class MainWindow(QMainWindow):
         # ── Widgets de cada calculo (tamaño / colores identicos) ──
         self.tab_eq   = TabEquilibrio()
         self.tab_env  = TabEnvolvente(get_z=self._getz_main,
-                                      get_kij=lambda: kij_user)
+                                      get_kij=lambda: kij_user,
+                                      get_metodo_densidad=self._metodo_densidad_main)
         self.tab_sat  = TabSaturacion(get_z=self._getz_main,
                                       get_kij=lambda: kij_user)
         self.tab_prop = TabPropiedades(get_z=self._getz_main,
@@ -2069,6 +2127,28 @@ class MainWindow(QMainWindow):
         self.tab_eq.cmb_dens.currentIndexChanged.connect(
             lambda i: self._sync_combo(cmbd, i))
 
+        # ── Corrección de volumen (Peneloux) ─────────────────
+        # Selector global que solo afecta a la composición principal.
+        # Switch: al elegir Peneloux se fuerza la densidad a EOS y se
+        # bloquea el selector de densidad (Peneloux corrige la densidad de
+        # la ecuación de estado, no COSTALD); al volver a Ninguna se
+        # rehabilita el selector de densidad.
+        # ── Corrección de volumen (Peneloux) ─────────────────
+        # La barra solo gobierna la composición principal: se sincroniza en
+        # ambos sentidos con el selector cmb_vol del equilibrio principal,
+        # igual que EOS y densidad.  Los fluidos usan su propio cmb_vol.
+        cmbv = self.selectores.get('volumen')
+        if cmbv is not None and hasattr(self.tab_eq, 'cmb_vol'):
+            idx = self.tab_eq.cmb_vol.currentIndex()
+            cmbv.setCurrentIndex(idx if idx >= 0 else 0)
+            cmbv.currentIndexChanged.connect(
+                lambda i: self.tab_eq.cmb_vol.setCurrentIndex(i))
+            self.tab_eq.cmb_vol.currentIndexChanged.connect(
+                lambda i: self._sync_combo(cmbv, i))
+            # Cuando la barra cambia la corrección de volumen, el switch del
+            # selector de densidad de la barra debe reflejar el del equilibrio.
+            cmbv.currentIndexChanged.connect(self._on_correccion_volumen)
+
         # Envolvente: barra <-> envolvente.cmb_metodo
         cmbe = self.selectores['envolvente']
         if hasattr(self.tab_env, 'cmb_metodo'):
@@ -2086,6 +2166,34 @@ class MainWindow(QMainWindow):
         # Boton de documentacion tecnica de la barra
         if hasattr(self.ribbon, 'btn_doc'):
             self.ribbon.btn_doc.clicked.connect(self._abrir_documentacion)
+
+    def _on_correccion_volumen(self, idx):
+        """Switch de la corrección de volumen en la barra (composición
+        principal).  Mantiene el selector de densidad de la barra coherente
+        con el switch: Peneloux fuerza densidad a EOS y la bloquea; Ninguna
+        la rehabilita.  La sincronización del valor con el equilibrio
+        principal la realiza el cableado de _cablear_selectores."""
+        cmbd = self.selectores.get('densidad')
+        es_peneloux = (idx == 1)
+        self._correccion_volumen = 'Peneloux' if es_peneloux else 'Ninguna'
+        if cmbd is not None:
+            if es_peneloux:
+                self._densidad_previa = cmbd.currentText()
+                iEOS = cmbd.findText('EOS')
+                if iEOS >= 0:
+                    self._sync_combo(cmbd, iEOS)
+                cmbd.setEnabled(False)
+            else:
+                cmbd.setEnabled(True)
+                prev = getattr(self, '_densidad_previa', 'COSTALD')
+                iPrev = cmbd.findText(prev)
+                if iPrev >= 0:
+                    self._sync_combo(cmbd, iPrev)
+
+    def correccion_volumen_activa(self):
+        """Devuelve 'Peneloux' o 'Ninguna' — corrección de volumen global
+        vigente para la composición principal."""
+        return getattr(self, '_correccion_volumen', 'Ninguna')
 
     def _on_unidades(self, idx):
         """Cambia el sistema de unidades de TODA la interfaz. El motor sigue
@@ -2138,6 +2246,15 @@ class MainWindow(QMainWindow):
         principal (la de la barra / Equilibrio principal) antes de leer z."""
         _set_eos(self._eos_main_code())
         return self.tab_eq.get_z()
+
+    def _metodo_densidad_main(self):
+        """Método de densidad efectivo de la composición principal, para el
+        mapa de densidad de la envolvente principal.  Refleja el selector de
+        corrección de volumen (Peneloux) y el de densidad (COSTALD/EOS) del
+        equilibrio principal."""
+        if self.tab_eq.cmb_vol.currentText() == 'Peneloux':
+            return 'Peneloux'
+        return self.tab_eq.cmb_dens.currentText()
 
     def _refrescar_pies(self):
         """Actualiza el pie (EOS) de cada ventana abierta."""
@@ -2349,8 +2466,19 @@ class MainWindow(QMainWindow):
         fluido."""
         gz = lambda f=fluido: self._getz_fluido(f)
         gk = lambda f=fluido: f['kij']
+        def gm(f=fluido):
+            # Método de densidad del fluido para su mapa: lee de la ventana
+            # de equilibrio del fluido si está abierta (fuente de verdad de
+            # sus selectores), con Peneloux prevaleciendo sobre densidad.
+            sub = self._subventanas.get(f"equilibrio@{f['nombre']}")
+            w = getattr(sub, '_widget', None) if sub is not None else None
+            if w is not None and hasattr(w, 'cmb_vol'):
+                if w.cmb_vol.currentText() == 'Peneloux':
+                    return 'Peneloux'
+                return w.cmb_dens.currentText()
+            return f.get('densidad', 'COSTALD')
         if clave == 'envolvente':
-            return TabEnvolvente(get_z=gz, get_kij=gk)
+            return TabEnvolvente(get_z=gz, get_kij=gk, get_metodo_densidad=gm)
         if clave == 'saturacion':
             return TabSaturacion(get_z=gz, get_kij=gk)
         if clave == 'propiedades':

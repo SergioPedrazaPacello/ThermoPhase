@@ -43,6 +43,7 @@ _SELECTORES = [
     ("eos",        "Ecuación de estado:", ["Peng-Robinson (HYSYS)", "SRK (HYSYS)",
                                            "Peng-Robinson (PVTsim)", "SRK (PVTsim)"]),
     ("densidad",   "Densidad:",           ["COSTALD", "EOS"]),
+    ("volumen",    "Corrección de volumen:", ["Ninguna", "Peneloux"]),
     ("envolvente", "Método envolvente:",  ["Ziervogel-Poling", "Michelsen"]),
     ("unidades",   "Sistema de unidades:", ["Field", "SI"]),
 ]
@@ -160,6 +161,7 @@ def construir_ribbon(acciones=None):
         return l
 
     _ICONO = {"eos": "eos", "densidad": "densidad",
+              "volumen": "volumen",
               "envolvente": "envolvente", "unidades": "unidades"}
     combos = {}
     grupos = []

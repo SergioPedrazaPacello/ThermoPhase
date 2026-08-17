@@ -55,6 +55,7 @@ TRAD = {
 
     # Barra de selectores / navegador
     "Ecuación de estado:": "Equation of state:", "Densidad:": "Density:",
+    "Corrección de volumen:": "Volume correction:", "Ninguna": "None",
     "Método envolvente:": "Envelope method:", "Navegador": "Navigator",
     "Cálculos": "Calculations", "Datos": "Data",
 

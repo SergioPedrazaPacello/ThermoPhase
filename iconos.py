@@ -583,6 +583,34 @@ def _unidades(p):
     p.drawEllipse(QRectF(cx - 1.7, cy - 1.7, 3.4, 3.4))
 
 
+def _volumen(p):
+    # Corrección de volumen: cubo en perspectiva con una flecha de ajuste
+    # vertical (representa el traslado del volumen molar).
+    OUT = QColor("#4A4A4A")
+    # Cara frontal del cubo
+    p.setPen(_pen(OUT, 1.5)); p.setBrush(QBrush(QColor("#5A86BE")))
+    p.drawRect(QRectF(7, 12, 12, 12))
+    # Cara superior (paralelogramo)
+    top = QPainterPath()
+    top.moveTo(7, 12); top.lineTo(12, 7); top.lineTo(24, 7); top.lineTo(19, 12)
+    top.closeSubpath()
+    p.setBrush(QBrush(QColor("#7BA3D6"))); p.drawPath(top)
+    # Cara lateral derecha
+    side = QPainterPath()
+    side.moveTo(19, 12); side.lineTo(24, 7); side.lineTo(24, 19); side.lineTo(19, 24)
+    side.closeSubpath()
+    p.setBrush(QBrush(QColor("#42648F"))); p.drawPath(side)
+    # Flecha roja de ajuste (doble punta vertical) a la derecha
+    p.setPen(_pen(QColor("#C0392B"), 1.8))
+    p.drawLine(QPointF(27.5, 8), QPointF(27.5, 23))
+    ar = QPainterPath()
+    ar.moveTo(27.5, 6.5); ar.lineTo(25.6, 9.5); ar.lineTo(29.4, 9.5); ar.closeSubpath()
+    ar2 = QPainterPath()
+    ar2.moveTo(27.5, 24.5); ar2.lineTo(25.6, 21.5); ar2.lineTo(29.4, 21.5); ar2.closeSubpath()
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#C0392B")))
+    p.drawPath(ar); p.drawPath(ar2)
+
+
 def _documentacion(p):
     # Documentacion tecnica: documento con esquina doblada e insignia roja de
     # interrogacion.
@@ -633,6 +661,7 @@ _REGISTRO = {
     "parametros": _parametros, "corriente": _corriente,
     # barra de herramientas
     "eos": _eos, "densidad": _densidad, "unidades": _unidades,
+    "volumen": _volumen,
     "documentacion": _documentacion,
 }
 
