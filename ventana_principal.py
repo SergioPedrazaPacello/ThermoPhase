@@ -1722,6 +1722,17 @@ class MainWindow(QMainWindow):
             _i18n.retraducir(self.tab_eq)   # traduce etiquetas y combos propios
             try: self.tab_eq.aplicar_unidades(_u0.sistema())
             except Exception: pass
+        # Pestaña principal de envolvente: reconstruir etiquetas (incluidas
+        # cricondentérmica y cricondenbárica) y re-trazar en el nuevo idioma.
+        if hasattr(self, 'tab_env'):
+            import unidades as _u0
+            _i18n.retraducir(self.tab_env)
+            if hasattr(self.tab_env, 'retraducir_grafico'):
+                try: self.tab_env.retraducir_grafico()
+                except Exception: pass
+            if hasattr(self.tab_env, 'aplicar_unidades'):
+                try: self.tab_env.aplicar_unidades(_u0.sistema())
+                except Exception: pass
         if hasattr(self, 'ribbon'):
             _i18n.retraducir(self.ribbon)
         if hasattr(self, 'nav'):

@@ -584,37 +584,22 @@ def _unidades(p):
 
 
 def _volumen(p):
-    # Corrección de volumen: recipiente graduado con nivel de líquido y una
-    # flecha de ajuste que indica la corrección aplicada al volumen.
-    OUT = QColor("#4A4A4A")
-    # Cuerpo del recipiente (vaso ligeramente cónico)
-    body = QPainterPath()
-    body.moveTo(9, 6); body.lineTo(10.5, 25)
-    body.quadTo(10.7, 27, 13, 27); body.lineTo(19, 27)
-    body.quadTo(21.3, 27, 21.5, 25); body.lineTo(23, 6)
-    p.setPen(_pen(OUT, 1.6)); p.setBrush(QBrush(QColor("#FDFDFD")))
-    p.drawPath(body)
-    # Líquido dentro (parte inferior)
-    liq = QPainterPath()
-    liq.moveTo(11.0, 16.5); liq.lineTo(11.6, 25)
-    liq.quadTo(11.8, 26.4, 13, 26.4); liq.lineTo(19, 26.4)
-    liq.quadTo(20.2, 26.4, 20.4, 25); liq.lineTo(21.0, 16.5)
-    liq.closeSubpath()
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#5A86BE")))
-    p.drawPath(liq)
-    # Marcas de graduación
-    p.setPen(_pen(QColor("#7A7A7A"), 1.0))
-    for yy in (11, 14, 17, 20):
-        p.drawLine(QPointF(19.5, yy), QPointF(22.0, yy))
-    # Flecha roja de ajuste (doble punta vertical) a la izquierda del nivel
-    p.setPen(_pen(QColor("#C0392B"), 1.7))
-    p.drawLine(QPointF(6.5, 11), QPointF(6.5, 20))
-    up = QPainterPath()
-    up.moveTo(6.5, 9.3); up.lineTo(4.8, 12.2); up.lineTo(8.2, 12.2); up.closeSubpath()
-    dn = QPainterPath()
-    dn.moveTo(6.5, 21.7); dn.lineTo(4.8, 18.8); dn.lineTo(8.2, 18.8); dn.closeSubpath()
-    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#C0392B")))
-    p.drawPath(up); p.drawPath(dn)
+    # Corrección de volumen: un cubo 3D simple (en tono ámbar, distinto del
+    # azul de la densidad) que representa el volumen molar.
+    OUT = QColor("#8A5A18")
+    # Cara frontal
+    p.setPen(_pen(OUT, 1.5)); p.setBrush(QBrush(QColor("#E8A54B")))
+    p.drawRect(QRectF(8, 13, 12, 12))
+    # Cara superior (paralelogramo)
+    top = QPainterPath()
+    top.moveTo(8, 13); top.lineTo(12.5, 8); top.lineTo(24.5, 8); top.lineTo(20, 13)
+    top.closeSubpath()
+    p.setBrush(QBrush(QColor("#F4C77E"))); p.drawPath(top)
+    # Cara lateral derecha
+    side = QPainterPath()
+    side.moveTo(20, 13); side.lineTo(24.5, 8); side.lineTo(24.5, 20); side.lineTo(20, 25)
+    side.closeSubpath()
+    p.setBrush(QBrush(QColor("#C67E28"))); p.drawPath(side)
 
 
 def _documentacion(p):

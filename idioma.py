@@ -185,6 +185,8 @@ TRAD = {
     "Cricondenbárica (psi):": "Cricondenbar (psi):",
     "Cricondentermica (°F):": "Cricondentherm (°F):",
     "Cricondenbarica (psi):": "Cricondenbar (psi):",
+    "Cricondentérmica": "Cricondentherm",
+    "Cricondenbárica": "Cricondenbar",
     "Línea de isocalidad N°1:": "Quality line No.1:",
     "Línea de isocalidad N°2:": "Quality line No.2:",
     "Línea de isocalidad N°3:": "Quality line No.3:",
