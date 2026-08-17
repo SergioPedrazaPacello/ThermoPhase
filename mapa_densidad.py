@@ -117,6 +117,12 @@ def _rho_kgm3_en_punto(z, T, P, kij, PM, metodo='COSTALD'):
     else:
         Z_use = ZV
         rho_lbft3 = P*PM/(Z_use*R*T)
+        # Corrección de volumen de Peneloux en la fase vapor
+        if metodo == 'Peneloux':
+            V_eos = Z_use*R*T/P
+            V_pen = e.V_liq_peneloux(z, V_eos)
+            if V_pen > 0:
+                rho_lbft3 = PM/V_pen
 
     return rho_lbft3   # unidades del programa (lb/ft³)
 

@@ -1291,6 +1291,16 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         ZV_fin,_=solve_Z(*AB(am_v,bm_v,T,P))
         rho_v=P*PM_v/(ZV_fin*R_GAS*T)
         sg_v=PM_v/28.9625
+        # Corrección de volumen de Peneloux en la fase vapor.  El traslado
+        # V = V_EOS − c desplaza el volumen molar y por tanto el factor de
+        # compresibilidad de la mezcla en vapor (composición y):
+        #   Z = P·(V_EOS − c)/(R·T) = Z_EOS − P·c/(R·T)
+        if metodo_densidad == 'Peneloux':
+            V_eos_v = ZV_fin*R_GAS*T/P
+            V_pen_v = V_liq_peneloux(y, V_eos_v)
+            if V_pen_v > 0:
+                rho_v  = PM_v/V_pen_v
+                ZV_fin = P*V_pen_v/(R_GAS*T)
     if L>0 and PM_l>0:
         am_l=am(x,T,kij); bm_l=bm(x)
         ZVL_l, ZLL_l = solve_Z(*AB(am_l,bm_l,T,P))

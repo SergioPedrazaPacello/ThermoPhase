@@ -379,8 +379,9 @@ class TabEquilibrio(QWidget):
 
         rp.addStretch(2)   # empuja bloque botones+selector hacia el centro
 
-        # Fila de botones
+        # Fila de botones (alineados a la derecha)
         btn_row = QHBoxLayout(); btn_row.setSpacing(8)
+        btn_row.addStretch()
 
         # Botón toggle que alterna entre Fraccion molar / masica
         self.btn_frac = QPushButton("Fraccion masica")
