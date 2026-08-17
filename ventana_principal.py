@@ -411,7 +411,9 @@ class TabEquilibrio(QWidget):
 
         rp.addSpacing(6)   # pequeño espacio entre botones y selector
 
-        # Fila selector densidad — etiqueta igual a inp_lbl + combobox, alineados a derecha
+        # Fila selector densidad + corrección de volumen (misma fila para no
+        # aumentar la altura del panel).  Etiqueta + combo, alineados a la
+        # derecha, con el mismo estilo que las demás filas.
         dens_row = QHBoxLayout(); dens_row.setSpacing(4)
         dens_row.addStretch()
         lbl_dens = QLabel("Densidad:")
@@ -426,28 +428,21 @@ class TabEquilibrio(QWidget):
         self.cmb_dens.setFixedHeight(22); self.cmb_dens.setFixedWidth(110)
         _aplicar_estilo_combo(self.cmb_dens)
         dens_row.addWidget(self.cmb_dens, alignment=Qt.AlignmentFlag.AlignVCenter)
-        rp.addLayout(dens_row)
-
-        rp.addSpacing(4)
-
-        # Fila selector Corrección de volumen (misma estetica que Densidad).
-        # Propio de esta ventana de equilibrio: para la composición principal
-        # se sincroniza con la barra; para un fluido es independiente.
-        vol_row = QHBoxLayout(); vol_row.setSpacing(4)
-        vol_row.addStretch()
+        # Corrección de volumen a la derecha de densidad, en la misma fila.
+        dens_row.addSpacing(10)
         lbl_vol = QLabel("Corrección de volumen:")
-        lbl_vol.setFixedHeight(22); lbl_vol.setFixedWidth(150)
+        lbl_vol.setFixedHeight(22)
         lbl_vol.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         lbl_vol.setStyleSheet(
             f'background:{GRAY_LBL};border:1px solid {BORDER};'
             f'padding:2px 6px;font-family:"{FONT_F}";font-size:{FS}pt;')
-        vol_row.addWidget(lbl_vol, alignment=Qt.AlignmentFlag.AlignVCenter)
+        dens_row.addWidget(lbl_vol, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.cmb_vol = QComboBox()
         self.cmb_vol.addItems(["Ninguna", "Peneloux"])
         self.cmb_vol.setFixedHeight(22); self.cmb_vol.setFixedWidth(110)
         _aplicar_estilo_combo(self.cmb_vol)
-        vol_row.addWidget(self.cmb_vol, alignment=Qt.AlignmentFlag.AlignVCenter)
-        rp.addLayout(vol_row)
+        dens_row.addWidget(self.cmb_vol, alignment=Qt.AlignmentFlag.AlignVCenter)
+        rp.addLayout(dens_row)
         # Switch local: Peneloux fuerza densidad a EOS y la bloquea.
         self.cmb_vol.currentIndexChanged.connect(self._on_vol_local)
 
@@ -781,6 +776,7 @@ class TabEquilibrio(QWidget):
                 self.cmb_dens.setCurrentIndex(iPrev)
 
     def calcular(self):
+        z = self.get_z()
         if self.get_P() <= 0 or self.get_T() <= 0:
             dialogos.advertencia(self,
                 "Ingrese la presion y la temperatura.")

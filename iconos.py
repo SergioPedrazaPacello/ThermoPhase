@@ -584,31 +584,37 @@ def _unidades(p):
 
 
 def _volumen(p):
-    # Corrección de volumen: cubo en perspectiva con una flecha de ajuste
-    # vertical (representa el traslado del volumen molar).
+    # Corrección de volumen: recipiente graduado con nivel de líquido y una
+    # flecha de ajuste que indica la corrección aplicada al volumen.
     OUT = QColor("#4A4A4A")
-    # Cara frontal del cubo
-    p.setPen(_pen(OUT, 1.5)); p.setBrush(QBrush(QColor("#5A86BE")))
-    p.drawRect(QRectF(7, 12, 12, 12))
-    # Cara superior (paralelogramo)
-    top = QPainterPath()
-    top.moveTo(7, 12); top.lineTo(12, 7); top.lineTo(24, 7); top.lineTo(19, 12)
-    top.closeSubpath()
-    p.setBrush(QBrush(QColor("#7BA3D6"))); p.drawPath(top)
-    # Cara lateral derecha
-    side = QPainterPath()
-    side.moveTo(19, 12); side.lineTo(24, 7); side.lineTo(24, 19); side.lineTo(19, 24)
-    side.closeSubpath()
-    p.setBrush(QBrush(QColor("#42648F"))); p.drawPath(side)
-    # Flecha roja de ajuste (doble punta vertical) a la derecha
-    p.setPen(_pen(QColor("#C0392B"), 1.8))
-    p.drawLine(QPointF(27.5, 8), QPointF(27.5, 23))
-    ar = QPainterPath()
-    ar.moveTo(27.5, 6.5); ar.lineTo(25.6, 9.5); ar.lineTo(29.4, 9.5); ar.closeSubpath()
-    ar2 = QPainterPath()
-    ar2.moveTo(27.5, 24.5); ar2.lineTo(25.6, 21.5); ar2.lineTo(29.4, 21.5); ar2.closeSubpath()
+    # Cuerpo del recipiente (vaso ligeramente cónico)
+    body = QPainterPath()
+    body.moveTo(9, 6); body.lineTo(10.5, 25)
+    body.quadTo(10.7, 27, 13, 27); body.lineTo(19, 27)
+    body.quadTo(21.3, 27, 21.5, 25); body.lineTo(23, 6)
+    p.setPen(_pen(OUT, 1.6)); p.setBrush(QBrush(QColor("#FDFDFD")))
+    p.drawPath(body)
+    # Líquido dentro (parte inferior)
+    liq = QPainterPath()
+    liq.moveTo(11.0, 16.5); liq.lineTo(11.6, 25)
+    liq.quadTo(11.8, 26.4, 13, 26.4); liq.lineTo(19, 26.4)
+    liq.quadTo(20.2, 26.4, 20.4, 25); liq.lineTo(21.0, 16.5)
+    liq.closeSubpath()
+    p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#5A86BE")))
+    p.drawPath(liq)
+    # Marcas de graduación
+    p.setPen(_pen(QColor("#7A7A7A"), 1.0))
+    for yy in (11, 14, 17, 20):
+        p.drawLine(QPointF(19.5, yy), QPointF(22.0, yy))
+    # Flecha roja de ajuste (doble punta vertical) a la izquierda del nivel
+    p.setPen(_pen(QColor("#C0392B"), 1.7))
+    p.drawLine(QPointF(6.5, 11), QPointF(6.5, 20))
+    up = QPainterPath()
+    up.moveTo(6.5, 9.3); up.lineTo(4.8, 12.2); up.lineTo(8.2, 12.2); up.closeSubpath()
+    dn = QPainterPath()
+    dn.moveTo(6.5, 21.7); dn.lineTo(4.8, 18.8); dn.lineTo(8.2, 18.8); dn.closeSubpath()
     p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor("#C0392B")))
-    p.drawPath(ar); p.drawPath(ar2)
+    p.drawPath(up); p.drawPath(dn)
 
 
 def _documentacion(p):
