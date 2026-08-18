@@ -219,6 +219,7 @@ PROP_RESUMEN = [
     ('pm',          'Peso molecular',              None,   4, True),
     ('entalpia',    'Entalpia molar',              'H',    2, True),
     ('entropia',    'Entropia molar',              'S',    4, True),
+    ('viscosidad',  'Viscosidad',                  'visc', 5, False),
 ]
 PROP_DEFAULT = ['frac_molar', 'frac_masica', 'sg', 'densidad', 'z', 'pm']
 _PROP_DEF = {d[0]: d for d in PROP_RESUMEN}
@@ -860,68 +861,136 @@ class TabEquilibrio(QWidget):
         fix_table_size(self.tbl_res)
 
     def _abrir_selector_props(self):
-        """Dialogo para elegir que propiedades mostrar en el resumen.
-        Se puede mostrar como maximo el numero actual de propiedades; para
-        agregar una hay que deseleccionar otra primero."""
-        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QCheckBox,
-                                     QDialogButtonBox, QLabel)
+        """Ventana de selección de propiedades con dos listas: disponibles
+        (izquierda) y seleccionadas (derecha), con botones para mover entre
+        ellas.  Se mantiene la premisa de exactamente 6 propiedades en el
+        resumen del equilibrio."""
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
+                                     QListWidget, QListWidgetItem, QPushButton,
+                                     QLabel, QDialogButtonBox)
         import idioma as _i18n, unidades as _u
-        MAX = len(PROP_DEFAULT)   # numero exacto de propiedades a mostrar (6)
+        MAX = len(PROP_DEFAULT)   # número exacto de propiedades a mostrar (6)
+
+        def etiqueta(key):
+            base = _PROP_DEF[key][1]; mag = _PROP_DEF[key][2]
+            unidad = f" [{_u.u(mag)}]" if mag else ""
+            return f"{_i18n.t(base)}{unidad}"
+
         dlg = QDialog(self)
         dlg.setWindowTitle(_i18n.t("Propiedades a mostrar"))
-        lay = QVBoxLayout(dlg)
-        lay.setContentsMargins(14, 12, 14, 10); lay.setSpacing(6)
-        info = QLabel(_i18n.t("Seleccione las propiedades a mostrar:"))
-        lay.addWidget(info)
-        # Estilo de casillas: indicador claramente visible (verde al marcar)
-        qss = (
-            'QCheckBox { font-family:"%s"; font-size:10pt; spacing:8px;'
-            ' padding:1px 0; }'
-            'QCheckBox::indicator { width:15px; height:15px;'
-            ' border:1.5px solid #7A7A7A; border-radius:3px; background:#FFFFFF; }'
-            'QCheckBox::indicator:checked { background:#2E8B57;'
-            ' border:1.5px solid #256F46; image:url(none); }'
-            'QCheckBox::indicator:checked:disabled { background:#A9C9B5;'
-            ' border:1.5px solid #A9C9B5; }'
-            'QCheckBox::indicator:unchecked:disabled { background:#ECECEC;'
-            ' border:1.5px solid #C4C4C4; }'
-            'QCheckBox:disabled { color:#A0A0A0; }'
-        ) % FONT_F
-        checks = {}
-        for key, base, mag, fmt, has_mix in PROP_RESUMEN:
-            unidad = f" [{_u.u(mag)}]" if mag else ""
-            cb = QCheckBox(f"{_i18n.t(base)}{unidad}")
-            cb.setChecked(key in self._props_sel)
-            cb.setStyleSheet(qss)
-            cb.setCursor(Qt.CursorShape.PointingHandCursor)
-            lay.addWidget(cb); checks[key] = cb
+        dlg.setStyleSheet(f'QDialog {{ background:{GRAY_LBL}; }}')
+        root = QVBoxLayout(dlg)
+        root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
+
+        info = QLabel(_i18n.t(
+            "Seleccione las 6 propiedades a mostrar en el resumen:"))
+        info.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                           f'color:{TEXT};background:transparent;')
+        root.addWidget(info)
+
+        list_qss = (f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
+                    f' font-family:"{FONT_F}"; font-size:{FS}pt; }}'
+                    f'QListWidget::item {{ height:22px; padding-left:4px; }}'
+                    f'QListWidget::item:selected {{ background:#DCDCDC;'
+                    f' color:{TEXT}; }}')
+        btn_qss = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
+                   f'font-family:"{FONT_F}";font-size:{FS}pt;')
+
+        cols = QHBoxLayout(); cols.setSpacing(12)
+
+        # Columna izquierda: disponibles
+        col_izq = QVBoxLayout(); col_izq.setSpacing(3)
+        lbl_disp = QLabel(_i18n.t("Disponibles"))
+        lbl_disp.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                               f'color:{TEXT};background:transparent;')
+        col_izq.addWidget(lbl_disp)
+        lista_disp = QListWidget(); lista_disp.setStyleSheet(list_qss)
+        lista_disp.setFixedSize(230, 210)
+        col_izq.addWidget(lista_disp)
+        cols.addLayout(col_izq)
+
+        # Columna derecha: seleccionadas
+        col_der = QVBoxLayout(); col_der.setSpacing(3)
+        lbl_sel = QLabel(_i18n.t("Seleccionadas"))
+        lbl_sel.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                              f'color:{TEXT};background:transparent;')
+        col_der.addWidget(lbl_sel)
+        lista_sel = QListWidget(); lista_sel.setStyleSheet(list_qss)
+        lista_sel.setFixedSize(230, 210)
+        col_der.addWidget(lista_sel)
+        cols.addLayout(col_der)
+
+        root.addLayout(cols)
+
+        # Fila de botones Agregar / Quitar debajo de las listas
+        acc_row = QHBoxLayout(); acc_row.setSpacing(8)
+        acc_row.addStretch()
+        btn_add = QPushButton(_i18n.t("Agregar"))
+        btn_rem = QPushButton(_i18n.t("Quitar"))
+        for b in (btn_add, btn_rem):
+            b.setFixedHeight(26); b.setMinimumWidth(90)
+            b.setStyleSheet(btn_qss)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+        acc_row.addWidget(btn_add); acc_row.addWidget(btn_rem)
+        acc_row.addStretch()
+        root.addLayout(acc_row)
+
+        def add_item(lista, key):
+            it = QListWidgetItem(etiqueta(key))
+            it.setData(Qt.ItemDataRole.UserRole, key)
+            lista.addItem(it)
+        for key in self._props_sel:
+            add_item(lista_sel, key)
+        for key, *_ in PROP_RESUMEN:
+            if key not in self._props_sel:
+                add_item(lista_disp, key)
+
+        contador = QLabel()
+        contador.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                               f'color:{TEXT};background:transparent;')
+        root.addWidget(contador)
 
         bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                               QDialogButtonBox.StandardButton.Cancel)
         bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
-        lay.addWidget(bb)
-        _ok_btn = bb.button(QDialogButtonBox.StandardButton.Ok)
+        root.addWidget(bb)
+        _ok = bb.button(QDialogButtonBox.StandardButton.Ok)
 
-        def _actualizar_habilitado():
-            n = sum(1 for c in checks.values() if c.isChecked())
-            # Al llegar al maximo, deshabilita las NO marcadas
-            for c in checks.values():
-                c.setEnabled(c.isChecked() or n < MAX)
-            # Aceptar solo cuando hay exactamente MAX seleccionadas
-            _ok_btn.setEnabled(n == MAX)
+        def _actualizar():
+            n = lista_sel.count()
+            contador.setText(_i18n.t("Seleccionadas: ") + f"{n} / {MAX}")
+            _ok.setEnabled(n == MAX)
+            btn_add.setEnabled(n < MAX and lista_disp.count() > 0)
+            btn_rem.setEnabled(lista_sel.count() > 0)
 
-        for c in checks.values():
-            c.stateChanged.connect(lambda _=0: _actualizar_habilitado())
-        _actualizar_habilitado()
+        def _mover(origen, destino):
+            it = origen.currentItem()
+            if it is None:
+                return
+            key = it.data(Qt.ItemDataRole.UserRole)
+            origen.takeItem(origen.row(it))
+            add_item(destino, key)
+            _actualizar()
 
-        # Tamaño compacto ajustado al contenido, y fijo (no redimensionable)
-        dlg.adjustSize()
-        dlg.setFixedSize(dlg.sizeHint())
+        def _agregar():
+            if lista_sel.count() < MAX:
+                _mover(lista_disp, lista_sel)
+        def _quitar():
+            _mover(lista_sel, lista_disp)
+
+        btn_add.clicked.connect(_agregar)
+        btn_rem.clicked.connect(_quitar)
+        lista_disp.itemDoubleClicked.connect(lambda _: _agregar())
+        lista_sel.itemDoubleClicked.connect(lambda _: _quitar())
+        _actualizar()
+
+        dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
 
         if dlg.exec():
-            nuevos = [k for k, *_ in PROP_RESUMEN if checks[k].isChecked()]
+            nuevos = [lista_sel.item(i).data(Qt.ItemDataRole.UserRole)
+                      for i in range(lista_sel.count())]
             if not nuevos:
-                nuevos = list(PROP_DEFAULT)   # nunca dejar la tabla vacia
+                nuevos = list(PROP_DEFAULT)
             self._props_sel = nuevos
             if getattr(self, 'last_result', None) is not None:
                 self._render(self.last_result)
@@ -973,6 +1042,7 @@ class TabEquilibrio(QWidget):
         liq_ok = L > 1e-9
         def cv(val, ok, d=4):
             return f(val, d) if (val is not None and ok) else ""
+        mu_v = r.get('mu_v'); mu_l = r.get('mu_l')   # viscosidad (cP)
         valores = {
             'frac_molar':  ("",          cv(V, vap_ok),  cv(L, liq_ok)),
             'frac_masica': ("",          cv(Vm, vap_ok), cv(Lm, liq_ok)),
@@ -982,6 +1052,7 @@ class TabEquilibrio(QWidget):
             'pm':          (f(PM_z),     cv(PM_v, vap_ok),cv(PM_l, liq_ok)),
             'entalpia':    (f(Hs, 2),    cv(Hv, vap_ok, 2),cv(Hl, liq_ok, 2)),
             'entropia':    (f(Ss),       cv(Sv, vap_ok), cv(Sl, liq_ok)),
+            'viscosidad':  ("",          cv(mu_v, vap_ok, 5),cv(mu_l, liq_ok, 5)),
         }
         self._rebuild_resumen(valores)
 

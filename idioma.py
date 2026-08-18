@@ -85,6 +85,13 @@ TRAD = {
         "Propiedades...": "Properties...",
     "Propiedades a mostrar": "Properties to show",
     "Seleccione las propiedades a mostrar:": "Select the properties to show:",
+    "Seleccione las 6 propiedades a mostrar en el resumen:":
+        "Select the 6 properties to show in the summary:",
+    "Disponibles": "Available",
+    "Seleccionadas": "Selected",
+    "Seleccionadas: ": "Selected: ",
+    "Agregar": "Add",
+    "Viscosidad": "Viscosity",
     "Realizar Calculo": "Run Calculation", "Fraccion masica": "Mass fraction",
     "Fraccion molar": "Mole fraction", "Normalizar": "Normalize",
     "Densidad": "Density", "Ecuacion:": "Equation:",

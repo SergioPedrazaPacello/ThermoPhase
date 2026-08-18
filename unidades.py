@@ -21,11 +21,11 @@ _NOMBRE_INV = {v: k for k, v in NOMBRE_SISTEMA.items()}
 # Unidades por magnitud y sistema
 U = {
     'FIELD':  {'P': 'psia', 'T': '°F', 'dens': 'lb/ft³',
-               'H': 'Btu/lbmol', 'S': 'Btu/lbmol·°F', 'V': 'ft³/lbmol'},
+               'H': 'Btu/lbmol', 'S': 'Btu/lbmol·°F', 'V': 'ft³/lbmol', 'visc': 'cP'},
     'SI':     {'P': 'kPa',  'T': '°C', 'dens': 'kg/m³',
-               'H': 'kJ/kgmol', 'S': 'kJ/kgmol·°C', 'V': 'm³/kgmol'},
+               'H': 'kJ/kgmol', 'S': 'kJ/kgmol·°C', 'V': 'm³/kgmol', 'visc': 'cP'},
     'METRIC': {'P': 'bar',  'T': '°C', 'dens': 'kg/m³',
-               'H': 'kcal/kgmol', 'S': 'kcal/kgmol·°C', 'V': 'm³/kgmol'},
+               'H': 'kcal/kgmol', 'S': 'kcal/kgmol·°C', 'V': 'm³/kgmol', 'visc': 'cP'},
 }
 
 # ── Factores de conversion desde la unidad interna FIELD ─────────────

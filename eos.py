@@ -1369,6 +1369,11 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
     Vm = V*PM_v/den_m if V>0 else 0.0
     Lm = L*PM_l/den_m if L>0 else 0.0
 
+    # Viscosidad de cada fase por Lohrenz-Bray-Clark (cP).  Se evalúa con la
+    # densidad másica de la fase en unidades internas (lb/ft³) y su PM.
+    mu_v = viscosidad_LBC(y, T, rho_v, PM_v) if (V > 0 and rho_v) else None
+    mu_l = viscosidad_LBC(x, T, rho_l, PM_l) if (L > 0 and rho_l) else None
+
     return {
         "V":V,"L":L,"Vm":Vm,"Lm":Lm,
         "x":x,"y":y,"z":list(z),"K":K,
@@ -1378,6 +1383,7 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         "PM_z":PM_z,
         "rho_v":rho_v,"rho_l":rho_l,
         "sg_v":sg_v,"sg_l":sg_l,
+        "mu_v":mu_v,"mu_l":mu_l,
         "modo":modo,
         "iter":it+1,
         "sumKz":sumKz,"sumZK":sumZK
@@ -1408,6 +1414,68 @@ def fase_pvtsim(z, T, P, Z, kij):
         Tcm = sum(z[i] * TCa[i] for i in range(NC))
         Pcm = sum(z[i] * PCa[i] for i in range(NC))
     return "liquido" if T < Tcm else "vapor"
+
+
+# ── Viscosidad por el método Lohrenz-Bray-Clark (LBC) ──────────
+# Correlación de Lohrenz, Bray y Clark (1964).  Relaciona la viscosidad
+# de gas y líquido con un polinomio de cuarto grado en la densidad
+# reducida ρ_r = ρ/ρc:
+#
+#   [(η − η*)·ξ + 1e-4]^(1/4) = a1 + a2·ρr + a3·ρr² + a4·ρr³ + a5·ρr⁴
+#
+# donde η* es la viscosidad de la mezcla de gas diluido y ξ el parámetro
+# reductor de viscosidad de la mezcla.  Fórmulas del manual de PVTsim.
+
+_LBC_A = (0.10230, 0.023364, 0.058533, -0.040758, 0.0093324)
+_CM3MOL_A_FT3LBMOL = 0.0160185   # 1 cm³/mol = 0.0160185 ft³/lbmol
+
+def _visc_gas_diluido_i(i, T_R):
+    """Viscosidad de gas diluido del componente i (cP) por Stiel-Thodos.
+    T_R en °R.  Tc en K y Pc en atm dentro de la correlación."""
+    Tc_K   = TC[i]/1.8
+    Pc_atm = PC[i]/14.696
+    xi_i   = (Tc_K**(1.0/6.0)) / (PM[i]**0.5 * Pc_atm**(2.0/3.0))
+    Tr_i   = (T_R/1.8) / Tc_K
+    if Tr_i <= 1.5:
+        return 34.0e-5 * (Tr_i**0.94) / xi_i
+    return 17.78e-5 * (4.58*Tr_i - 1.67)**(5.0/8.0) / xi_i
+
+def viscosidad_LBC(comp, T_R, rho_masa_lbft3, PM_fase):
+    """Viscosidad de una fase (cP) por Lohrenz-Bray-Clark.
+
+    comp            fracciones molares de la fase
+    T_R             temperatura en °R
+    rho_masa_lbft3  densidad másica de la fase en lb/ft³
+    PM_fase         peso molecular de la fase
+    """
+    if rho_masa_lbft3 is None or rho_masa_lbft3 <= 0 or PM_fase is None:
+        return None
+    z = comp
+    # Viscosidad de gas diluido por componente
+    eta_i = [(_visc_gas_diluido_i(i, T_R) if z[i] != 0 else 0.0)
+             for i in range(NC)]
+    # Mezcla de gas diluido (Herning-Zippener)
+    num = sum(z[i]*eta_i[i]*PM[i]**0.5 for i in range(NC) if z[i] != 0)
+    den = sum(z[i]*PM[i]**0.5          for i in range(NC) if z[i] != 0)
+    if den <= 0:
+        return None
+    eta_star = num/den
+    # Parámetro reductor de viscosidad ξ (Tc en K, Pc en atm)
+    s_zTc = sum(z[i]*(TC[i]/1.8)     for i in range(NC) if z[i] != 0)
+    s_zM  = sum(z[i]*PM[i]           for i in range(NC) if z[i] != 0)
+    s_zPc = sum(z[i]*(PC[i]/14.696)  for i in range(NC) if z[i] != 0)
+    xi = (s_zTc**(1.0/6.0)) / (s_zM**0.5 * s_zPc**(2.0/3.0))
+    # Densidad reducida ρ_r = ρ_molar · Vc_mezcla
+    Vc_m = sum(z[i]*VC[i]*_CM3MOL_A_FT3LBMOL for i in range(NC) if z[i] != 0)
+    rho_molar = rho_masa_lbft3/PM_fase       # lbmol/ft³
+    rho_r = rho_molar*Vc_m
+    # Polinomio LBC
+    a1, a2, a3, a4, a5 = _LBC_A
+    poly = a1 + a2*rho_r + a3*rho_r**2 + a4*rho_r**3 + a5*rho_r**4
+    val = poly**4 - 1.0e-4
+    if val < 0:
+        val = 0.0
+    return val/xi + eta_star   # cP
 
 
 def calcular(z,T,P,kij=None,metodo_densidad='EOS'):
