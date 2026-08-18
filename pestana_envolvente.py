@@ -399,6 +399,7 @@ class TabEnvolvente(QWidget):
         vr.addWidget(_reg_row)
 
         sep=QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
         sep.setStyleSheet(f'color:{BORDER};')
         vr.addWidget(sep)
 
@@ -432,6 +433,7 @@ class TabEnvolvente(QWidget):
 
         # ── Sección: marcar un punto en el gráfico (triángulo verde) ──
         sep2=QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setFrameShadow(QFrame.Shadow.Sunken)
         sep2.setStyleSheet(f'color:{BORDER};')
         vr.addWidget(sep2)
         pt_title=QLabel("Marcar punto:")
@@ -465,6 +467,7 @@ class TabEnvolvente(QWidget):
 
         # ── Sección: líneas de isocalidad (fracción de vapor constante) ──
         sep3=QFrame(); sep3.setFrameShape(QFrame.Shape.HLine)
+        sep3.setFrameShadow(QFrame.Shadow.Sunken)
         sep3.setStyleSheet(f'color:{BORDER};')
         vr.addWidget(sep3)
         iso_title=QLabel("Líneas de isocalidad:")

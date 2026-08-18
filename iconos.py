@@ -584,22 +584,22 @@ def _unidades(p):
 
 
 def _volumen(p):
-    # Corrección de volumen: un cubo 3D simple (en tono ámbar, distinto del
-    # azul de la densidad) que representa el volumen molar.
-    OUT = QColor("#8A5A18")
+    # Corrección de volumen: un cubo 3D simple en tono gris pizarra (neutro,
+    # distinto del azul de la densidad) que representa el volumen molar.
+    OUT = QColor("#3D4450")
     # Cara frontal
-    p.setPen(_pen(OUT, 1.5)); p.setBrush(QBrush(QColor("#E8A54B")))
+    p.setPen(_pen(OUT, 1.5)); p.setBrush(QBrush(QColor("#8993A3")))
     p.drawRect(QRectF(8, 13, 12, 12))
     # Cara superior (paralelogramo)
     top = QPainterPath()
     top.moveTo(8, 13); top.lineTo(12.5, 8); top.lineTo(24.5, 8); top.lineTo(20, 13)
     top.closeSubpath()
-    p.setBrush(QBrush(QColor("#F4C77E"))); p.drawPath(top)
+    p.setBrush(QBrush(QColor("#AAB2BF"))); p.drawPath(top)
     # Cara lateral derecha
     side = QPainterPath()
     side.moveTo(20, 13); side.lineTo(24.5, 8); side.lineTo(24.5, 20); side.lineTo(20, 25)
     side.closeSubpath()
-    p.setBrush(QBrush(QColor("#C67E28"))); p.drawPath(side)
+    p.setBrush(QBrush(QColor("#6B7482"))); p.drawPath(side)
 
 
 def _documentacion(p):
