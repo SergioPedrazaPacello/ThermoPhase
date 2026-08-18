@@ -87,6 +87,8 @@ TRAD = {
     "Seleccione las propiedades a mostrar:": "Select the properties to show:",
     "Seleccione las 6 propiedades a mostrar en el resumen:":
         "Select the 6 properties to show in the summary:",
+    "Seleccione las propiedades a mostrar en el resumen:":
+        "Select the properties to show in the summary:",
     "Disponibles": "Available",
     "Seleccionadas": "Selected",
     "Seleccionadas: ": "Selected: ",
@@ -149,7 +151,7 @@ TRAD = {
     "Peso Molecular (lb/lb-mol)": "Molecular Weight (lb/lb-mol)",
 
     # Botones / dialogos comunes
-    "Aceptar": "OK", "Exportar CSV": "Export CSV",
+    "Aceptar": "OK", "Cancelar": "Cancel", "Exportar CSV": "Export CSV",
     "Coeficientes restaurados.": "Coefficients restored.",
     "Operacion completada.": "Operation completed.",
     "Convergencia exitosa.": "Convergence successful.",

@@ -584,22 +584,31 @@ def _unidades(p):
 
 
 def _volumen(p):
-    # Corrección de volumen: un cubo 3D simple en tono gris pizarra (neutro,
-    # distinto del azul de la densidad) que representa el volumen molar.
-    OUT = QColor("#3D4450")
+    # Corrección de volumen: un cubo 3D translúcido dentro de un par de ejes
+    # (mismo marco que los íconos de envolvente y ecuación de estado), que
+    # representa el volumen molar.
+    # Ejes
+    p.setPen(_pen(QColor("#8A8A8A"), 1.3))
+    p.drawLine(QPointF(6, 4), QPointF(6, 27))
+    p.drawLine(QPointF(6, 27), QPointF(28, 27))
+    # Colores del cubo con transparencia (alpha)
+    OUT = QColor("#3D4450"); OUT.setAlpha(200)
+    c_front = QColor("#8993A3"); c_front.setAlpha(150)
+    c_top   = QColor("#AAB2BF"); c_top.setAlpha(150)
+    c_side  = QColor("#6B7482"); c_side.setAlpha(150)
     # Cara frontal
-    p.setPen(_pen(OUT, 1.5)); p.setBrush(QBrush(QColor("#8993A3")))
-    p.drawRect(QRectF(8, 13, 12, 12))
+    p.setPen(_pen(OUT, 1.4)); p.setBrush(QBrush(c_front))
+    p.drawRect(QRectF(11, 15, 10, 10))
     # Cara superior (paralelogramo)
     top = QPainterPath()
-    top.moveTo(8, 13); top.lineTo(12.5, 8); top.lineTo(24.5, 8); top.lineTo(20, 13)
+    top.moveTo(11, 15); top.lineTo(15, 11); top.lineTo(25, 11); top.lineTo(21, 15)
     top.closeSubpath()
-    p.setBrush(QBrush(QColor("#AAB2BF"))); p.drawPath(top)
+    p.setBrush(QBrush(c_top)); p.drawPath(top)
     # Cara lateral derecha
     side = QPainterPath()
-    side.moveTo(20, 13); side.lineTo(24.5, 8); side.lineTo(24.5, 20); side.lineTo(20, 25)
+    side.moveTo(21, 15); side.lineTo(25, 11); side.lineTo(25, 21); side.lineTo(21, 25)
     side.closeSubpath()
-    p.setBrush(QBrush(QColor("#6B7482"))); p.drawPath(side)
+    p.setBrush(QBrush(c_side)); p.drawPath(side)
 
 
 def _documentacion(p):

@@ -867,7 +867,7 @@ class TabEquilibrio(QWidget):
         resumen del equilibrio."""
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                      QListWidget, QListWidgetItem, QPushButton,
-                                     QLabel, QDialogButtonBox)
+                                     QLabel)
         import idioma as _i18n, unidades as _u
         MAX = len(PROP_DEFAULT)   # número exacto de propiedades a mostrar (6)
 
@@ -878,12 +878,12 @@ class TabEquilibrio(QWidget):
 
         dlg = QDialog(self)
         dlg.setWindowTitle(_i18n.t("Propiedades a mostrar"))
-        dlg.setStyleSheet(f'QDialog {{ background:{GRAY_LBL}; }}')
+        dlg.setStyleSheet('QDialog { background:#efefef; }')
         root = QVBoxLayout(dlg)
         root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
 
         info = QLabel(_i18n.t(
-            "Seleccione las 6 propiedades a mostrar en el resumen:"))
+            "Seleccione las propiedades a mostrar en el resumen:"))
         info.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
                            f'color:{TEXT};background:transparent;')
         root.addWidget(info)
@@ -922,19 +922,6 @@ class TabEquilibrio(QWidget):
 
         root.addLayout(cols)
 
-        # Fila de botones Agregar / Quitar debajo de las listas
-        acc_row = QHBoxLayout(); acc_row.setSpacing(8)
-        acc_row.addStretch()
-        btn_add = QPushButton(_i18n.t("Agregar"))
-        btn_rem = QPushButton(_i18n.t("Quitar"))
-        for b in (btn_add, btn_rem):
-            b.setFixedHeight(26); b.setMinimumWidth(90)
-            b.setStyleSheet(btn_qss)
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-        acc_row.addWidget(btn_add); acc_row.addWidget(btn_rem)
-        acc_row.addStretch()
-        root.addLayout(acc_row)
-
         def add_item(lista, key):
             it = QListWidgetItem(etiqueta(key))
             it.setData(Qt.ItemDataRole.UserRole, key)
@@ -945,21 +932,33 @@ class TabEquilibrio(QWidget):
             if key not in self._props_sel:
                 add_item(lista_disp, key)
 
+        # Fila única inferior: contador a la izquierda; botones Agregar,
+        # Quitar, OK y Cancel a la derecha, todos a la misma altura.
+        fila = QHBoxLayout(); fila.setSpacing(8)
         contador = QLabel()
         contador.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
                                f'color:{TEXT};background:transparent;')
-        root.addWidget(contador)
+        fila.addWidget(contador)
+        fila.addStretch()
 
-        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
-                              QDialogButtonBox.StandardButton.Cancel)
-        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
-        root.addWidget(bb)
-        _ok = bb.button(QDialogButtonBox.StandardButton.Ok)
+        btn_add = QPushButton(_i18n.t("Agregar"))
+        btn_rem = QPushButton(_i18n.t("Quitar"))
+        btn_ok  = QPushButton(_i18n.t("Aceptar"))
+        btn_cancel = QPushButton(_i18n.t("Cancelar"))
+        for b in (btn_add, btn_rem, btn_ok, btn_cancel):
+            b.setFixedHeight(26); b.setMinimumWidth(84)
+            b.setStyleSheet(btn_qss)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            fila.addWidget(b)
+        root.addLayout(fila)
+
+        btn_ok.clicked.connect(dlg.accept)
+        btn_cancel.clicked.connect(dlg.reject)
 
         def _actualizar():
             n = lista_sel.count()
             contador.setText(_i18n.t("Seleccionadas: ") + f"{n} / {MAX}")
-            _ok.setEnabled(n == MAX)
+            btn_ok.setEnabled(n == MAX)
             btn_add.setEnabled(n < MAX and lista_disp.count() > 0)
             btn_rem.setEnabled(lista_sel.count() > 0)
 
