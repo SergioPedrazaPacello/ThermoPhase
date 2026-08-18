@@ -336,7 +336,6 @@ class TabSaturacion(QWidget):
                 self.tbl_prop.setItem(r,c,cc)
         self.tbl_prop.setRowCount(6)
         root.addWidget(self.tbl_prop)
-        root.addStretch()   # el espacio sobrante va al fondo, no entre tablas
 
     def showEvent(self, event):
         super().showEvent(event)

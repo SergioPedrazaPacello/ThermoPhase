@@ -878,7 +878,7 @@ class TabEquilibrio(QWidget):
 
         dlg = QDialog(self)
         dlg.setWindowTitle(_i18n.t("Propiedades a mostrar"))
-        dlg.setStyleSheet('QDialog { background:#efefef; }')
+        dlg.setStyleSheet('QDialog { background:#e0e0e0; }')
         root = QVBoxLayout(dlg)
         root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
 
