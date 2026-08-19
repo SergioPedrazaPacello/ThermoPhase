@@ -1408,6 +1408,113 @@ Chemical Engineering Thermodynamics</em>, 7ª ed. McGraw-Hill.</p>
 
 
 
+S8_1 = """
+<h2>8.1 El método Lohrenz-Bray-Clark</h2>
+<p>La viscosidad dinámica de una mezcla de hidrocarburos puede ser
+necesaria para el dimensionamiento de líneas de flujo, el cálculo de
+caídas de presión y la simulación de procesos de transporte. El programa
+calcula la viscosidad por el método de Lohrenz, Bray y Clark (1964),
+conocido por sus siglas LBC, que expresa la viscosidad de gas y de
+líquido a partir de una sola correlación polinómica en la densidad
+reducida. Este enfoque unificado es el que adopta el software de
+referencia para fluidos de yacimiento.</p>
+<p>El método LBC descompone la viscosidad de la mezcla en dos
+contribuciones: la viscosidad del gas diluido a baja presión, que depende
+solo de la temperatura y la composición, y un residual de densidad que
+recoge el efecto de la presión. El residual se expresa como un polinomio
+de cuarto grado en la densidad reducida ρ<sub>r</sub> = ρ/ρ<sub>c</sub>,
+donde ρ<sub>c</sub> es la densidad crítica de la mezcla. La misma
+expresión es válida para la fase vapor y para la fase líquida.</p>
+<p>La viscosidad se calcula en cada flash para cada fase presente y se
+reporta en centipoise (cP), que coincide numéricamente con el milipascal-
+segundo (mPa·s) del Sistema Internacional. Solo se reporta la viscosidad
+por fase: la fase vapor y la fase líquida por separado. No existe un
+valor de viscosidad de mezcla bifásica porque la viscosidad no es una
+propiedad aditiva entre fases.</p>
+"""
+
+S8_2 = """
+<h2>8.2 Viscosidad de gas diluido por componente</h2>
+<p>La viscosidad del gas diluido de cada componente puro se obtiene de
+la correlación de Stiel y Thodos (1961), que distingue dos regímenes
+según la temperatura reducida T<sub>r,i</sub> = T/T<sub>c,i</sub>:</p>
+""" + _eq(r"T_{r,i} \leq 1.5:\quad \eta^*_i = \frac{34 \times 10^{-5}\,T_{r,i}^{0.94}}{\xi_i}") + """
+""" + _eq(r"T_{r,i} > 1.5:\quad \eta^*_i = \frac{17.78 \times 10^{-5}\,(4.58\,T_{r,i} - 1.67)^{5/8}}{\xi_i}") + """
+<p>El parámetro reductor de viscosidad individual ξ<sub>i</sub> combina
+las propiedades críticas del componente y su peso molecular:</p>
+""" + _eq(r"\xi_i = \frac{T_{ci}^{1/6}}{M_i^{1/2}\,P_{ci}^{2/3}}") + """
+<p>donde T<sub>ci</sub> se evalúa en kelvin y P<sub>ci</sub> en
+atmósferas para obtener η<sup>*</sup><sub>i</sub> en centipoise.</p>
+<p>Las viscosidades de los componentes puros se combinan para obtener
+la viscosidad de la mezcla de gas diluido mediante la regla de Herning
+y Zippener (1936), que pondera cada contribución por la raíz cuadrada
+del peso molecular:</p>
+""" + _eq(r"\eta^* = \frac{\displaystyle\sum_{i=1}^{N} z_i\,\eta^*_i\,M_i^{1/2}}{\displaystyle\sum_{i=1}^{N} z_i\,M_i^{1/2}}") + """
+<p>donde z<sub>i</sub> es la fracción molar del componente i en la fase
+considerada y N es el número de componentes con presencia en esa fase.
+Esta regla de mezcla reproduce la dependencia de la viscosidad del gas
+diluido con el peso molecular mejor que un promedio molar simple.</p>
+"""
+
+S8_3 = """
+<h2>8.3 Parámetro reductor y densidad crítica</h2>
+<p>El parámetro reductor de viscosidad de la mezcla ξ tiene la misma
+forma que el de un componente puro pero usa las propiedades
+pseudocríticas de la mezcla calculadas como promedios molares:</p>
+""" + _eq(r"\xi = \frac{\left(\displaystyle\sum_{i=1}^{N} z_i\,T_{ci}\right)^{1/6}}{\left(\displaystyle\sum_{i=1}^{N} z_i\,M_i\right)^{1/2}\left(\displaystyle\sum_{i=1}^{N} z_i\,P_{ci}\right)^{2/3}}") + """
+<p>con T<sub>c</sub> en kelvin y P<sub>c</sub> en atmósferas.</p>
+<p>La densidad crítica de la mezcla se obtiene del volumen crítico molar
+de cada componente mediante la regla de mezcla aditiva inversa:</p>
+""" + _eq(r"\rho_c = \frac{1}{\displaystyle\sum_{i=1}^{N} z_i\,V_{ci}}") + """
+<p>donde V<sub>ci</sub> es el volumen crítico molar del componente i,
+que para los componentes definidos se toma de la base de datos de
+propiedades. La densidad reducida de la fase es la densidad molar
+dividida entre la densidad crítica:</p>
+""" + _eq(r"\rho_r = \rho_{\text{molar}} \cdot \left(\sum_{i=1}^{N} z_i\,V_{ci}\right)") + """
+<p>Una densidad reducida de uno corresponde al punto crítico de la
+mezcla. Para la fase vapor a baja presión ρ<sub>r</sub> es pequeño y el
+residual de densidad tiene poca influencia; para la fase líquida
+ρ<sub>r</sub> puede alcanzar valores de 2 a 3 y el residual domina
+sobre la contribución de gas diluido.</p>
+"""
+
+S8_4 = """
+<h2>8.4 Polinomio LBC y viscosidad de la mezcla</h2>
+<p>El polinomio de cuarto grado en densidad reducida relaciona la
+viscosidad total de la fase con su viscosidad de gas diluido mediante
+la expresión central del método LBC:</p>
+""" + _eq(r"\left[(\eta - \eta^*)\,\xi + 10^{-4}\right]^{1/4} = a_1 + a_2\,\rho_r + a_3\,\rho_r^2 + a_4\,\rho_r^3 + a_5\,\rho_r^4") + """
+<p>Los cinco coeficientes son constantes universales ajustadas por
+Lohrenz, Bray y Clark sobre datos de componentes puros y mezclas:</p>
+""" + _eq(r"a_1 = 0.10230 \quad a_2 = 0.023364 \quad a_3 = 0.058533 \quad a_4 = -0.040758 \quad a_5 = 0.0093324") + """
+<p>Despejando la viscosidad de la fase:</p>
+""" + _eq(r"\eta = \frac{(a_1 + a_2\,\rho_r + a_3\,\rho_r^2 + a_4\,\rho_r^3 + a_5\,\rho_r^4)^4 - 10^{-4}}{\xi} + \eta^*") + """
+<p>El término 10<sup>-4</sup> garantiza que cuando ρ<sub>r</sub> = 0
+la expresión se reduce exactamente a η<sup>*</sup>, asegurando
+continuidad con la viscosidad de gas diluido en el límite de baja
+densidad.</p>
+<h3>Alcance del método</h3>
+<p>El método LBC es aplicable a gases y líquidos de yacimiento en el
+rango de condiciones habitual de la ingeniería de producción. Su
+principal ventaja es que usa los mismos parámetros de la ecuación de
+estado (T<sub>c</sub>, P<sub>c</sub>, volúmenes críticos) sin
+necesitar datos adicionales. La precisión típica para mezclas de
+hidrocarburos ligeros es de 5 a 10 por ciento, suficiente para la mayor
+parte de los cálculos de ingeniería. Para aceites pesados con alto
+contenido de fracciones C7+ la precisión puede ser menor.</p>
+<h3>Referencias</h3>
+<p>Lohrenz, J., Bray, B.G. y Clark, C.R. (1964). Calculating Viscosities
+of Reservoir Fluids from Their Compositions. <em>Journal of Petroleum
+Technology</em>, octubre 1964, pp. 1171-1176.</p>
+<p>Stiel, L.I. y Thodos, G. (1961). The Viscosity of Non-Polar Gases at
+Normal Pressures. <em>AIChE Journal</em>, 7, pp. 611-615.</p>
+<p>Herning, F. y Zippener, L. (1936). Calculation of the Viscosity of
+Technical Gas Mixtures from the Viscosity of the Individual Gases.
+<em>Gas und Wasserfach</em>, 79, pp. 69-73.</p>
+<p>Pedersen, K.S. y Christensen, P.L. (2007). <em>Phase Behavior of
+Petroleum Reservoir Fluids</em>. CRC Press.</p>
+"""
+
 SECCIONES = [
     ("1. Fundamentos de las EOS cúbicas", [
         ("1.1 Ecuación de estado", S1_1),
@@ -1466,6 +1573,12 @@ SECCIONES = [
         ("7.2 Contribución de gas ideal", S7_2),
         ("7.3 Desviación por la ecuación de estado", S7_3),
         ("7.4 Ensamblaje por fase", S7_4),
+    ]),
+    ("8. Viscosidad", [
+        ("8.1 El método Lohrenz-Bray-Clark", S8_1),
+        ("8.2 Viscosidad de gas diluido por componente", S8_2),
+        ("8.3 Parámetro reductor y densidad crítica", S8_3),
+        ("8.4 Polinomio LBC y viscosidad de la mezcla", S8_4),
     ]),
 ]
 import re
