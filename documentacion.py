@@ -1449,7 +1449,7 @@ atmósferas para obtener η<sup>*</sup><sub>i</sub> en centipoise.</p>
 la viscosidad de la mezcla de gas diluido mediante la regla de Herning
 y Zippener (1936), que pondera cada contribución por la raíz cuadrada
 del peso molecular:</p>
-""" + _eq(r"\eta^* = \frac{\displaystyle\sum_{i=1}^{N} z_i\,\eta^*_i\,M_i^{1/2}}{\displaystyle\sum_{i=1}^{N} z_i\,M_i^{1/2}}") + """
+""" + _eq(r"\eta^* = \frac{\sum_i z_i\,\eta^*_i\,M_i^{1/2}}{\sum_i z_i\,M_i^{1/2}}") + """
 <p>donde z<sub>i</sub> es la fracción molar del componente i en la fase
 considerada y N es el número de componentes con presencia en esa fase.
 Esta regla de mezcla reproduce la dependencia de la viscosidad del gas
@@ -1461,16 +1461,16 @@ S8_3 = """
 <p>El parámetro reductor de viscosidad de la mezcla ξ tiene la misma
 forma que el de un componente puro pero usa las propiedades
 pseudocríticas de la mezcla calculadas como promedios molares:</p>
-""" + _eq(r"\xi = \frac{\left(\displaystyle\sum_{i=1}^{N} z_i\,T_{ci}\right)^{1/6}}{\left(\displaystyle\sum_{i=1}^{N} z_i\,M_i\right)^{1/2}\left(\displaystyle\sum_{i=1}^{N} z_i\,P_{ci}\right)^{2/3}}") + """
+""" + _eq(r"\xi = \frac{\left(\sum_i z_i\,T_{ci}\right)^{1/6}}{\left(\sum_i z_i\,M_i\right)^{1/2}\left(\sum_i z_i\,P_{ci}\right)^{2/3}}") + """
 <p>con T<sub>c</sub> en kelvin y P<sub>c</sub> en atmósferas.</p>
 <p>La densidad crítica de la mezcla se obtiene del volumen crítico molar
 de cada componente mediante la regla de mezcla aditiva inversa:</p>
-""" + _eq(r"\rho_c = \frac{1}{\displaystyle\sum_{i=1}^{N} z_i\,V_{ci}}") + """
+""" + _eq(r"\rho_c = \frac{1}{\sum_i z_i\,V_{ci}}") + """
 <p>donde V<sub>ci</sub> es el volumen crítico molar del componente i,
 que para los componentes definidos se toma de la base de datos de
 propiedades. La densidad reducida de la fase es la densidad molar
 dividida entre la densidad crítica:</p>
-""" + _eq(r"\rho_r = \rho_{\text{molar}} \cdot \left(\sum_{i=1}^{N} z_i\,V_{ci}\right)") + """
+""" + _eq(r"\rho_r = \rho_{\text{molar}} \cdot \sum_i z_i\,V_{ci}") + """
 <p>Una densidad reducida de uno corresponde al punto crítico de la
 mezcla. Para la fase vapor a baja presión ρ<sub>r</sub> es pequeño y el
 residual de densidad tiene poca influencia; para la fase líquida
