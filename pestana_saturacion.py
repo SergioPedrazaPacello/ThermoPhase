@@ -354,7 +354,7 @@ class TabSaturacion(QWidget):
             h = tbl.horizontalHeader().height()
             for r in range(nrows):
                 h += tbl.rowHeight(r)
-            h += 2*tbl.frameWidth() + 2
+            h += 2*tbl.frameWidth()   # solo el borde; el scroll está siempre OFF
             tbl.setFixedHeight(h)
 
     def _tipo_es(self):

@@ -1171,7 +1171,8 @@ class TabParametros(QWidget):
         ancho_tabla = (NC + 1) * WK + 2   # columnas kij + borde (1 px por lado)
         margen_lat = 13                    # margen lateral izquierdo/derecho
         ancho = ancho_tabla + 2*margen_lat
-        alto = 8 + 22 + 3 + 316 + 3 + 22 + 3 + 310 + 3 + 30
+        h_tbl = (NC+1)*ROW_H + 2   # alto de cada tabla (filas + borde)
+        alto = 8 + 22 + 3 + h_tbl + 3 + 22 + 3 + h_tbl + 3 + 30
         return (ancho, alto)
 
     def _build(self):
@@ -1210,7 +1211,7 @@ class TabParametros(QWidget):
 
         self.tbl_p.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl_p.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.tbl_p.setFixedHeight(316)
+        self.tbl_p.setFixedHeight((NC+1)*ROW_H + 2)   # filas + borde (1 px por lado)
         self.tbl_p.setFixedWidth(sum(WP) + 2)   # columnas + borde (1 px por lado)
         outer.addWidget(self.tbl_p, alignment=Qt.AlignmentFlag.AlignHCenter)
 
