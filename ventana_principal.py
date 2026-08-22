@@ -1165,14 +1165,18 @@ class TabParametros(QWidget):
 
     def tam_ideal(self):
         """Tamaño (ancho, alto) que hace entrar todo el contenido justo, sin
-        scrollbars ni espacio sobrante."""
-        ancho = (NC + 1) * self._WK + 12      # cols kij + borde + margenes justos
+        scrollbars ni espacio sobrante.  El ancho es el de las tablas (912 px:
+        columnas + borde) más los márgenes laterales del layout."""
+        WK = self._WK
+        ancho_tabla = (NC + 1) * WK + 2   # columnas kij + borde (1 px por lado)
+        margen_lat = 13                    # margen lateral izquierdo/derecho
+        ancho = ancho_tabla + 2*margen_lat
         alto = 8 + 22 + 3 + 316 + 3 + 22 + 3 + 310 + 3 + 30
         return (ancho, alto)
 
     def _build(self):
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(4,4,4,4)
+        outer.setContentsMargins(13,4,13,4)
         outer.setSpacing(3)
         self.setStyleSheet(f'background:{GRAY_LBL};')
 
@@ -1204,10 +1208,11 @@ class TabParametros(QWidget):
         # Filas 1..NC: datos (segun la EOS del contexto)
         self._llenar_criticas()
 
-        self.tbl_p.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.tbl_p.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tbl_p.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.tbl_p.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl_p.setFixedHeight(316)
-        outer.addWidget(self.tbl_p)
+        self.tbl_p.setFixedWidth(sum(WP) + 2)   # columnas + borde (1 px por lado)
+        outer.addWidget(self.tbl_p, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # ─── Tabla kij (cabecera+datos en una sola tabla) ─────
         outer.addWidget(title_label("Coeficientes de interaccion binaria"))
@@ -1247,10 +1252,11 @@ class TabParametros(QWidget):
                 self.tbl_k.setItem(r,j+1, it)
 
         self.tbl_k.itemChanged.connect(self._on_kij)
-        self.tbl_k.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.tbl_k.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tbl_k.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.tbl_k.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl_k.setFixedHeight(310)
-        outer.addWidget(self.tbl_k)  # altura fija 316px
+        self.tbl_k.setFixedWidth((NC+1)*WK + 2)   # columnas + borde
+        outer.addWidget(self.tbl_k, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         bot = QHBoxLayout()
         lf = QLabel("Fuente de los coeficientes de iteracion binaria:")
