@@ -39,38 +39,85 @@ FS       = 10
 # ════════════════════════════════════════════════════════════════
 #  Definición de las propiedades a mostrar por componente
 # ════════════════════════════════════════════════════════════════
-# Cada entrada: (etiqueta, nombre_array_en_eos, unidad, decimales)
-# El grupo indica el bloque (cabecera) bajo el que se muestra.
+# Cada entrada: (etiqueta, nombre_array_en_eos, magnitud, decimales)
+#   magnitud: None (adimensional), 'T_abs' (°R/K), 'P' (psia/kPa/bar),
+#             'V_mol_cm3' (cm³/mol → se mantiene), 'V_mol_ft3' (ft³/lbmol),
+#             'PM' (lb/lbmol), 'NBP' (°R/K temperatura absoluta)
+# Los valores se guardan internamente en unidades de campo y se convierten
+# a la unidad del sistema activo al mostrarlos.
+
+import unidades as _u
 
 _GRUPOS_PROP = [
-    ("Identificación", [
-        ("Nombre",                 None,             "",        None),
-        ("Símbolo",                None,             "",        None),
-        ("Peso molecular",         "PM",             "lb/lbmol", 4),
-        ("Punto de ebullición normal", "NBP",        "°R",       2),
-        ("Volumen crítico",        "VC",             "cm³/mol",  2),
+    # Propiedades genéricas, comunes a ambos modelos
+    ("Propiedades en conjunto", [
+        ("Nombre",                  None,           None,   None),
+        ("Símbolo",                 None,           None,   None),
+        ("Peso molecular",          "PM",           "PM",   4),
+        ("Punto de ebullición normal", "NBP",       "T_abs", 2),
+        ("Volumen crítico",         "VC",           "Vc",   2),
     ]),
-    ("Propiedades críticas (HYSYS)", [
-        ("Temperatura crítica",    "TC",             "°R",       4),
-        ("Presión crítica",        "PC",             "psia",     4),
-        ("Factor acéntrico (PR)",  "OMEGA",          "",         6),
-        ("Factor acéntrico (SRK)", "OMEGA_SRK",      "",         6),
+    # Todo lo recopilado de HYSYS (incluye COSTALD, que es el método de
+    # densidad de líquido del paquete HYSYS)
+    ("Propiedades recopiladas de HYSYS", [
+        ("Temperatura crítica",     "TC",           "T_abs", 4),
+        ("Presión crítica",         "PC",           "P",    4),
+        ("Factor acéntrico (PR)",   "OMEGA",        None,   6),
+        ("Factor acéntrico (SRK)",  "OMEGA_SRK",    None,   6),
+        ("Volumen característico V* (COSTALD)", "VSTAR_COSTALD", "Vstar", 6),
     ]),
-    ("Propiedades críticas (PVTsim)", [
-        ("Temperatura crítica",    "TC_PVT",         "°R",       4),
-        ("Presión crítica",        "PC_PVT",         "psia",     4),
-        ("Factor acéntrico",       "OMEGA_PVT",      "",         6),
-        ("Peso molecular",         "PM_PVT",         "lb/lbmol", 4),
-    ]),
-    ("Densidad de líquido (COSTALD)", [
-        ("Volumen característico V*", "VSTAR_COSTALD", "ft³/lbmol", 6),
+    # Todo lo recopilado de PVTsim
+    ("Propiedades recopiladas de PVTsim", [
+        ("Temperatura crítica",     "TC_PVT",       "T_abs", 4),
+        ("Presión crítica",         "PC_PVT",       "P",    4),
+        ("Factor acéntrico",        "OMEGA_PVT",    None,   6),
+        ("Peso molecular",          "PM_PVT",       "PM",   4),
     ]),
 ]
 
 
+def _unidad_prop(magnitud):
+    """Etiqueta de unidad de una propiedad según el sistema activo."""
+    if magnitud is None:
+        return ""
+    if magnitud == 'T_abs':
+        return _u.u_abs()                 # °R o K
+    if magnitud == 'P':
+        return _u.u('P')                  # psia, kPa o bar
+    if magnitud == 'PM':
+        return _u.u('dens') and 'lb/lbmol' if _u.sistema() == 'FIELD' else 'kg/kgmol'
+    if magnitud == 'Vc':
+        return 'cm³/mol'                  # volumen crítico se mantiene
+    if magnitud == 'Vstar':
+        return 'ft³/lbmol' if _u.sistema() == 'FIELD' else 'm³/kgmol'
+    return ""
+
+
+def _valor_convertido(idx, nombre_array, magnitud, decimales):
+    """Valor de una propiedad convertido al sistema activo, formateado."""
+    if nombre_array is None:
+        return ""
+    arr = getattr(_eng, nombre_array, None)
+    if arr is None or idx >= len(arr):
+        return ""
+    val = arr[idx]
+    # Conversión según magnitud
+    if magnitud == 'T_abs':
+        val = _u.abs_desde_R(val)
+    elif magnitud == 'P':
+        val = _u.p_desde_psia(val)
+    elif magnitud == 'PM':
+        val = val if _u.sistema() == 'FIELD' else val   # lb/lbmol = kg/kgmol num.
+    elif magnitud == 'Vstar':
+        val = val if _u.sistema() == 'FIELD' else _u.V_desde(val)
+    # 'Vc' y None no se convierten
+    if decimales is None:
+        return str(val)
+    return f"{val:.{decimales}f}"
+
+
 def _valor_prop(idx, nombre_array, decimales):
-    """Devuelve el texto formateado del valor de una propiedad para el
-    componente idx.  Si el array no existe devuelve cadena vacía."""
+    """Compatibilidad: valor sin conversión (solo para casos None)."""
     if nombre_array is None:
         return ""
     arr = getattr(_eng, nombre_array, None)
@@ -103,24 +150,28 @@ class VentanaPropComponente(QWidget):
         title.setFixedHeight(22)
         title.setStyleSheet(
             f'background:{GRAY_TIT};color:{TEXT};padding:2px 8px;'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;font-weight:bold;')
+            f'font-family:"{FONT_F}";font-size:{FS}pt;')
         root.addWidget(title)
 
-        # Construir la tabla de propiedades: filas de grupo (cabecera) +
-        # filas de propiedad (etiqueta | valor | unidad)
-        filas = []   # (tipo, ...) tipo='grupo' o 'prop'
+        # Filas: cabecera de grupo + una fila por propiedad
+        # Columna 0 = "Nombre de la propiedad [unidad]", Columna 1 = valor
+        filas = []   # ('grupo', texto) | ('prop', etiqueta_con_unidad, valor)
         for grupo, props in _GRUPOS_PROP:
             filas.append(('grupo', grupo))
-            for etiqueta, arr, unidad, dec in props:
+            for etiqueta, arr, magnitud, dec in props:
+                unidad = _unidad_prop(magnitud)
+                et_full = _i18n.t(etiqueta)
+                if unidad:
+                    et_full = f"{et_full} [{unidad}]"
                 if etiqueta == "Nombre":
                     valor = _eng.NOMBRES[self.idx].rstrip(':')
                 elif etiqueta == "Símbolo":
                     valor = _eng.COMPONENTES[self.idx]
                 else:
-                    valor = _valor_prop(self.idx, arr, dec)
-                filas.append(('prop', etiqueta, valor, unidad))
+                    valor = _valor_convertido(self.idx, arr, magnitud, dec)
+                filas.append(('prop', et_full, valor))
 
-        tbl = QTableWidget(len(filas), 3)
+        tbl = QTableWidget(len(filas), 2)
         tbl.horizontalHeader().hide()
         tbl.verticalHeader().hide()
         tbl.setShowGrid(True)
@@ -131,30 +182,26 @@ class VentanaPropComponente(QWidget):
             f'QTableWidget {{ border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
             f'QTableWidget::item {{ padding:2px 6px; }}')
-        # Anchos: etiqueta ancha, valor medio, unidad angosta
-        W_ET, W_VAL, W_UN = 250, 150, 110
+        # Dos columnas: etiqueta+unidad (ancha) | valor
+        W_ET, W_VAL = 320, 150
         tbl.setColumnWidth(0, W_ET)
         tbl.setColumnWidth(1, W_VAL)
-        tbl.setColumnWidth(2, W_UN)
         hh = tbl.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
 
         ROW_H = 24
         for r, fila in enumerate(filas):
             tbl.setRowHeight(r, ROW_H)
             if fila[0] == 'grupo':
-                # Fila de grupo: una celda combinada visualmente (gris título)
                 it = QTableWidgetItem(_i18n.t(fila[1]))
                 it.setBackground(_qcolor(GRAY_TIT))
                 it.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-                f = it.font(); f.setBold(True); it.setFont(f)
                 tbl.setItem(r, 0, it)
-                tbl.setSpan(r, 0, 1, 3)
+                tbl.setSpan(r, 0, 1, 2)
             else:
-                _, etiqueta, valor, unidad = fila
-                it_et = QTableWidgetItem(_i18n.t(etiqueta))
+                _, etiqueta, valor = fila
+                it_et = QTableWidgetItem(etiqueta)
                 it_et.setBackground(_qcolor(GRAY_LBL))
                 it_et.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 tbl.setItem(r, 0, it_et)
@@ -163,15 +210,10 @@ class VentanaPropComponente(QWidget):
                 it_val.setForeground(_qcolor(TEXT_RES))
                 it_val.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 tbl.setItem(r, 1, it_val)
-                it_un = QTableWidgetItem(unidad)
-                it_un.setBackground(_qcolor(GRAY_RES))
-                it_un.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                tbl.setItem(r, 2, it_un)
 
-        # Altura fija ajustada al contenido; ancho fijo = suma de columnas
         alto_tabla = ROW_H * len(filas) + 2
         tbl.setFixedHeight(alto_tabla)
-        tbl.setFixedWidth(W_ET + W_VAL + W_UN + 2)
+        tbl.setFixedWidth(W_ET + W_VAL + 2)
         tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         root.addWidget(tbl, alignment=Qt.AlignmentFlag.AlignHCenter)
@@ -179,10 +221,11 @@ class VentanaPropComponente(QWidget):
 
         self._tbl = tbl
         self._alto_tabla = alto_tabla
+        self._ancho_tabla = W_ET + W_VAL + 2
 
     def tam_ideal(self):
         """Tamaño (ancho, alto) ajustado al contenido."""
-        ancho = (250 + 150 + 110 + 2) + 2*13
+        ancho = self._ancho_tabla + 2*13
         alto = 22 + 3 + self._alto_tabla + 9 + 9 + 4
         return (ancho, alto)
 
@@ -210,7 +253,7 @@ class VentanaGestorComponentes(QWidget):
         title.setFixedHeight(22)
         title.setStyleSheet(
             f'background:{GRAY_TIT};color:{TEXT};padding:2px 8px;'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;font-weight:bold;')
+            f'font-family:"{FONT_F}";font-size:{FS}pt;')
         root.addWidget(title)
 
         info = QLabel(_i18n.t("Seleccione los componentes del fluido:"))
@@ -234,7 +277,7 @@ class VentanaGestorComponentes(QWidget):
                                f'color:{TEXT};background:transparent;')
         col_izq.addWidget(lbl_disp)
         self.lista_disp = QListWidget(); self.lista_disp.setStyleSheet(list_qss)
-        self.lista_disp.setFixedSize(250, 260)
+        self.lista_disp.setFixedSize(250, 310)
         col_izq.addWidget(self.lista_disp)
         cols.addLayout(col_izq)
 
@@ -244,7 +287,7 @@ class VentanaGestorComponentes(QWidget):
                               f'color:{TEXT};background:transparent;')
         col_der.addWidget(lbl_sel)
         self.lista_sel = QListWidget(); self.lista_sel.setStyleSheet(list_qss)
-        self.lista_sel.setFixedSize(250, 260)
+        self.lista_sel.setFixedSize(250, 310)
         col_der.addWidget(self.lista_sel)
         cols.addLayout(col_der)
 
@@ -308,7 +351,7 @@ class VentanaGestorComponentes(QWidget):
         self._mover(self.lista_sel, self.lista_disp)
 
     def tam_ideal(self):
-        return (250*2 + 12 + 2*14, 22 + 3 + 20 + 260 + 40 + 24 + 12)
+        return (250*2 + 12 + 2*14, 22 + 3 + 20 + 310 + 40 + 24 + 12)
 
 
 def _qcolor(hexstr):

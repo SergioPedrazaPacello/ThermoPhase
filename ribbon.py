@@ -257,7 +257,7 @@ class NavigatorPanel(QWidget):
     dato_pedido    = pyqtSignal(str)
     fluido_calc_pedido = pyqtSignal(str, str)   # (nombre_fluido, clave_calculo)
     componente_pedido = pyqtSignal(str)         # nombre del componente
-    gestor_comp_pedido = pyqtSignal()           # doble clic en "Fluidos"
+    gestor_comp_pedido = pyqtSignal()           # doble clic en "Componentes"
     cerrar_pedido  = pyqtSignal()
 
     ANCHO = 244
@@ -325,6 +325,7 @@ class NavigatorPanel(QWidget):
         for nombre in _NOMBRES_COMP:
             txt = nombre.rstrip(':')
             hijo = QTreeWidgetItem([txt])
+            hijo.setIcon(0, icono("componente_hex", 16))
             hijo.setData(0, Qt.ItemDataRole.UserRole, ('comp', txt))
             self._nodo_comp.addChild(hijo)
         self._nodo_comp.setExpanded(False)
@@ -374,10 +375,11 @@ class NavigatorPanel(QWidget):
             item.setExpanded(not item.isExpanded())
 
     def _on_dato_double_click(self, item, col):
-        """Doble clic en el nodo 'Fluidos' → abre el gestor de componentes
-        (ventana de dos listas para sacar/añadir compuestos)."""
+        """Doble clic en el nodo 'Componentes' → abre el gestor de
+        componentes (ventana de dos listas para sacar/añadir compuestos).
+        El clic simple sigue expandiendo/colapsando el árbol de componentes."""
         data = item.data(0, Qt.ItemDataRole.UserRole)
-        if data == 'fluidos':
+        if data == 'componentes':
             self.gestor_comp_pedido.emit()
 
     def set_fluidos(self, nombres):

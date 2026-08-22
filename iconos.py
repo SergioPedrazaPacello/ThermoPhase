@@ -288,6 +288,24 @@ def _componentes(p):
     p.drawEllipse(QRectF(11.5, 11.5, 9, 9))
 
 
+def _componente_hex(p):
+    # Hexágono químico (símbolo de compuesto orgánico) para cada componente
+    # individual del árbol.  Relleno azul grisáceo claro, contorno sobrio.
+    import math
+    hexa = QPainterPath()
+    for i in range(6):
+        a = math.radians(60*i - 90)
+        x = 16 + 8*math.cos(a); y = 16 + 8*math.sin(a)
+        if i == 0:
+            hexa.moveTo(x, y)
+        else:
+            hexa.lineTo(x, y)
+    hexa.closeSubpath()
+    p.setPen(_pen(QColor("#5A6B7A"), 1.6))
+    p.setBrush(QBrush(QColor("#DCE6EF")))
+    p.drawPath(hexa)
+
+
 def _fluidos(p):
     # Matraz Erlenmeyer con liquido ambar UNIFORME.
     OUT = QColor("#4A4A4A"); OIL = QColor("#D9A441")
@@ -649,6 +667,7 @@ _REGISTRO = {
     "sistema": _sistema, "conversor": _conversor,
     # datos
     "componentes": _componentes, "fluidos": _fluidos, "mezclas": _mezclas,
+    "componente_hex": _componente_hex,
     # herramientas
     "tablas": _tablas, "calculadora": _calculadora, "graficas": _graficas,
     # preferencias

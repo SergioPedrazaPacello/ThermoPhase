@@ -905,7 +905,7 @@ class TabEquilibrio(QWidget):
                                f'color:{TEXT};background:transparent;')
         col_izq.addWidget(lbl_disp)
         lista_disp = QListWidget(); lista_disp.setStyleSheet(list_qss)
-        lista_disp.setFixedSize(230, 210)
+        lista_disp.setFixedSize(240, 240)
         col_izq.addWidget(lista_disp)
         cols.addLayout(col_izq)
 
@@ -916,7 +916,7 @@ class TabEquilibrio(QWidget):
                               f'color:{TEXT};background:transparent;')
         col_der.addWidget(lbl_sel)
         lista_sel = QListWidget(); lista_sel.setStyleSheet(list_qss)
-        lista_sel.setFixedSize(230, 210)
+        lista_sel.setFixedSize(240, 240)
         col_der.addWidget(lista_sel)
         cols.addLayout(col_der)
 
