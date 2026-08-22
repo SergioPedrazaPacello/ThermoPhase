@@ -2124,6 +2124,8 @@ class MainWindow(QMainWindow):
         self.nav.calculo_pedido.connect(self._abrir_calculo)
         self.nav.dato_pedido.connect(self._accion_nav)
         self.nav.fluido_calc_pedido.connect(self._abrir_calc_fluido_por_nombre)
+        self.nav.componente_pedido.connect(self._abrir_componente)
+        self.nav.gestor_comp_pedido.connect(self._abrir_gestor_componentes)
 
         # ── Area de simulacion (MDI) ─────────────────────────
         # Cada calculo se abre como una subventana con barra de titulo nativa
@@ -2463,6 +2465,42 @@ class MainWindow(QMainWindow):
             tam = self._tam_calculo(clave, widget)
             sw = self._montar_subventana(clave, widget, titulo, tam=tam,
                                          eos_provider=prov)
+        self._mostrar_subventana(sw)
+
+    def _abrir_gestor_componentes(self):
+        """Abre (o activa) el gestor de componentes del fluido: ventana de
+        dos listas (disponibles / seleccionados) para sacar y añadir
+        compuestos.  Por ahora es solo la interfaz, sin efecto sobre los
+        cálculos."""
+        import componentes_ui as _cui
+        clave = 'gestor_componentes'
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            widget = _cui.VentanaGestorComponentes()
+            tam = widget.tam_ideal()
+            sw = self._montar_subventana(
+                clave, widget, _i18n.t("Componentes del fluido"), tam=tam)
+        self._mostrar_subventana(sw)
+
+    def _abrir_componente(self, nombre):
+        """Abre (o activa) la ventana de propiedades de un componente puro.
+        `nombre` es el texto mostrado en el árbol (nombre completo sin ':')."""
+        import componentes_ui as _cui
+        # Resolver el índice del componente por su nombre mostrado
+        idx = None
+        for i, nom in enumerate(NOMBRES):
+            if nom.rstrip(':') == nombre:
+                idx = i
+                break
+        if idx is None:
+            return
+        clave = f'componente@{idx}'
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            widget = _cui.VentanaPropComponente(idx)
+            titulo = NOMBRES[idx].rstrip(':')
+            tam = widget.tam_ideal()
+            sw = self._montar_subventana(clave, widget, titulo, tam=tam)
         self._mostrar_subventana(sw)
 
     def _abrir_fluidos(self):

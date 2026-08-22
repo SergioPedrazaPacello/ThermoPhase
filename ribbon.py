@@ -256,6 +256,8 @@ class NavigatorPanel(QWidget):
     calculo_pedido = pyqtSignal(str)
     dato_pedido    = pyqtSignal(str)
     fluido_calc_pedido = pyqtSignal(str, str)   # (nombre_fluido, clave_calculo)
+    componente_pedido = pyqtSignal(str)         # nombre del componente
+    gestor_comp_pedido = pyqtSignal()           # doble clic en "Fluidos"
     cerrar_pedido  = pyqtSignal()
 
     ANCHO = 244
@@ -333,6 +335,7 @@ class NavigatorPanel(QWidget):
         self.tree_datos.addTopLevelItem(self._nodo_fluidos)
         self._nodo_fluidos.setExpanded(True)
         self.tree_datos.itemClicked.connect(self._on_dato_click)
+        self.tree_datos.itemDoubleClicked.connect(self._on_dato_double_click)
         self.tree_datos.itemExpanded.connect(lambda *_: self._ajustar_alto_datos())
         self.tree_datos.itemCollapsed.connect(lambda *_: self._ajustar_alto_datos())
         v.addWidget(self.tree_datos)
@@ -359,8 +362,8 @@ class NavigatorPanel(QWidget):
             # Hoja de funcionalidad de un fluido: (‘calc’, nombre, clave)
             self.fluido_calc_pedido.emit(data[1], data[2])
         elif isinstance(data, tuple) and data and data[0] == 'comp':
-            # Nombre de componente (por ahora solo se muestra).
-            pass
+            # Nombre de componente: abrir su ventana de propiedades.
+            self.componente_pedido.emit(data[1])
         elif data == 'componentes':
             # Expandir/colapsar para mostrar los 13 componentes.
             item.setExpanded(not item.isExpanded())
@@ -369,6 +372,13 @@ class NavigatorPanel(QWidget):
         else:
             # Nodo de fluido: alternar expandido/colapsado
             item.setExpanded(not item.isExpanded())
+
+    def _on_dato_double_click(self, item, col):
+        """Doble clic en el nodo 'Fluidos' → abre el gestor de componentes
+        (ventana de dos listas para sacar/añadir compuestos)."""
+        data = item.data(0, Qt.ItemDataRole.UserRole)
+        if data == 'fluidos':
+            self.gestor_comp_pedido.emit()
 
     def set_fluidos(self, nombres):
         """Reconstruye el arbol de fluidos: cada fluido con sus 4
