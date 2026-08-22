@@ -136,7 +136,7 @@ class TabSaturacion(QWidget):
     def _build(self):
         self.setStyleSheet(f'background:{GRAY_LBL};')
         root=QVBoxLayout(self)
-        root.setContentsMargins(4,9,4,5); root.setSpacing(3)
+        root.setContentsMargins(13,9,13,5); root.setSpacing(3)
 
         # Título
         title=QLabel("ThermoPhase — Puntos de Saturación")
@@ -268,6 +268,10 @@ class TabSaturacion(QWidget):
         self.tbl.verticalHeader().setDefaultSectionSize(22)
         self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Expandir horizontalmente para llenar el ancho del layout (la
+        # columna 0 en Stretch absorbe el espacio sobrante).
+        self.tbl.setSizePolicy(QSizePolicy.Policy.Expanding,
+                               QSizePolicy.Policy.Fixed)
 
         GRIS_NOMBRE = QColor("#E8E8E8")   # gris claro para nombres
         BLANCO = QColor(WHITE)
@@ -319,6 +323,8 @@ class TabSaturacion(QWidget):
         self.tbl_prop.verticalHeader().setDefaultSectionSize(22)
         self.tbl_prop.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.tbl_prop.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                    QSizePolicy.Policy.Fixed)
 
         _props=["Peso molecular","Factor de compresibilidad",
                 "Densidad masica [lb/ft3]","Gravedad especifica",
