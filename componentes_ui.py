@@ -195,14 +195,14 @@ class VentanaPropComponente(QWidget):
             tbl.setRowHeight(r, ROW_H)
             if fila[0] == 'grupo':
                 it = QTableWidgetItem(_i18n.t(fila[1]))
-                it.setBackground(_qcolor(GRAY_TIT))
+                it.setBackground(_qcolor(GRAY_LBL))
                 it.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
                 tbl.setItem(r, 0, it)
                 tbl.setSpan(r, 0, 1, 2)
             else:
                 _, etiqueta, valor = fila
                 it_et = QTableWidgetItem(etiqueta)
-                it_et.setBackground(_qcolor(GRAY_LBL))
+                it_et.setBackground(_qcolor(GRAY_RES))
                 it_et.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 tbl.setItem(r, 0, it_et)
                 it_val = QTableWidgetItem(valor)
@@ -235,26 +235,27 @@ class VentanaGestorComponentes(QWidget):
     seleccionados) con botones Agregar y Quitar.  Por ahora solo interfaz;
     no modifica el motor."""
 
-    def __init__(self, seleccionados=None):
+    def __init__(self, seleccionados=None, on_cambio=None):
         super().__init__()
         # Por defecto, todos los componentes están seleccionados
         if seleccionados is None:
             seleccionados = list(range(_eng.NC))
         self._sel = list(seleccionados)
+        self._on_cambio = on_cambio    # callback(lista_indices) al cambiar
         self._build()
+
+    def _indices_seleccionados(self):
+        """Índices de componentes actualmente en la lista de seleccionados,
+        en el orden canónico del motor."""
+        idxs = []
+        for r in range(self.lista_sel.count()):
+            idxs.append(self.lista_sel.item(r).data(Qt.ItemDataRole.UserRole))
+        return sorted(idxs)
 
     def _build(self):
         self.setStyleSheet(f'background:{GRAY_LBL};')
         root = QVBoxLayout(self)
         root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
-
-        title = QLabel(_i18n.t("ThermoPhase — Componentes del fluido"))
-        title.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        title.setFixedHeight(22)
-        title.setStyleSheet(
-            f'background:{GRAY_TIT};color:{TEXT};padding:2px 8px;'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;')
-        root.addWidget(title)
 
         info = QLabel(_i18n.t("Seleccione los componentes del fluido:"))
         info.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
@@ -327,22 +328,33 @@ class VentanaGestorComponentes(QWidget):
         nombre = _eng.NOMBRES[idx].rstrip(':')
         it = QListWidgetItem(nombre)
         it.setData(Qt.ItemDataRole.UserRole, idx)
-        lista.addItem(it)
+        # Insertar en orden canónico (por índice de componente)
+        pos = lista.count()
+        for r in range(lista.count()):
+            if lista.item(r).data(Qt.ItemDataRole.UserRole) > idx:
+                pos = r; break
+        lista.insertItem(pos, it)
 
     def _actualizar(self):
         n = self.lista_sel.count()
         self.contador.setText(_i18n.t("Seleccionados: ") + f"{n} / {_eng.NC}")
         self.btn_add.setEnabled(self.lista_disp.count() > 0)
-        self.btn_rem.setEnabled(self.lista_sel.count() > 0)
+        # No permitir quitar el último componente (siempre al menos 1)
+        self.btn_rem.setEnabled(self.lista_sel.count() > 1)
 
     def _mover(self, origen, destino):
         it = origen.currentItem()
         if it is None:
             return
+        # No permitir vaciar la lista de seleccionados
+        if origen is self.lista_sel and self.lista_sel.count() <= 1:
+            return
         idx = it.data(Qt.ItemDataRole.UserRole)
         origen.takeItem(origen.row(it))
         self._add_item(destino, idx)
         self._actualizar()
+        if self._on_cambio is not None:
+            self._on_cambio(self._indices_seleccionados())
 
     def _agregar(self):
         self._mover(self.lista_disp, self.lista_sel)
@@ -351,7 +363,12 @@ class VentanaGestorComponentes(QWidget):
         self._mover(self.lista_sel, self.lista_disp)
 
     def tam_ideal(self):
-        return (250*2 + 12 + 2*14, 22 + 3 + 20 + 310 + 40 + 24 + 12)
+        # ancho: 2 listas de 250 + espaciado central + márgenes laterales
+        # alto: márgenes(12+12) + info(~18) + spacing(8) + listas(310)
+        #       + spacing(8) + fila inferior de botones/contador(~30)
+        ancho = 250*2 + 12 + 2*14
+        alto = 12 + 18 + 8 + 310 + 8 + 30 + 12
+        return (ancho, alto)
 
 
 def _qcolor(hexstr):

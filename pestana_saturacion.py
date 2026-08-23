@@ -348,14 +348,34 @@ class TabSaturacion(QWidget):
         self._fit_table_heights()
 
     def _fit_table_heights(self):
-        """Ajusta la altura de cada tabla a la suma real de sus filas,
-        para mostrar todas sin scrollbar (robusto ante DPI/versión Windows)."""
+        """Ajusta la altura de cada tabla a la suma real de sus filas
+        visibles, para mostrar todas sin scrollbar (robusto ante DPI/versión
+        Windows).  Ignora las filas ocultas de componentes deshabilitados."""
         for tbl, nrows in [(self.tbl, NC+1), (self.tbl_prop, 6)]:
             h = tbl.horizontalHeader().height()
             for r in range(nrows):
-                h += tbl.rowHeight(r)
+                if not tbl.isRowHidden(r):
+                    h += tbl.rowHeight(r)
             h += 2*tbl.frameWidth()   # solo el borde; el scroll está siempre OFF
             tbl.setFixedHeight(h)
+
+    def aplicar_componentes_activos(self, activos):
+        """Oculta las filas de componentes inactivos en la tabla de
+        composición y reajusta la altura."""
+        activos_set = set(activos)
+        self._n_activos = len(activos_set)
+        for i in range(NC):
+            self.tbl.setRowHidden(i, i not in activos_set)
+        self._fit_table_heights()
+
+    def tam_ideal(self):
+        """Tamaño (ancho, alto) ajustado al número de componentes activos.
+        La tabla de composición tiene (n_activos + 1) filas visibles."""
+        n = getattr(self, '_n_activos', NC)
+        sh = self.sizeHint()
+        # Altura: la diferencia respecto al total es (NC - n) filas de 22 px
+        alto = sh.height() - (NC - n)*22
+        return (sh.width(), alto)
 
     def _tipo_es(self):
         """Clave ESPAÑOL del tipo seleccionado (robusto a la traduccion)."""
