@@ -736,6 +736,7 @@ class TabEquilibrio(QWidget):
         tamaño de la tabla.  Los inactivos se ocultan y su fracción se pone
         a 0 para que el motor los ignore."""
         activos_set = set(activos)
+        self._n_activos = len(activos_set)
         self.tbl_comp.blockSignals(True)
         for i in range(NC):
             oculto = i not in activos_set
@@ -745,6 +746,16 @@ class TabEquilibrio(QWidget):
         self.tbl_comp.blockSignals(False)
         fix_table_size(self.tbl_comp)
         self._upd_suma()
+
+    def tam_ideal(self):
+        """Tamaño (ancho, alto) ajustado al número de componentes activos.
+        La tabla de composición tiene (n_activos + 1) filas visibles (la
+        fila extra es la de Sumatorias)."""
+        n = getattr(self, '_n_activos', NC)
+        sh = self.sizeHint()
+        # Cada componente oculto reduce el alto en ROW_H
+        alto = sh.height() - (NC - n)*ROW_H
+        return (sh.width(), alto)
 
     def get_z(self):
         z = []
@@ -2498,7 +2509,7 @@ class MainWindow(QMainWindow):
 
     def _tam_calculo(self, clave, widget):
         """Tamaño fijo para la ventana de cada cálculo."""
-        if clave in ('parametros', 'saturacion') and hasattr(widget, 'tam_ideal'):
+        if clave in ('equilibrio', 'parametros', 'saturacion') and hasattr(widget, 'tam_ideal'):
             return widget.tam_ideal()
         return None   # el resto usa el tamaño estandar (igual que Equilibrio)
 
@@ -2543,7 +2554,8 @@ class MainWindow(QMainWindow):
             self.tab_sat.aplicar_componentes_activos(self.componentes_activos)
         if hasattr(self, 'tab_par') and hasattr(self.tab_par, 'aplicar_componentes_activos'):
             self.tab_par.aplicar_componentes_activos(self.componentes_activos)
-        mapa = {'saturacion': 'tab_sat', 'parametros': 'tab_par'}
+        mapa = {'equilibrio': 'tab_eq', 'saturacion': 'tab_sat',
+                'parametros': 'tab_par'}
         for clave_sub, attr in mapa.items():
             sw = self._subventanas.get(clave_sub)
             widget = getattr(self, attr, None)

@@ -363,12 +363,10 @@ class VentanaGestorComponentes(QWidget):
         self._mover(self.lista_sel, self.lista_disp)
 
     def tam_ideal(self):
-        # ancho: 2 listas de 250 + espaciado central + márgenes laterales
-        # alto: márgenes(12+12) + info(~18) + spacing(8) + listas(310)
-        #       + spacing(8) + fila inferior de botones/contador(~30)
-        ancho = 250*2 + 12 + 2*14
-        alto = 12 + 18 + 8 + 310 + 8 + 30 + 12
-        return (ancho, alto)
+        """Tamaño (ancho, alto) ajustado exactamente al contenido, medido
+        con el sizeHint real del widget para evitar scrollbars o huecos."""
+        sh = self.sizeHint()
+        return (sh.width(), sh.height())
 
 
 def _qcolor(hexstr):
