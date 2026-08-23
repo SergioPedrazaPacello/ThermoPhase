@@ -23,7 +23,7 @@ from eos import (
 )
 import eos as _eng
 from pestana_envolvente import TabEnvolvente
-from pestana_saturacion import TabSaturacion
+from pestana_saturacion import TabSaturacion, PROP_SAT_MAX
 from pestana_propiedades import TabPropiedades
 import dialogos as dialogos
 from rutas import ruta_recurso
@@ -2166,6 +2166,7 @@ class MainWindow(QMainWindow):
                                       get_metodo_densidad=self._metodo_densidad_main)
         self.tab_sat  = TabSaturacion(get_z=self._getz_main,
                                       get_kij=lambda: kij_user)
+        self.tab_sat._on_props_resize = self._on_sat_props_change
         self.tab_prop = TabPropiedades(get_z=self._getz_main,
                                        get_kij=lambda: kij_user)
         self.tab_par  = TabParametros()
@@ -2592,6 +2593,21 @@ class MainWindow(QMainWindow):
                 clave, widget, _i18n.t("Componentes del fluido"), tam=tam)
         self._mostrar_subventana(sw)
 
+    def _on_sat_props_change(self, tab, n_props):
+        """Reajusta el alto de la ventana de saturacion (principal o de un
+        fluido) cuando cambia cuantas propiedades muestra su tabla inferior.
+        Cada propiedad ocupa una fila (ROW_H). Es independiente del ajuste por
+        componentes, asi que ambos se componen sobre el alto actual."""
+        for sw in self._subventanas.values():
+            if getattr(sw, '_widget', None) is tab:
+                n_old = getattr(sw, '_n_props', PROP_SAT_MAX)
+                delta = (n_props - n_old) * ROW_H
+                if delta != 0:
+                    s = sw.size()
+                    sw.setFixedSize(s.width(), s.height() + delta)
+                sw._n_props = n_props
+                return
+
     def _aplicar_componentes(self, activos):
         """Aplica la lista de componentes activos a todas las ventanas
         involucradas: las pestañas principales (equilibrio, saturacion,
@@ -2752,7 +2768,9 @@ class MainWindow(QMainWindow):
         if clave == 'envolvente':
             return TabEnvolvente(get_z=gz, get_kij=gk, get_metodo_densidad=gm)
         if clave == 'saturacion':
-            return TabSaturacion(get_z=gz, get_kij=gk)
+            w = TabSaturacion(get_z=gz, get_kij=gk)
+            w._on_props_resize = self._on_sat_props_change
+            return w
         if clave == 'propiedades':
             return TabPropiedades(get_z=gz, get_kij=gk)
         if clave == 'parametros':

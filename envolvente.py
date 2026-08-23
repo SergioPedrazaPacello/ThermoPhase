@@ -551,6 +551,15 @@ def propiedades_punto(T, P, x, y, kij=None, metodo_densidad='COSTALD'):
     except Exception:
         out['H_v'] = out['S_v'] = out['H_l'] = out['S_l'] = None
 
+    # Viscosidad molar de cada fase (cP) por Lohrenz-Bray-Clark, la MISMA
+    # correlacion ya validada que usa el equilibrio de fases.
+    try:
+        from eos import viscosidad_LBC as _visc
+        out['mu_v'] = _visc(y, T, out.get('rho_v'), PM_v)
+        out['mu_l'] = _visc(x, T, out.get('rho_l'), PM_l)
+    except Exception:
+        out['mu_v'] = out['mu_l'] = None
+
     return out
 
 

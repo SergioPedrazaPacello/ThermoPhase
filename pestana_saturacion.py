@@ -19,6 +19,43 @@ import unidades as _u
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"
 GRAY_RES="#E8E8E8"; BORDER="#888888"; TEXT="#000000"; TEXT_DIM="#555555"
 TEXT_RES="#000080"; FONT_F="Arial Narrow"; FS=10
+ROW_H = 22
+
+# ── Catalogo de propiedades por fase del punto de saturacion ─────
+# Son las MISMAS propiedades que ofrece el resumen de Equilibrio de fases
+# (mas la viscosidad, ya calculada por la misma correlacion LBC validada).
+# Cada entrada: (key, etiqueta_base, magnitud_unidad|None, decimales,
+#                key_vapor, key_liquido, conversor|None)
+_PROP_SAT = [
+    ('pm',         'Peso molecular',            None,   4, 'PM_v',  'PM_l',  None),
+    ('z',          'Factor de compresibilidad', None,   4, 'ZV',    'ZL',    None),
+    ('densidad',   'Densidad masica',           'dens', 4, 'rho_v', 'rho_l', 'dens'),
+    ('sg',         'Gravedad especifica',       None,   4, 'sg_v',  'sg_l',  None),
+    ('entalpia',   'Entalpia molar',            'H',    2, 'H_v',   'H_l',   'H'),
+    ('entropia',   'Entropia molar',            'S',    4, 'S_v',   'S_l',   'S'),
+    ('viscosidad', 'Viscosidad',                'visc', 5, 'mu_v',  'mu_l',  None),
+]
+_PROP_SAT_DEF = {d[0]: d for d in _PROP_SAT}
+# Seleccion por defecto = las 6 propiedades que la pestaña muestra hoy.
+_PROP_SAT_DEFAULT = ['pm', 'z', 'densidad', 'sg', 'entalpia', 'entropia']
+# Tope de propiedades a mostrar (para no desconfigurar la ventana): el numero
+# que la pestaña muestra actualmente.
+PROP_SAT_MAX = len(_PROP_SAT_DEFAULT)
+
+
+def _conv_prop(clave_conv, val):
+    """Convierte un valor de propiedad al sistema de unidades activo segun el
+    conversor indicado en el catalogo. cP (viscosidad) es universal: sin
+    conversion."""
+    if val is None or clave_conv is None:
+        return val
+    if clave_conv == 'dens':
+        return _u.dens_desde(val)
+    if clave_conv == 'H':
+        return _u.H_desde(val)
+    if clave_conv == 'S':
+        return _u.S_desde(val)
+    return val
 
 # ── Estilo retro de las listas desplegables (QComboBox) ───────
 # Cambia de modelo comentando el activo y descomentando otro.
@@ -299,11 +336,25 @@ class TabSaturacion(QWidget):
         root.addWidget(self.tbl)
 
         # ── Panel de propiedades del punto de saturación ──────
+        # Cabecera: titulo + boton para elegir que propiedades mostrar
+        # (mismo comportamiento que el resumen de Equilibrio de fases).
+        prop_hdr = QHBoxLayout()
+        prop_hdr.setContentsMargins(0, 0, 0, 0); prop_hdr.setSpacing(6)
         prop_title=QLabel("Propiedades del punto de saturacion:")
         prop_title.setStyleSheet(LBL_SEC); prop_title.setFixedHeight(20)
-        root.addWidget(prop_title)
+        prop_hdr.addWidget(prop_title, 1)
+        self.btn_props = QPushButton("Propiedades")
+        self.btn_props.setFixedHeight(22); self.btn_props.setFixedWidth(120)
+        self.btn_props.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_props.setStyleSheet(
+            f'QPushButton {{ background:{GRAY_LBL}; border:1px solid {BORDER};'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; padding:1px 8px; }}'
+            f'QPushButton:hover {{ background:#DCDCDC; }}')
+        self.btn_props.clicked.connect(self._abrir_selector_props)
+        prop_hdr.addWidget(self.btn_props, 0)
+        root.addLayout(prop_hdr)
 
-        self.tbl_prop=QTableWidget(6, 3)
+        self.tbl_prop=QTableWidget(0, 3)
         self.tbl_prop.setHorizontalHeaderLabels(
             ["Propiedad","Fase Vapor","Fase Liquida"])
         self.tbl_prop.verticalHeader().setVisible(False)
@@ -326,21 +377,12 @@ class TabSaturacion(QWidget):
         self.tbl_prop.setSizePolicy(QSizePolicy.Policy.Expanding,
                                     QSizePolicy.Policy.Fixed)
 
-        _props=["Peso molecular","Factor de compresibilidad",
-                "Densidad masica [lb/ft3]","Gravedad especifica",
-                "Entalpia molar [Btu/lbmol]","Entropia molar [Btu/lbmol-F]"]
-        GRIS=QColor("#E8E8E8"); BLANCO_P=QColor(WHITE)
-        for r,lbl_p in enumerate(_props):
-            it=QTableWidgetItem(lbl_p)
-            it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-            it.setBackground(QBrush(GRIS))
-            self.tbl_prop.setItem(r,0,it)
-            for c in (1,2):
-                cc=QTableWidgetItem("")
-                cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-                cc.setBackground(QBrush(BLANCO_P))
-                self.tbl_prop.setItem(r,c,cc)
-        self.tbl_prop.setRowCount(6)
+        # Propiedades seleccionadas (por defecto, las 6 que mostraba la pestaña)
+        self._props_sel = list(_PROP_SAT_DEFAULT)
+        # Callback (lo fija la ventana principal) para redimensionar la ventana
+        # cuando cambia el numero de propiedades mostradas.
+        self._on_props_resize = None
+        self._rebuild_prop_table()
         root.addWidget(self.tbl_prop)
 
     def showEvent(self, event):
@@ -358,10 +400,161 @@ class TabSaturacion(QWidget):
         # La fila de Sumatorias (indice NC) nunca se oculta.
         self._fit_table_heights()
 
+    def _rebuild_prop_table(self):
+        """(Re)construye la tabla de propiedades mostrando solo las
+        seleccionadas, en el orden del catalogo. Solo arma etiquetas y celdas
+        vacias; los valores los rellena _render."""
+        sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
+        GRIS = QColor(GRAY_RES); BLANCO_P = QColor(WHITE)
+        self.tbl_prop.setRowCount(len(sel))
+        for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
+            self.tbl_prop.setRowHeight(r, ROW_H)
+            unidad = f" [{_u.u(mag)}]" if mag else ""
+            it = QTableWidgetItem(f"{_i18n.t(base)}{unidad}:")
+            it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+            it.setBackground(QBrush(GRIS))
+            self.tbl_prop.setItem(r, 0, it)
+            for c in (1, 2):
+                cc = QTableWidgetItem("")
+                cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+                cc.setBackground(QBrush(BLANCO_P))
+                self.tbl_prop.setItem(r, c, cc)
+        self._fit_table_heights()
+
+    def _abrir_selector_props(self):
+        """Ventana de seleccion de propiedades (dos listas: disponibles /
+        seleccionadas). Se puede mostrar entre 1 y PROP_SAT_MAX propiedades,
+        de las MISMAS que ofrece el equilibrio de fases, para no
+        desconfigurar la ventana."""
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
+                                     QListWidget, QListWidgetItem, QPushButton,
+                                     QLabel)
+        MIN, MAX = 1, PROP_SAT_MAX
+
+        def etiqueta(key):
+            base = _PROP_SAT_DEF[key][1]; mag = _PROP_SAT_DEF[key][2]
+            unidad = f" [{_u.u(mag)}]" if mag else ""
+            return f"{_i18n.t(base)}{unidad}"
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(_i18n.t("Propiedades a mostrar"))
+        dlg.setStyleSheet('QDialog { background:#e0e0e0; }')
+        root = QVBoxLayout(dlg)
+        root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
+
+        info = QLabel(_i18n.t(
+            "Seleccione las propiedades a mostrar en el resumen:"))
+        info.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                           f'color:{TEXT};background:transparent;')
+        root.addWidget(info)
+
+        list_qss = (f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
+                    f' font-family:"{FONT_F}"; font-size:{FS}pt; }}'
+                    f'QListWidget::item {{ height:22px; padding-left:4px; }}'
+                    f'QListWidget::item:selected {{ background:#DCDCDC;'
+                    f' color:{TEXT}; }}')
+        btn_qss = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
+                   f'font-family:"{FONT_F}";font-size:{FS}pt;')
+
+        cols = QHBoxLayout(); cols.setSpacing(12)
+        col_izq = QVBoxLayout(); col_izq.setSpacing(3)
+        lbl_disp = QLabel(_i18n.t("Disponibles"))
+        lbl_disp.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                               f'color:{TEXT};background:transparent;')
+        col_izq.addWidget(lbl_disp)
+        lista_disp = QListWidget(); lista_disp.setStyleSheet(list_qss)
+        lista_disp.setFixedSize(240, 240)
+        col_izq.addWidget(lista_disp)
+        cols.addLayout(col_izq)
+
+        col_der = QVBoxLayout(); col_der.setSpacing(3)
+        lbl_sel = QLabel(_i18n.t("Seleccionadas"))
+        lbl_sel.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                              f'color:{TEXT};background:transparent;')
+        col_der.addWidget(lbl_sel)
+        lista_sel = QListWidget(); lista_sel.setStyleSheet(list_qss)
+        lista_sel.setFixedSize(240, 240)
+        col_der.addWidget(lista_sel)
+        cols.addLayout(col_der)
+        root.addLayout(cols)
+
+        def add_item(lista, key):
+            it = QListWidgetItem(etiqueta(key))
+            it.setData(Qt.ItemDataRole.UserRole, key)
+            lista.addItem(it)
+        for key in self._props_sel:
+            add_item(lista_sel, key)
+        for key, *_ in _PROP_SAT:
+            if key not in self._props_sel:
+                add_item(lista_disp, key)
+
+        fila = QHBoxLayout(); fila.setSpacing(8)
+        contador = QLabel()
+        contador.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                               f'color:{TEXT};background:transparent;')
+        fila.addWidget(contador); fila.addStretch()
+        btn_add = QPushButton(_i18n.t("Agregar"))
+        btn_rem = QPushButton(_i18n.t("Quitar"))
+        btn_ok  = QPushButton(_i18n.t("Aceptar"))
+        btn_cancel = QPushButton(_i18n.t("Cancelar"))
+        for b in (btn_add, btn_rem, btn_ok, btn_cancel):
+            b.setFixedHeight(26); b.setMinimumWidth(84)
+            b.setStyleSheet(btn_qss)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            fila.addWidget(b)
+        root.addLayout(fila)
+        btn_ok.clicked.connect(dlg.accept)
+        btn_cancel.clicked.connect(dlg.reject)
+
+        def _actualizar():
+            n = lista_sel.count()
+            contador.setText(_i18n.t("Seleccionadas: ") + f"{n} / {MAX}")
+            btn_ok.setEnabled(MIN <= n <= MAX)
+            btn_add.setEnabled(n < MAX and lista_disp.count() > 0)
+            btn_rem.setEnabled(n > MIN)
+
+        def _mover(origen, destino):
+            it = origen.currentItem()
+            if it is None:
+                return
+            key = it.data(Qt.ItemDataRole.UserRole)
+            origen.takeItem(origen.row(it))
+            add_item(destino, key)
+            _actualizar()
+
+        def _agregar():
+            if lista_sel.count() < MAX:
+                _mover(lista_disp, lista_sel)
+        def _quitar():
+            if lista_sel.count() > MIN:
+                _mover(lista_sel, lista_disp)
+
+        btn_add.clicked.connect(_agregar)
+        btn_rem.clicked.connect(_quitar)
+        lista_disp.itemDoubleClicked.connect(lambda _: _agregar())
+        lista_sel.itemDoubleClicked.connect(lambda _: _quitar())
+        _actualizar()
+        dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
+
+        if dlg.exec():
+            nuevos = [lista_sel.item(i).data(Qt.ItemDataRole.UserRole)
+                      for i in range(lista_sel.count())]
+            if not nuevos:
+                nuevos = list(_PROP_SAT_DEFAULT)
+            # Mantener el orden canonico del catalogo.
+            self._props_sel = [k for k, *_ in _PROP_SAT if k in nuevos]
+            self._rebuild_prop_table()
+            if getattr(self, 'last_result', None) is not None:
+                self._render(self.last_result)
+            # Avisar a la ventana principal para reajustar el alto.
+            if self._on_props_resize is not None:
+                self._on_props_resize(self, len(self._props_sel))
+
     def _fit_table_heights(self):
         """Ajusta la altura de cada tabla a la suma real de sus filas,
         para mostrar todas sin scrollbar (robusto ante DPI/versión Windows)."""
-        for tbl, nrows in [(self.tbl, NC+1), (self.tbl_prop, 6)]:
+        for tbl, nrows in [(self.tbl, NC+1),
+                           (self.tbl_prop, self.tbl_prop.rowCount())]:
             h = tbl.horizontalHeader().height()
             for r in range(nrows):
                 h += tbl.rowHeight(r)
@@ -445,16 +638,13 @@ class TabSaturacion(QWidget):
             self.lbl_cond.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
         else:
             self.lbl_cond.setText(f"{_i18n.t('Temperatura')} ({_u.u_abs()}):")
-        # Etiqueta de densidad de la tabla de propiedades
-        it_d = self.tbl_prop.item(2, 0)
-        if it_d is not None:
-            it_d.setText(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:")
-        it_h=self.tbl_prop.item(4,0)
-        if it_h is not None:
-            it_h.setText(f"{_i18n.t('Entalpia molar')} [{_u.u('H')}]:")
-        it_s=self.tbl_prop.item(5,0)
-        if it_s is not None:
-            it_s.setText(f"{_i18n.t('Entropia molar')} [{_u.u('S')}]:")
+        # Etiquetas de la tabla de propiedades con la unidad activa
+        sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
+        for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
+            it = self.tbl_prop.item(r, 0)
+            if it is not None:
+                unidad = f" [{_u.u(mag)}]" if mag else ""
+                it.setText(f"{_i18n.t(base)}{unidad}:")
         # Etiquetas de resultado (aunque no haya calculo aun)
         self._actualizar_labels_resultado()
         # Re-render del ultimo resultado (internos °R/psia)
@@ -507,33 +697,21 @@ class TabSaturacion(QWidget):
         self.tbl.item(NC,1).setText(f"{sy:.4f}")
         self.tbl.item(NC,2).setText(f"{sx:.4f}")
 
-        # Llenar panel de propiedades
+        # Llenar panel de propiedades (solo las seleccionadas, en orden)
         p=res.get('props',{})
-        def setp(row, key_v, key_l, fmt="{:.4f}", conv=None):
-            vv=p.get(key_v); vl=p.get(key_l)
-            if conv is not None:
-                vv = conv(vv) if vv is not None else None
-                vl = conv(vl) if vl is not None else None
-            self.tbl_prop.item(row,1).setText(fmt.format(vv) if vv is not None else "")
-            self.tbl_prop.item(row,2).setText(fmt.format(vl) if vl is not None else "")
-            self.tbl_prop.item(row,1).setForeground(QBrush(QColor(TEXT_RES)))
-            self.tbl_prop.item(row,2).setForeground(QBrush(QColor(TEXT_RES)))
-        setp(0,'PM_v','PM_l')
-        setp(1,'ZV','ZL')
-        setp(2,'rho_v','rho_l', conv=_u.dens_desde)   # densidad al sistema activo
-        setp(3,'sg_v','sg_l')
-        setp(4,'H_v','H_l', fmt="{:.2f}", conv=_u.H_desde)   # entalpía molar
-        setp(5,'S_v','S_l', fmt="{:.4f}", conv=_u.S_desde)   # entropía molar
-        # Etiqueta de densidad con la unidad activa
-        it_d=self.tbl_prop.item(2,0)
-        if it_d is not None:
-            it_d.setText(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:")
-        it_h=self.tbl_prop.item(4,0)
-        if it_h is not None:
-            it_h.setText(f"{_i18n.t('Entalpia molar')} [{_u.u('H')}]:")
-        it_s=self.tbl_prop.item(5,0)
-        if it_s is not None:
-            it_s.setText(f"{_i18n.t('Entropia molar')} [{_u.u('S')}]:")
+        sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
+        for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
+            unidad = f" [{_u.u(mag)}]" if mag else ""
+            it_lbl = self.tbl_prop.item(r, 0)
+            if it_lbl is not None:
+                it_lbl.setText(f"{_i18n.t(base)}{unidad}:")
+            vv = _conv_prop(conv, p.get(kv))
+            vl = _conv_prop(conv, p.get(kl))
+            fmt = f"{{:.{dec}f}}"
+            self.tbl_prop.item(r,1).setText(fmt.format(vv) if vv is not None else "")
+            self.tbl_prop.item(r,2).setText(fmt.format(vl) if vl is not None else "")
+            self.tbl_prop.item(r,1).setForeground(QBrush(QColor(TEXT_RES)))
+            self.tbl_prop.item(r,2).setForeground(QBrush(QColor(TEXT_RES)))
 
     # ── Guardar / restaurar estado ────────────────────────────
     def get_estado(self):
@@ -543,6 +721,7 @@ class TabSaturacion(QWidget):
                 'tipo':  self._tipo_es(),
                 'valor': float(self.sp_cond.value()),
             },
+            'props': list(self._props_sel),
             'resultado': self.last_result,   # dict o None
         }
 
@@ -559,6 +738,15 @@ class TabSaturacion(QWidget):
             self.sp_cond.setValue(float(e.get('valor', 0.0)))
         except (TypeError, ValueError):
             self.sp_cond.setValue(0.0)
+        # Restaurar la seleccion de propiedades (si viene guardada).
+        props = datos.get('props')
+        if props:
+            sel = [k for k, *_ in _PROP_SAT if k in props][:PROP_SAT_MAX]
+            if sel and sel != self._props_sel:
+                self._props_sel = sel
+                self._rebuild_prop_table()
+                if self._on_props_resize is not None:
+                    self._on_props_resize(self, len(self._props_sel))
         # Renderizar resultado si estaba
         r = datos.get('resultado')
         if not r:
