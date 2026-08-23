@@ -288,9 +288,7 @@ def _componentes(p):
     p.drawEllipse(QRectF(11.5, 11.5, 9, 9))
 
 
-def _componente_hex(p):
-    # Hexágono químico (símbolo de compuesto orgánico) para cada componente
-    # individual del árbol.  Relleno azul grisáceo claro, contorno sobrio.
+def _hex_path():
     import math
     hexa = QPainterPath()
     for i in range(6):
@@ -301,9 +299,24 @@ def _componente_hex(p):
         else:
             hexa.lineTo(x, y)
     hexa.closeSubpath()
+    return hexa
+
+
+def _componente_hex(p):
+    # Hexágono químico (símbolo de compuesto orgánico) para cada componente
+    # individual del árbol.  Relleno azul grisáceo claro, contorno sobrio.
+    # Esta es la variante de componente INACTIVO (quitado del fluido).
     p.setPen(_pen(QColor("#5A6B7A"), 1.6))
     p.setBrush(QBrush(QColor("#DCE6EF")))
-    p.drawPath(hexa)
+    p.drawPath(_hex_path())
+
+
+def _componente_hex_activo(p):
+    # Misma forma que el hexágono de componente, pero en verde suave para
+    # señalar que el componente esta ACTIVO (forma parte del fluido).
+    p.setPen(_pen(QColor("#4F8F52"), 1.6))
+    p.setBrush(QBrush(QColor("#CFEAD0")))
+    p.drawPath(_hex_path())
 
 
 def _fluidos(p):
@@ -668,6 +681,7 @@ _REGISTRO = {
     # datos
     "componentes": _componentes, "fluidos": _fluidos, "mezclas": _mezclas,
     "componente_hex": _componente_hex,
+    "componente_hex_activo": _componente_hex_activo,
     # herramientas
     "tablas": _tablas, "calculadora": _calculadora, "graficas": _graficas,
     # preferencias

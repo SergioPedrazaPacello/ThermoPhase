@@ -322,12 +322,15 @@ class NavigatorPanel(QWidget):
         self._nodo_comp.setIcon(0, icono("componentes", 16))
         self._nodo_comp.setData(0, Qt.ItemDataRole.UserRole, "componentes")
         self.tree_datos.addTopLevelItem(self._nodo_comp)
+        self._comp_items = []      # hojas de componente en orden canonico
         for nombre in _NOMBRES_COMP:
             txt = nombre.rstrip(':')
             hijo = QTreeWidgetItem([txt])
-            hijo.setIcon(0, icono("componente_hex", 16))
+            # Por defecto todos los componentes estan activos -> verde suave.
+            hijo.setIcon(0, icono("componente_hex_activo", 16))
             hijo.setData(0, Qt.ItemDataRole.UserRole, ('comp', txt))
             self._nodo_comp.addChild(hijo)
+            self._comp_items.append(hijo)
         self._nodo_comp.setExpanded(False)
         # Fluidos (nodo raiz expandible; sus hijos son los fluidos)
         self._nodo_fluidos = QTreeWidgetItem(["Fluidos"])
@@ -381,6 +384,15 @@ class NavigatorPanel(QWidget):
         data = item.data(0, Qt.ItemDataRole.UserRole)
         if data == 'componentes':
             self.gestor_comp_pedido.emit()
+
+    def set_componentes_activos(self, activos):
+        """Recolorea el icono de cada componente: verde suave si esta activo
+        (forma parte del fluido) o el hexagono azulado por defecto si esta
+        quitado. `activos` es la lista de indices canonicos activos."""
+        act = set(activos)
+        for i, it in enumerate(getattr(self, '_comp_items', [])):
+            nombre = "componente_hex_activo" if i in act else "componente_hex"
+            it.setIcon(0, icono(nombre, 16))
 
     def set_fluidos(self, nombres):
         """Reconstruye el arbol de fluidos: cada fluido con sus 4

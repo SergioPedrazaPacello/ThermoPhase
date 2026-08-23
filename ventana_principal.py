@@ -1487,6 +1487,11 @@ class TabFluidos(QWidget):
         izq = QVBoxLayout(); izq.setSpacing(4)
         izq.addWidget(section_label("Fluidos guardados", left=True))
         self.lista = QListWidget(); self.lista.setFixedWidth(250)
+        # La lista de fluidos guardados marca el alto minimo (piso) de la
+        # ventana cuando la tabla de composicion se reduce por quitar
+        # componentes: nunca baja de mostrar comodamente ~6 fluidos.
+        self._piso_lista = 6 * ROW_H          # 132 px
+        self.lista.setMinimumHeight(self._piso_lista)
         self.lista.setStyleSheet(
             f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
             f' font-family:"{FONT_F}"; font-size:{FS}pt; outline:0; }}'
@@ -1582,10 +1587,39 @@ class TabFluidos(QWidget):
         return z
 
     def _upd_suma(self):
-        s = sum(self._leer_z())
+        s = 0.0
+        for i in range(NC):
+            if self.tbl.isRowHidden(i):
+                continue
+            try: s += float(self.tbl.item(i, 1).text())
+            except: pass
         self.tbl.blockSignals(True)
         self.tbl.item(NC, 1).setText(f"{s:.4f}")
         self.tbl.blockSignals(False)
+
+    def aplicar_componentes(self, activos):
+        """Muestra unicamente las filas de los componentes activos en la tabla
+        de composicion y reajusta su alto. Los valores de los componentes
+        ocultos se conservan en la celda (para restaurarlos al reactivarlos);
+        no entran en la suma ni, via el enmascarado de get_z, en los calculos.
+        Cambio puramente estetico."""
+        act = set(activos)
+        for i in range(NC):
+            self.tbl.setRowHidden(i, i not in act)
+        fix_table_size(self.tbl)
+        self._upd_suma()
+
+    def reduccion_maxima(self):
+        """Cuanto (px) puede encogerse como maximo el alto de la ventana antes
+        de topar con el piso que impone el panel izquierdo (lista de fluidos).
+        La tabla de composicion puede bajar hasta igualar el alto del panel
+        izquierdo con la lista en su minimo."""
+        tabla_full = (NC + 1) * ROW_H + 2
+        # Diferencia de partes fijas entre columna izquierda (etiqueta+lista+
+        # 2 filas de botones) y derecha (etiqueta+tabla+1 fila de botones):
+        # cuando tabla == piso_lista + 32 ambas columnas se igualan.
+        tabla_piso = self._piso_lista + 32
+        return max(0, tabla_full - tabla_piso)
 
     def _on_edit(self, item):
         if item.column() != 1 or item.row() >= NC:
@@ -2531,6 +2565,9 @@ class MainWindow(QMainWindow):
             h = widget.sizeHint()
             sw = self._montar_subventana('fluidos', widget, "Fluidos",
                                          tam=(h.width() + 24, h.height() + 16))
+            if len(self._comp_activos) < NC:
+                widget.aplicar_componentes(self._comp_activos)
+                self._reajustar_ventana_comp(sw, widget, len(self._comp_activos))
         self._mostrar_subventana(sw)
 
     def _cargar_fluido_principal(self, z):
@@ -2556,30 +2593,57 @@ class MainWindow(QMainWindow):
         self._mostrar_subventana(sw)
 
     def _aplicar_componentes(self, activos):
-        """Aplica la lista de componentes activos a las pestañas involucradas:
-        oculta/muestra sus filas y ajusta el tamaño de cada ventana para que
-        no queden espacios. Es un cambio puramente estetico: el motor de
-        calculo sigue trabajando con todos los componentes (los ocultos entran
+        """Aplica la lista de componentes activos a todas las ventanas
+        involucradas: las pestañas principales (equilibrio, saturacion,
+        parametros), las ventanas por-fluido abiertas (equilibrio/saturacion/
+        parametros de cada fluido) y el gestor de Fluidos. Oculta/muestra sus
+        filas y ajusta cada ventana para que no queden espacios. Es puramente
+        estetico: el motor sigue con todos los componentes (los ocultos entran
         como fraccion 0 desde get_z)."""
         self._comp_activos = sorted(activos)
+        n = len(self._comp_activos)
+        # 1) Pestañas principales (aunque su ventana este cerrada, para que
+        #    nazcan correctas al abrirse).
         for clave, tab in self._tabs_comp.items():
             if hasattr(tab, 'aplicar_componentes'):
                 tab.aplicar_componentes(self._comp_activos)
             sw = self._subventanas.get(clave)
             if sw is not None:
-                self._reajustar_ventana_comp(sw, tab, len(self._comp_activos))
+                self._reajustar_ventana_comp(sw, tab, n)
+        # 2) Ventanas por-fluido abiertas y gestor de Fluidos: cualquier
+        #    subventana cuyo widget sepa reducir componentes.
+        for clave, sw in self._subventanas.items():
+            if clave in self._tabs_comp:
+                continue   # ya tratadas arriba
+            w = getattr(sw, '_widget', None)
+            if w is None or not hasattr(w, 'aplicar_componentes'):
+                continue
+            w.aplicar_componentes(self._comp_activos)
+            self._reajustar_ventana_comp(sw, w, n)
+        # 3) Recolorear los iconos de componentes del navegador.
+        if hasattr(self, 'nav') and hasattr(self.nav, 'set_componentes_activos'):
+            self.nav.set_componentes_activos(self._comp_activos)
 
-    def _reajustar_ventana_comp(self, sw, tab, n_activos):
+    def _reajustar_ventana_comp(self, sw, w, n_activos):
         """Ajusta el alto fijo de una subventana segun cuantos componentes hay
         activos. Cada componente aporta una fila (ROW_H) por tabla dependiente
-        de componentes: 1 en equilibrio/saturacion, 2 en parametros (tabla de
-        propiedades + matriz kij)."""
+        de componentes. El gestor de Fluidos ademas respeta un piso de alto
+        impuesto por su lista de fluidos guardados."""
         n_old = getattr(sw, '_n_comp', NC)
-        factor = 2 if tab is self.tab_par else 1
-        delta = (n_activos - n_old) * ROW_H * factor
-        if delta != 0:
-            s = sw.size()
-            sw.setFixedSize(s.width(), s.height() + delta)
+        if isinstance(w, TabFluidos):
+            # Alto pleno (13 comp) de esta ventana, reconstruido desde el
+            # estado actual, y reduccion topada por el piso del panel izquierdo.
+            if not hasattr(sw, '_h_full'):
+                sw._h_full = sw.height() + (NC - n_old) * ROW_H
+            k = NC - n_activos
+            red = min(k * ROW_H, w.reduccion_maxima())
+            sw.setFixedSize(sw.width(), sw._h_full - red)
+        else:
+            factor = 2 if isinstance(w, TabParametros) else 1
+            delta = (n_activos - n_old) * ROW_H * factor
+            if delta != 0:
+                s = sw.size()
+                sw.setFixedSize(s.width(), s.height() + delta)
         sw._n_comp = n_activos
 
     def _abrir_componente(self, nombre):
@@ -2653,13 +2717,21 @@ class MainWindow(QMainWindow):
             tam = self._tam_calculo(clave, widget)
             sw = self._montar_subventana(subclave, widget, titulo,
                                          tam=tam, eos_provider=prov)
+            # Si ya se habian quitado componentes, la ventana nace reducida.
+            if hasattr(widget, 'aplicar_componentes') and len(self._comp_activos) < NC:
+                widget.aplicar_componentes(self._comp_activos)
+                self._reajustar_ventana_comp(sw, widget, len(self._comp_activos))
         self._mostrar_subventana(sw)
 
     def _getz_fluido(self, fluido):
         """get_z para las ventanas de un fluido: fija la EOS del fluido antes
-        de leer su composicion (asi su envolvente/saturacion la respetan)."""
+        de leer su composicion (asi su envolvente/saturacion la respetan).
+        Los componentes desactivados en el gestor entran como fraccion 0, de
+        forma coherente con la composicion principal y sin tocar el motor."""
         _set_eos(fluido.get('eos', 'PR'))
-        return list(fluido['z'])
+        z = fluido['z']
+        act = set(getattr(self, '_comp_activos', range(NC)))
+        return [(z[i] if (i in act and i < len(z)) else 0.0) for i in range(NC)]
 
     def _crear_widget_fluido(self, clave, fluido):
         """Construye el widget de calculo ligado a la composicion y kij del
