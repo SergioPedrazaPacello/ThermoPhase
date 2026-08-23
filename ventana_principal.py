@@ -23,7 +23,7 @@ from eos import (
 )
 import eos as _eng
 from pestana_envolvente import TabEnvolvente
-from pestana_saturacion import TabSaturacion, PROP_SAT_MAX
+from pestana_saturacion import TabSaturacion
 from pestana_propiedades import TabPropiedades
 import dialogos as dialogos
 from rutas import ruta_recurso
@@ -532,6 +532,9 @@ class TabEquilibrio(QWidget):
 
         # Propiedades seleccionadas (por defecto, las 6 clásicas)
         self._props_sel = list(PROP_DEFAULT)
+        # Callback (lo fija la ventana principal) para redimensionar la ventana
+        # cuando cambia el numero de propiedades mostradas.
+        self._on_props_resize = None
         self._rebuild_resumen()      # arma filas/etiquetas iniciales
         root.addWidget(self.tbl_res)
 
@@ -666,6 +669,7 @@ class TabEquilibrio(QWidget):
                 'eos':         _eos_code(self.cmb_eos.currentIndex()),
                 'modo_masico': self.btn_frac.isChecked(),
             },
+            'props': list(self._props_sel),
             'resultado': self.last_result,   # dict o None
         }
 
@@ -705,6 +709,15 @@ class TabEquilibrio(QWidget):
         masico = bool(e.get('modo_masico', False))
         self.btn_frac.setChecked(masico)
         self._on_chk()  # ajusta cabeceras
+        # Restaurar la seleccion de propiedades (si viene guardada).
+        props = datos.get('props')
+        if props:
+            sel = [k for k, *_ in PROP_RESUMEN if k in props]
+            if sel and sel != self._props_sel:
+                self._props_sel = sel
+                self._rebuild_resumen()
+                if self._on_props_resize is not None:
+                    self._on_props_resize(self, len(self._props_sel))
         # Resultado
         r = datos.get('resultado')
         if r:
@@ -885,7 +898,8 @@ class TabEquilibrio(QWidget):
                                      QListWidget, QListWidgetItem, QPushButton,
                                      QLabel)
         import idioma as _i18n, unidades as _u
-        MAX = len(PROP_DEFAULT)   # número exacto de propiedades a mostrar (6)
+        MIN = 1                          # al menos una propiedad
+        MAX = len(PROP_RESUMEN)          # se pueden mostrar TODAS
 
         def etiqueta(key):
             base = _PROP_DEF[key][1]; mag = _PROP_DEF[key][2]
@@ -974,9 +988,9 @@ class TabEquilibrio(QWidget):
         def _actualizar():
             n = lista_sel.count()
             contador.setText(_i18n.t("Seleccionadas: ") + f"{n} / {MAX}")
-            btn_ok.setEnabled(n == MAX)
+            btn_ok.setEnabled(MIN <= n <= MAX)
             btn_add.setEnabled(n < MAX and lista_disp.count() > 0)
-            btn_rem.setEnabled(lista_sel.count() > 0)
+            btn_rem.setEnabled(n > MIN)
 
         def _mover(origen, destino):
             it = origen.currentItem()
@@ -991,7 +1005,8 @@ class TabEquilibrio(QWidget):
             if lista_sel.count() < MAX:
                 _mover(lista_disp, lista_sel)
         def _quitar():
-            _mover(lista_sel, lista_disp)
+            if lista_sel.count() > MIN:
+                _mover(lista_sel, lista_disp)
 
         btn_add.clicked.connect(_agregar)
         btn_rem.clicked.connect(_quitar)
@@ -1006,11 +1021,15 @@ class TabEquilibrio(QWidget):
                       for i in range(lista_sel.count())]
             if not nuevos:
                 nuevos = list(PROP_DEFAULT)
-            self._props_sel = nuevos
+            # Mantener el orden canonico del catalogo.
+            self._props_sel = [k for k, *_ in PROP_RESUMEN if k in nuevos]
             if getattr(self, 'last_result', None) is not None:
                 self._render(self.last_result)
             else:
                 self._rebuild_resumen()
+            # Avisar a la ventana principal para reajustar el alto.
+            if self._on_props_resize is not None:
+                self._on_props_resize(self, len(self._props_sel))
 
     def _render(self, r):
         masa = self.btn_frac.isChecked()
@@ -2161,12 +2180,13 @@ class MainWindow(QMainWindow):
     def _build(self):
         # ── Widgets de cada calculo (tamaño / colores identicos) ──
         self.tab_eq   = TabEquilibrio()
+        self.tab_eq._on_props_resize = self._on_props_change
         self.tab_env  = TabEnvolvente(get_z=self._getz_main,
                                       get_kij=lambda: kij_user,
                                       get_metodo_densidad=self._metodo_densidad_main)
         self.tab_sat  = TabSaturacion(get_z=self._getz_main,
                                       get_kij=lambda: kij_user)
-        self.tab_sat._on_props_resize = self._on_sat_props_change
+        self.tab_sat._on_props_resize = self._on_props_change
         self.tab_prop = TabPropiedades(get_z=self._getz_main,
                                        get_kij=lambda: kij_user)
         self.tab_par  = TabParametros()
@@ -2542,6 +2562,9 @@ class MainWindow(QMainWindow):
             tam = self._tam_calculo(clave, widget)
             sw = self._montar_subventana(clave, widget, titulo, tam=tam,
                                          eos_provider=prov)
+            # Referencia inicial para el redimensionado por propiedades.
+            if hasattr(widget, '_props_sel'):
+                sw._n_props = len(widget._props_sel)
             # Si esta pestaña depende de los componentes y ya se habian
             # quitado algunos antes de abrirla, nace ya reducida.
             if clave in self._tabs_comp and len(self._comp_activos) < NC:
@@ -2593,14 +2616,14 @@ class MainWindow(QMainWindow):
                 clave, widget, _i18n.t("Componentes del fluido"), tam=tam)
         self._mostrar_subventana(sw)
 
-    def _on_sat_props_change(self, tab, n_props):
-        """Reajusta el alto de la ventana de saturacion (principal o de un
-        fluido) cuando cambia cuantas propiedades muestra su tabla inferior.
+    def _on_props_change(self, tab, n_props):
+        """Reajusta el alto de una ventana (equilibrio o saturacion, principal
+        o de un fluido) cuando cambia cuantas propiedades muestra su tabla.
         Cada propiedad ocupa una fila (ROW_H). Es independiente del ajuste por
         componentes, asi que ambos se componen sobre el alto actual."""
         for sw in self._subventanas.values():
             if getattr(sw, '_widget', None) is tab:
-                n_old = getattr(sw, '_n_props', PROP_SAT_MAX)
+                n_old = getattr(sw, '_n_props', n_props)
                 delta = (n_props - n_old) * ROW_H
                 if delta != 0:
                     s = sw.size()
@@ -2733,6 +2756,9 @@ class MainWindow(QMainWindow):
             tam = self._tam_calculo(clave, widget)
             sw = self._montar_subventana(subclave, widget, titulo,
                                          tam=tam, eos_provider=prov)
+            # Referencia inicial para el redimensionado por propiedades.
+            if hasattr(widget, '_props_sel'):
+                sw._n_props = len(widget._props_sel)
             # Si ya se habian quitado componentes, la ventana nace reducida.
             if hasattr(widget, 'aplicar_componentes') and len(self._comp_activos) < NC:
                 widget.aplicar_componentes(self._comp_activos)
@@ -2769,7 +2795,7 @@ class MainWindow(QMainWindow):
             return TabEnvolvente(get_z=gz, get_kij=gk, get_metodo_densidad=gm)
         if clave == 'saturacion':
             w = TabSaturacion(get_z=gz, get_kij=gk)
-            w._on_props_resize = self._on_sat_props_change
+            w._on_props_resize = self._on_props_change
             return w
         if clave == 'propiedades':
             return TabPropiedades(get_z=gz, get_kij=gk)
@@ -2781,6 +2807,7 @@ class MainWindow(QMainWindow):
             # fluido y usa el kij del fluido. Su composicion queda LIGADA al
             # fluido (edicion bidireccional con el gestor de Fluidos).
             w = TabEquilibrio(kij_get=gk)
+            w._on_props_resize = self._on_props_change
             w.set_z(fluido['z'])
             w.cmb_eos.blockSignals(True)
             w.cmb_eos.setCurrentIndex(_eos_idx(fluido.get('eos', 'PR')))

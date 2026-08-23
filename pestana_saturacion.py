@@ -38,9 +38,9 @@ _PROP_SAT = [
 _PROP_SAT_DEF = {d[0]: d for d in _PROP_SAT}
 # Seleccion por defecto = las 6 propiedades que la pestaña muestra hoy.
 _PROP_SAT_DEFAULT = ['pm', 'z', 'densidad', 'sg', 'entalpia', 'entropia']
-# Tope de propiedades a mostrar (para no desconfigurar la ventana): el numero
-# que la pestaña muestra actualmente.
-PROP_SAT_MAX = len(_PROP_SAT_DEFAULT)
+# Tope de propiedades a mostrar: se pueden colocar TODAS las del catalogo
+# (minimo 1). La ventana se ajusta sola al numero elegido.
+PROP_SAT_MAX = len(_PROP_SAT)
 
 
 def _conv_prop(clave_conv, val):
