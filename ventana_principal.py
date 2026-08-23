@@ -731,9 +731,25 @@ class TabEquilibrio(QWidget):
     def get_z(self):
         z = []
         for i in range(NC):
+            # Un componente oculto (quitado en el gestor) no entra en la
+            # mezcla: se comporta como fraccion 0 sin necesidad de tocar su
+            # celda ni el motor de calculo.
+            if self.tbl_comp.isRowHidden(i):
+                z.append(0.0); continue
             try: z.append(float(self.tbl_comp.item(i,1).text()))
             except: z.append(0.0)
         return z
+
+    def aplicar_componentes(self, activos):
+        """Muestra unicamente las filas de los componentes activos y reajusta
+        la tabla a su contenido (cambio puramente estetico: los ocultos no
+        entran en la mezcla porque get_z los devuelve como 0)."""
+        act = set(activos)
+        for i in range(NC):
+            self.tbl_comp.setRowHidden(i, i not in act)
+        # La fila de Sumatorias (indice NC) nunca se oculta.
+        fix_table_size(self.tbl_comp)
+        self._upd_suma()
 
     def set_z(self, z):
         """Carga una composicion (lista de NC fracciones) en la tabla."""
@@ -1311,6 +1327,21 @@ class TabParametros(QWidget):
                 if it and i != j:
                     it.setText(f"{m[i][j]:.5f}")
         self.tbl_k.blockSignals(False)
+
+    def aplicar_componentes(self, activos):
+        """Oculta las filas de los componentes no activos en la tabla de
+        propiedades criticas y, en la matriz kij, oculta su fila Y su columna
+        (es una matriz cuadrada componente x componente). Reajusta ambas
+        tablas a su contenido visible. Cambio puramente estetico."""
+        act = set(activos)
+        for i in range(NC):
+            oculto = i not in act
+            # +1 porque la fila 0 (y en kij tambien la columna 0) es cabecera.
+            self.tbl_p.setRowHidden(i+1, oculto)
+            self.tbl_k.setRowHidden(i+1, oculto)
+            self.tbl_k.setColumnHidden(i+1, oculto)
+        fix_table_size(self.tbl_p)
+        fix_table_size(self.tbl_k)
 
     def _reset(self):
         # Restaura al default de la EOS-fuente seleccionada.
@@ -2115,6 +2146,17 @@ class MainWindow(QMainWindow):
         }
         self._subventanas = {}     # clave -> QMdiSubWindow
 
+        # Componentes activos del fluido principal (orden canonico). El gestor
+        # de componentes los modifica; las pestañas involucradas (equilibrio,
+        # saturacion, parametros) se reducen/amplian de forma solo estetica.
+        self._comp_activos = list(range(NC))
+        # Pestañas afectadas por el gestor de componentes.
+        self._tabs_comp = {
+            'equilibrio': self.tab_eq,
+            'saturacion': self.tab_sat,
+            'parametros': self.tab_par,
+        }
+
         # ── Barra superior de selectores globales ────────────
         self.ribbon, self.selectores = construir_ribbon()
         self._cablear_selectores()
@@ -2465,6 +2507,13 @@ class MainWindow(QMainWindow):
             tam = self._tam_calculo(clave, widget)
             sw = self._montar_subventana(clave, widget, titulo, tam=tam,
                                          eos_provider=prov)
+            # Si esta pestaña depende de los componentes y ya se habian
+            # quitado algunos antes de abrirla, nace ya reducida.
+            if clave in self._tabs_comp and len(self._comp_activos) < NC:
+                tab = self._tabs_comp[clave]
+                if hasattr(tab, 'aplicar_componentes'):
+                    tab.aplicar_componentes(self._comp_activos)
+                self._reajustar_ventana_comp(sw, tab, len(self._comp_activos))
         self._mostrar_subventana(sw)
 
     def _abrir_fluidos(self):
@@ -2492,18 +2541,46 @@ class MainWindow(QMainWindow):
     def _abrir_gestor_componentes(self):
         """Abre (o activa) el gestor de componentes del fluido: ventana de
         dos listas (disponibles / seleccionados) para sacar y añadir
-        compuestos.  Por ahora es solo la interfaz, sin efecto sobre los
-        cálculos ni sobre el tamaño de las pestañas."""
+        compuestos. Al mover componentes se reducen/amplian de forma solo
+        estetica las pestañas de equilibrio, saturacion y parametros."""
         import componentes_ui as _cui
         clave = 'gestor_componentes'
         sw = self._subventanas.get(clave)
         if sw is None:
-            # Sin callback: mover componentes entre listas no afecta nada aún.
-            widget = _cui.VentanaGestorComponentes()
+            widget = _cui.VentanaGestorComponentes(
+                seleccionados=self._comp_activos,
+                on_cambio=self._aplicar_componentes)
             tam = widget.tam_ideal()
             sw = self._montar_subventana(
                 clave, widget, _i18n.t("Componentes del fluido"), tam=tam)
         self._mostrar_subventana(sw)
+
+    def _aplicar_componentes(self, activos):
+        """Aplica la lista de componentes activos a las pestañas involucradas:
+        oculta/muestra sus filas y ajusta el tamaño de cada ventana para que
+        no queden espacios. Es un cambio puramente estetico: el motor de
+        calculo sigue trabajando con todos los componentes (los ocultos entran
+        como fraccion 0 desde get_z)."""
+        self._comp_activos = sorted(activos)
+        for clave, tab in self._tabs_comp.items():
+            if hasattr(tab, 'aplicar_componentes'):
+                tab.aplicar_componentes(self._comp_activos)
+            sw = self._subventanas.get(clave)
+            if sw is not None:
+                self._reajustar_ventana_comp(sw, tab, len(self._comp_activos))
+
+    def _reajustar_ventana_comp(self, sw, tab, n_activos):
+        """Ajusta el alto fijo de una subventana segun cuantos componentes hay
+        activos. Cada componente aporta una fila (ROW_H) por tabla dependiente
+        de componentes: 1 en equilibrio/saturacion, 2 en parametros (tabla de
+        propiedades + matriz kij)."""
+        n_old = getattr(sw, '_n_comp', NC)
+        factor = 2 if tab is self.tab_par else 1
+        delta = (n_activos - n_old) * ROW_H * factor
+        if delta != 0:
+            s = sw.size()
+            sw.setFixedSize(s.width(), s.height() + delta)
+        sw._n_comp = n_activos
 
     def _abrir_componente(self, nombre):
         """Abre (o activa) la ventana de propiedades de un componente puro.

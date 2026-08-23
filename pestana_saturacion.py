@@ -347,6 +347,17 @@ class TabSaturacion(QWidget):
         super().showEvent(event)
         self._fit_table_heights()
 
+    def aplicar_componentes(self, activos):
+        """Oculta las filas de los componentes no activos en la tabla de
+        composicion de fases y reajusta su alto. Cambio puramente estetico
+        (la composicion se lee del fluido principal via get_z, que ya
+        devuelve 0 para los componentes ocultos)."""
+        act = set(activos)
+        for i in range(NC):
+            self.tbl.setRowHidden(i, i not in act)
+        # La fila de Sumatorias (indice NC) nunca se oculta.
+        self._fit_table_heights()
+
     def _fit_table_heights(self):
         """Ajusta la altura de cada tabla a la suma real de sus filas,
         para mostrar todas sin scrollbar (robusto ante DPI/versión Windows)."""
