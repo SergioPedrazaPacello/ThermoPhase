@@ -197,12 +197,9 @@ def make_table(rows, cols, row_h=22):
     return t
 
 def fix_table_size(t):
-    """Ajusta el tamaño de la tabla a su contenido, ignorando filas y
-    columnas ocultas (para soportar componentes deshabilitados)."""
-    w = sum(t.columnWidth(c) for c in range(t.columnCount())
-            if not t.isColumnHidden(c)) + 2
-    h = sum(t.rowHeight(r) for r in range(t.rowCount())
-            if not t.isRowHidden(r)) + 2
+    """Ajusta el tamaño de la tabla a su contenido."""
+    w = sum(t.columnWidth(c) for c in range(t.columnCount())) + 2
+    h = sum(t.rowHeight(r) for r in range(t.rowCount())) + 2
     t.setFixedSize(w, h)
 
 # ── Dimensiones ──────────────────────────────────────────────
@@ -731,32 +728,6 @@ class TabEquilibrio(QWidget):
         if item.row() == self.sum_row: return  # no procesar fila sumatorias
         self._upd_suma()
 
-    def aplicar_componentes_activos(self, activos):
-        """Muestra solo las filas de los componentes activos y ajusta el
-        tamaño de la tabla.  Los inactivos se ocultan y su fracción se pone
-        a 0 para que el motor los ignore."""
-        activos_set = set(activos)
-        self._n_activos = len(activos_set)
-        self.tbl_comp.blockSignals(True)
-        for i in range(NC):
-            oculto = i not in activos_set
-            self.tbl_comp.setRowHidden(i, oculto)
-            if oculto:
-                self.tbl_comp.item(i, 1).setText("0.0000")
-        self.tbl_comp.blockSignals(False)
-        fix_table_size(self.tbl_comp)
-        self._upd_suma()
-
-    def tam_ideal(self):
-        """Tamaño (ancho, alto) ajustado al número de componentes activos.
-        La tabla de composición tiene (n_activos + 1) filas visibles (la
-        fila extra es la de Sumatorias)."""
-        n = getattr(self, '_n_activos', NC)
-        sh = self.sizeHint()
-        # Cada componente oculto reduce el alto en ROW_H
-        alto = sh.height() - (NC - n)*ROW_H
-        return (sh.width(), alto)
-
     def get_z(self):
         z = []
         for i in range(NC):
@@ -1194,41 +1165,15 @@ class TabParametros(QWidget):
 
     def tam_ideal(self):
         """Tamaño (ancho, alto) que hace entrar todo el contenido justo, sin
-        scrollbars ni espacio sobrante.  El alto depende del número de
-        componentes activos (filas visibles)."""
+        scrollbars ni espacio sobrante.  El ancho es el de las tablas (912 px:
+        columnas + borde) más los márgenes laterales del layout."""
         WK = self._WK
-        n_act = getattr(self, '_n_activos', NC)
-        ancho_tabla = (n_act + 1) * WK + 2   # columnas kij visibles + borde
-        margen_lat = 13
+        ancho_tabla = (NC + 1) * WK + 2   # columnas kij + borde (1 px por lado)
+        margen_lat = 13                    # margen lateral izquierdo/derecho
         ancho = ancho_tabla + 2*margen_lat
-        h_tbl = (n_act+1)*ROW_H + 2   # cabecera + filas activas + borde
+        h_tbl = (NC+1)*ROW_H + 2   # alto de cada tabla (filas + borde)
         alto = 8 + 22 + 3 + h_tbl + 3 + 22 + 3 + h_tbl + 3 + 30
         return (ancho, alto)
-
-    def aplicar_componentes_activos(self, activos):
-        """Oculta filas y columnas de los componentes inactivos en ambas
-        tablas (propiedades críticas y coeficientes kij) y reajusta tamaños.
-        En tbl_p el componente i está en la fila i+1; en tbl_k está en la
-        fila i+1 y la columna i+1 (fila/col 0 son cabeceras)."""
-        activos_set = set(activos)
-        self._n_activos = len(activos_set)
-        # Tabla de propiedades críticas: ocultar filas de datos inactivas
-        for i in range(NC):
-            self.tbl_p.setRowHidden(i+1, i not in activos_set)
-        # Tabla kij: ocultar filas y columnas inactivas
-        for i in range(NC):
-            oculto = i not in activos_set
-            self.tbl_k.setRowHidden(i+1, oculto)
-            self.tbl_k.setColumnHidden(i+1, oculto)
-        # Reajustar alturas y anchos de ambas tablas contando solo lo visible
-        n = self._n_activos
-        self.tbl_p.setFixedHeight((n+1)*ROW_H + 2)
-        self.tbl_k.setFixedHeight((n+1)*ROW_H + 2)
-        # Ancho de la tabla kij = (activos + 1) columnas
-        WK = self._WK
-        self.tbl_k.setFixedWidth((n+1)*WK + 2)
-        # La tabla de propiedades mantiene su ancho de columnas fijas (WP)
-        # porque sus columnas no son por componente.
 
     def _build(self):
         outer = QVBoxLayout(self)
@@ -1714,10 +1659,6 @@ class MainWindow(QMainWindow):
         self.resize(1300, 840)
         self.current_path = None        # ruta del .tpsim actual (None = sin guardar)
         self.fluidos = []               # lista de fluidos guardados (gestor Fluidos)
-        # Componentes activos del fluido: conjunto de índices (0..NC-1).
-        # Inicialmente todos activos.  Los inactivos se ocultan en las tablas
-        # y su fracción molar se fuerza a 0 (el motor los ignora).
-        self.componentes_activos = list(range(NC))
         self._build()
         # Gestor de edicion (copiar/pegar/deshacer/rehacer sobre celdas).
         self.gestor_edicion = edicion.GestorEdicion()
@@ -2509,7 +2450,7 @@ class MainWindow(QMainWindow):
 
     def _tam_calculo(self, clave, widget):
         """Tamaño fijo para la ventana de cada cálculo."""
-        if clave in ('equilibrio', 'parametros', 'saturacion') and hasattr(widget, 'tam_ideal'):
+        if clave == 'parametros':
             return widget.tam_ideal()
         return None   # el resto usa el tamaño estandar (igual que Equilibrio)
 
@@ -2524,66 +2465,6 @@ class MainWindow(QMainWindow):
             tam = self._tam_calculo(clave, widget)
             sw = self._montar_subventana(clave, widget, titulo, tam=tam,
                                          eos_provider=prov)
-        self._mostrar_subventana(sw)
-
-    def _abrir_gestor_componentes(self):
-        """Abre (o activa) el gestor de componentes del fluido: ventana de
-        dos listas (disponibles / seleccionados) para sacar y añadir
-        compuestos.  Por ahora es solo la interfaz, sin efecto sobre los
-        cálculos."""
-        import componentes_ui as _cui
-        clave = 'gestor_componentes'
-        sw = self._subventanas.get(clave)
-        if sw is None:
-            widget = _cui.VentanaGestorComponentes(
-                seleccionados=self.componentes_activos,
-                on_cambio=self.aplicar_componentes_activos)
-            tam = widget.tam_ideal()
-            sw = self._montar_subventana(
-                clave, widget, _i18n.t("Componentes del fluido"), tam=tam)
-        self._mostrar_subventana(sw)
-
-    def aplicar_componentes_activos(self, activos):
-        """Aplica el conjunto de componentes activos a todas las pestañas:
-        oculta las filas/columnas de los inactivos y reajusta el tamaño de
-        cada subventana para que no queden huecos ni scrollbars."""
-        self.componentes_activos = sorted(activos)
-        if hasattr(self, 'tab_eq') and hasattr(self.tab_eq, 'aplicar_componentes_activos'):
-            self.tab_eq.aplicar_componentes_activos(self.componentes_activos)
-        if hasattr(self, 'tab_sat') and hasattr(self.tab_sat, 'aplicar_componentes_activos'):
-            self.tab_sat.aplicar_componentes_activos(self.componentes_activos)
-        if hasattr(self, 'tab_par') and hasattr(self.tab_par, 'aplicar_componentes_activos'):
-            self.tab_par.aplicar_componentes_activos(self.componentes_activos)
-        mapa = {'equilibrio': 'tab_eq', 'saturacion': 'tab_sat',
-                'parametros': 'tab_par'}
-        for clave_sub, attr in mapa.items():
-            sw = self._subventanas.get(clave_sub)
-            widget = getattr(self, attr, None)
-            if sw is not None and widget is not None:
-                tam = self._tam_calculo(clave_sub, widget)
-                if tam:
-                    sw.setFixedSize(tam[0], tam[1] + 20)
-                    widget.setFixedSize(tam[0], tam[1])
-
-    def _abrir_componente(self, nombre):
-        """Abre (o activa) la ventana de propiedades de un componente puro.
-        `nombre` es el texto mostrado en el árbol (nombre completo sin ':')."""
-        import componentes_ui as _cui
-        # Resolver el índice del componente por su nombre mostrado
-        idx = None
-        for i, nom in enumerate(NOMBRES):
-            if nom.rstrip(':') == nombre:
-                idx = i
-                break
-        if idx is None:
-            return
-        clave = f'componente@{idx}'
-        sw = self._subventanas.get(clave)
-        if sw is None:
-            widget = _cui.VentanaPropComponente(idx)
-            titulo = NOMBRES[idx].rstrip(':')
-            tam = widget.tam_ideal()
-            sw = self._montar_subventana(clave, widget, titulo, tam=tam)
         self._mostrar_subventana(sw)
 
     def _abrir_fluidos(self):
@@ -2607,6 +2488,42 @@ class MainWindow(QMainWindow):
         """Carga la composicion de un fluido en la pestaña de Equilibrio."""
         self.tab_eq.set_z(z)
         self._abrir_calculo('equilibrio')
+
+    def _abrir_gestor_componentes(self):
+        """Abre (o activa) el gestor de componentes del fluido: ventana de
+        dos listas (disponibles / seleccionados) para sacar y añadir
+        compuestos.  Por ahora es solo la interfaz, sin efecto sobre los
+        cálculos ni sobre el tamaño de las pestañas."""
+        import componentes_ui as _cui
+        clave = 'gestor_componentes'
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            # Sin callback: mover componentes entre listas no afecta nada aún.
+            widget = _cui.VentanaGestorComponentes()
+            tam = widget.tam_ideal()
+            sw = self._montar_subventana(
+                clave, widget, _i18n.t("Componentes del fluido"), tam=tam)
+        self._mostrar_subventana(sw)
+
+    def _abrir_componente(self, nombre):
+        """Abre (o activa) la ventana de propiedades de un componente puro.
+        `nombre` es el texto mostrado en el árbol (nombre completo sin ':')."""
+        import componentes_ui as _cui
+        idx = None
+        for i, nom in enumerate(NOMBRES):
+            if nom.rstrip(':') == nombre:
+                idx = i
+                break
+        if idx is None:
+            return
+        clave = f'componente@{idx}'
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            widget = _cui.VentanaPropComponente(idx)
+            titulo = NOMBRES[idx].rstrip(':')
+            tam = widget.tam_ideal()
+            sw = self._montar_subventana(clave, widget, titulo, tam=tam)
+        self._mostrar_subventana(sw)
 
     def _sync_nav_fluidos(self):
         """Actualiza el arbol de fluidos del navegador. Si el idioma activo es
