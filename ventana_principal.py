@@ -2211,6 +2211,13 @@ class MainWindow(QMainWindow):
             'saturacion': self.tab_sat,
             'parametros': self.tab_par,
         }
+        # Tamaño estandar de las ventanas de calculo, fijado AHORA (con los 13
+        # componentes visibles y las propiedades por defecto), para que NO
+        # dependa de si se quitaron componentes antes de abrir la primera
+        # ventana. La ventana se montara ya reducida segun cuantos componentes
+        # esten activos en ese momento.
+        h = self.tab_eq.sizeHint()
+        self._tam_sub = (h.width() + 26, h.height() + 12)
 
         # ── Barra superior de selectores globales ────────────
         self.ribbon, self.selectores = construir_ribbon()
@@ -2551,6 +2558,26 @@ class MainWindow(QMainWindow):
             return widget.tam_ideal()
         return None   # el resto usa el tamaño estandar (igual que Equilibrio)
 
+    def _tam_montaje(self, clave_base, widget, n_comp):
+        """Tamaño con el que se MONTA la ventana, ya reducido segun los
+        componentes activos (y las propiedades seleccionadas, por si se
+        restauran desde un archivo), para que nazca al tamaño correcto en una
+        sola operacion (no depende del orden abrir/quitar)."""
+        quitados = NC - n_comp
+        if clave_base == 'parametros':
+            w0, h0 = widget.tam_ideal()
+            # 2 tablas dependientes de componentes (propiedades criticas + kij)
+            return (w0, h0 - quitados * ROW_H * 2)
+        if clave_base in ('equilibrio', 'saturacion'):
+            w0, h0 = self._tam_sub
+            h0 -= quitados * ROW_H
+            # Delta por propiedades respecto al numero por defecto (6).
+            if hasattr(widget, '_props_sel'):
+                h0 -= (len(PROP_DEFAULT) - len(widget._props_sel)) * ROW_H
+            return (w0, h0)
+        # envolvente / propiedades: no dependen de componentes
+        return self._tam_sub
+
     def _abrir_calculo(self, clave):
         """Abre (o activa) la ventana del calculo pedido."""
         if clave not in self._defs_calc:
@@ -2559,19 +2586,19 @@ class MainWindow(QMainWindow):
         if sw is None:
             widget, titulo, ic = self._defs_calc[clave]
             prov = self._eos_main_code
-            tam = self._tam_calculo(clave, widget)
+            n_comp = len(self._comp_activos)
+            # Aplicar el estado de componentes al widget ANTES de montar, para
+            # que la ventana nazca ya al tamaño correcto (una sola operacion,
+            # sin depender del orden abrir/quitar).
+            if clave in self._tabs_comp and hasattr(widget, 'aplicar_componentes'):
+                widget.aplicar_componentes(self._comp_activos)
+            tam = self._tam_montaje(clave, widget, n_comp)
             sw = self._montar_subventana(clave, widget, titulo, tam=tam,
                                          eos_provider=prov)
-            # Referencia inicial para el redimensionado por propiedades.
+            # Referencias para los redimensionados en vivo posteriores.
+            sw._n_comp = n_comp
             if hasattr(widget, '_props_sel'):
                 sw._n_props = len(widget._props_sel)
-            # Si esta pestaña depende de los componentes y ya se habian
-            # quitado algunos antes de abrirla, nace ya reducida.
-            if clave in self._tabs_comp and len(self._comp_activos) < NC:
-                tab = self._tabs_comp[clave]
-                if hasattr(tab, 'aplicar_componentes'):
-                    tab.aplicar_componentes(self._comp_activos)
-                self._reajustar_ventana_comp(sw, tab, len(self._comp_activos))
         self._mostrar_subventana(sw)
 
     def _abrir_fluidos(self):
@@ -2750,19 +2777,21 @@ class MainWindow(QMainWindow):
                     widget.set_estado(pend[clave])
                 except Exception:
                     pass
+            # Aplicar el estado de componentes ANTES de montar, para que la
+            # ventana nazca ya al tamaño correcto (independiente del orden).
+            if hasattr(widget, 'aplicar_componentes'):
+                widget.aplicar_componentes(self._comp_activos)
             titulo = f"{etiquetas[clave]} - {fluido['nombre']}"
             # Pie con la EOS del fluido.
             prov = (lambda f=fluido: f.get('eos', 'PR'))
-            tam = self._tam_calculo(clave, widget)
+            n_comp = len(self._comp_activos)
+            tam = self._tam_montaje(clave, widget, n_comp)
             sw = self._montar_subventana(subclave, widget, titulo,
                                          tam=tam, eos_provider=prov)
-            # Referencia inicial para el redimensionado por propiedades.
+            # Referencias para los redimensionados en vivo posteriores.
+            sw._n_comp = n_comp
             if hasattr(widget, '_props_sel'):
                 sw._n_props = len(widget._props_sel)
-            # Si ya se habian quitado componentes, la ventana nace reducida.
-            if hasattr(widget, 'aplicar_componentes') and len(self._comp_activos) < NC:
-                widget.aplicar_componentes(self._comp_activos)
-                self._reajustar_ventana_comp(sw, widget, len(self._comp_activos))
         self._mostrar_subventana(sw)
 
     def _getz_fluido(self, fluido):

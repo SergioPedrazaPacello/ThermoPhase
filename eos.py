@@ -396,22 +396,19 @@ def costald_Vs(comp, T):
 # supercrítico.  Referencia: Aspen HYSYS Documentation and Course Hero
 # transcription of the manual.
 #
-# La ecuación de Chueh-Prausnitz (Prausnitz & Chueh 1968; el manual
-# HYSYS la lista como opción del *Pressure Correction* con la forma
-#   ρ = 1/[Vs·(1+B)^n],  B = f(P,Ps,T,Tc,Pc),  n = constante):
-# aquí se usa la forma logarítmica equivalente, con la definición de
-# β(Tr,ω,Pc) tomada de la extensión Hankinson-Brobst-Thomson (que HYSYS
-# también acepta como opción "Tait's Equation" en el mismo menú):
+# La ecuación de Chueh-Prausnitz (1969) es la corrección de líquido
+# comprimido que usa HYSYS con COSTALD.  Parte de la compresibilidad del
+# líquido saturado βˢ y la integra a n = 9:
 #
-#   V(T,P) = Vs(T) · [1 − c · ln((β+P)/(β+Ps))]
-#   c = 0.0894
-#   β/Pc = -1 + a(1-Tr)^(1/3) + b(1-Tr)^(2/3) + d(1-Tr) + e(1-Tr)^(4/3)
-#   e = exp(f + g·ω + h·ω²)
-#   a=-9.070217, b=62.45326, d=-135.1102, f=4.79594, g=0.250047, h=1.14188
+#   V(T,P) = Vs(T) · [1 + 9·βˢ·(P − Ps)]^(−1/9)
+#   R·βˢ·Tc/vc = [1 − 0.89·√ω]·exp(6.9547 − 76.2853·Tr + 191.3060·Tr²
+#                 − 203.5472·Tr³ + 82.7631·Tr⁴)          (válida 0.4 ≤ Tr ≤ 0.98)
 #
-# Ps (presión de saturación de la mezcla a T) se estima explícitamente
-# vía Wilson (evita la iteración del punto de burbuja):
-#   Ps = Σ zi · Pci · exp[5.373·(1+ωi)·(1−Tci/T)]
+# con vc = Vm* (volumen característico COSTALD de la mezcla) y ω = ω_SRK.  El
+# factor [1 − 0.89·√ω] usa la RAÍZ del factor acentrico (no ω): es lo que
+# reproduce la densidad interna de HYSYS al segundo decimal en la región de
+# líquido.  Ps (presión de saturación de la mezcla a T) se toma de la ecuación
+# de Riedel de COSTALD.
 
 def _costald_mix_params(comp):
     """Tcm, ω_SRK,m, Pcm pseudocríticos de la regla COSTALD/Kay."""
@@ -510,19 +507,28 @@ def _Ps_riedel_costald(Tr, om, Pcm):
 
 def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
     """Volumen molar de líquido por el método COSTALD con corrección de
-    presión para líquido comprimido (ecuación tipo Tait generalizada).
+    presión de Chueh-Prausnitz (1969) para líquido comprimido/subenfriado.
+
+    Es la corrección que HYSYS aplica al método COSTALD por encima de la
+    presión de saturación ("Chueh and Prausnitz correction factor for
+    compressed fluids"), válida mientras la temperatura pseudo-reducida de la
+    mezcla sea menor a 1.
 
     Retorna None si la mezcla no admite estado líquido en (T,P) por COSTALD
     (Vs no calculable, Tr ≥ 1). El caller debe entonces caer a la EOS.
 
-        V = Vs·(1 − C·ln((B+P)/(B+Ps)))
-        B = Pcm·(−1 − 9.070217·τ^⅓ + 62.45326·τ^⅔ − 135.1102·τ + e₁·τ^(4/3))
-        e₁ = exp(4.79594 + 0.250047·ω_SRK + 1.14188·ω_SRK²)
-        C  = 0.0861488 + 0.0344483·ω_SRK
-        τ  = 1 − Tr
+        V(T,P) = Vs(T) · [1 + 9·βˢ·(P − Ps)]^(−1/9)                    (5,7)
 
-    donde Pcm es la presión pseudocrítica de la mezcla y Ps la presión de
-    saturación de la mezcla por la ecuación de Riedel.
+        R·βˢ·Tc/vc = [1 − 0.89·√ω] · exp( 6.9547 − 76.2853·Tr          (6)
+                       + 191.3060·Tr² − 203.5472·Tr³ + 82.7631·Tr⁴ )
+
+    donde βˢ es la compresibilidad isotérmica del líquido saturado, vc el
+    volumen característico de la mezcla (Vm* de COSTALD), ω el factor acentrico
+    SRK de la mezcla y n = 9 (Chueh-Prausnitz obtienen mejor ajuste con n = 9
+    que con el n = 7 de Wada).  La correlación de βˢ es válida para
+    0.4 ≤ Tr ≤ 0.98; la banda 0.95 ≤ Tr < 1 la resuelve el suavizado del
+    caller.  Como Pcm = Zcm·R·Tcm/Vm*, se cumple vc/(R·Tc) = Zcm/Pcm, lo que
+    permite evaluar βˢ sin recalcular Vm*.
 
     Argumentos:
         Ps  — presión de saturación de la mezcla a T (psia).  Si es None,
@@ -541,15 +547,17 @@ def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
             return Vs                 # sin Ps válida, mantener saturado
     if P <= Ps:
         return Vs                     # COSTALD saturado tal cual
-    # Corrección de líquido comprimido (Tait generalizada)
-    tau = 1.0 - Tr
-    e1  = np.exp(4.79594 + 0.250047*om + 1.14188*om*om)
-    B   = Pcm*(-1.0 - 9.070217*tau**(1/3.0) + 62.45326*tau**(2/3.0)
-               - 135.1102*tau + e1*tau**(4/3.0))
-    C   = 0.0861488 + 0.0344483*om
-    if B + Ps <= 0 or B + P <= 0:
-        return Vs                     # fuera del rango, mantener saturado
-    V_CP = Vs*(1.0 - C*np.log((B + P)/(B + Ps)))
+    if Pcm <= 0:
+        return Vs
+    # Compresibilidad del líquido saturado βˢ (correlación Chueh-Prausnitz)
+    Zcm    = 0.291 - 0.080*om          # misma Zcm con que se define Pcm
+    f      = (6.9547 - 76.2853*Tr + 191.3060*Tr*Tr
+              - 203.5472*Tr**3 + 82.7631*Tr**4)
+    beta_s = (Zcm/Pcm)*(1.0 - 0.89*np.sqrt(max(om, 0.0)))*np.exp(f)
+    arg    = 1.0 + 9.0*beta_s*(P - Ps)
+    if arg <= 0.0:
+        return Vs                     # fuera del rango de validez
+    V_CP = Vs*arg**(-1.0/9.0)
     return V_CP if V_CP > 0 else Vs
 
 
