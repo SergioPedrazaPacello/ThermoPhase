@@ -505,6 +505,57 @@ def _Ps_riedel_costald(Tr, om, Pcm):
     return PRs*Pcm
 
 
+_PS_BURBUJA_CACHE = {}
+
+def _Ps_burbuja_eos(comp, T, kij=None):
+    """Presión de burbuja de la mezcla a T por la EOS activa.
+
+    Es la presión de saturación FÍSICA que la corrección de Chueh-Prausnitz
+    necesita como referencia.  Cerca del crítico la correlación generalizada de
+    Riedel subestima fuertemente la saturación de una mezcla con livianos (p.
+    ej. metano eleva mucho la burbuja real), lo que hacía que la corrección
+    comprimiera de más.  HYSYS, al disponer de la EOS completa, usa esta
+    presión de burbuja real; usarla acá alinea la densidad al segundo decimal
+    en toda la región de líquido.
+
+    Se resuelve por sustitución sucesiva (Σ Kᵢ·xᵢ = 1) partiendo de Wilson.
+    Devuelve None si no converge.  Cachea por (composición, T, EOS) para no
+    repetir el cálculo en mapas de densidad.
+    """
+    if kij is None:
+        kij = KIJ_DEFAULT
+    key = (tuple(comp), round(float(T), 6), _EOS_ACTIVA)
+    if key in _PS_BURBUJA_CACHE:
+        return _PS_BURBUJA_CACHE[key]
+    z = np.asarray(comp, dtype=float)
+    P = float(sum(z[i]*PC[i]*np.exp(5.373*(1.0+OMEGA[i])*(1.0 - TC[i]/T))
+                  for i in range(NC) if z[i] > 0.0))
+    res = None
+    if P > 0.0:
+        Ki = np.array([Ki_wilson(i, T, P) for i in range(NC)])
+        for _ in range(200):
+            s = float(np.sum(Ki*z))
+            if s <= 0.0:
+                break
+            y = Ki*z/s
+            aL = am(z, T, kij); bL = bm(z); ZL = solve_Z(*AB(aL, bL, T, P))[1]
+            aV = am(y, T, kij); bV = bm(y); ZV = solve_Z(*AB(aV, bV, T, P))[0]
+            phiL = phi_vec(z, T, P, ZL, aL, bL, kij)
+            phiV = phi_vec(y, T, P, ZV, aV, bV, kij)
+            Ki = phiL/phiV
+            s = float(np.sum(Ki*z))
+            if abs(s - 1.0) < 1e-9:
+                res = P
+                break
+            P *= s
+            if P <= 0.0:
+                break
+    if len(_PS_BURBUJA_CACHE) > 5000:
+        _PS_BURBUJA_CACHE.clear()
+    _PS_BURBUJA_CACHE[key] = res
+    return res
+
+
 def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
     """Volumen molar de líquido por el método COSTALD con corrección de
     presión de Chueh-Prausnitz (1969) para líquido comprimido/subenfriado.
@@ -532,8 +583,9 @@ def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
 
     Argumentos:
         Ps  — presión de saturación de la mezcla a T (psia).  Si es None,
-              se calcula por la ecuación de Riedel de COSTALD.
-        kij — no usado (se mantiene por compatibilidad de interfaz).
+              se toma la burbuja real de la EOS activa (con respaldo a la
+              ecuación de Riedel de COSTALD si no converge).
+        kij — usado para la burbuja de la EOS (no interviene en el Vs).
     """
     mix = _costald_mix_params(comp)
     if mix is None: return None
@@ -542,7 +594,12 @@ def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
     if Vs is None or Vs <= 0: return None
     Tr = T/Tcm
     if Ps is None:
-        Ps = _Ps_riedel_costald(Tr, om, Pcm)
+        # Presión de saturación = burbuja real de la EOS (la que usa HYSYS).
+        # Respaldo a la correlación de Riedel si el solver de burbuja no
+        # converge (p. ej. muy cerca del crítico).
+        Ps = _Ps_burbuja_eos(comp, T, kij)
+        if Ps is None or Ps <= 0:
+            Ps = _Ps_riedel_costald(Tr, om, Pcm)
         if Ps is None or Ps <= 0:
             return Vs                 # sin Ps válida, mantener saturado
     if P <= Ps:
@@ -1325,9 +1382,10 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         #
         # Para COSTALD, la correlación con corrección de líquido comprimido
         # se aplica cuando la temperatura pseudo-reducida de la mezcla es
-        # menor a 0.95.  En la banda 0.95 ≤ Tr < 1.0 se interpola con perfil
-        # cuadrático entre la densidad de líquido en Tr=0.95 y la densidad
-        # de la EOS en Tr=1.0.  Para Tr ≥ 1.0 se usa la densidad de la EOS.
+        # menor a 0.95.  En la banda 0.95 ≤ Tr < 1.0 se mezcla, con peso
+        # cuadrático, la densidad COSTALD y la de la EOS AMBAS evaluadas a la
+        # temperatura real, para una transición continua al régimen
+        # supercrítico.  Para Tr ≥ 1.0 se usa la densidad de la EOS.
         if metodo_densidad == 'Peneloux':
             V_pen = V_liq_peneloux(x, ZL_fin*R_GAS*T/P)
             rho_l = PM_l/V_pen if V_pen > 0 else rho_l_EOS
@@ -1347,25 +1405,16 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
                     else:
                         rho_l = rho_l_EOS
                 else:
-                    # Banda de transición 0.95 < Tr < 1.0: interpolación
-                    # entre la densidad de líquido en Tr=0.95 (COSTALD) y la
-                    # densidad de la EOS en Tr=1.0, con perfil cuadrático que
-                    # sigue la curvatura de la densidad hacia el punto crítico
-                    # de la mezcla.
-                    T95 = 0.95*Tcm
-                    V95 = V_liq_costald_smooth(x, T95, P, kij=kij)
-                    if V95 is not None and V95 > 0:
-                        rho95 = PM_l/V95
-                    else:
-                        am95 = am(x, T95, kij); bm95 = bm(x)
-                        _, ZL95 = solve_Z(*AB(am95, bm95, T95, P))
-                        rho95 = P*PM_l/(ZL95*R_GAS*T95)
-                    T100 = Tcm
-                    am100 = am(x, T100, kij); bm100 = bm(x)
-                    _, ZL100 = solve_Z(*AB(am100, bm100, T100, P))
-                    rho100 = P*PM_l/(ZL100*R_GAS*T100)
+                    # Banda de transición 0.95 < Tr < 1.0: mezcla entre la
+                    # densidad COSTALD y la de la EOS, ambas a la T real, con
+                    # peso cuadrático que crece de 0 (todo COSTALD en Tr=0.95)
+                    # a 1 (todo EOS en Tr=1.0).
+                    V_cost = V_liq_costald_smooth(x, T, P, kij=kij)
+                    rho_cost = PM_l/V_cost if (V_cost is not None and V_cost > 0) else rho_l_EOS
                     frac = (Tr - 0.95)/(1.0 - 0.95)
-                    rho_l = rho95 + (rho100 - rho95)*frac*frac
+                    w = frac*frac
+                    rho_l = (1.0 - w)*rho_cost + w*rho_l_EOS
+                    ZL_fin = P*PM_l/(rho_l*R_GAS*T) if rho_l > 0 else ZL_fin
             else:
                 rho_l = rho_l_EOS
         else:
