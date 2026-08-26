@@ -1558,7 +1558,7 @@ class TabFluidos(QWidget):
         for txt, clave in [("Equilibrio de fases", "equilibrio"),
                            ("Envolvente de fases", "envolvente"),
                            ("Puntos de saturación", "saturacion"),
-                           ("Propiedades termodinámicas", "propiedades"),
+                           ("Análisis de sensibilidad", "propiedades"),
                            ("Parámetros EOS", "parametros")]:
             b = QPushButton(txt); b.setStyleSheet(BTN)
             b.clicked.connect(lambda _=False, c=clave: self._abrir(c))
@@ -2196,7 +2196,7 @@ class MainWindow(QMainWindow):
             'equilibrio':  (self.tab_eq,   "Equilibrio de fases",                 "equilibrio"),
             'envolvente':  (self.tab_env,  "Envolvente de fases",                 "envolvente"),
             'saturacion':  (self.tab_sat,  "Puntos de saturación",                "saturacion"),
-            'propiedades': (self.tab_prop, "Propiedades termodinámicas",          "propiedades"),
+            'propiedades': (self.tab_prop, "Análisis de sensibilidad",             "propiedades"),
             'parametros':  (self.tab_par,  "Parámetros de la ecuación de estado", "parametros"),
         }
         self._subventanas = {}     # clave -> QMdiSubWindow
@@ -2755,7 +2755,7 @@ class MainWindow(QMainWindow):
             'equilibrio':  "Equilibrio",
             'envolvente':  "Envolvente",
             'saturacion':  "Saturacion",
-            'propiedades': "Propiedades",
+            'propiedades': "Sensibilidad",
             'parametros':  "Parametros",
         }
         if clave not in etiquetas:

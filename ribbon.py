@@ -53,7 +53,7 @@ NAV_CALCULOS = [
     ("equilibrio",  "Equilibrio de fases"),
     ("envolvente",  "Envolvente de fases"),
     ("saturacion",  "Puntos de saturación"),
-    ("propiedades", "Propiedades termodinámicas"),
+    ("propiedades", "Análisis de sensibilidad"),
     ("parametros",  "Parámetros de la ecuación de estado"),
 ]
 
@@ -68,7 +68,7 @@ FUNC_FLUIDO = [
     ("equilibrio",  "Equilibrio"),
     ("envolvente",  "Envolvente"),
     ("saturacion",  "Saturación"),
-    ("propiedades", "Propiedades"),
+    ("propiedades", "Sensibilidad"),
 ]
 
 # Estilo plano (sin relieve) de las listas desplegables de la barra.
