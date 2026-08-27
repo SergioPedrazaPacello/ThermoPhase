@@ -6,31 +6,30 @@ gravedad específica, peso molecular, viscosidad, entalpía y entropía) sobre
 un rango de temperatura y presión, usando la composición global de la
 pestaña de Equilibrio de fases.
 
-Distribución tipo Envolvente: gráfico a la izquierda; a la derecha la
-propiedad a graficar, la variable del eje X, y los rangos (desde/hasta/N°
-puntos) de temperatura y presión.  Las curvas usan la misma paleta que las
-líneas de isocalidad de la Envolvente.
+Distribución y estética idénticas a la Envolvente de fases: gráfico a la
+izquierda; a la derecha la propiedad, la variable del eje X y los rangos
+(desde/hasta/N° puntos) de temperatura y presión.  Las curvas usan la misma
+paleta y grosor que las líneas de isocalidad de la Envolvente.
 """
 import numpy as np
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QDoubleSpinBox, QSpinBox, QGridLayout, QFrame, QProgressBar,
-    QSizePolicy, QAbstractSpinBox
+    QGridLayout, QFrame, QProgressBar, QSizePolicy, QLineEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
-import matplotlib
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-import matplotlib.ticker as ticker
 
 from eos import NC
 import idioma as _i18n
 import unidades as _u
+# Reutilizar el estilo EXACTO de combos de la Envolvente (Fusion + flecha).
+from pestana_envolvente import _aplicar_estilo_combo, COMBO_STYLE
 
-# ── Estilo (mismo que las demás pestañas) ─────────────────────
+# ── Estilo (idéntico al de la Envolvente) ─────────────────────
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"
-GRAY_RES="#E8E8E8"; GRAY_PLOT_BG="#ECECEC"; BORDER="#888888"
+GRAY_RES="#E8E8E8"; GRAY_PLOT_BG="#DCDCDC"; BORDER="#888888"
 TEXT="#000000"; TEXT_DIM="#555555"; TEXT_RES="#000080"
 FONT_F="Arial Narrow"; FS=10
 
@@ -40,16 +39,15 @@ LBL_HDR=(f'background:{GRAY_TIT};color:{TEXT};border:1px solid {BORDER};'
          f'font-family:"{FONT_F}";font-size:{FS}pt;padding:0px 6px;')
 LBL_SEC=(f'background:{GRAY_LBL};color:{TEXT};border:1px solid {BORDER};'
          f'font-family:"{FONT_F}";font-size:{FS}pt;padding:0px 6px;')
+LBL_STYLE=(f'font-family:"{FONT_F}";font-size:{FS}pt;'
+           f'color:{TEXT};background:transparent;')
+ED_STYLE=(f'QLineEdit {{ background:{WHITE};border:1px solid {BORDER};'
+          f'color:{TEXT};font-family:"{FONT_F}";font-size:{FS}pt;'
+          f'padding:1px 4px; }}')
 
-# Paleta idéntica a las líneas de isocalidad de la Envolvente.
+# Paleta y grosor idénticos a las líneas de isocalidad de la Envolvente.
 CURVA_COLORS = ['#c0392b','#e67e22','#27ae60','#2980b9','#8e44ad']
-
-_COMBO_QSS = (
-    f'QComboBox {{ background:{WHITE}; border:2px inset {BORDER};'
-    f' color:{TEXT}; font-family:"{FONT_F}"; font-size:{FS}pt; padding:1px 4px; }}'
-    f'QAbstractItemView {{ background:{WHITE}; border:1px solid #000000;'
-    f' color:{TEXT}; selection-background-color:#DCDCDC; selection-color:#000000;'
-    f' font-family:"{FONT_F}"; font-size:{FS}pt; outline:0; }}')
+CURVA_LW = 0.7
 
 
 def _rho_mezcla(r):
@@ -101,8 +99,7 @@ class SensWorker(QThread):
     error = pyqtSignal(str)
     progreso = pyqtSignal(int, int)
 
-    def __init__(self, z, kij, eos, prop_key, eje_x,
-                 T_vals, P_vals):
+    def __init__(self, z, kij, eos, prop_key, eje_x, T_vals, P_vals):
         super().__init__()
         self.z=z; self.kij=kij; self.eos=eos
         self.prop_key=prop_key; self.eje_x=eje_x
@@ -117,15 +114,15 @@ class SensWorker(QThread):
             if necesita_hs:
                 import entalpia_entropia_gen as hs
 
-            # Curvas paramétricas: si el eje X es T, cada curva es una isóbara
-            # (un P fijo, barrido en T); si es P, cada curva es una isoterma.
+            # Si el eje X es T, cada curva es una isóbara (P fijo, barrido en
+            # T); si es P, cada curva es una isoterma.
             if self.eje_x == 'T':
                 x_int = self.T_vals; fam = self.P_vals; x_es_T = True
             else:
                 x_int = self.P_vals; fam = self.T_vals; x_es_T = False
 
-            total = len(x_int)*len(fam); hecho = 0
-            curvas = []   # [(valor_fam, [x...], [y...])]
+            total = max(len(x_int)*len(fam), 1); hecho = 0
+            curvas = []
             for vf in fam:
                 xs=[]; ys=[]
                 for vx in x_int:
@@ -133,12 +130,9 @@ class SensWorker(QThread):
                     P = vf if x_es_T else vx
                     try:
                         rf = eng.calcular(self.z, float(T), float(P),
-                                          kij=self.kij,
-                                          metodo_densidad='COSTALD')
-                        rh = None
-                        if necesita_hs:
-                            rh = hs.calcular_HS(self.z, float(T), float(P),
-                                                rf, eos=self.eos, kij=self.kij)
+                                          kij=self.kij, metodo_densidad='COSTALD')
+                        rh = hs.calcular_HS(self.z, float(T), float(P), rf,
+                                            eos=self.eos, kij=self.kij) if necesita_hs else None
                         val = extractor(rf, rh)
                     except Exception:
                         val = None
@@ -160,10 +154,10 @@ class TabSensibilidad(QWidget):
         super().__init__()
         self.get_z=get_z; self.get_kij=get_kij
         self.worker=None
-        self._last=None      # último resultado dibujado
+        self._last=None
         self._build()
 
-    # ── Construcción de la interfaz ───────────────────────────
+    # ── Interfaz ──────────────────────────────────────────────
     def _build(self):
         self.setObjectName('sensTab')
         self.setStyleSheet(f'QWidget#sensTab {{ background:{GRAY_LBL}; }}')
@@ -198,29 +192,26 @@ class TabSensibilidad(QWidget):
         left_lay.addWidget(self.canvas)
         content.addWidget(self.left_box, stretch=1)
 
-        # ── Derecha: panel de control ──
-        right=QWidget(); right.setFixedWidth(232)
-        vr=QVBoxLayout(right); vr.setContentsMargins(0,0,0,0); vr.setSpacing(5)
+        # ── Derecha: panel de control (mismo ancho/espaciado que Envolvente) ──
+        right=QWidget(); right.setFixedWidth(210)
+        vr=QVBoxLayout(right); vr.setContentsMargins(0,0,0,0); vr.setSpacing(6)
 
         def sub(txt):
-            l=QLabel(_i18n.t(txt))
-            l.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
-                            f'color:{TEXT};background:transparent;')
-            l.setFixedHeight(15)
+            l=QLabel(_i18n.t(txt)); l.setStyleSheet(LBL_STYLE)
             return l
 
         vr.addWidget(sub("Propiedad:"))
         self.cmb_prop=QComboBox(); self.cmb_prop.setFixedHeight(24)
-        self.cmb_prop.setStyleSheet(_COMBO_QSS)
         for key, lbl, *_ in _PROPS_SENS:
             self.cmb_prop.addItem(_i18n.t(lbl), key)
+        _aplicar_estilo_combo(self.cmb_prop)
         vr.addWidget(self.cmb_prop)
 
         vr.addWidget(sub("Variable del eje X:"))
         self.cmb_eje=QComboBox(); self.cmb_eje.setFixedHeight(24)
-        self.cmb_eje.setStyleSheet(_COMBO_QSS)
         self.cmb_eje.addItem(_i18n.t("Temperatura"), 'T')
         self.cmb_eje.addItem(_i18n.t("Presion"), 'P')
+        _aplicar_estilo_combo(self.cmb_eje)
         vr.addWidget(self.cmb_eje)
 
         sep=QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
@@ -228,14 +219,14 @@ class TabSensibilidad(QWidget):
         vr.addWidget(sep)
 
         # Rango de temperatura
-        self.lbl_T=QLabel(); self.lbl_T.setStyleSheet(LBL_SEC); self.lbl_T.setFixedHeight(20)
+        self.lbl_T=QLabel(); self.lbl_T.setStyleSheet(LBL_SEC); self.lbl_T.setFixedHeight(22)
         vr.addWidget(self.lbl_T)
-        self.sp_T_ini, self.sp_T_fin, self.sp_T_n = self._fila_rango(vr, 550.0, 900.0, 40)
+        self.ed_T_ini, self.ed_T_fin, self.ed_T_n = self._fila_rango(vr)
 
         # Rango de presión
-        self.lbl_P=QLabel(); self.lbl_P.setStyleSheet(LBL_SEC); self.lbl_P.setFixedHeight(20)
+        self.lbl_P=QLabel(); self.lbl_P.setStyleSheet(LBL_SEC); self.lbl_P.setFixedHeight(22)
         vr.addWidget(self.lbl_P)
-        self.sp_P_ini, self.sp_P_fin, self.sp_P_n = self._fila_rango(vr, 200.0, 3000.0, 5)
+        self.ed_P_ini, self.ed_P_fin, self.ed_P_n = self._fila_rango(vr)
 
         self.btn=QPushButton(_i18n.t("Calcular"))
         self.btn.setStyleSheet(BTN_STYLE); self.btn.setFixedHeight(30)
@@ -252,45 +243,36 @@ class TabSensibilidad(QWidget):
         vr.addStretch()
         content.addWidget(right, stretch=0)
         root.addLayout(content)
-
         self._retitular_rangos()
 
-    def _fila_rango(self, parent_lay, ini, fin, npts):
-        """Crea una fila con Desde / Hasta / N° puntos y la agrega."""
-        g=QGridLayout(); g.setContentsMargins(0,0,0,0)
-        g.setHorizontalSpacing(4); g.setVerticalSpacing(3)
+    def _fila_rango(self, parent_lay):
+        """Fila con Desde / Hasta / N° puntos (celdas vacías por defecto)."""
+        g=QGridLayout(); g.setContentsMargins(0,2,0,0)
+        g.setHorizontalSpacing(4); g.setVerticalSpacing(4)
         def _lbl(t):
-            l=QLabel(_i18n.t(t)); l.setStyleSheet(
-                f'font-family:"{FONT_F}";font-size:{FS}pt;color:{TEXT};'
-                f'background:transparent;'); return l
-        def _spin(v, lo, hi, dec):
-            s=QDoubleSpinBox(); s.setRange(lo, hi); s.setDecimals(dec)
-            s.setValue(v); s.setFixedHeight(22)
-            s.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-            s.setStyleSheet(
-                f'QDoubleSpinBox {{ background:{WHITE}; border:2px inset {BORDER};'
-                f' font-family:"{FONT_F}"; font-size:{FS}pt; padding:1px 3px; }}')
-            return s
-        sp_ini=_spin(ini, 0.0, 1e7, 2)
-        sp_fin=_spin(fin, 0.0, 1e7, 2)
-        sp_n=QSpinBox(); sp_n.setRange(2, 300); sp_n.setValue(npts)
-        sp_n.setFixedHeight(22)
-        sp_n.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-        sp_n.setStyleSheet(
-            f'QSpinBox {{ background:{WHITE}; border:2px inset {BORDER};'
-            f' font-family:"{FONT_F}"; font-size:{FS}pt; padding:1px 3px; }}')
-        g.addWidget(_lbl("Desde:"),   0,0); g.addWidget(sp_ini, 0,1)
-        g.addWidget(_lbl("Hasta:"),   1,0); g.addWidget(sp_fin, 1,1)
-        g.addWidget(_lbl("N° puntos:"),2,0); g.addWidget(sp_n,   2,1)
+            l=QLabel(_i18n.t(t)); l.setStyleSheet(LBL_STYLE); return l
+        def _ed():
+            e=QLineEdit(); e.setStyleSheet(ED_STYLE); e.setFixedHeight(22); return e
+        ed_ini=_ed(); ed_fin=_ed(); ed_n=_ed()
+        g.addWidget(_lbl("Desde:"),    0,0); g.addWidget(ed_ini, 0,1)
+        g.addWidget(_lbl("Hasta:"),    1,0); g.addWidget(ed_fin, 1,1)
+        g.addWidget(_lbl("N° puntos:"),2,0); g.addWidget(ed_n,   2,1)
         g.setColumnStretch(1,1)
         w=QWidget(); w.setLayout(g); parent_lay.addWidget(w)
-        return sp_ini, sp_fin, sp_n
+        return ed_ini, ed_fin, ed_n
 
     def _retitular_rangos(self):
-        self.lbl_T.setText(f"{_i18n.t('Temperatura')} [{_u.u_abs()}]:")
-        self.lbl_P.setText(f"{_i18n.t('Presion')} [{_u.u('P')}]:")
+        self.lbl_T.setText(f"{_i18n.t('Temperatura')} ({_u.u_abs()}):")
+        self.lbl_P.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
 
     # ── Cálculo ────────────────────────────────────────────────
+    @staticmethod
+    def _num(edit):
+        t=edit.text().strip().replace(',', '.')
+        if not t: return None
+        try: return float(t)
+        except ValueError: return None
+
     def calcular(self):
         import dialogos
         z=self.get_z(); s=sum(z)
@@ -301,34 +283,37 @@ class TabSensibilidad(QWidget):
             return
         z=[zi/s for zi in z]
 
-        # Rangos en unidades activas -> internos (°R, psia)
-        Ti=_u.R_desde_abs(self.sp_T_ini.value()); Tf=_u.R_desde_abs(self.sp_T_fin.value())
-        Pi=_u.p_a_psia(self.sp_P_ini.value());     Pf=_u.p_a_psia(self.sp_P_fin.value())
-        nT=self.sp_T_n.value(); nP=self.sp_P_n.value()
-        if Ti<=0 or Tf<=0 or Pi<=0 or Pf<=0:
-            dialogos.advertencia(self, _i18n.t("Ingrese rangos positivos de T y P."))
+        Ti=self._num(self.ed_T_ini); Tf=self._num(self.ed_T_fin); nT=self._num(self.ed_T_n)
+        Pi=self._num(self.ed_P_ini); Pf=self._num(self.ed_P_fin); nP=self._num(self.ed_P_n)
+        if None in (Ti,Tf,nT,Pi,Pf,nP):
+            dialogos.advertencia(self, _i18n.t(
+                "Complete los campos de temperatura y presión (desde, hasta y N° puntos)."))
             return
+        nT=int(round(nT)); nP=int(round(nP))
+        if nT<2 or nP<1 or Ti<=0 or Tf<=0 or Pi<=0 or Pf<=0:
+            dialogos.advertencia(self, _i18n.t(
+                "Ingrese rangos positivos y N° de puntos válidos (T≥2, P≥1)."))
+            return
+
+        # A internos (°R, psia)
+        Ti=_u.R_desde_abs(Ti); Tf=_u.R_desde_abs(Tf)
+        Pi=_u.p_a_psia(Pi);     Pf=_u.p_a_psia(Pf)
         if Tf<Ti: Ti,Tf=Tf,Ti
         if Pf<Pi: Pi,Pf=Pf,Pi
-        T_vals=list(np.linspace(Ti,Tf,nT))
-        P_vals=list(np.linspace(Pi,Pf,nP))
         eje=self.cmb_eje.currentData()
-        prop=self.cmb_prop.currentData()
-
-        # Advertir si habrá demasiadas curvas (ilegible)
         fam_n = nP if eje=='T' else nT
         if fam_n > 12:
             dialogos.advertencia(self, _i18n.t(
                 "Demasiadas curvas (>12). Reduzca el N° de puntos de la "
                 "variable que NO está en el eje X."))
             return
+        T_vals=list(np.linspace(Ti,Tf,nT)); P_vals=list(np.linspace(Pi,Pf,nP))
+        prop=self.cmb_prop.currentData()
 
         import eos as eng
-        eos_ctx=eng.get_eos()
-        kij=self.get_kij()
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.prog.setRange(0,100); self.prog.setValue(0); self.prog.setVisible(True)
-        self.worker=SensWorker(z, kij, eos_ctx, prop, eje, T_vals, P_vals)
+        self.worker=SensWorker(z, self.get_kij(), eng.get_eos(), prop, eje, T_vals, P_vals)
         self.worker.progreso.connect(self._on_prog)
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
@@ -340,8 +325,7 @@ class TabSensibilidad(QWidget):
     def _on_done(self, res):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular"))
         self.prog.setVisible(False)
-        self._last=res
-        self._plot(res)
+        self._last=res; self._plot(res)
 
     def _on_error(self, msg):
         import dialogos
@@ -357,15 +341,16 @@ class TabSensibilidad(QWidget):
         ax.set_facecolor('#FFFFFF'); ax.set_axisbelow(True)
         ax.set_position([0.135, 0.11, 0.84, 0.86])
 
-        # Etiquetas de eje X y unidad de la propiedad (eje Y)
         if eje=='T':
             x_label=f"{_i18n.t('Temperatura')} ({_u.u_abs()})"
             x_conv=lambda v: _u.abs_desde_R(v)
             fam_label=lambda vf: f"{_u.p_desde_psia(vf):.0f} {_u.u('P')}"
+            leg_title=_i18n.t('Presion')
         else:
             x_label=f"{_i18n.t('Presion')} ({_u.u('P')})"
             x_conv=lambda v: _u.p_desde_psia(v)
             fam_label=lambda vf: f"{_u.abs_desde_R(vf):.0f} {_u.u_abs()}"
+            leg_title=_i18n.t('Temperatura')
         y_unit=f" ({_u.u(mag)})" if mag else ""
 
         hay=False
@@ -373,23 +358,22 @@ class TabSensibilidad(QWidget):
             xa=[x_conv(v) for v in xs]
             ya=[_conv_mag(mag, v) if not (isinstance(v,float) and np.isnan(v)) else np.nan
                 for v in ys]
-            col=CURVA_COLORS[i % len(CURVA_COLORS)]
-            if any(not np.isnan(v) for v in ya):
+            if any(not (isinstance(v,float) and np.isnan(v)) for v in ya):
                 hay=True
-            ax.plot(xa, ya, '-', color=col, linewidth=1.4,
-                    label=fam_label(vf), zorder=3)
+            ax.plot(xa, ya, '-', color=CURVA_COLORS[i % len(CURVA_COLORS)],
+                    linewidth=CURVA_LW, label=fam_label(vf), zorder=3)
 
         ax.set_xlabel(x_label, fontsize=10, color=TEXT)
         ax.set_ylabel(f"{etiqueta}{y_unit}", fontsize=10, color=TEXT)
         ax.tick_params(labelsize=8, colors='#000000', direction='in',
                        top=True, right=True, length=4, width=1.0)
-        for s in ax.spines.values():
-            s.set_edgecolor('#000000'); s.set_linewidth(1.4)
+        for sp in ax.spines.values():
+            sp.set_edgecolor('#000000'); sp.set_linewidth(1.4)
         ax.grid(True, linestyle='-', linewidth=0.8, alpha=1.0, color=GRAY_LBL)
         if hay:
             leg=ax.legend(fontsize=8, framealpha=1.0, fancybox=False,
                           edgecolor='#000000', facecolor=GRAY_PLOT_BG,
-                          title=(_i18n.t('Presion') if eje=='T' else _i18n.t('Temperatura')))
+                          title=leg_title)
             leg.get_frame().set_linewidth(1.0)
             leg.get_title().set_fontsize(8)
         self.canvas.setVisible(True)
@@ -397,15 +381,17 @@ class TabSensibilidad(QWidget):
 
     # ── Unidades / idioma ─────────────────────────────────────
     def aplicar_unidades(self, old):
-        # Convertir los valores de los rangos del sistema 'old' al activo.
-        # (Si old == activo —p. ej. al cambiar de idioma— es identidad.)
+        # Convertir los valores presentes de 'old' al sistema activo.
+        def _conv(edit, f_desde, f_a):
+            v=self._num(edit)
+            if v is None: return
+            interno=f_desde(v, old)
+            edit.blockSignals(True); edit.setText(f"{f_a(interno):.2f}"); edit.blockSignals(False)
         try:
-            for sp in (self.sp_T_ini, self.sp_T_fin):
-                r = _u.R_desde_abs(sp.value(), old)      # old abs -> °R
-                sp.blockSignals(True); sp.setValue(_u.abs_desde_R(r)); sp.blockSignals(False)
-            for sp in (self.sp_P_ini, self.sp_P_fin):
-                psia = _u.p_a_psia(sp.value(), old)      # old -> psia
-                sp.blockSignals(True); sp.setValue(_u.p_desde_psia(psia)); sp.blockSignals(False)
+            _conv(self.ed_T_ini, _u.R_desde_abs, _u.abs_desde_R)
+            _conv(self.ed_T_fin, _u.R_desde_abs, _u.abs_desde_R)
+            _conv(self.ed_P_ini, _u.p_a_psia,    _u.p_desde_psia)
+            _conv(self.ed_P_fin, _u.p_a_psia,    _u.p_desde_psia)
         except Exception:
             pass
         self._retitular_rangos()
@@ -413,10 +399,8 @@ class TabSensibilidad(QWidget):
             self._plot(self._last)
 
     def retraducir_grafico(self):
-        # Recargar textos traducibles
         self._retitular_rangos()
         self.btn.setText(_i18n.t("Calcular"))
-        # combos
         prop_sel=self.cmb_prop.currentData(); eje_sel=self.cmb_eje.currentData()
         self.cmb_prop.blockSignals(True); self.cmb_prop.clear()
         for key,lbl,*_ in _PROPS_SENS:
@@ -431,16 +415,16 @@ class TabSensibilidad(QWidget):
         if self._last is not None:
             self._plot(self._last)
 
-    # ── Estado (persistencia con el archivo) ──────────────────
+    # ── Estado ────────────────────────────────────────────────
     def get_estado(self):
         return {
             'entrada': {
                 'prop': self.cmb_prop.currentData(),
                 'eje':  self.cmb_eje.currentData(),
-                'T': [self.sp_T_ini.value(), self.sp_T_fin.value(), self.sp_T_n.value()],
-                'P': [self.sp_P_ini.value(), self.sp_P_fin.value(), self.sp_P_n.value()],
+                'T': [self.ed_T_ini.text(), self.ed_T_fin.text(), self.ed_T_n.text()],
+                'P': [self.ed_P_ini.text(), self.ed_P_fin.text(), self.ed_P_n.text()],
             },
-            'resultado': None,   # el barrido no se persiste (se recalcula)
+            'resultado': None,
         }
 
     def set_estado(self, datos):
@@ -451,11 +435,11 @@ class TabSensibilidad(QWidget):
             idx=self.cmb_eje.findData(e.get('eje'))
             if idx>=0: self.cmb_eje.setCurrentIndex(idx)
             if 'T' in e:
-                self.sp_T_ini.setValue(float(e['T'][0])); self.sp_T_fin.setValue(float(e['T'][1]))
-                self.sp_T_n.setValue(int(e['T'][2]))
+                self.ed_T_ini.setText(str(e['T'][0])); self.ed_T_fin.setText(str(e['T'][1]))
+                self.ed_T_n.setText(str(e['T'][2]))
             if 'P' in e:
-                self.sp_P_ini.setValue(float(e['P'][0])); self.sp_P_fin.setValue(float(e['P'][1]))
-                self.sp_P_n.setValue(int(e['P'][2]))
+                self.ed_P_ini.setText(str(e['P'][0])); self.ed_P_fin.setText(str(e['P'][1]))
+                self.ed_P_n.setText(str(e['P'][2]))
         except Exception:
             pass
 

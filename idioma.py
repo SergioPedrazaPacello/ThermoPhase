@@ -87,6 +87,10 @@ TRAD = {
     "Demasiadas curvas (>12). Reduzca el N° de puntos de la variable que NO está en el eje X.":
         "Too many curves (>12). Reduce the number of points of the variable NOT on the X-axis.",
     "Ingrese rangos positivos de T y P.": "Enter positive T and P ranges.",
+    "Complete los campos de temperatura y presión (desde, hasta y N° puntos).":
+        "Fill in the temperature and pressure fields (from, to and No. of points).",
+    "Ingrese rangos positivos y N° de puntos válidos (T≥2, P≥1).":
+        "Enter positive ranges and valid point counts (T≥2, P≥1).",
     "Error en el cálculo:": "Calculation error:",
     "Parámetros de la ecuación de estado": "Equation of state parameters",
     "Componentes": "Components", "Fluidos": "Fluids",
