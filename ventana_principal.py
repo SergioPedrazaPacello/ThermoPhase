@@ -1825,6 +1825,14 @@ class MainWindow(QMainWindow):
             self.nav.cerrar_pedido.connect(
                 lambda: self._act_nav.setChecked(False))
 
+        # ── Gráficos ─────────────────────────────────────────
+        self._cursor_activo = False   # cursor de lectura desactivado por defecto
+        m_graf = menubar.addMenu("&Gráficos")
+        self._act_cursor = QAction("Activar cursor", self, checkable=True)
+        self._act_cursor.setChecked(self._cursor_activo)
+        self._act_cursor.toggled.connect(self._toggle_cursor)
+        m_graf.addAction(self._act_cursor)
+
         # ── Herramientas ─────────────────────────────────────
         m_herr = menubar.addMenu("&Herramientas")
         m_herr.addAction(_act("&Asociar archivos .tpsim con este programa",
@@ -1865,6 +1873,18 @@ class MainWindow(QMainWindow):
     def _toggle_nav(self, on):
         if hasattr(self, 'nav'):
             self.nav.setVisible(on)
+
+    def _toggle_cursor(self, on):
+        """Activa/desactiva el cursor de lectura en TODOS los gráficos."""
+        self._cursor_activo = bool(on)
+        self._aplicar_cursor_tabs()
+
+    def _aplicar_cursor_tabs(self):
+        for win in self._subventanas.values():
+            w = getattr(win, '_widget', None)
+            if w is not None and hasattr(w, 'set_cursor'):
+                try: w.set_cursor(self._cursor_activo)
+                except Exception: pass
 
     def _cambiar_idioma(self, lang):
         """Cambia el idioma de TODA la interfaz (principal + subventanas)."""
@@ -2543,6 +2563,11 @@ class MainWindow(QMainWindow):
             if w is not None and hasattr(w, 'aplicar_unidades'):
                 try: w.aplicar_unidades('FIELD')
                 except Exception: pass
+        # La ventana nace con el estado de cursor (activo/inactivo) actual
+        w = getattr(win, '_widget', None)
+        if w is not None and hasattr(w, 'set_cursor'):
+            try: w.set_cursor(getattr(self, '_cursor_activo', False))
+            except Exception: pass
         return win
 
     def _mostrar_subventana(self, win):

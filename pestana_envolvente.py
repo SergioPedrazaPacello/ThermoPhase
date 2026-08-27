@@ -332,10 +332,11 @@ class TabEnvolvente(QWidget):
         self._cross_v = None
         self._cross_h = None
         self._bg = None
+        self._cursor_on = False   # el cursor arranca desactivado (menú Gráficos)
         self.canvas.mpl_connect('motion_notify_event', self._on_hover)
         self.canvas.mpl_connect('draw_event', self._on_draw)
-        # Cursor en forma de cruz al estar sobre el gráfico
-        self.canvas.setCursor(Qt.CursorShape.CrossCursor)
+        # Puntero: cruz solo cuando el cursor está activo (lo fija set_cursor)
+        self.canvas.setCursor(Qt.CursorShape.ArrowCursor)
         # Punto marcado por el usuario (P_psia, T_F) o None
         self._punto_usuario = None
 
@@ -653,7 +654,7 @@ class TabEnvolvente(QWidget):
             return
         kij = self.get_kij()
         self.chk_reg.setEnabled(False)
-        self.lbl_reg_cargando.setText("(cargando)")
+        self.lbl_reg_cargando.setText(_i18n.t("(cargando)"))
         metodo = 'COSTALD'
         if self.get_metodo_densidad is not None:
             try: metodo = self.get_metodo_densidad() or 'COSTALD'
@@ -1033,6 +1034,17 @@ class TabEnvolvente(QWidget):
         else:
             self._plot({'burbuja': [], 'rocio': []})
 
+    def set_cursor(self, on):
+        """Activa/desactiva el cursor de lectura (crucecita + P,T)."""
+        self._cursor_on = bool(on)
+        self.canvas.setCursor(Qt.CursorShape.CrossCursor if on
+                              else Qt.CursorShape.ArrowCursor)
+        if not on and self._hover_annot is not None and self._hover_annot.get_visible():
+            self._hover_annot.set_visible(False)
+            if self._cross_v is not None:
+                self._cross_v.set_visible(False); self._cross_h.set_visible(False)
+            self.canvas.draw_idle()
+
     def _on_draw(self, event):
         # Recaptura el fondo tras cada redibujo completo (plot, zoom, resize)
         # para poder hacer blitting del cursor encima.
@@ -1042,8 +1054,8 @@ class TabEnvolvente(QWidget):
             self._bg = None
 
     def _on_hover(self, event):
-        # Solo si hay datos y el cursor está dentro del área de trazado
-        if not self.canvas.isVisible() or event.inaxes != self.ax:
+        # Solo si el cursor está activo, hay datos y está dentro del área
+        if not self._cursor_on or not self.canvas.isVisible() or event.inaxes != self.ax:
             if self._hover_annot is not None and self._hover_annot.get_visible():
                 self._hover_annot.set_visible(False)
                 if self._cross_v is not None:

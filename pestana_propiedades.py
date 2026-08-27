@@ -190,6 +190,13 @@ class TabSensibilidad(QWidget):
                                   QSizePolicy.Policy.Expanding)
         self.canvas.setVisible(False)
         left_lay.addWidget(self.canvas)
+        # Cursor interactivo (crucecita + lectura X/Y), igual que la Envolvente,
+        # con blitting. Arranca DESACTIVADO; se activa desde el menú Gráficos.
+        self._hover_annot=None; self._cross_v=None; self._cross_h=None; self._bg=None
+        self._cursor_on=False
+        self._cur_xsym="X"; self._cur_xu=""; self._cur_yu=""
+        self.canvas.mpl_connect('motion_notify_event', self._on_hover)
+        self.canvas.mpl_connect('draw_event', self._on_draw)
         content.addWidget(self.left_box, stretch=1)
 
         # ── Derecha: panel de control (mismo ancho/espaciado que Envolvente) ──
@@ -338,6 +345,7 @@ class TabSensibilidad(QWidget):
         key=res['prop_key']; eje=res['eje_x']; curvas=res['curvas']
         d=_PROPS_BY_KEY[key]; etiqueta=_i18n.t(d[1]); mag=d[2]
         ax=self.ax; ax.clear()
+        self._hover_annot=None; self._cross_v=None; self._cross_h=None
         ax.set_facecolor('#FFFFFF'); ax.set_axisbelow(True)
         ax.set_position([0.135, 0.11, 0.84, 0.86])
 
@@ -352,6 +360,10 @@ class TabSensibilidad(QWidget):
             fam_label=lambda vf: f"{_u.abs_desde_R(vf):.0f} {_u.u_abs()}"
             leg_title=_i18n.t('Temperatura')
         y_unit=f" ({_u.u(mag)})" if mag else ""
+        # Guardar datos para la lectura del cursor.
+        self._cur_xsym = _i18n.t('Temperatura') if eje=='T' else _i18n.t('Presion')
+        self._cur_xu   = (_u.u_abs() if eje=='T' else _u.u('P'))
+        self._cur_yu   = (_u.u(mag) if mag else "")
 
         hay=False
         for i,(vf,xs,ys) in enumerate(curvas):
@@ -378,6 +390,67 @@ class TabSensibilidad(QWidget):
             leg.get_title().set_fontsize(8)
         self.canvas.setVisible(True)
         self.canvas.draw_idle()
+
+    # ── Cursor interactivo (crucecita + lectura), con blitting ────
+    def set_cursor(self, on):
+        """Activa/desactiva el cursor de lectura. Llamado desde el menú."""
+        self._cursor_on = bool(on)
+        self.canvas.setCursor(Qt.CursorShape.CrossCursor if on
+                              else Qt.CursorShape.ArrowCursor)
+        if not on and self._hover_annot is not None and self._hover_annot.get_visible():
+            self._hover_annot.set_visible(False)
+            if self._cross_v is not None:
+                self._cross_v.set_visible(False); self._cross_h.set_visible(False)
+            self.canvas.draw_idle()
+
+    def _on_draw(self, event):
+        try:
+            self._bg = self.canvas.copy_from_bbox(self.ax.bbox)
+        except Exception:
+            self._bg = None
+
+    def _on_hover(self, event):
+        if not self._cursor_on or not self.canvas.isVisible() or event.inaxes != self.ax:
+            if self._hover_annot is not None and self._hover_annot.get_visible():
+                self._hover_annot.set_visible(False)
+                if self._cross_v is not None:
+                    self._cross_v.set_visible(False); self._cross_h.set_visible(False)
+                self.canvas.draw_idle()
+            return
+        x = event.xdata; y = event.ydata
+        if x is None or y is None:
+            return
+        if self._hover_annot is None:
+            self._hover_annot = self.ax.annotate(
+                "", xy=(0,0), xytext=(12,12), textcoords="offset points",
+                fontsize=8, fontfamily='Arial Narrow', color="#000000",
+                bbox=dict(boxstyle="round,pad=0.4", fc=GRAY_PLOT_BG,
+                          ec="#888888", lw=0.8), zorder=10)
+        if self._cross_v is None:
+            self._cross_v = self.ax.axvline(x, color="#888888", lw=0.7,
+                                            ls=(0,(4,3)), zorder=9, animated=True)
+            self._cross_h = self.ax.axhline(y, color="#888888", lw=0.7,
+                                            ls=(0,(4,3)), zorder=9, animated=True)
+        self._hover_annot.set_animated(True)
+        xmin,xmax=self.ax.get_xlim(); ymin,ymax=self.ax.get_ylim()
+        fx=(x-xmin)/(xmax-xmin) if xmax!=xmin else 0.5
+        fy=(y-ymin)/(ymax-ymin) if ymax!=ymin else 0.5
+        dx=-12 if fx>0.5 else 12; dy=-12 if fy>0.5 else 12
+        self._hover_annot.set_ha('right' if dx<0 else 'left')
+        self._hover_annot.set_va('top' if dy<0 else 'bottom')
+        self._hover_annot.set_position((dx,dy)); self._hover_annot.xy=(x,y)
+        xu=f" {self._cur_xu}" if self._cur_xu else ""
+        yu=f" {self._cur_yu}" if self._cur_yu else ""
+        self._hover_annot.set_text(f"{self._cur_xsym} = {x:.4g}{xu}\n{y:.4g}{yu}")
+        self._hover_annot.set_visible(True)
+        self._cross_v.set_xdata([x,x]); self._cross_v.set_visible(True)
+        self._cross_h.set_ydata([y,y]); self._cross_h.set_visible(True)
+        if self._bg is None:
+            self.canvas.draw(); self._bg=self.canvas.copy_from_bbox(self.ax.bbox)
+        self.canvas.restore_region(self._bg)
+        self.ax.draw_artist(self._cross_v); self.ax.draw_artist(self._cross_h)
+        self.ax.draw_artist(self._hover_annot)
+        self.canvas.blit(self.ax.bbox)
 
     # ── Unidades / idioma ─────────────────────────────────────
     def aplicar_unidades(self, old):
