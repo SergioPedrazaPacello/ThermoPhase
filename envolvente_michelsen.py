@@ -616,6 +616,86 @@ def _completar_rocio_desde_critico(*_a, **_k):
     return []
 
 
+# ── Rama de burbuja de ALTA PRESIÓN (mezclas de rango de ebullición amplio) ──
+def _rama_alta_presion(z, act, env_pmax, max_pts, paso_max):
+    """Captura la rama de burbuja que asciende a presiones muy altas a baja T,
+    típica de mezclas con livianos + pesados (p. ej. C1/C9).
+
+    La estrategia de dos ramas (sembrado a P moderada) no la alcanza porque a
+    baja T la ecuación de burbuja tiene varias raíces y el crítico queda en
+    medio.  Aquí se siembra desde el FLASH (que da las K incipientes) en el
+    medio de la rama y se traza en ambas direcciones: una hacia el crítico
+    (subiendo por el lazo) y otra hacia baja T (la rama ascendente de alta P).
+
+    Devuelve la línea de burbuja COMPLETA ordenada [alta P … crítico], o []
+    si no hay una rama de alta presión que supere holgadamente `env_pmax`
+    (mezclas normales → no aporta nada y no se toca la envolvente).
+    """
+    from eos import calcular
+    m = len(act)
+    Tc_mix = sum(z[i]*_TCa[i] for i in range(NC))
+    umbral = max(env_pmax*1.30, env_pmax + 3000.0)   # debe superar el lazo
+    P_escaneo = [300, 600, 1000, 1500, 2500, 4000, 6000, 9000,
+                 13000, 18000, 24000, 31000]
+    for frac in (0.80, 0.78, 0.82, 0.76, 0.84):
+        Ts = frac*Tc_mix
+        # Punto de burbuja: primera transición V→0 subiendo en P.
+        Pbif = Pliq = None
+        for P in P_escaneo:
+            V = calcular(z, Ts, float(P), kij_g).get('V', 1.0)
+            if 0.02 < V < 0.98 and Pbif is None:
+                Pbif = P
+            elif V < 0.01 and Pbif is not None and P > Pbif:
+                Pliq = P; break
+        if Pbif is None or Pliq is None:
+            continue
+        lo, hi = Pbif, Pliq
+        for _ in range(45):
+            mid = 0.5*(lo+hi)
+            if calcular(z, Ts, mid, kij_g).get('V', 1.0) < 0.005:
+                hi = mid
+            else:
+                lo = mid
+        Pb = hi
+        r = calcular(z, Ts, Pb, kij_g)
+        K = np.array(r.get('K', []))
+        if K.size < NC:
+            continue
+        X = np.zeros(m+2)
+        for j, i in enumerate(act):
+            X[j] = math.log(max(K[i], 1e-300))
+        X[m] = math.log(Ts); X[m+1] = math.log(Pb)
+        Xr, _ok = _resolver_punto(X, z, act, ('coord', m+1, math.log(Pb)),
+                                  tol=1e-7)
+        if not np.all(np.isfinite(Xr)) or float(np.sum(Xr[:m]**2)) < 0.05:
+            continue
+        t0 = _tangente(Xr, z, act)
+        if t0 is None:
+            continue
+        # Dirección hacia T decreciente = rama ascendente de alta presión.
+        t_dn = t0 if t0[m] < 0 else -t0
+        pdn, _, _, _, _ = _trazar(
+            Xr, z, act, t_dn.copy(), max_pts=max_pts, paso_ini=0.02,
+            PASO_MAX=min(paso_max, 0.06), p_stop_max=env_pmax*10.0)
+        pmax = max((p for p, _ in pdn), default=0.0)
+        if pmax < umbral:
+            continue   # esta semilla no reveló rama de alta presión
+        # Dirección hacia el crítico = sube por el lazo (parada limpia en crít).
+        t_up = -t_dn
+        pup, _, mk2_up, crit_up, i_up = _trazar(
+            Xr, z, act, t_up.copy(), max_pts=max_pts, paso_ini=0.02,
+            PASO_MAX=min(paso_max, 0.06), sumk2_stop=1.5e-3)
+        # Cortar EXACTAMENTE en el crítico (mínimo sum(lnK)²) para no
+        # sobrepasar hacia la rama de rocío.
+        if mk2_up < 0.5 and 0 < i_up < len(pup):
+            pup = pup[:i_up+1]
+        crit_hp = crit_up if mk2_up < 0.5 else None
+        # Línea completa ordenada [alta P … semilla … crítico].
+        linea = list(reversed(pdn)) + pup[1:]
+        return linea, crit_hp
+    return [], None
+
+
 # ── Punto de entrada principal ───────────────────────────────────────────────
 def construir_envolvente(z, kij=None, progress_cb=None,
                          P_ini=14.7, max_pts=2000, paso_max=0.10):
@@ -780,6 +860,30 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             crit = (0.5*(crit_b[0]+crit_d[0]), 0.5*(crit_b[1]+crit_d[1]))
         else:
             crit = crit_b if crit_b[0] >= crit_d[0] else crit_d
+
+    # ── Captura de la rama de burbuja de ALTA PRESIÓN ───────────────────────
+    # Para mezclas de rango de ebullición amplio (livianos + pesados) la rama
+    # de burbuja asciende a P muy alta a baja T y la estrategia de dos ramas no
+    # la alcanza. Se detecta y, de existir, se reemplaza la rama de burbuja por
+    # la línea completa [alta P … crítico]. Para mezclas normales no aporta
+    # nada (devuelve []) y la envolvente queda idéntica.  Sólo se intenta si el
+    # rango de ebullición es amplio (Tc_max/Tc_min de los activos alto), para
+    # no penalizar el rendimiento de las mezclas comunes.
+    Tc_ratio = max(Tc_act) / max(min(Tc_act), 1e-9)
+    if (not casi_ideal) and Tc_ratio > 2.5:
+        try:
+            env_pmax = 0.0
+            if pts_burb: env_pmax = max(env_pmax, max(p for p, _ in pts_burb))
+            if pts_dew:  env_pmax = max(env_pmax, max(p for p, _ in pts_dew))
+            rama_hp, crit_hp = _rama_alta_presion(z, act, env_pmax, max_pts, paso_max)
+            if rama_hp and len(rama_hp) >= 10:
+                pts_burb = rama_hp        # línea completa [alta P … crítico]
+                if crit_hp is not None:
+                    crit = crit_hp
+                elif crit is None and crit_d is not None:
+                    crit = crit_d
+        except Exception:
+            pass
 
     # ── Ensamblar la envolvente cerrada ─────────────────────────────────────
     # burbuja (P baja → crítico) + [crítico] + rocío (crítico → P baja).
