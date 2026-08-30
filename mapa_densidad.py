@@ -180,6 +180,23 @@ def _envolvente_polygon_TP(resultado_env):
     for pt in roc:
         poly.append((pt[1], pt[0]))
     if len(poly) < 3: return None
+
+    # ── Cierre de envolventes ABIERTAS por arriba (rama de alta presión) ─────
+    # Para mezclas de rango de ebullición amplio la rama de burbuja se corta en
+    # el techo práctico (~10000 psia): la envolvente NO cierra por arriba (el
+    # primer punto de burbuja está a P alta, no en la base a P baja). Si se deja
+    # así, matplotlib une el último punto de rocío (T alta, P baja) con el primero
+    # de burbuja (T baja, P alta) por una diagonal que rellena mal el gráfico.
+    # Se cierra explícitamente: base a P mínima + arista vertical hasta el techo,
+    # de modo que la zona bifásica quede correctamente delimitada y el mapa de
+    # densidad se dibuje por fuera sin desconfigurarse.
+    Ptop = burb[0][0]                    # P del primer punto de burbuja
+    Pbase = min([pt[0] for pt in burb] + [pt[0] for pt in roc])
+    Pmax_env = max([pt[0] for pt in burb] + [pt[0] for pt in roc])
+    if Ptop > 0.5 * Pmax_env:            # envolvente abierta por arriba
+        Tleft = burb[0][1]              # T del extremo de alta presión
+        poly.append((Tleft, Pbase))     # base a P mínima bajo el extremo izq.
+        # matplotlib cierra (Tleft, Pbase) → (Tleft, Ptop): arista vertical.
     return np.array(poly)
 
 
@@ -212,7 +229,14 @@ def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
     Tmin_env = min(Ts_env) if Ts_env else 100.0
     Tc_Kay = sum(z[i]*e.TC[i] for i in range(e.NC))
     Pc_Kay = sum(z[i]*e.PC[i] for i in range(e.NC))
-    P_max = 1.5 * max(Pmax_env, Pc_Kay)
+    # Si la envolvente alcanzó el techo práctico (~10000 psia, rama de alta
+    # presión), el mapa se capa justo por encima de ese techo (no tiene sentido
+    # mostrar espacio vacío por arriba). En mezclas normales se deja el margen
+    # habitual del 50 % sobre la P máxima.
+    if Pmax_env >= 9500.0:
+        P_max = Pmax_env * 1.02
+    else:
+        P_max = 1.5 * max(Pmax_env, Pc_Kay)
     T_min = max(50.0, Tmin_env - 50.0)
     T_max = Tmax_env + 100.0
     PM = sum(z[i]*e.PM[i] for i in range(e.NC))

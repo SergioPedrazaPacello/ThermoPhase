@@ -617,83 +617,121 @@ def _completar_rocio_desde_critico(*_a, **_k):
 
 
 # ── Rama de burbuja de ALTA PRESIÓN (mezclas de rango de ebullición amplio) ──
-def _rama_alta_presion(z, act, env_pmax, max_pts, paso_max):
-    """Captura la rama de burbuja que asciende a presiones muy altas a baja T,
-    típica de mezclas con livianos + pesados (p. ej. C1/C9).
+def _rama_alta_presion(z, act, env_pmax, max_pts, paso_max, crit_ref=None):
+    """Captura la rama de burbuja que asciende a presiones muy altas a baja T
+    (mezclas con livianos + pesados, p. ej. C1/C9), que la estrategia de dos
+    ramas no alcanza.
 
-    La estrategia de dos ramas (sembrado a P moderada) no la alcanza porque a
-    baja T la ecuación de burbuja tiene varias raíces y el crítico queda en
-    medio.  Aquí se siembra desde el FLASH (que da las K incipientes) en el
-    medio de la rama y se traza en ambas direcciones: una hacia el crítico
-    (subiendo por el lazo) y otra hacia baja T (la rama ascendente de alta P).
+    Se construye por MARCHA EN T con bisección, usando como criterio el análisis
+    de estabilidad de Michelsen (rápido, ~8 ms con pocas iteraciones) en lugar
+    del flash completo: robusto incluso con constantes K extremas (C1/C9 90/10),
+    donde la continuación por Newton diverge.
 
-    Devuelve la línea de burbuja COMPLETA ordenada [alta P … crítico], o []
-    si no hay una rama de alta presión que supere holgadamente `env_pmax`
-    (mezclas normales → no aporta nada y no se toca la envolvente).
+    Un GATE barato al inicio (¿hay bifásico por encima del lazo a alguna T baja?)
+    hace que las mezclas SIN rama de alta presión no paguen prácticamente nada.
+
+    Devuelve (línea [alta P … crítico], crítico) o ([], None).
     """
-    from eos import calcular
-    m = len(act)
+    from eos import analisis_estabilidad
+    za = np.asarray(z, dtype=float)
+
+    def bif(T, P, maxit=45):
+        """True si a (T,P) el sistema es bifásico (por debajo de la burbuja)."""
+        try:
+            return bool(analisis_estabilidad(za, float(T), float(P), kij_g,
+                                             max_iter=maxit).get('inestable', False))
+        except Exception:
+            return False
+
     Tc_mix = sum(z[i]*_TCa[i] for i in range(NC))
-    umbral = max(env_pmax*1.30, env_pmax + 3000.0)   # debe superar el lazo
-    P_escaneo = [300, 600, 1000, 1500, 2500, 4000, 6000, 9000,
-                 13000, 18000, 24000, 31000]
-    for frac in (0.80, 0.78, 0.82, 0.76, 0.84):
-        Ts = frac*Tc_mix
-        # Punto de burbuja: primera transición V→0 subiendo en P.
-        Pbif = Pliq = None
-        for P in P_escaneo:
-            V = calcular(z, Ts, float(P), kij_g).get('V', 1.0)
-            if 0.02 < V < 0.98 and Pbif is None:
-                Pbif = P
-            elif V < 0.01 and Pbif is not None and P > Pbif:
-                Pliq = P; break
-        if Pbif is None or Pliq is None:
-            continue
-        lo, hi = Pbif, Pliq
-        for _ in range(45):
+    umbral = max(env_pmax*1.12, env_pmax + 800.0)      # apenas por encima del lazo
+    # Techo práctico: por encima de ~10000 psia los datos no tienen utilidad, así
+    # que la rama de alta presión se corta ahí. Además de ser lo que necesita el
+    # usuario, evita perseguir la zona casi vertical (muy empinada y frágil) y
+    # hace el trazado mucho más rápido y robusto.
+    P_ceil = max(env_pmax*1.05, 10000.0)
+
+    def bubbleP(T, plo, phi):
+        """Burbuja de alta presión a T por bisección (transición bifásico→líquido)."""
+        vlo = bif(T, plo); k = 0
+        while (not vlo) and k < 5:
+            plo *= 0.7; vlo = bif(T, plo); k += 1
+        vhi = bif(T, phi); k = 0
+        while vhi and k < 5:
+            phi = min(phi*1.5, P_ceil*1.15); vhi = bif(T, phi); k += 1
+        if (not vlo) or vhi:
+            return None
+        lo, hi = plo, phi
+        for _ in range(15):
             mid = 0.5*(lo+hi)
-            if calcular(z, Ts, mid, kij_g).get('V', 1.0) < 0.005:
-                hi = mid
-            else:
-                lo = mid
-        Pb = hi
-        r = calcular(z, Ts, Pb, kij_g)
-        K = np.array(r.get('K', []))
-        if K.size < NC:
+            if not bif(T, mid): hi = mid
+            else: lo = mid
+        return hi
+
+    # ── GATE + semilla sobre la rama de alta presión ────────────────────────
+    seedT = seedP = None
+    T = 0.72*Tc_mix
+    Tf = max(0.38*Tc_mix, 150.0)
+    while T > Tf:
+        if bif(T, umbral):                     # bifásico por encima del lazo
+            pb = bubbleP(T, umbral, umbral*3.0 + 5000.0)
+            if pb is not None and pb > umbral:
+                seedT, seedP = T, pb
+                break
+        T -= 10.0
+    if seedT is None:
+        return [], None                        # mezcla normal: sin rama de alta P
+
+    # ── Marcha en T por bisección, ambos sentidos desde la semilla ──────────
+    pdn = [(seedP, seedT)]                      # hacia baja T / alta P
+    T, P = seedT, seedP; n = 0; step = 8.0
+    while n < 300:
+        Tn = T - step
+        if Tn < max(0.22*Tc_mix, 125.0): break
+        pb = bubbleP(Tn, P*0.65, P*3.0 + 5000.0)
+        if pb is None:
+            # ¿la burbuja superó el techo? (bifásico hasta P_ceil) → rama al techo
+            if bif(Tn, P_ceil):
+                pdn.append((P_ceil, Tn)); break
+            step *= 0.5                          # zona empinada: afinar el paso
+            if step < 0.4: break
             continue
-        X = np.zeros(m+2)
-        for j, i in enumerate(act):
-            X[j] = math.log(max(K[i], 1e-300))
-        X[m] = math.log(Ts); X[m+1] = math.log(Pb)
-        Xr, _ok = _resolver_punto(X, z, act, ('coord', m+1, math.log(Pb)),
-                                  tol=1e-7)
-        if not np.all(np.isfinite(Xr)) or float(np.sum(Xr[:m]**2)) < 0.05:
+        pb = min(pb, P_ceil)
+        pdn.append((pb, Tn)); T, P = Tn, pb; n += 1
+        if pb >= P_ceil*0.999: break
+        step = min(8.0, step*1.4)
+
+    pup = []                                    # hacia alta T / lazo → crítico
+    T, P = seedT, seedP; n = 0; crit_hp = None; step = 8.0
+    # El crítico de la mezcla puede estar muy por encima del Tc molar cuando hay
+    # pesados (C9 eleva mucho el crítico). Si las dos ramas ya localizaron el
+    # crítico (crit_ref), se usa su T como tope: así la marcha ascendente cierra
+    # exactamente donde arranca el rocío (sin sobrepasar el crítico ni invadir
+    # la rama de rocío por el lado de alta T). Si no, se usa el Tc del componente
+    # más pesado como cota de seguridad.
+    if crit_ref is not None:
+        T_ceil_up = crit_ref[1]
+    else:
+        T_ceil_up = max(_TCa[i] for i in act) * 1.05
+    while n < 400:
+        Tn = T + step
+        if Tn > T_ceil_up:
+            crit_hp = crit_ref            # cerrar en el crítico de referencia
+            break
+        pb = bubbleP(Tn, max(P*0.4, 150.0), P*1.7 + 2500.0)
+        if pb is None:                          # el bifásico se cerró: crítico
+            step *= 0.5
+            if step < 0.4:
+                crit_hp = crit_ref if crit_ref is not None else (P, T); break
             continue
-        t0 = _tangente(Xr, z, act)
-        if t0 is None:
-            continue
-        # Dirección hacia T decreciente = rama ascendente de alta presión.
-        t_dn = t0 if t0[m] < 0 else -t0
-        pdn, _, _, _, _ = _trazar(
-            Xr, z, act, t_dn.copy(), max_pts=max_pts, paso_ini=0.02,
-            PASO_MAX=min(paso_max, 0.06), p_stop_max=env_pmax*10.0)
-        pmax = max((p for p, _ in pdn), default=0.0)
-        if pmax < umbral:
-            continue   # esta semilla no reveló rama de alta presión
-        # Dirección hacia el crítico = sube por el lazo (parada limpia en crít).
-        t_up = -t_dn
-        pup, _, mk2_up, crit_up, i_up = _trazar(
-            Xr, z, act, t_up.copy(), max_pts=max_pts, paso_ini=0.02,
-            PASO_MAX=min(paso_max, 0.06), sumk2_stop=1.5e-3)
-        # Cortar EXACTAMENTE en el crítico (mínimo sum(lnK)²) para no
-        # sobrepasar hacia la rama de rocío.
-        if mk2_up < 0.5 and 0 < i_up < len(pup):
-            pup = pup[:i_up+1]
-        crit_hp = crit_up if mk2_up < 0.5 else None
-        # Línea completa ordenada [alta P … semilla … crítico].
-        linea = list(reversed(pdn)) + pup[1:]
-        return linea, crit_hp
-    return [], None
+        pup.append((pb, Tn)); T, P = Tn, pb; n += 1
+        step = min(8.0, step*1.4)
+
+    # Línea continua ordenada [alta P / baja T → semilla → crítico].
+    linea = list(reversed(pdn)) + pup
+    if len(linea) < 5 or max((p for p, _ in linea), default=0.0) < umbral:
+        return [], None
+    return linea, crit_hp
 
 
 # ── Punto de entrada principal ───────────────────────────────────────────────
@@ -875,7 +913,8 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             env_pmax = 0.0
             if pts_burb: env_pmax = max(env_pmax, max(p for p, _ in pts_burb))
             if pts_dew:  env_pmax = max(env_pmax, max(p for p, _ in pts_dew))
-            rama_hp, crit_hp = _rama_alta_presion(z, act, env_pmax, max_pts, paso_max)
+            rama_hp, crit_hp = _rama_alta_presion(z, act, env_pmax, max_pts,
+                                                  paso_max, crit_ref=crit)
             if rama_hp and len(rama_hp) >= 10:
                 pts_burb = rama_hp        # línea completa [alta P … crítico]
                 if crit_hp is not None:
