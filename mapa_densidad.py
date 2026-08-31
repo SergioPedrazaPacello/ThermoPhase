@@ -185,63 +185,6 @@ def _envolvente_polygon_TP(resultado_env):
     return np.array(poly)
 
 
-# ── Contorno cerrado de la envolvente trazada (burbuja + rocío) ─────────────
-def _contorno_env_TP(resultado_env):
-    """Contorno cerrado de la envolvente TRAZADA en (T°R, P psia).
-
-    A diferencia de `_envolvente_polygon_TP` (que RECORTA la cola de alta
-    presión para el fill gris de las envolventes normales), aquí se usa el
-    recorrido COMPLETO tal como lo dibujan las curvas de burbuja y rocío,
-    INCLUYENDO la cola de alta presión. burbuja va (P baja → cola → crítico)
-    y rocío va (crítico → P baja); concatenadas forman un lazo cerrado,
-    ordenado y sin auto-intersección, que coincide exactamente con lo que
-    ve el usuario. Sirve para confinar el sombreado gris (mask_bif) al
-    interior real del trazado y evitar que se desborde por la cola.
-
-    Retorna un array (N,2) en (T°R, P psia) o None si no hay puntos.
-    """
-    burb = resultado_env.get('burbuja', []) or []
-    roc  = resultado_env.get('rocio',   []) or []
-    if not burb and not roc:
-        return None
-    # burbuja: (P,T) en orden P baja → crítico; rocío: (P,T) crítico → P baja.
-    # El primer punto de rocío suele coincidir con el crítico (último de
-    # burbuja); se omite para no duplicar el vértice de la cúspide.
-    loop = list(burb)
-    if roc:
-        loop += list(roc[1:]) if burb else list(roc)
-    if len(loop) < 3:
-        return None
-    poly = np.array([(pt[1], pt[0]) for pt in loop], dtype=float)  # (T°R, P)
-    return poly
-
-
-def _mascara_dentro_contorno(poly_TP, Tg_R, Pg):
-    """Máscara booleana (len(Pg), len(Tg_R)) True dentro del contorno.
-
-    Test punto-en-polígono por ray casting vectorizado sobre toda la malla.
-    poly_TP en (T°R, P psia); Tg_R en °R; Pg en psia. El resultado usa el
-    mismo orden de índices que rho_map / mask_bif: [j (P), i (T)].
-    """
-    Tx = poly_TP[:, 0]
-    Py = poly_TP[:, 1]
-    n  = len(poly_TP)
-    Tm, Pm = np.meshgrid(Tg_R, Pg)          # (nP, nT)
-    dentro = np.zeros(Tm.shape, dtype=bool)
-    j = n - 1
-    for i in range(n):
-        Ti, Pi = Tx[i], Py[i]
-        Tj, Pj = Tx[j], Py[j]
-        # ¿el segmento (i,j) cruza el rayo horizontal a P=Pm hacia -T?
-        cond = ((Pi > Pm) != (Pj > Pm))
-        denom = (Pj - Pi)
-        denom = np.where(np.abs(denom) < 1e-30, 1e-30, denom)
-        Tcross = Ti + (Tj - Ti) * (Pm - Pi) / denom
-        dentro ^= (cond & (Tm < Tcross))
-        j = i
-    return dentro
-
-
 # ── Función principal ───────────────────────────────────────────
 def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
                            progress_cb=None, metodo='COSTALD'):
@@ -318,22 +261,41 @@ def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
             pct = 15 + int(70 * N_done / N_total)
             progress_cb(pct, "Calculando densidad…")
 
-    # ── Confinar el sombreado gris al interior del trazado real ──────────────
-    # El test de estabilidad (mask_bif) puede marcar como inestables celdas
-    # que caen FUERA del contorno trazado por burbuja/rocío, en especial en la
-    # "cola" de alta presión de las mezclas con metano + pesados (nonano,
-    # octano, heptano): ahí el gris se desbordaba a la izquierda de la rama de
-    # burbuja. Se intersecta mask_bif con el interior del contorno COMPLETO
-    # (burbuja con cola + rocío) para que el sombreado coincida exactamente
-    # con la envolvente dibujada. En envolventes normales el contorno contiene
-    # toda la zona inestable, así que este recorte no cambia nada.
-    contorno = _contorno_env_TP(resultado_env)
-    if contorno is not None and mask_bif.any():
-        try:
-            dentro = _mascara_dentro_contorno(contorno, Tg, Pg)
-            mask_bif &= dentro
-        except Exception:
-            pass
+    # ── Refinar SOLO la cola de alta presión (sin tocar el cuerpo) ───────────
+    # El test de estabilidad (mask_bif) marca correctamente la zona bifásica en
+    # el cuerpo de la envolvente, y ahí debe respetarse tal cual. El único punto
+    # donde se desborda es la "cola" de alta presión de las mezclas metano +
+    # pesados (nonano/octano/heptano): por encima del codo, mask_bif marca
+    # celdas a la IZQUIERDA de la rama de burbuja que no son bifásicas reales.
+    # Se recortan SOLO esas: para cada P por encima del codo, se anula el gris
+    # a la izquierda de la rama de burbuja trazada. El cuerpo (P ≤ P_codo) no se
+    # toca en absoluto, de modo que no se desombra nada del interior real.
+    if burb and len(burb) >= 3:
+        Pb = np.array([pt[0] for pt in burb], dtype=float)
+        Tb = np.array([pt[1] for pt in burb], dtype=float)
+        i_codo = int(np.argmin(Pb))          # codo = mínimo de P de la burbuja
+        P_codo = Pb[i_codo]
+        Ptop   = Pb[0]                        # tope de la cola (P alta a baja T)
+        # Solo actuar si hay cola real (la burbuja arranca en P alta y baja
+        # hasta un codo bien por debajo del tope).
+        if Ptop > 1.3 * P_codo:
+            # Rama de la cola: del tope al codo (P descendente), la pared casi
+            # vertical que limita el sombreado por la izquierda.
+            Pcola = Pb[:i_codo+1]
+            Tcola = Tb[:i_codo+1]
+            for j, P in enumerate(Pg):
+                if P <= P_codo:
+                    continue                 # cuerpo: no tocar
+                # T de la rama de burbuja a esta P (interpolación en la cola).
+                Tcru = []
+                for k in range(len(Pcola) - 1):
+                    p0, p1 = Pcola[k], Pcola[k+1]
+                    if p0 != p1 and (p0 - P) * (p1 - P) <= 0.0:
+                        f = (P - p0) / (p1 - p0)
+                        Tcru.append(Tcola[k] + f * (Tcola[k+1] - Tcola[k]))
+                if Tcru:
+                    T_borde = min(Tcru)
+                    mask_bif[j, Tg < T_borde] = False
 
     # ── Envolvente abierta: blanquear a la izquierda de la burbuja ───────────
     if Pmax_env >= 9500.0 and burb and len(burb) >= 2:
