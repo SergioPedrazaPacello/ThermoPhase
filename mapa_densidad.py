@@ -154,49 +154,41 @@ def calcular_curva_transicion(z, kij, P_min, P_max, n_pts=40,
 
 # ── Polígono envolvente para el fill gris ───────────────────────
 def _envolvente_polygon_TP(resultado_env):
-    """Polígono cerrado suave de la envolvente en (T°R, P psia).
+    """Polígono cerrado de la ZONA BIFÁSICA en (T°R, P psia).
 
-    Usa el ORDEN NATURAL con el que el algoritmo (Ziervogel o Michelsen)
-    recorre continuamente el envelope: primer extremo → línea de burbuja
-    → punto crítico → línea de rocío → segundo extremo.  matplotlib
-    cierra el polígono automáticamente uniendo el último punto con el
-    primero, que ambos están en la base del envelope a baja P, así que
-    el cierre es una línea recta corta que representa la "base".
+    La zona bifásica es el interior encerrado por la línea de burbuja y la de
+    rocío (la "panza" o lazo). Para envolventes de rango de ebullición amplio la
+    rama de burbuja además sube casi vertical hasta el techo práctico (~10000
+    psia): esa COLA vertical NO encierra zona bifásica (a esas presiones sólo
+    existe la línea de burbuja, sin rama de rocío que la cierre), por lo que se
+    excluye del polígono. Se usa únicamente el LAZO: desde el codo (punto de
+    presión mínima de la burbuja) hasta el crítico, más toda la rocío.
 
-    IMPORTANTE: no invertir la rocío.  Ambas listas ya vienen en orden
-    de recorrido continuo: burbuja[-1] ≈ rocío[0] ≈ crítico.  Invertir
-    la rocío hace que el polígono se auto-cruce (recorre A→crítico→Z→
-    crítico→A formando una "X"), lo que confunde al motor de fill de
-    matplotlib y termina rellenando todo el rectángulo del gráfico.
+    El cierre lo hace matplotlib uniendo el último punto de rocío con el codo,
+    ambos a presión baja (la base del lazo), con lo que la zona bifásica queda
+    correctamente delimitada y sin desbordes por fuera de las curvas.
 
     Retorna None si no hay suficientes puntos.
     """
     burb = resultado_env.get('burbuja', []) or []
     roc  = resultado_env.get('rocio', []) or []
     if not burb and not roc: return None
+
+    # Detectar cola de alta presión y quedarse sólo con el lazo de la burbuja.
+    lazo = burb
+    if burb and roc:
+        Pmax_env = max([pt[0] for pt in burb] + [pt[0] for pt in roc])
+        Ptop = burb[0][0]                      # P del primer punto de burbuja
+        if Ptop > 0.5 * Pmax_env:              # envolvente abierta por arriba
+            i_codo = min(range(len(burb)), key=lambda i: burb[i][0])
+            lazo = burb[i_codo:]               # del codo (P mínima) al crítico
+
     poly = []
-    for pt in burb:
+    for pt in lazo:
         poly.append((pt[1], pt[0]))     # (T°R, Ppsia)
     for pt in roc:
         poly.append((pt[1], pt[0]))
     if len(poly) < 3: return None
-
-    # ── Cierre de envolventes ABIERTAS por arriba (rama de alta presión) ─────
-    # Para mezclas de rango de ebullición amplio la rama de burbuja se corta en
-    # el techo práctico (~10000 psia): la envolvente NO cierra por arriba (el
-    # primer punto de burbuja está a P alta, no en la base a P baja). Si se deja
-    # así, matplotlib une el último punto de rocío (T alta, P baja) con el primero
-    # de burbuja (T baja, P alta) por una diagonal que rellena mal el gráfico.
-    # Se cierra explícitamente: base a P mínima + arista vertical hasta el techo,
-    # de modo que la zona bifásica quede correctamente delimitada y el mapa de
-    # densidad se dibuje por fuera sin desconfigurarse.
-    Ptop = burb[0][0]                    # P del primer punto de burbuja
-    Pbase = min([pt[0] for pt in burb] + [pt[0] for pt in roc])
-    Pmax_env = max([pt[0] for pt in burb] + [pt[0] for pt in roc])
-    if Ptop > 0.5 * Pmax_env:            # envolvente abierta por arriba
-        Tleft = burb[0][1]              # T del extremo de alta presión
-        poly.append((Tleft, Pbase))     # base a P mínima bajo el extremo izq.
-        # matplotlib cierra (Tleft, Pbase) → (Tleft, Ptop): arista vertical.
     return np.array(poly)
 
 
@@ -271,20 +263,23 @@ def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
     # ── Envolvente abierta: blanquear todo lo que quede a la IZQUIERDA de la
     # rama de burbuja ───────────────────────────────────────────────────────
     # A la izquierda de la rama de burbuja de alta presión hay líquido, que sin
-    # esto se colorearía (franja verde). Para cada P se toma el borde izquierdo
-    # de la envolvente (menor T de los puntos cercanos en P) y se pone NaN a
-    # todo T menor: así esa región queda en blanco, sin color.
-    if Pmax_env >= 9500.0 and (burb or roc):
-        allpts = burb + roc
-        Ppts = np.array([pt[0] for pt in allpts])
-        Tpts = np.array([pt[1] for pt in allpts])
-        dP_band = (P_max - 10.0) / n_grid * 1.5
+    # esto se colorearía (franja verde). Para cada presión del grid se calcula el
+    # borde izquierdo como la MENOR temperatura en que la línea de burbuja cruza
+    # esa presión (interpolando los segmentos), y se pone NaN a todo T menor. Al
+    # interpolar el cruce exacto el borde queda continuo, sin los escalones que
+    # producía trabajar con una banda de presión.
+    if Pmax_env >= 9500.0 and burb and len(burb) >= 2:
+        Pb = np.array([pt[0] for pt in burb])
+        Tb = np.array([pt[1] for pt in burb])
         for j, P in enumerate(Pg):
-            sel = np.abs(Ppts - P) < dP_band
-            if not sel.any():
-                continue
-            T_left = Tpts[sel].min()
-            rho_map[j, Tg < T_left] = np.nan
+            Tcru = []
+            for k in range(len(burb) - 1):
+                p0, p1 = Pb[k], Pb[k+1]
+                if p0 != p1 and (p0 - P) * (p1 - P) <= 0.0:
+                    f = (P - p0) / (p1 - p0)
+                    Tcru.append(Tb[k] + f * (Tb[k+1] - Tb[k]))
+            if Tcru:
+                rho_map[j, Tg < min(Tcru)] = np.nan
 
     if progress_cb: progress_cb(88, "Ensamblando envolvente y transición…")
     poly = _envolvente_polygon_TP(resultado_env)
