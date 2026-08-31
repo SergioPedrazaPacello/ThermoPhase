@@ -955,10 +955,14 @@ class TabEnvolvente(QWidget):
                         linewidth=0.9, label=_i18n.t('Curva de Rocío'), zorder=5)
         else:
             if Tb and Pb:
+                ax.plot(Tb, Pb, linestyle='-', linewidth=0.7,
+                        color='#a83218', zorder=2)
                 ax.plot(Tb,Pb,linestyle='none',marker='^',
                         color='#a83218',markersize=3,
                         label=_i18n.t('Curva de Burbuja'))
             if Td and Pd:
+                ax.plot(Td, Pd, linestyle='-', linewidth=0.7,
+                        color='#1a4fa8', zorder=2)
                 ax.plot(Td,Pd,linestyle='none',marker='^',
                         color='#1a4fa8',markersize=3,
                         label=_i18n.t('Curva de Rocío'))

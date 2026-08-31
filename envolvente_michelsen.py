@@ -682,27 +682,61 @@ def _rama_alta_presion(z, act, env_pmax, max_pts, paso_max, crit_ref=None):
     if seedT is None:
         return [], None                        # mezcla normal: sin rama de alta P
 
-    # ── Marcha en T por bisección, ambos sentidos desde la semilla ──────────
-    pdn = [(seedP, seedT)]                      # hacia baja T / alta P
-    T, P = seedT, seedP; n = 0; step = 8.0
-    while n < 300:
-        Tn = T - step
-        if Tn < max(0.22*Tc_mix, 125.0): break
-        pb = bubbleP(Tn, P*0.65, P*3.0 + 5000.0)
-        if pb is None:
-            # ¿la burbuja superó el techo? (bifásico hasta P_ceil) → rama al techo
-            if bif(Tn, P_ceil):
-                pdn.append((P_ceil, Tn)); break
-            step *= 0.5                          # zona empinada: afinar el paso
-            if step < 0.4: break
-            continue
-        pb = min(pb, P_ceil)
-        pdn.append((pb, Tn)); T, P = Tn, pb; n += 1
-        if pb >= P_ceil*0.999: break
-        step = min(8.0, step*1.4)
+    def bubbleT(P, T_hint):
+        """T de burbuja de la rama ascendente a P fija (borde superior de la banda
+        bifásica), buscada de forma robusta cerca de `T_hint`.
+
+        A P alta la zona bifásica es una banda ANGOSTA con líquido a ambos lados,
+        así que no basta suponer "T baja = bifásico": se busca primero una T
+        dentro de la banda cerca de la guía, luego el líquido por encima, y se
+        bisecciona el borde. Devuelve la T del borde superior o None.
+        """
+        Tin = None
+        for dT in (0.0, -3, 3, -6, 6, -10, 10, -15, 15, -22, 22, -30, 30):
+            if bif(T_hint + dT, P):
+                Tin = T_hint + dT; break
+        if Tin is None:
+            return None
+        Tup = Tin; ok = False
+        for _ in range(12):
+            Tup += 4.0
+            if not bif(Tup, P):
+                ok = True; break
+        if not ok:
+            return None
+        lo, hi = Tin, Tup
+        for _ in range(16):
+            mid = 0.5*(lo+hi)
+            if bif(mid, P): lo = mid
+            else: hi = mid
+        return hi
+
+    # ── Rama ascendente de ALTA PRESIÓN: marcha en P desde la semilla ───────
+    # La rama puede ser casi vertical; se marcha en PRESIÓN (arriba hacia el
+    # techo y abajo hacia el mínimo del lazo) para poblarla densa y pareja sin
+    # huecos, resolviendo la T de burbuja en cada P.
+    dP = max(180.0, (P_ceil - seedP) / 35.0)
+    up = []                                     # semilla → techo
+    P, T = seedP, seedT
+    while P < P_ceil*0.999 and len(up) < 250:
+        Pn = min(P + dP, P_ceil)
+        Tb = bubbleT(Pn, T)
+        if Tb is None: break
+        up.append((Pn, Tb)); P, T = Pn, Tb
+    dn = []                                     # semilla → mínimo del lazo
+    P, T = seedP, seedT
+    while P > 20.0 and len(dn) < 250:
+        Pn = P - dP
+        Tb = bubbleT(Pn, T)
+        if Tb is None or (Tb - T) > 25.0:       # se aplana → base de la vertical
+            break
+        dn.append((Pn, Tb)); P, T = Pn, Tb
+    # Rama vertical completa, P ascendente: [mínimo … semilla … techo]
+    pdn = list(reversed(dn)) + [(seedP, seedT)] + up
+    P0, T0 = pdn[0]                             # base de la vertical (arranque lazo)
 
     pup = []                                    # hacia alta T / lazo → crítico
-    T, P = seedT, seedP; n = 0; crit_hp = None; step = 8.0
+    T, P = T0, P0; n = 0; crit_hp = None; step = 8.0
     # El crítico de la mezcla puede estar muy por encima del Tc molar cuando hay
     # pesados (C9 eleva mucho el crítico). Si las dos ramas ya localizaron el
     # crítico (crit_ref), se usa su T como tope: así la marcha ascendente cierra
@@ -731,6 +765,23 @@ def _rama_alta_presion(z, act, env_pmax, max_pts, paso_max, crit_ref=None):
     linea = list(reversed(pdn)) + pup
     if len(linea) < 5 or max((p for p, _ in linea), default=0.0) < umbral:
         return [], None
+
+    # ── Densificación por interpolación ─────────────────────────────────────
+    # Donde dos puntos consecutivos queden muy separados (tramos empinados que el
+    # cálculo dejó ralos), se insertan puntos intermedios por interpolación
+    # lineal. En la recta casi vertical la interpolación es prácticamente exacta
+    # (los puntos caen sobre la misma recta), y en el resto sólo rellena huecos.
+    dP_obj = max(300.0, (P_ceil - umbral) / 45.0)   # separación objetivo en P
+    dT_obj = 12.0                                    # separación objetivo en T
+    densa = [linea[0]]
+    for (p1, t1), (p0, t0) in zip(linea[1:], linea):
+        nseg = int(max(abs(p1 - p0) / dP_obj, abs(t1 - t0) / dT_obj))
+        for k in range(1, nseg):
+            f = k / nseg
+            densa.append((p0 + f*(p1 - p0), t0 + f*(t1 - t0)))
+        densa.append((p1, t1))
+    linea = densa
+
     return linea, crit_hp
 
 
@@ -916,11 +967,56 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             rama_hp, crit_hp = _rama_alta_presion(z, act, env_pmax, max_pts,
                                                   paso_max, crit_ref=crit)
             if rama_hp and len(rama_hp) >= 10:
-                pts_burb = rama_hp        # línea completa [alta P … crítico]
-                if crit_hp is not None:
-                    crit = crit_hp
-                elif crit is None and crit_d is not None:
-                    crit = crit_d
+                # Dos formas de armar la rama de burbuja con la vertical de alta
+                # presión, y se elige la de trazado MÁS continuo (menor salto
+                # máximo entre puntos consecutivos):
+                #  (a) vertical (punta de rama_hp, monótona en P) + rama estándar
+                #      de Michelsen (codo y lazo densos y limpios). Ideal cuando
+                #      la vertical está separada del lazo por un codo largo.
+                #  (b) rama_hp completa (vertical + lazo por bisección). Ideal
+                #      cuando la vertical se integra suave al lazo.
+                def _maxsalto(pts):
+                    m = 0.0
+                    for i in range(1, len(pts)):
+                        p0, t0 = pts[i-1]; p1, t1 = pts[i]
+                        d = ((p1-p0)**2 + (t1-t0)**2) ** 0.5
+                        if d > m: m = d
+                    return m
+                pts_std = pts_burb
+                vertical = [rama_hp[0]]
+                for p, t in rama_hp[1:]:
+                    if p < vertical[-1][0] - 1.0:
+                        vertical.append((p, t))
+                    else:
+                        break
+                cand = None
+                if len(vertical) >= 3 and pts_std:
+                    p_v, t_v = vertical[-1]
+                    p_s, t_s = pts_std[0]
+                    conector = []
+                    nseg = int(max(abs(p_v-p_s)/300.0, abs(t_v-t_s)/12.0))
+                    for k in range(1, nseg):
+                        f = k / nseg
+                        conector.append((p_v + f*(p_s-p_v), t_v + f*(t_s-t_v)))
+                    cand = vertical + conector + pts_std
+                # El candidato (vertical + estándar) sólo sirve si además de ser
+                # continuo LLEGA al crítico: si la rama estándar no alcanza el
+                # crítico, el cierre de la envolvente lo uniría con una diagonal
+                # espuria. En ese caso se usa rama_hp completa, que sí cierra.
+                usar_cand = False
+                if cand is not None and crit is not None:
+                    pe, te = cand[-1]
+                    dist = ((pe-crit[0])**2 + (te-crit[1])**2) ** 0.5
+                    if dist < 0.20*max(crit[0], 1.0) and _maxsalto(cand) < 600.0:
+                        usar_cand = True
+                if usar_cand:
+                    pts_burb = cand              # empalme limpio con la estándar
+                else:
+                    pts_burb = rama_hp           # rama_hp completa cierra mejor
+                    if crit_hp is not None:
+                        crit = crit_hp
+                    elif crit is None and crit_d is not None:
+                        crit = crit_d
         except Exception:
             pass
 

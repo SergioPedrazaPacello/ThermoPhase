@@ -235,9 +235,13 @@ def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
     # habitual del 50 % sobre la P máxima.
     if Pmax_env >= 9500.0:
         P_max = Pmax_env * 1.02
+        # Envolvente abierta (rama vertical de burbuja a baja T): el grid empieza
+        # justo en la rama, sin margen a la izquierda, para que no quede una
+        # franja coloreada (líquido) a la izquierda de la zona sombreada.
+        T_min = Tmin_env
     else:
         P_max = 1.5 * max(Pmax_env, Pc_Kay)
-    T_min = max(50.0, Tmin_env - 50.0)
+        T_min = max(50.0, Tmin_env - 50.0)
     T_max = Tmax_env + 100.0
     PM = sum(z[i]*e.PM[i] for i in range(e.NC))
 
@@ -263,6 +267,24 @@ def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
         if progress_cb and (j % 10 == 0):
             pct = 15 + int(70 * N_done / N_total)
             progress_cb(pct, "Calculando densidad…")
+
+    # ── Envolvente abierta: blanquear todo lo que quede a la IZQUIERDA de la
+    # rama de burbuja ───────────────────────────────────────────────────────
+    # A la izquierda de la rama de burbuja de alta presión hay líquido, que sin
+    # esto se colorearía (franja verde). Para cada P se toma el borde izquierdo
+    # de la envolvente (menor T de los puntos cercanos en P) y se pone NaN a
+    # todo T menor: así esa región queda en blanco, sin color.
+    if Pmax_env >= 9500.0 and (burb or roc):
+        allpts = burb + roc
+        Ppts = np.array([pt[0] for pt in allpts])
+        Tpts = np.array([pt[1] for pt in allpts])
+        dP_band = (P_max - 10.0) / n_grid * 1.5
+        for j, P in enumerate(Pg):
+            sel = np.abs(Ppts - P) < dP_band
+            if not sel.any():
+                continue
+            T_left = Tpts[sel].min()
+            rho_map[j, Tg < T_left] = np.nan
 
     if progress_cb: progress_cb(88, "Ensamblando envolvente y transición…")
     poly = _envolvente_polygon_TP(resultado_env)
