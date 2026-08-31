@@ -894,26 +894,17 @@ class TabEnvolvente(QWidget):
                            origin='lower', aspect='auto',
                            cmap=cmap, alpha=0.5, vmin=v_min, vmax=v_max,
                            interpolation='bilinear', zorder=0)
-            # Sombreado gris de la zona bifásica: se usa la máscara termodinámica
-            # (analisis_estabilidad celda a celda) que marca exactamente las
-            # celdas donde el sistema es inestable — esa es la región bifásica real.
-            mask_bif = reg.get('mask_bif')
-            if mask_bif is not None and mask_bif.any():
-                import matplotlib.colors as _mcolors
-                gris = np.where(mask_bif, 1.0, np.nan).astype(float)
-                ax.imshow(np.ma.masked_invalid(gris),
-                          extent=[Tg_F[0], Tg_F[-1], Pg[0], Pg[-1]],
-                          origin='lower', aspect='auto',
-                          cmap=_mcolors.ListedColormap(['#E8E8E8']),
-                          vmin=0.0, vmax=1.0, alpha=1.0, zorder=1,
-                          interpolation='nearest')
-            else:
-                poly = reg.get('poly_env_TP')
-                if poly is not None and len(poly) >= 3:
-                    poly_F = np.column_stack([poly[:,0] - 459.67, poly[:,1]])
-                    ax.fill(poly_F[:,0], poly_F[:,1],
-                            color='#E8E8E8', alpha=1.0, zorder=1,
-                            edgecolor='none')
+            # Sombreado gris de la zona bifásica: relleno sólido del polígono
+            # cerrado de la envolvente trazada (burbuja con cola + rocío, cerrado
+            # por el borde inferior). Sigue exactamente las curvas dibujadas en
+            # cualquier topología, incluida la cola de alta presión de las mezclas
+            # metano + pesados, sin bordes dentados ni huecos.
+            poly = reg.get('poly_env_TP')
+            if poly is not None and len(poly) >= 3:
+                poly_F = np.column_stack([poly[:,0] - 459.67, poly[:,1]])
+                ax.fill(poly_F[:,0], poly_F[:,1],
+                        color='#E8E8E8', alpha=1.0, zorder=1,
+                        edgecolor='none')
             # Curva de transición LIQ↔VAP: OCULTA temporalmente
             # (a Sergio no le convence que no llegue hasta el punto crítico
             # verdadero — se está estudiando por qué difiere de la

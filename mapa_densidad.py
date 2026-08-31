@@ -156,33 +156,54 @@ def calcular_curva_transicion(z, kij, P_min, P_max, n_pts=40,
 def _envolvente_polygon_TP(resultado_env):
     """Polígono cerrado de la zona bifásica en (T°R, P psia).
 
-    Usa el recorrido natural: burbuja (sin la cola de alta presión) →
-    punto crítico → rocío.  La COLA VERTICAL (el tramo de la rama de
-    burbuja por encima del codo, donde P > P_codo) no encierra zona
-    bifásica real y se excluye para evitar que el polígono se desborde
-    fuera de las curvas en esa región. El resto de la burbuja y toda la
-    rocío se incluyen tal como estaban antes.
+    El contorno se construye recorriendo la envolvente trazada COMPLETA:
+    burbuja (arranque → codo → crítico) + rocío (crítico → baja P),
+    INCLUYENDO la cola de alta presión y baja temperatura de las mezclas
+    metano + pesados (nonano/octano/heptano).
 
-    Retorna None si no hay suficientes puntos.
+    El trazado de la envolvente no cierra el fondo del domo (la burbuja se
+    detiene en el codo y el rocío en baja presión), de modo que para tener
+    un polígono cerrado rellenable se añade un cierre por el borde inferior:
+    desde el final del rocío se baja a P≈0, se recorre hasta la temperatura
+    del arranque de la burbuja y se sube hasta él. Esto deja una franja fina
+    a la izquierda de la cola (región monofásica de líquido) que se acepta a
+    cambio de un sombreado sólido y sin bordes dentados en toda la zona
+    bifásica, cola incluida.
+
+    Para envolventes normales (sin cola) el recorrido burbuja+rocío ya cierra
+    el domo de forma natural y el cierre inferior queda pegado a las curvas.
+
+    Retorna un array (N,2) en (T°R, P psia) o None si no hay puntos.
     """
     burb = resultado_env.get('burbuja', []) or []
     roc  = resultado_env.get('rocio',   []) or []
     if not burb and not roc:
         return None
 
-    lazo = burb   # por defecto: toda la burbuja (envolventes normales)
-    if burb:
-        Pmax_env = max([pt[0] for pt in burb] + ([pt[0] for pt in roc] if roc else []))
-        Ptop = burb[0][0]
-        if Ptop > 0.5 * Pmax_env:            # envolvente con cola de alta P
-            i_codo = min(range(len(burb)), key=lambda i: burb[i][0])
-            lazo = burb[i_codo:]             # solo del codo al crítico
-
-    poly = [(pt[1], pt[0]) for pt in lazo]   # (T°R, P psia)
-    poly += [(pt[1], pt[0]) for pt in roc]
-    if len(poly) < 3:
+    # Recorrido natural de la envolvente trazada, en (T°R, P psia):
+    #   burbuja (P baja/arranque → codo → crítico) + rocío (crítico → P baja).
+    # El primer punto de rocío suele coincidir con el crítico (último de
+    # burbuja); se omite para no duplicar el vértice de la cúspide.
+    loop = [(pt[1], pt[0]) for pt in burb]
+    if roc:
+        roc_TP = [(pt[1], pt[0]) for pt in roc]
+        loop += roc_TP[1:] if burb else roc_TP
+    if len(loop) < 3:
         return None
-    return np.array(poly)
+    loop = np.array(loop, dtype=float)   # (T°R, P psia)
+
+    # Cierre por el borde inferior para obtener un polígono relleno correcto
+    # aun cuando el trazado no cierra el fondo del domo (caso con cola).
+    T_ini, P_ini = loop[0, 0], loop[0, 1]     # arranque de la burbuja
+    T_fin, P_fin = loop[-1, 0], loop[-1, 1]   # final del rocío
+    P_base = 0.0
+    cierre = np.array([
+        [T_fin, P_base],   # bajar el final del rocío al borde inferior
+        [T_ini, P_base],   # recorrer el borde inferior hasta la T del arranque
+        [T_ini, P_ini],    # subir hasta el arranque de la burbuja
+    ], dtype=float)
+    poly = np.vstack([loop, cierre])
+    return poly
 
 
 # ── Función principal ───────────────────────────────────────────
@@ -260,56 +281,6 @@ def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
         if progress_cb and (j % 10 == 0):
             pct = 15 + int(70 * N_done / N_total)
             progress_cb(pct, "Calculando densidad…")
-
-    # ── Refinar SOLO la cola de alta presión (sin tocar el cuerpo) ───────────
-    # El test de estabilidad (mask_bif) marca correctamente la zona bifásica en
-    # el cuerpo de la envolvente, y ahí debe respetarse tal cual. El único punto
-    # donde se desborda es la "cola" de alta presión de las mezclas metano +
-    # pesados (nonano/octano/heptano): por encima del codo, mask_bif marca
-    # celdas a la IZQUIERDA de la rama de burbuja que no son bifásicas reales.
-    # Se recortan SOLO esas: para cada P por encima del codo, se anula el gris
-    # a la izquierda de la rama de burbuja trazada. El cuerpo (P ≤ P_codo) no se
-    # toca en absoluto, de modo que no se desombra nada del interior real.
-    if burb and len(burb) >= 3:
-        Pb = np.array([pt[0] for pt in burb], dtype=float)
-        Tb = np.array([pt[1] for pt in burb], dtype=float)
-        i_codo = int(np.argmin(Pb))          # codo = mínimo de P de la burbuja
-        P_codo = Pb[i_codo]
-        Ptop   = Pb[0]                        # tope de la cola (P alta a baja T)
-        # Solo actuar si hay cola real (la burbuja arranca en P alta y baja
-        # hasta un codo bien por debajo del tope).
-        if Ptop > 1.3 * P_codo:
-            # Rama de la cola: del tope al codo (P descendente), la pared casi
-            # vertical que limita el sombreado por la izquierda.
-            Pcola = Pb[:i_codo+1]
-            Tcola = Tb[:i_codo+1]
-            for j, P in enumerate(Pg):
-                if P <= P_codo:
-                    continue                 # cuerpo: no tocar
-                # T de la rama de burbuja a esta P (interpolación en la cola).
-                Tcru = []
-                for k in range(len(Pcola) - 1):
-                    p0, p1 = Pcola[k], Pcola[k+1]
-                    if p0 != p1 and (p0 - P) * (p1 - P) <= 0.0:
-                        f = (P - p0) / (p1 - p0)
-                        Tcru.append(Tcola[k] + f * (Tcola[k+1] - Tcola[k]))
-                if Tcru:
-                    T_borde = min(Tcru)
-                    mask_bif[j, Tg < T_borde] = False
-
-    # ── Envolvente abierta: blanquear a la izquierda de la burbuja ───────────
-    if Pmax_env >= 9500.0 and burb and len(burb) >= 2:
-        Pb = np.array([pt[0] for pt in burb])
-        Tb = np.array([pt[1] for pt in burb])
-        for j, P in enumerate(Pg):
-            Tcru = []
-            for k in range(len(burb) - 1):
-                p0, p1 = Pb[k], Pb[k+1]
-                if p0 != p1 and (p0 - P) * (p1 - P) <= 0.0:
-                    f = (P - p0) / (p1 - p0)
-                    Tcru.append(Tb[k] + f * (Tb[k+1] - Tb[k]))
-            if Tcru:
-                rho_map[j, Tg < min(Tcru)] = np.nan
 
     if progress_cb: progress_cb(88, "Ensamblando envolvente y transición…")
     poly = _envolvente_polygon_TP(resultado_env)
