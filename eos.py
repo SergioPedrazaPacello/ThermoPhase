@@ -932,6 +932,16 @@ def _cardano_cubica(p2, p1, p0):
         return [u + v - shift]
     if abs(p) < 1e-30:
         return [-shift]
+    # Caso de tres raíces reales (disc ≤ 0): la fórmula trigonométrica requiere
+    # p < 0. Por redondeo, disc puede caer en (·,1e-14] con p ligeramente
+    # POSITIVO; entonces -p/3 < 0 y math.sqrt daría "math domain error". Si p no
+    # es negativo, el discriminante efectivo es no-negativo: se resuelve por la
+    # rama de Cardano real (una sola raíz real) en lugar de la trigonométrica.
+    if p >= 0.0:
+        sq = math.sqrt(max(disc, 0.0))
+        u = np.cbrt(-q/2.0 + sq)
+        v = np.cbrt(-q/2.0 - sq)
+        return [u + v - shift]
     mfac = 2.0*math.sqrt(-p/3.0)
     arg = 3.0*q/(p*mfac)
     arg = max(-1.0, min(1.0, arg))
