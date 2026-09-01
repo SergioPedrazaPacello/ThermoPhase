@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 import matplotlib
 matplotlib.use('QtAgg')
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QEvent
-from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QKeySequence
+from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QActionGroup, QKeySequence
 
 from eos import (
     COMPONENTES, NOMBRES, PM, TC, PC, OMEGA, KIJ_DEFAULT, NC,
@@ -1833,6 +1833,25 @@ class MainWindow(QMainWindow):
         self._act_cursor.toggled.connect(self._toggle_cursor)
         m_graf.addAction(self._act_cursor)
 
+        # Puntos especiales de la envolvente: cricondentérmica/barrica (por
+        # defecto) o punto crítico. Mutuamente excluyentes (radio).
+        m_graf.addSeparator()
+        self._modo_puntos_env = 'cricond'
+        self._grp_puntos = QActionGroup(self)
+        self._grp_puntos.setExclusive(True)
+        self._act_pts_cricond = QAction(
+            "Mostrar cricondentérmica y cricondenbárica", self, checkable=True)
+        self._act_pts_critico = QAction(
+            "Mostrar punto crítico", self, checkable=True)
+        self._act_pts_cricond.setChecked(True)
+        for a in (self._act_pts_cricond, self._act_pts_critico):
+            self._grp_puntos.addAction(a)
+            m_graf.addAction(a)
+        self._act_pts_cricond.triggered.connect(
+            lambda: self._set_modo_puntos_env('cricond'))
+        self._act_pts_critico.triggered.connect(
+            lambda: self._set_modo_puntos_env('critico'))
+
         # ── Herramientas ─────────────────────────────────────
         m_herr = menubar.addMenu("&Herramientas")
         m_herr.addAction(_act("&Asociar archivos .tpsim con este programa",
@@ -1884,6 +1903,20 @@ class MainWindow(QMainWindow):
             w = getattr(win, '_widget', None)
             if w is not None and hasattr(w, 'set_cursor'):
                 try: w.set_cursor(self._cursor_activo)
+                except Exception: pass
+
+    def _set_modo_puntos_env(self, modo):
+        """Elige qué puntos especiales muestran las envolventes: cricondentérmica
+        + cricondenbárica ('cricond') o punto crítico ('critico')."""
+        self._modo_puntos_env = 'critico' if modo == 'critico' else 'cricond'
+        self._aplicar_modo_puntos_tabs()
+
+    def _aplicar_modo_puntos_tabs(self):
+        modo = getattr(self, '_modo_puntos_env', 'cricond')
+        for win in self._subventanas.values():
+            w = getattr(win, '_widget', None)
+            if w is not None and hasattr(w, 'set_modo_puntos'):
+                try: w.set_modo_puntos(modo)
                 except Exception: pass
 
     def _cambiar_idioma(self, lang):
@@ -2567,6 +2600,10 @@ class MainWindow(QMainWindow):
         w = getattr(win, '_widget', None)
         if w is not None and hasattr(w, 'set_cursor'):
             try: w.set_cursor(getattr(self, '_cursor_activo', False))
+            except Exception: pass
+        # La ventana nace con el modo de puntos especiales actual
+        if w is not None and hasattr(w, 'set_modo_puntos'):
+            try: w.set_modo_puntos(getattr(self, '_modo_puntos_env', 'cricond'))
             except Exception: pass
         return win
 

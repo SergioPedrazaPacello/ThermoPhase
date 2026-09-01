@@ -288,6 +288,9 @@ class TabEnvolvente(QWidget):
         self.iso_worker=None
         self.regiones_worker=None
         self._regiones=None      # Resultado de rf.ejecutar_completo o None
+        # Modo de puntos especiales en el panel: 'cricond' (cricondentérmica +
+        # cricondenbárica, por defecto) o 'critico' (punto crítico P y T).
+        self._modo_puntos='cricond'
         self._build()
 
     def _build(self):
@@ -1121,16 +1124,54 @@ class TabEnvolvente(QWidget):
         self.ax.draw_artist(self._hover_annot)
         self.canvas.blit(self.ax.bbox)
 
+    def set_modo_puntos(self, modo):
+        """Cambia qué puntos especiales muestra el panel lateral:
+          • 'cricond' → Cricondentérmica + Cricondenbárica (por defecto)
+          • 'critico' → Punto crítico (T y P)
+        Mantiene la misma estética: el crítico ocupa exactamente las dos filas
+        que usaban la cricondentérmica/barrica.
+        """
+        modo = 'critico' if modo == 'critico' else 'cricond'
+        if modo == getattr(self, '_modo_puntos', 'cricond'):
+            return
+        self._modo_puntos = modo
+        import idioma as _i18n
+        # Reetiquetar las dos filas según el modo (base sin unidad).
+        base_T = "T crítica" if modo == 'critico' else "Cricondentérmica"
+        base_P = "P crítica" if modo == 'critico' else "Cricondenbárica"
+        lblT = self.res_lbl_widgets.get('cric_T')
+        lblP = self.res_lbl_widgets.get('cric_P')
+        if lblT is not None:
+            lblT.setProperty("_base", base_T)
+            lblT.setText(f"{_i18n.t(base_T)} ({_u.u('T')}):")
+        if lblP is not None:
+            lblP.setProperty("_base", base_P)
+            lblP.setText(f"{_i18n.t(base_P)} ({_u.u('P')}):")
+        # Recalcular los valores mostrados con el resultado actual.
+        if getattr(self, 'result', None) is not None:
+            try: self._update_results(self.result)
+            except Exception: pass
+
     def _update_results(self,res):
         burb=res.get('burbuja',[]); rocio=res.get('rocio',[])
         def fv(v): return f"{v:.1f}" if v is not None else ""
         Tb=[_u.t_desde_R(t) for _,t in burb]; Pb=[_u.p_desde_psia(p) for p,_ in burb]
         Td=[_u.t_desde_R(t) for _,t in rocio]; Pd=[_u.p_desde_psia(p) for p,_ in rocio]
         all_T=Tb+Td; all_P=Pb+Pd
-        # Cricondentérmica = T máxima de la envolvente
-        self.res_labels['cric_T'].setText(fv(max(all_T)) if all_T else "")
-        # Cricondenbárica = P máxima de la envolvente
-        self.res_labels['cric_P'].setText(fv(max(all_P)) if all_P else "")
+        if self._modo_puntos=='critico':
+            # Punto crítico (P y T) en las dos mismas filas.
+            crit=res.get('critico')
+            if crit is not None:
+                self.res_labels['cric_T'].setText(fv(_u.t_desde_R(crit[1])))
+                self.res_labels['cric_P'].setText(fv(_u.p_desde_psia(crit[0])))
+            else:
+                self.res_labels['cric_T'].setText("")
+                self.res_labels['cric_P'].setText("")
+        else:
+            # Cricondentérmica = T máxima de la envolvente
+            self.res_labels['cric_T'].setText(fv(max(all_T)) if all_T else "")
+            # Cricondenbárica = P máxima de la envolvente
+            self.res_labels['cric_P'].setText(fv(max(all_P)) if all_P else "")
 
     def exportar_csv(self):
         if not self.result: return

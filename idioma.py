@@ -255,6 +255,11 @@ TRAD = {
     "Cricondenbarica (psi):": "Cricondenbar (psi):",
     "Cricondentérmica": "Cricondentherm",
     "Cricondenbárica": "Cricondenbar",
+    "T crítica": "Critical T",
+    "P crítica": "Critical P",
+    "Mostrar cricondentérmica y cricondenbárica":
+        "Show cricondentherm and cricondenbar",
+    "Mostrar punto crítico": "Show critical point",
     "Línea de isocalidad N°1:": "Quality line No.1:",
     "Línea de isocalidad N°2:": "Quality line No.2:",
     "Línea de isocalidad N°3:": "Quality line No.3:",

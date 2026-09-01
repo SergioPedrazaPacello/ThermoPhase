@@ -597,16 +597,175 @@ def _bajar_burbuja_desde_critico(z, act, P_ini, max_pts, paso, crit=None):
     desc = pts[icrit:]                  # crítico → burbuja (descendente, arco)
     crit_ref = cr if cr is not None else (pts[icrit][0], pts[icrit][1])
     Pc = crit_ref[0]
+
+    # La burbuja descendente arranca en el crítico y debe BAJAR hacia la región
+    # de la burbuja-desde-abajo. En mezclas de TRANSICIÓN (p. ej. C1/C9 70/30,
+    # C1/C7 75/25) el locus de burbuja post-crítico primero desciende de forma
+    # limpia y luego, al acercarse a la pared casi vertical de alta presión,
+    # la continuación se DISPARA a presiones absurdas (Tipo III divergente:
+    # P → ∞). Antes esto se rechazaba por completo (guarda max(Pd) > 60·Pc) y
+    # el hueco de burbuja quedaba sin cerrar. En su lugar se TRUNCA la rama en
+    # el punto donde empieza a divergir, conservando el tramo válido que sí
+    # baja desde el crítico: eso basta para cerrar la envolvente hasta donde
+    # empalma con la burbuja-desde-abajo.
+    P_techo = max(60.0 * max(Pc, 1.0), 12000.0)   # techo físico de recorte
+    desc_ok = []
+    P_prev = None
+    subiendo = 0
+    for (p, t) in desc:
+        if p > P_techo:                # se disparó por encima del techo → cortar
+            break
+        # Detectar divergencia sostenida: tras haber empezado a bajar, si la
+        # presión vuelve a subir de forma persistente es que entró en la rama
+        # divergente; se corta para no arrastrar la explosión numérica.
+        if P_prev is not None and p > P_prev * 1.02:
+            subiendo += 1
+            if subiendo >= 4 and p > 1.5 * Pc:
+                break
+        else:
+            subiendo = 0
+        desc_ok.append((p, t)); P_prev = p
+    desc = desc_ok
+
     Pd = [p[0] for p in desc]
-    # La burbuja descendente sólo es útil si DESCIENDE de verdad (baja hacia la
-    # región de la burbuja-desde-abajo) y no se dispara a presiones absurdas
-    # (Tipo III divergente: el locus se va al infinito → no cierra).
-    if not Pd or min(Pd) > 0.6*Pc or max(Pd) > 60.0*max(Pc, 1.0):
+    # Sólo es útil si quedó un tramo que DESCIENDE de verdad por debajo del
+    # crítico (baja hacia la región de la burbuja-desde-abajo).
+    if len(desc) < 3 or not Pd or min(Pd) > 0.6*Pc:
         return []
     # Devolver en orden de ARCO ascendente [estancamiento → cricondenbárica →
     # crítico]. NO se ordena por presión: la cricondenbárica suele estar por
     # ENCIMA del crítico, así que ordenar por P rompería la curva en el tope.
     return list(reversed(desc))
+
+
+def _cerrar_burbuja_por_bordes(z, act, P_desde, P_hasta, T_hint, crit):
+    """Reconstruye el tramo faltante de la rama de BURBUJA entre dos presiones
+    por bisección directa del borde bifásico→líquido, sin depender de la
+    continuación (que en mezclas de transición se dispara — Tipo III).
+
+    Para una malla de presiones entre P_desde (tope de la burbuja-desde-abajo)
+    y P_hasta (crítico), se halla en cada P la temperatura del borde de burbuja
+    (transición líquido↔bifásico por el lado de alta T de la banda) mediante el
+    test de estabilidad. Es determinista, robusto y cierra cualquier hueco que
+    los mecanismos de continuación no hayan podido cubrir.
+
+    Devuelve puntos (P, T) en orden de presión ASCENDENTE [P_desde → crítico],
+    o [] si no logra poblar un tramo utilizable.
+    """
+    if kij_g is None or P_hasta <= P_desde:
+        return []
+    from eos import analisis_estabilidad
+    zc = np.array(z, dtype=float)
+
+    def bif(T, P):
+        try:
+            return bool(analisis_estabilidad(zc, float(T), float(P), kij_g,
+                                             max_iter=40).get('inestable', False))
+        except Exception:
+            return False
+
+    def P_borde_sup(T, P_lo_lim, P_hi_lim):
+        """P del borde superior de la banda bifásica a T fija (líquido por encima
+        en P). Para la pared casi vertical de la cola de alta presión."""
+        # localizar una P bifásica
+        Pin = None
+        for P in np.linspace(P_lo_lim, P_hi_lim, 24):
+            if bif(T, P):
+                Pin = P
+        if Pin is None:
+            return None
+        lo, hi = Pin, min(P_hi_lim * 1.5, P_hi_lim + 3000.0)
+        if bif(T, hi):
+            return None                     # sigue bifásico arriba: no hay borde
+        for _ in range(20):
+            mid = 0.5 * (lo + hi)
+            if bif(T, mid):
+                lo = mid
+            else:
+                hi = mid
+        return hi
+
+    def T_borde_sup(P, T0, T_lo_lim, T_hi_lim):
+        """T del borde superior de la banda bifásica a P (líquido por encima).
+
+        La banda puede ser ancha y su borde superior estar lejos de la guía, así
+        que se localiza primero CUALQUIER T bifásica dentro de [T_lo_lim,
+        T_hi_lim] barriendo desde la guía hacia afuera, y luego se sube hasta el
+        borde con el líquido.
+        """
+        Tin = None
+        # búsqueda amplia de un punto dentro de la banda
+        pasos = [0]
+        d = 15.0
+        while d <= (T_hi_lim - T_lo_lim):
+            pasos.extend([d, -d]); d += 15.0
+        for dT in pasos:
+            Tt = T0 + dT
+            if T_lo_lim <= Tt <= T_hi_lim and bif(Tt, P):
+                Tin = Tt; break
+        if Tin is None:
+            return None
+        # subir hasta salir de la banda (líquido por encima)
+        Tup = Tin; ok = False
+        while Tup < T_hi_lim + 60.0:
+            Tup += 8.0
+            if not bif(Tup, P):
+                ok = True; break
+        if not ok:
+            return None
+        lo, hi = Tin, Tup
+        for _ in range(20):
+            mid = 0.5 * (lo + hi)
+            if bif(mid, P):
+                lo = mid
+            else:
+                hi = mid
+        return hi
+
+    n = 26
+    pts = []
+    # Guía inicial: cerca del crítico (borde superior arranca alto y baja al
+    # descender P). Límites amplios de T para no perder bandas anchas.
+    T_crit = crit[1] if crit else T_hint
+    T_lo_lim = min(T_hint, T_crit) - 120.0
+    T_hi_lim = max(T_hint, T_crit) + 120.0
+    T_prev = T_crit
+    # recorrer de ALTA P (cerca del crítico) hacia P_desde, así la guía sigue
+    # el borde de forma continua.
+    for k in range(n, 0, -1):
+        P = P_desde + (P_hasta - P_desde) * k / (n + 1)
+        Tb = T_borde_sup(P, T_prev, T_lo_lim, T_hi_lim)
+        if Tb is None:
+            continue
+        pts.append((P, Tb)); T_prev = Tb
+    pts.reverse()   # orden de P ascendente
+
+    # ── Pared vertical de la cola (borde de burbuja a T casi constante) ──────
+    # En mezclas muy ricas en metano (p. ej. C1/C9 0.95) la burbuja-desde-abajo
+    # se estanca a T baja y la rama de burbuja continúa como una pared casi
+    # VERTICAL: sube en presión a T≈constante. El barrido horizontal (borde en
+    # T) no la captura; se rellena buscando el borde superior de PRESIÓN a T
+    # fija, en un rango estrecho de T alrededor del estancamiento.
+    vert = []
+    if T_hint is not None:
+        # rango de P de la pared: del estancamiento hasta donde el borde en P
+        # deja de existir (tope de la cola). Se explora hasta P_hasta.
+        for T in np.linspace(T_hint - 20.0, T_hint + 40.0, 10):
+            Pb = P_borde_sup(T, max(P_desde * 0.5, 100.0), P_hasta)
+            if Pb is not None and Pb > P_desde:
+                vert.append((Pb, float(T)))
+    # combinar: la pared vertical (P ascendente) precede al borde horizontal.
+    combinado = sorted(vert + pts, key=lambda pt: pt[0])
+    # deduplicar por presión muy cercana
+    fin = []
+    for p, t in combinado:
+        if fin and abs(p - fin[-1][0]) < 1e-6:
+            continue
+        fin.append((p, t))
+    if len(fin) < 4:
+        return []
+    return fin
+
 
 
 def _completar_rocio_desde_critico(*_a, **_k):
@@ -1099,6 +1258,32 @@ def construir_envolvente(z, kij=None, progress_cb=None,
                 mj0, _ = _max_salto_P(envolvente)
                 mj1, _ = _max_salto_P(nueva)
                 if mj1 < mj0:
+                    envolvente = nueva
+
+    # ── GATE 3: cierre de respaldo por bisección de bordes ───────────────────
+    # Si tras las estrategias de continuación (GATE 2 / rama de alta presión) la
+    # envolvente TODAVÍA tiene un salto grande de presión (mezclas de TRANSICIÓN
+    # como C1/C9 0.95, C1/C7 0.75, donde el locus de burbuja post-crítico se
+    # dispara y ninguna continuación cierra), se reconstruye el tramo de burbuja
+    # faltante por bisección directa del borde bifásico→líquido. Es determinista
+    # y sólo actúa cuando de verdad falta cerrar: en envolventes ya cerradas el
+    # salto relativo es pequeño y este bloque no hace nada.
+    if crit is not None and len(envolvente) >= 4:
+        mj, idx_j = _max_salto_P(envolvente)
+        Ps_env = [p for p, _ in envolvente]
+        span = max(Ps_env) - min(Ps_env)
+        if span > 0 and mj > 0.15 * span and pts_burb:
+            # Tope de la burbuja-desde-abajo (donde se estancó) y crítico.
+            P_top = pts_burb[-1][0]; T_top = pts_burb[-1][1]
+            relleno = _cerrar_burbuja_por_bordes(
+                z, act, P_top, crit[0], T_top, crit)
+            if relleno and len(relleno) >= 4:
+                # Reordenar burbuja-abajo + relleno + crítico + rocío.
+                burb_full = list(pts_burb) + list(relleno)
+                nueva = burb_full + [crit] + list(reversed(pts_dew))
+                nueva = _despike(nueva, cos_min=-0.40, proteger=crit)
+                mj1, _ = _max_salto_P(nueva)
+                if mj1 < mj:
                     envolvente = nueva
 
     # ── Crítico estimado (si ambas ramas fallaron en detectarlo) ─────────────
