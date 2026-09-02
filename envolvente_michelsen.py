@@ -638,6 +638,237 @@ def _bajar_burbuja_desde_critico(z, act, P_ini, max_pts, paso, crit=None):
     return list(reversed(desc))
 
 
+def _envolvente_por_banda(z, act, crit, P_ini=14.7):
+    """Reconstruye la envolvente COMPLETA por bisección del borde de la banda
+    bifásica (test de estabilidad), cuando el trazador por continuación falla
+    (crítico falso, tramos rectos). Para cada presión desde P_ini hasta el
+    crítico se localizan los bordes inferior (burbuja) y superior (rocío) de la
+    banda en T; ambos convergen en el crítico. Determinista y robusto para las
+    mezclas asimétricas problemáticas.
+
+    Devuelve (env_pts, crit) con env_pts recorriendo burbuja (P baja→crítico) +
+    crítico + rocío (crítico→P baja), o (None, None) si no se puebla bien.
+    """
+    if kij_g is None or crit is None:
+        return None, None, None, None
+    from eos import analisis_estabilidad
+    zc = np.array(z, dtype=float)
+    Pc, Tc = crit
+
+    def bordes(P, g_lo=None, g_hi=None):
+        """(Tmin, Tmax) del DOMO bifásico a P, o None si monofásico.
+
+        Barre T en una ventana centrada en la Tc del crítico. Cuando se dan
+        guías (bordes del punto de presión anterior), se selecciona el borde
+        inferior/superior CONTINUO con ellas, evitando saltar a la cola fría de
+        baja T que coexiste a presiones intermedias en estas mezclas.
+        """
+        frac = 1.0 - min(P / max(Pc, 1.0), 1.0)
+        half = 200.0 + 420.0 * frac
+        Tlo_lim = max(Tc - half, 150.0)
+        Thi_lim = Tc + half
+        bif = []
+        for T in np.arange(Tlo_lim, Thi_lim, 18.0):
+            try:
+                if analisis_estabilidad(zc, float(T), float(P), kij_g,
+                                        max_iter=30).get('inestable', False):
+                    bif.append(T)
+            except Exception:
+                pass
+        if not bif:
+            return None
+        bif.sort()
+        bloques = [[bif[0]]]
+        for T in bif[1:]:
+            if T - bloques[-1][-1] <= 40.0:
+                bloques[-1].append(T)
+            else:
+                bloques.append([T])
+
+        def inside(T):
+            try:
+                return analisis_estabilidad(zc, float(T), float(P), kij_g,
+                        max_iter=30).get('inestable', False)
+            except Exception:
+                return False
+        def refina(Tin, Tout):
+            lo, hi = Tin, Tout
+            for _ in range(10):
+                mid = 0.5*(lo+hi)
+                if inside(mid): lo = mid
+                else:           hi = mid
+            return 0.5*(lo+hi)
+
+        if g_lo is not None and g_hi is not None:
+            # Con guía: el domo es el bloque cuyo rango [min,max] se solapa o
+            # está más cerca del intervalo guía [g_lo, g_hi]. Esto mantiene la
+            # continuidad y descarta la cola fría (lejos de la guía).
+            def dist_guia(b):
+                c = 0.5*(b[0]+b[-1]); cg = 0.5*(g_lo+g_hi)
+                return abs(c - cg)
+            blq = min(bloques, key=dist_guia)
+            # Puede que el domo haya quedado partido: unir bloques cuyo centro
+            # esté dentro de la envergadura de la guía ± margen.
+            margen = 0.5*(g_hi - g_lo) + 120.0
+            cg = 0.5*(g_lo+g_hi)
+            sel = [b for b in bloques if abs(0.5*(b[0]+b[-1]) - cg) <= margen]
+            if sel:
+                Tlo = min(b[0] for b in sel); Thi = max(b[-1] for b in sel)
+            else:
+                Tlo, Thi = blq[0], blq[-1]
+        else:
+            # Sin guía (primer punto, junto al crítico): domo = bloque(s) ancho(s)
+            anchos = [b for b in bloques if (b[-1] - b[0]) >= 40.0] or bloques
+            Tlo = min(b[0] for b in anchos)
+            Thi = max(b[-1] for b in anchos)
+
+        Tlo_r = refina(Tlo, Tlo-18.0)
+        Thi_r = refina(Thi, Thi+18.0)
+        return (Tlo_r, Thi_r)
+
+    # Recorrer de ALTA P (crítico) hacia ABAJO, usando los bordes del punto
+    # anterior como guía. Así el borde de burbuja se sigue de forma CONTINUA
+    # desde el crítico (donde es inequívoco) y no salta a la cola fría de baja
+    # temperatura, que en estas mezclas coexiste a presiones intermedias.
+    n = 44
+    burb = []
+    dew  = []
+    P_top = Pc * 0.985
+    g_lo, g_hi = None, None       # guías de borde inferior/superior
+    Ps = [Pc*f for f in (0.999, 0.997, 0.994, 0.990)]
+    Ps += [P_ini + (P_top - P_ini) * k / n for k in range(n, -1, -1)]
+    for P in Ps:
+        b = bordes(P, g_lo, g_hi)
+        if b is None:
+            continue
+        Tlo, Thi = b
+        if Thi - Tlo < 4.0:            # prácticamente en el crítico
+            continue
+        burb.append((P, Tlo)); dew.append((P, Thi))
+        g_lo, g_hi = Tlo, Thi
+    if len(burb) < 6 or len(dew) < 6:
+        return None, None, None, None
+    burb.sort(key=lambda pt: pt[0])
+    dew.sort(key=lambda pt: pt[0])
+
+    # Filtro de continuidad: eliminar puntos aislados que rompen la suavidad de
+    # la rama en T (p. ej. un punto que cae a la cola fría). Se compara cada
+    # punto interior con la interpolación lineal de sus vecinos; si se desvía
+    # más de un umbral se descarta.
+    def _suavizar(rama):
+        if len(rama) < 3:
+            return rama
+        out = [rama[0]]
+        for i in range(1, len(rama) - 1):
+            p0, t0 = out[-1]
+            p1, t1 = rama[i]
+            p2, t2 = rama[i+1]
+            if p2 != p0:
+                t_interp = t0 + (t2 - t0) * (p1 - p0) / (p2 - p0)
+                if abs(t1 - t_interp) > 90.0:      # desvío grande → punto espurio
+                    continue
+            out.append(rama[i])
+        out.append(rama[-1])
+        return out
+    burb = _suavizar(burb)
+    dew  = _suavizar(dew)
+    if len(burb) < 6 or len(dew) < 6:
+        return None, None, None, None
+
+    env = list(burb) + [(Pc, Tc)] + list(reversed(dew))
+    return env, (Pc, Tc), burb, dew
+
+
+def _critico_por_cierre_banda(z, act, crit_ini):
+    """Localiza la presión donde la banda bifásica se CIERRA (ancho en T → 0)
+    en torno al crítico, usando el test de estabilidad, para corregir un crítico
+    mal detectado. Ventana de T FIJA alrededor de la Tc original: a presiones
+    altas existe la cola fría de baja T que no es el domo a cerrar; seguir su
+    centro descarrilaría la detección.
+
+    Devuelve (Pc, Tc) corregido, o crit_ini si la banda ya estaba cerrada por
+    encima del crítico (crítico correcto) o si no se pudo mejorar.
+    """
+    if kij_g is None or crit_ini is None:
+        return crit_ini
+    from eos import analisis_estabilidad
+    zc = np.array(z, dtype=float)
+    Pc0, Tc0 = crit_ini
+    T_win = 250.0
+
+    def ancho_banda(P):
+        Tlo = max(Tc0 - T_win, 100.0); Thi = Tc0 + T_win
+        bif = []
+        for T in np.arange(Tlo, Thi, 6.0):
+            try:
+                if analisis_estabilidad(zc, float(T), float(P), kij_g,
+                                        max_iter=40).get('inestable', False):
+                    bif.append(T)
+            except Exception:
+                pass
+        if not bif:
+            return 0.0, None
+        return (max(bif) - min(bif)), 0.5*(max(bif)+min(bif))
+
+    anc, _ = ancho_banda(Pc0 * 1.08)
+    if anc < 60.0:                      # banda ya cerrada: crítico correcto
+        return crit_ini
+
+    P = Pc0 * 1.08
+    P_open = P; P_closed = None; T_cen_open = Tc0
+    P_lim = Pc0 * 5.0 + 3000.0
+    while P < P_lim:
+        anc, Tcen = ancho_banda(P)
+        if anc <= 0.0:
+            P_closed = P; break
+        P_open = P
+        if Tcen is not None:
+            T_cen_open = Tcen
+        P *= 1.10
+    if P_closed is None:
+        return crit_ini
+
+    lo, hi = P_open, P_closed; T_c = T_cen_open
+    for _ in range(22):
+        mid = 0.5 * (lo + hi)
+        anc, Tcen = ancho_banda(mid)
+        if anc > 0.0:
+            lo = mid
+            if Tcen is not None:
+                T_c = Tcen
+        else:
+            hi = mid
+    return (lo, T_c)
+
+
+def _rellenar_burbuja_por_semillas(z, act, P_desde, P_hasta, semilla_fn, n=24):
+    """Traza la rama de BURBUJA entre dos presiones sembrando el punto de
+    saturación a presiones crecientes y resolviéndolo por Newton (no por
+    bisección de estabilidad). Cada semilla converge al borde de burbuja real
+    a esa P, así que el tramo sigue la curva termodinámica correcta aunque la
+    marcha por continuación se haya atascado en un punto de retorno.
+
+    Devuelve puntos (P, T) en orden de presión ASCENDENTE, o [] si el tramo no
+    es utilizable.
+    """
+    if kij_g is None or P_hasta <= P_desde:
+        return []
+    m = len(act)
+    pts = []
+    for k in range(1, n + 1):
+        P = P_desde + (P_hasta - P_desde) * k / (n + 1)
+        Xs = semilla_fn(z, act, P)
+        if Xs is None:
+            continue
+        Xr, ok = _resolver_punto(Xs, z, act, ('coord', m+1, np.log(P)), tol=1e-8)
+        if ok and np.all(np.isfinite(Xr)) and Xr[m] > 0:
+            pts.append((np.exp(Xr[m+1]), np.exp(Xr[m])))
+    if len(pts) < 3:
+        return []
+    pts.sort(key=lambda pt: pt[0])
+    return pts
+
+
 def _cerrar_burbuja_por_bordes(z, act, P_desde, P_hasta, T_hint, crit):
     """Reconstruye el tramo faltante de la rama de BURBUJA entre dos presiones
     por bisección directa del borde bifásico→líquido, sin depender de la
@@ -1294,6 +1525,40 @@ def construir_envolvente(z, kij=None, progress_cb=None,
     if crit is None and len(envolvente) >= 4:
         idx_pmax = max(range(len(envolvente)), key=lambda i: envolvente[i][0])
         crit = envolvente[idx_pmax]
+
+    # ── Corrección QUIRÚRGICA final de envolvente defectuosa ─────────────────
+    # Se evalúa sobre la envolvente YA ENSAMBLADA (tras rama de alta presión y
+    # los GATE de cierre). En composiciones puntuales (p. ej. C1/C9 65/35, 66/34)
+    # todos los mecanismos previos dejan aún un salto grande en TEMPERATURA
+    # porque el crítico quedó FALSO (la banda bifásica sigue abierta por encima).
+    # Las mezclas que SÍ cerraron bien (70/30, 90/10) llegan aquí con salto en T
+    # pequeño y no se tocan. Cuando el salto persiste, se localiza el crítico
+    # verdadero (cierre de banda) y se RECONSTRUYE la envolvente por bisección
+    # del borde de la banda bifásica — determinista y físicamente correcto.
+    if crit is not None and len(envolvente) >= 8 and not casi_ideal:
+        try:
+            Ts_e = [t for _, t in envolvente]
+            spanT = max(Ts_e) - min(Ts_e)
+            maxdT = max(abs(envolvente[i][1] - envolvente[i-1][1])
+                        for i in range(1, len(envolvente)))
+            if spanT > 0 and maxdT / spanT > 0.10:
+                crit_corr = _critico_por_cierre_banda(z, act, crit)
+                if crit_corr is not None and crit_corr[0] > crit[0] * 1.05:
+                    env_bnd, crit_bnd, burb_bnd, dew_bnd = _envolvente_por_banda(
+                        z, act, crit_corr,
+                        P_ini=max(P_ini, 60.0))
+                    if env_bnd is not None and len(env_bnd) >= 12:
+                        eb = _despike(env_bnd, cos_min=-0.40, proteger=crit_corr)
+                        Tb = [t for _, t in eb]
+                        spb = max(Tb) - min(Tb)
+                        mdb = max(abs(eb[i][1] - eb[i-1][1])
+                                  for i in range(1, len(eb)))
+                        # aceptar sólo si reduce sustancialmente el salto en T
+                        if spb > 0 and mdb / spb < 0.6 * (maxdT / spanT):
+                            envolvente = eb
+                            crit = crit_corr
+        except Exception:
+            pass
 
     return {'envolvente': envolvente, 'critico': crit}
 
