@@ -257,6 +257,10 @@ TRAD = {
     "Cricondenbárica": "Cricondenbar",
     "T crítica": "Critical T",
     "P crítica": "Critical P",
+    "HHV masico [BTU/lb]": "HHV mass [BTU/lb]",
+    "LHV masico [BTU/lb]": "LHV mass [BTU/lb]",
+    "HHV volumetrico [BTU/pie3]": "HHV volumetric [BTU/ft3]",
+    "LHV volumetrico [BTU/pie3]": "LHV volumetric [BTU/ft3]",
     "Mostrar cricondentérmica y cricondenbárica":
         "Show cricondentherm and cricondenbar",
     "Mostrar punto crítico": "Show critical point",

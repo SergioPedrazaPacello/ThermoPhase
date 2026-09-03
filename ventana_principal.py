@@ -220,6 +220,10 @@ PROP_RESUMEN = [
     ('entalpia',    'Entalpia molar',              'H',    2, True),
     ('entropia',    'Entropia molar',              'S',    4, True),
     ('viscosidad',  'Viscosidad',                  'visc', 5, False),
+    ('hhv_mas',     'HHV masico [BTU/lb]',         None,   1, True),
+    ('lhv_mas',     'LHV masico [BTU/lb]',         None,   1, True),
+    ('hhv_vol',     'HHV volumetrico [BTU/pie3]',  None,   1, True),
+    ('lhv_vol',     'LHV volumetrico [BTU/pie3]',  None,   1, True),
 ]
 PROP_DEFAULT = ['frac_molar', 'frac_masica', 'sg', 'densidad', 'z', 'pm']
 _PROP_DEF = {d[0]: d for d in PROP_RESUMEN}
@@ -1077,6 +1081,19 @@ class TabEquilibrio(QWidget):
         def cv(val, ok, d=4):
             return f(val, d) if (val is not None and ok) else ""
         mu_v = r.get('mu_v'); mu_l = r.get('mu_l')   # viscosidad (cP)
+
+        # ── Poder calorífico (GPSA-87) por fase ──────────────────────────────
+        # Vapor → composición y; Líquido → x; Mezcla → z global. HHV/LHV en base
+        # másica (BTU/lb) y volumétrica (BTU/pie³ gas ideal, 60 °F, 14.696 psia).
+        import poder_calorifico as _pc
+        z_glob = r.get('z')
+        pcv = _pc.poder_calorifico_fase(y, r.get('PM_v')) if y is not None else {}
+        pcl = _pc.poder_calorifico_fase(x, r.get('PM_l')) if x is not None else {}
+        pcz = _pc.poder_calorifico_fase(z_glob, r.get('PM_z')) if z_glob else {}
+        def pcf(d, key, ok=True, dg=1):
+            v = d.get(key) if d else None
+            return f(v, dg) if (v is not None and ok) else ""
+
         valores = {
             'frac_molar':  ("",          cv(V, vap_ok),  cv(L, liq_ok)),
             'frac_masica': ("",          cv(Vm, vap_ok), cv(Lm, liq_ok)),
@@ -1087,6 +1104,10 @@ class TabEquilibrio(QWidget):
             'entalpia':    (f(Hs, 2),    cv(Hv, vap_ok, 2),cv(Hl, liq_ok, 2)),
             'entropia':    (f(Ss),       cv(Sv, vap_ok), cv(Sl, liq_ok)),
             'viscosidad':  ("",          cv(mu_v, vap_ok, 5),cv(mu_l, liq_ok, 5)),
+            'hhv_mas':     (pcf(pcz,'hhv_mas'), pcf(pcv,'hhv_mas',vap_ok), pcf(pcl,'hhv_mas',liq_ok)),
+            'lhv_mas':     (pcf(pcz,'lhv_mas'), pcf(pcv,'lhv_mas',vap_ok), pcf(pcl,'lhv_mas',liq_ok)),
+            'hhv_vol':     (pcf(pcz,'hhv_vol'), pcf(pcv,'hhv_vol',vap_ok), pcf(pcl,'hhv_vol',liq_ok)),
+            'lhv_vol':     (pcf(pcz,'lhv_vol'), pcf(pcv,'lhv_vol',vap_ok), pcf(pcl,'lhv_vol',liq_ok)),
         }
         self._rebuild_resumen(valores)
 

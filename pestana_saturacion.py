@@ -34,6 +34,12 @@ _PROP_SAT = [
     ('entalpia',   'Entalpia molar',            'H',    2, 'H_v',   'H_l',   'H'),
     ('entropia',   'Entropia molar',            'S',    4, 'S_v',   'S_l',   'S'),
     ('viscosidad', 'Viscosidad',                'visc', 5, 'mu_v',  'mu_l',  None),
+    # Poder calorífico (GPSA-87). Se calcula desde la composición de cada fase
+    # (marcador 'PCAL:<clave>'); no proviene del dict 'props'.
+    ('hhv_mas',    'HHV masico [BTU/lb]',       None,   1, 'PCAL:hhv_mas', 'PCAL:hhv_mas', None),
+    ('lhv_mas',    'LHV masico [BTU/lb]',       None,   1, 'PCAL:lhv_mas', 'PCAL:lhv_mas', None),
+    ('hhv_vol',    'HHV volumetrico [BTU/pie3]',None,   1, 'PCAL:hhv_vol', 'PCAL:hhv_vol', None),
+    ('lhv_vol',    'LHV volumetrico [BTU/pie3]',None,   1, 'PCAL:lhv_vol', 'PCAL:lhv_vol', None),
 ]
 _PROP_SAT_DEF = {d[0]: d for d in _PROP_SAT}
 # Seleccion por defecto = las 6 propiedades que la pestaña muestra hoy.
@@ -699,14 +705,23 @@ class TabSaturacion(QWidget):
 
         # Llenar panel de propiedades (solo las seleccionadas, en orden)
         p=res.get('props',{})
+        # Poder calorífico (GPSA-87) de vapor y líquido a partir de composición.
+        import poder_calorifico as _pc
+        _pc_v = _pc.poder_calorifico_fase(y, p.get('PM_v'))
+        _pc_l = _pc.poder_calorifico_fase(x, p.get('PM_l'))
+        def _valor_prop(kf, phase_pc):
+            """Resuelve el valor de una propiedad: marcador PCAL o key de props."""
+            if isinstance(kf, str) and kf.startswith('PCAL:'):
+                return phase_pc.get(kf.split(':', 1)[1])
+            return _conv_prop(conv, p.get(kf))
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
             unidad = f" [{_u.u(mag)}]" if mag else ""
             it_lbl = self.tbl_prop.item(r, 0)
             if it_lbl is not None:
                 it_lbl.setText(f"{_i18n.t(base)}{unidad}:")
-            vv = _conv_prop(conv, p.get(kv))
-            vl = _conv_prop(conv, p.get(kl))
+            vv = _valor_prop(kv, _pc_v)
+            vl = _valor_prop(kl, _pc_l)
             fmt = f"{{:.{dec}f}}"
             self.tbl_prop.item(r,1).setText(fmt.format(vv) if vv is not None else "")
             self.tbl_prop.item(r,2).setText(fmt.format(vl) if vl is not None else "")
