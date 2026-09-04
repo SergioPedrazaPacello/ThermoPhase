@@ -151,3 +151,54 @@ def poder_calorifico_fase(frac, PM=None):
 
     return {'hhv_vol': hhv_vol, 'lhv_vol': lhv_vol,
             'hhv_mas': hhv_mas, 'lhv_mas': lhv_mas}
+
+
+# ── GPM — contenido líquido (riqueza) del gas, C3+ ──────────────────────────
+# GPM = galones de líquido recuperables por cada 1000 pie³ (normales) de gas.
+# Se calcula sobre la fase GAS (vapor). Fórmula (GPSA / "Ingeniería de gas",
+# ec. 160):
+#     GPM = Σ (1000 · yᵢ · galᵢ_por_lbmol) / Vm
+# donde galᵢ_por_lbmol es el volumen de líquido (galones) que produce un lbmol
+# del componente i (columna "gal/lbs.mol" de GPSA-87, densidad de líquido a
+# 60 °F, 14.696 psia) y Vm es el volumen molar del gas ideal a 60 °F.
+#
+# Convención GPM C3+: se suman propano y componentes más pesados. Metano,
+# etano, N₂ y CO₂ no se recuperan como líquido y quedan fuera (factor 0).
+#
+# Orden canónico: N₂, CO₂, C1, C2, C3, iC4, nC4, iC5, nC5, C6, C7, C8, C9.
+# Valores gal/lbmol (GPSA-87, componentes normales):
+#   C3=10.433  iC4=12.386  nC4=11.937  iC5=13.853  nC5=13.712
+#   C6(n-hexano)=15.571  C7(n-heptano)=17.464  C8(n-octano)=19.381
+#   C9(n-nonano)=21.311
+GAL_POR_LBMOL = [
+    0.0,      # N₂   (no recuperable)
+    0.0,      # CO₂  (no recuperable)
+    0.0,      # C1   (fuera de C3+)
+    0.0,      # C2   (fuera de C3+)
+    10.433,   # C3
+    12.386,   # iC4
+    11.937,   # nC4
+    13.853,   # iC5
+    13.712,   # nC5
+    15.571,   # C6
+    17.464,   # C7
+    19.381,   # C8
+    21.311,   # C9
+]
+
+
+def gpm_c3(frac):
+    """GPM (galones por 1000 pie³ de gas) de la fase, componentes C3+.
+
+    frac: fracciones molares de la fase GAS (vapor). Devuelve el GPM en
+    gal/1000 pie³, o None si la composición no es utilizable.
+    """
+    if frac is None:
+        return None
+    z = np.asarray(frac, dtype=float)
+    s = z.sum()
+    if s <= 0:
+        return None
+    z = z / s
+    gpm = float(np.dot(z, GAL_POR_LBMOL[:len(z)])) * 1000.0 / VM_IDEAL
+    return gpm

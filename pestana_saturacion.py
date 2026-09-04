@@ -40,6 +40,8 @@ _PROP_SAT = [
     ('lhv_mas',    'LHV masico [BTU/lb]',       None,   1, 'PCAL:lhv_mas', 'PCAL:lhv_mas', None),
     ('hhv_vol',    'HHV volumetrico [BTU/pie3]',None,   1, 'PCAL:hhv_vol', 'PCAL:hhv_vol', None),
     ('lhv_vol',    'LHV volumetrico [BTU/pie3]',None,   1, 'PCAL:lhv_vol', 'PCAL:lhv_vol', None),
+    # GPM C3+ solo en fase vapor (marcador GPM:vapor); líquido vacío.
+    ('gpm',        'GPM C3+ [gal/1000pie3]',    None,   4, 'GPM:v', 'GPM:none', None),
 ]
 _PROP_SAT_DEF = {d[0]: d for d in _PROP_SAT}
 # Seleccion por defecto = las 6 propiedades que la pestaña muestra hoy.
@@ -709,10 +711,13 @@ class TabSaturacion(QWidget):
         import poder_calorifico as _pc
         _pc_v = _pc.poder_calorifico_fase(y, p.get('PM_v'))
         _pc_l = _pc.poder_calorifico_fase(x, p.get('PM_l'))
+        _gpm_v = _pc.gpm_c3(y)
         def _valor_prop(kf, phase_pc):
-            """Resuelve el valor de una propiedad: marcador PCAL o key de props."""
+            """Resuelve el valor de una propiedad: marcador PCAL/GPM o key props."""
             if isinstance(kf, str) and kf.startswith('PCAL:'):
                 return phase_pc.get(kf.split(':', 1)[1])
+            if isinstance(kf, str) and kf.startswith('GPM:'):
+                return _gpm_v if kf == 'GPM:v' else None
             return _conv_prop(conv, p.get(kf))
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):

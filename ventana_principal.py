@@ -224,6 +224,7 @@ PROP_RESUMEN = [
     ('lhv_mas',     'LHV masico [BTU/lb]',         None,   1, True),
     ('hhv_vol',     'HHV volumetrico [BTU/pie3]',  None,   1, True),
     ('lhv_vol',     'LHV volumetrico [BTU/pie3]',  None,   1, True),
+    ('gpm',         'GPM C3+ [gal/1000pie3]',      None,   4, False),
 ]
 PROP_DEFAULT = ['frac_molar', 'frac_masica', 'sg', 'densidad', 'z', 'pm']
 _PROP_DEF = {d[0]: d for d in PROP_RESUMEN}
@@ -1090,8 +1091,11 @@ class TabEquilibrio(QWidget):
         pcv = _pc.poder_calorifico_fase(y, r.get('PM_v')) if y is not None else {}
         pcl = _pc.poder_calorifico_fase(x, r.get('PM_l')) if x is not None else {}
         pcz = _pc.poder_calorifico_fase(z_glob, r.get('PM_z')) if z_glob else {}
+        gpm_v = _pc.gpm_c3(y) if y is not None else None
         def pcf(d, key, ok=True, dg=1):
             v = d.get(key) if d else None
+            return f(v, dg) if (v is not None and ok) else ""
+        def gpmf(v, ok, dg=4):
             return f(v, dg) if (v is not None and ok) else ""
 
         valores = {
@@ -1108,6 +1112,7 @@ class TabEquilibrio(QWidget):
             'lhv_mas':     (pcf(pcz,'lhv_mas'), pcf(pcv,'lhv_mas',vap_ok), pcf(pcl,'lhv_mas',liq_ok)),
             'hhv_vol':     (pcf(pcz,'hhv_vol'), pcf(pcv,'hhv_vol',vap_ok), pcf(pcl,'hhv_vol',liq_ok)),
             'lhv_vol':     (pcf(pcz,'lhv_vol'), pcf(pcv,'lhv_vol',vap_ok), pcf(pcl,'lhv_vol',liq_ok)),
+            'gpm':         ("",                 gpmf(gpm_v, vap_ok),        ""),
         }
         self._rebuild_resumen(valores)
 
