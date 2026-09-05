@@ -1,161 +1,218 @@
 # -*- coding: utf-8 -*-
 """
-Regla de mezcla de Huron-Vidal para mezclas hidrocarburo-agua.
+Regla de mezcla de Huron-Vidal para mezclas hidrocarburo-agua (método PVTsim).
 
-Basado en Lindeloff & Michelsen, "Phase Envelope Calculations for
-Hydrocarbon-Water Mixtures", SPE Journal, sept. 2003 (SPE 85971), que es el
-enfoque usado por PVTsim. La regla de mezcla original de Huron-Vidal (1979)
-con un modelo NRTL modificado para la energía de exceso G^E permite representar
-mezclas con componentes polares (agua) manteniendo la EOS cúbica clásica.
+Implementa la regla de mezcla original de Huron-Vidal (1979) con energías de
+interacción g_ij dependientes de la temperatura, tal como la usa PVTsim para
+el parámetro atractivo de la EOS en presencia de agua. Basado en Lindeloff &
+Michelsen, SPE 85971 (2003).
 
-Propiedad clave (requisito 4 del paper): con α_ij = 0 y los parámetros de
-energía g elegidos según las ecuaciones 6-8 del paper, la regla Huron-Vidal
-se REDUCE EXACTAMENTE a la regla de mezcla cuadrática clásica
+Regla (ec. 3-4 del paper):
+    a = b · [ Σ_i z_i (a_i/b_i)  −  G^E/ln2 ]
+    G^E/RT = Σ_i z_i · [ Σ_j τ_ji b_j z_j exp(-α_ji τ_ji) ]
+                       / [ Σ_k b_k z_k exp(-α_ki τ_ki) ]
+    τ_ji = (g_ji - g_ii)/(R T),   g_ii = -(a_i/b_i) ln2 (ec. 7)
 
-    a_m = Σ_i Σ_j z_i z_j √(a_i a_j)(1 - k_ij)
+Para pares HC-HC, PVTsim usa "Classic" (g_ij de la ec. 8 con α=0), que reduce
+HV a la regla cuadrática. Solo los pares con agua usan parámetros HV propios
+(matrices G0/GT y KIJHV extraídas de PVTsim). La dependencia con T es
+    g_ij(T) = G0_ij + GT_ij · (T[K] - 273.15)
+con T de referencia 0 °C (PVTsim usa °C para el término lineal).
 
-para los pares hidrocarburo-hidrocarburo. Solo los pares que involucran agua
-(HC-polar y polar-polar) usan parámetros de interacción propios.
-
-    IMPORTANTE — reducción exacta:
-    Este módulo se activa SOLO cuando el agua está presente en la mezcla. En
-    ausencia de agua, el motor sigue usando la regla cuadrática original de
-    eos.py y los resultados son idénticos bit a bit a los actuales. Esto
-    preserva toda la validación previa de los 13 componentes hidrocarburos.
-
-Ecuaciones implementadas (numeración del paper):
-    (3)  a = b · [ Σ z_i (a_i/b_i)  −  G^E/ln2 ]
-    (4)  G^E/RT = Σ_i z_i · [ Σ_j τ_ji b_j z_j exp(-α_ji τ_ji) ]
-                             / [ Σ_k b_k z_k exp(-α_ki τ_ki) ]
-    (5)  τ_ji = (g_ji - g_ii) / (R T)
-    (6)  α_ij = 0                       (para pares HC-HC → reducción cuadrática)
-    (7)  g_ii = -(a_i/b_i) ln2
-    (8)  g_ji = -2 √(b_i b_j)/(b_i+b_j) · √(g_ii g_jj) (1 - k_ij)
-
-Con (6)-(8), la ec. (3) devuelve la a_m cuadrática. Para pares con agua se
-usan α_ij y g_ij específicos (parámetros de interacción del agua, pendientes
-de calibrar contra PVTsim/HYSYS).
-
-NOTA: Los parámetros de interacción del agua (WATER_KIJ y WATER_ALPHA) son
-PRELIMINARES (valores de literatura). Se reemplazarán por los de PVTsim/HYSYS
-cuando estén disponibles, sin cambiar la estructura del cálculo.
+Los datos (G0, GT, KIJHV) provienen del reporte de PVTsim para PR y SRK, en el
+orden canónico N₂, CO₂, C1..C9, H₂O (índice 13 = agua).
 """
 
 import numpy as np
 
 LN2 = np.log(2.0)
-
-
-# ── Índice del agua en el orden canónico extendido ──────────────────────────
-# El agua se añade como componente 14 (índice 13), tras C9.
+R_GAS = 10.7316           # psia·ft³/(lbmol·°R)
+R_SI = 8.314             # J/(mol·K), para g en unidades consistentes con PVTsim
 IDX_AGUA = 13
 
+G0_PR = [
+    [0.0000, 539.8400, 186.0800, 605.5800, 954.3700, 1202.4300, 1292.0400, 1555.6600, 1639.7100, 1995.4700, 2319.5000, 2590.9600, 2902.5800, 5330.1800],
+    [-274.4900, 0.0000, -126.0700, 158.7700, 436.4800, 657.1900, 741.6000, 985.5100, 1056.5000, 1373.7000, 1663.0700, 1972.0700, 2279.0500, 4104.1300],
+    [-106.3600, 395.8300, 0.0000, 332.6200, 628.7900, 854.6100, 945.8600, 1193.4800, 1267.4100, 1586.7800, 1939.2400, 2262.1900, 2568.8000, 4629.5000],
+    [-227.7400, 139.7900, -208.2600, 0.0000, 220.0500, 404.6700, 480.3000, 695.9800, 760.1900, 1051.0400, 1356.1000, 1668.0700, 1934.2400, 4749.8500],
+    [-256.6800, 39.7600, -289.8200, -157.6900, 0.0000, 141.7500, 208.2200, 388.4400, 444.7100, 700.1900, 977.8100, 1238.9000, 1514.4600, 3625.1600],
+    [-257.7000, 11.3900, -313.0900, -222.1500, -107.3300, 0.0000, 61.5300, 211.5500, 261.9900, 485.0600, 726.7200, 975.8300, 1232.7100, 3196.4400],
+    [-289.0800, -25.1900, -342.8200, -267.5100, -161.8500, -59.4600, 0.0000, 146.0200, 195.2000, 414.5500, 660.1900, 899.8800, 1154.7600, 3194.7500],
+    [-289.9700, -45.7900, -359.7200, -316.3300, -246.1400, -173.9500, -118.4900, 0.0000, 43.9900, 232.5000, 446.2900, 670.4900, 906.3400, 2514.0200],
+    [-292.7400, -61.6300, -372.6100, -338.9500, -276.7000, -210.3300, -156.1300, -42.8300, 0.0000, 182.9000, 410.2600, 612.2500, 844.6700, 2513.9500],
+    [-266.5900, -74.0400, -382.8500, -377.7100, -350.8300, -316.8700, -266.4000, -183.9300, -146.7200, 0.0000, 158.9300, 371.4400, 579.7500, 2514.4600],
+    [-277.6700, -119.7700, -365.5000, -407.7600, -408.3200, -410.3200, -355.8600, -305.2500, -254.4600, -176.1800, 0.0000, 167.7400, 355.5000, 2646.3600],
+    [-317.0800, -121.6400, -353.4200, -406.6500, -458.0900, -472.0800, -427.0400, -391.9200, -363.3300, -274.5300, -143.1300, 0.0000, 166.4700, 2651.3600],
+    [-319.7700, -128.9800, -361.1200, -454.8000, -496.8500, -529.5100, -486.4800, -470.3800, -445.2300, -380.5300, -269.6800, -147.8400, 0.0000, 2649.4000],
+    [119.7400, -4247.2100, -557.6600, -1186.2600, -1633.1800, -612.4500, -608.8700, 728.1900, 726.4200, 720.1700, 1753.9100, 2069.7700, 2382.1200, 0.0000],
+]
 
-# ── Parámetros de interacción del agua (PRELIMINARES) ───────────────────────
-# k_ij del agua con cada componente HC + consigo misma. Valores típicos de
-# literatura para agua-hidrocarburo con PR (grandes, ~0.5, muy distintos de los
-# HC-HC). Se calibrarán contra PVTsim/HYSYS. Orden: N₂, CO₂, C1..C9, H₂O.
-# (Estos son marcadores; el agua-agua es 0.)
-WATER_KIJ_PRELIM = {
-    # componente_idx : k_ij(agua, componente)
-    0:  0.48,   # N₂ - H₂O
-    1:  0.20,   # CO₂ - H₂O  (menor, CO₂ algo soluble)
-    2:  0.50,   # C1 - H₂O
-    3:  0.50,   # C2 - H₂O
-    4:  0.50,   # C3 - H₂O
-    5:  0.50,   # iC4 - H₂O
-    6:  0.50,   # nC4 - H₂O
-    7:  0.50,   # iC5 - H₂O
-    8:  0.50,   # nC5 - H₂O
-    9:  0.50,   # C6 - H₂O
-    10: 0.50,   # C7 - H₂O
-    11: 0.50,   # C8 - H₂O
-    12: 0.50,   # C9 - H₂O
-    13: 0.00,   # H₂O - H₂O
-}
+GT_PR = [
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -6.1000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -6.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -6.5300],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -4.9300],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.2800],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -1.8500],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -1.8600],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [1.5300, 8.8000, 3.2600, 2.0400, -1.3400, 1.8000, 1.8200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+]
 
-# α_ij (nonrandomness) para pares con agua. α=0 reduce a cuadrática; para agua
-# se usa un valor típico NRTL (~0.2-0.3) que introduce el efecto de composición
-# local. PRELIMINAR.
-WATER_ALPHA_PRELIM = 0.0   # arranque conservador: α=0 → reducción cuadrática
-                           # incluso para el agua, hasta calibrar. Así la
-                           # Etapa 1 es un cambio estructural SIN efecto físico
-                           # nuevo todavía (validable como no-regresión).
+KIJHV_PR = [
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1474],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0285],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1444],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0855],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0654],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1168],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1170],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1465],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1464],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1459],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+]
+G0_SRK = [
+    [0.0000, 534.6900, 176.7500, 594.5300, 944.3500, 1192.2600, 1285.7300, 1553.1900, 1634.6200, 1997.1100, 2326.9400, 2610.8300, 2930.8500, 5193.8900],
+    [-257.4200, 0.0000, -128.9400, 147.7300, 423.6600, 643.4300, 729.2200, 973.7900, 1045.6500, 1365.2300, 1672.9900, 1974.5100, 2288.5500, 3932.0000],
+    [-99.3000, 387.1200, 0.0000, 331.6800, 629.2900, 855.5300, 949.0800, 1198.4300, 1273.6900, 1596.3900, 1947.8800, 2275.2800, 2591.7500, 4559.0000],
+    [-216.1800, 129.1400, -202.9800, 0.0000, 220.3200, 405.1600, 482.2000, 699.2000, 764.3600, 1057.9600, 1363.5300, 1681.3300, 1957.8600, 4671.9900],
+    [-244.8200, 26.6100, -283.8300, -158.1300, 0.0000, 142.4000, 209.8000, 391.4600, 448.5200, 706.7500, 986.1600, 1254.6500, 1536.7200, 3517.0000],
+    [-247.8400, -4.5500, -308.5200, -224.2300, -108.5300, 0.0000, 62.1600, 213.9300, 265.0800, 491.1100, 737.0600, 990.9500, 1254.1700, 3181.0000],
+    [-276.4900, -40.8900, -337.0900, -269.3100, -163.2500, -59.9600, 0.0000, 147.5000, 197.3100, 419.3200, 660.8900, 913.2500, 1174.2500, 3181.0000],
+    [-276.6400, -63.9100, -355.3400, -319.9100, -249.1900, -175.7900, -120.1000, 0.0000, 44.5300, 235.7700, 453.4300, 682.0900, 923.8300, 2507.0000],
+    [-283.0500, -79.9000, -367.9300, -342.5900, -279.9800, -212.4900, -158.1400, -43.3200, 0.0000, 185.5200, 402.9800, 617.5000, 861.1500, 2507.0000],
+    [-255.4100, -95.1800, -380.0800, -383.8500, -356.6000, -321.3100, -270.9700, -186.9300, -149.3300, 0.0000, 180.4000, 379.1400, 592.9100, 2507.0000],
+    [-267.3600, -129.1900, -370.3600, -420.0600, -418.9700, -417.1400, -371.1800, -311.0400, -273.6400, -161.3800, 0.0000, 171.6300, 364.4700, 2626.0600],
+    [-301.8700, -146.0700, -361.3600, -420.6500, -468.8800, -481.6400, -437.2200, -400.7900, -377.5200, -281.0400, -146.7700, 0.0000, 171.2200, 2628.5700],
+    [-305.2600, -155.4500, -368.3100, -467.5300, -510.2100, -541.8400, -499.6300, -482.4600, -457.2800, -390.6700, -277.3400, -152.1900, 0.0000, 2624.4000],
+    [73.4600, -4127.0000, -570.5000, -1128.0600, -1584.0000, -567.8000, -567.8000, 681.0000, 681.0000, 681.0000, 1711.9600, 2032.8700, 2352.1100, 0.0000],
+]
+
+GT_SRK = [
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -6.0500],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -5.8900],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -6.5400],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -5.0200],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -0.1000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -1.9300],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -1.9300],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [1.8500, 8.9000, 3.4600, 2.2900, -0.4400, 1.9700, 1.9700, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+]
+
+KIJHV_SRK = [
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1536],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0300],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1500],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0900],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0700],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1200],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1200],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1450],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1450],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.1450],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+]
 
 
-# ── Propiedades preliminares del agua (literatura) ──────────────────────────
-# Se reemplazarán por las de PVTsim/HYSYS. En unidades internas (°R, psia).
-AGUA_TC_R   = 1164.77      # 647.096 K → °R
-AGUA_PC_PSI = 3200.11      # 22.064 MPa → psia
-AGUA_OMEGA  = 0.3443
-AGUA_PM     = 18.0153
+# Propiedades preliminares del agua (se toman de flash_agua/eos en uso real).
+AGUA_TC_R = 1165.14
+AGUA_PC_PSI = 3203.73
+AGUA_OMEGA = 0.344
+AGUA_PM = 18.015
+
+
+def _g_matrix(eos, T_R):
+    """Matriz g_ij(T) de energías de interacción Huron-Vidal para la EOS dada.
+    g_ij(T) = G0_ij + GT_ij·(T_C), con T_C en °C. T_R en °R."""
+    import eos as _e
+    es_srk = _e.es_srk(eos)
+    G0 = np.array(G0_SRK if es_srk else G0_PR)
+    GT = np.array(GT_SRK if es_srk else GT_PR)
+    T_K = T_R/1.8
+    T_C = T_K - 273.15
+    return G0 + GT*T_C
+
+
+def _kij_hv(eos):
+    import eos as _e
+    return np.array(KIJHV_SRK if _e.es_srk(eos) else KIJHV_PR)
 
 
 def hay_agua(z, tol=1e-12):
-    """True si la composición incluye agua en fracción apreciable."""
     z = np.asarray(z, dtype=float)
     return len(z) > IDX_AGUA and z[IDX_AGUA] > tol
 
 
-def construir_g(ai, bi, kij_arr, alpha_water=WATER_ALPHA_PRELIM):
-    """Matrices g_ij y α_ij para la regla Huron-Vidal, a partir de los
-    parámetros de la EOS (ai·α(T) y bi) y la matriz k_ij extendida.
+def am_bm_hv(z, aa, bi, eos, T_R, kij_classic):
+    """Parámetro atractivo a_m y co-volumen b_m por Huron-Vidal.
 
-    Para pares HC-HC devuelve exactamente los g de las ecuaciones 7-8 con α=0,
-    lo que reproduce la regla cuadrática. Para pares con agua usa α = alpha_water.
-
-    ai, bi : arrays (N,) de a_i·α(T) y b_i.
-    kij_arr: matriz (N,N) de interacción binaria (incluye fila/col del agua).
-    Devuelve (g, alpha) matrices (N,N).
-    """
-    N = len(ai)
-    gii = -(ai / bi) * LN2                      # ec. 7 (diagonal)
-    g = np.zeros((N, N))
-    alpha = np.zeros((N, N))
-    for i in range(N):
-        g[i, i] = gii[i]
-    for i in range(N):
-        for j in range(N):
-            if i == j:
-                continue
-            # ec. 8: g_ji = -2 √(b_i b_j)/(b_i+b_j) √(g_ii g_jj)(1-k_ij)
-            fac = 2.0 * np.sqrt(bi[i]*bi[j]) / (bi[i]+bi[j])
-            g[j, i] = -fac * np.sqrt(gii[i]*gii[j]) * (1.0 - kij_arr[i, j])
-            # α: 0 para HC-HC; alpha_water si alguno es agua
-            if i == IDX_AGUA or j == IDX_AGUA:
-                alpha[j, i] = alpha_water
-    return g, alpha
-
-
-def am_huron_vidal(z, ai, bi, kij_arr, T, alpha_water=WATER_ALPHA_PRELIM):
-    """Parámetro atractivo a_m por la regla Huron-Vidal (ec. 3-4).
-
-    z  : fracciones molares (N,)
-    ai : a_i·α(T) (N,)
-    bi : b_i (N,)
-    kij_arr : matriz k_ij (N,N)
-    T  : temperatura (°R)
-    Devuelve a_m (float).
+    z: fracciones (14), aa: a_i·α(T), bi: b_i, kij_classic: matriz kij Classic
+    (para los pares HC-HC que se calculan por la reducción cuadrática).
+    Para pares con agua se usan las energías g de PVTsim.
     """
     z = np.asarray(z, dtype=float)
     N = len(z)
     bm = float(z @ bi)
-    g, alpha = construir_g(ai, bi, kij_arr, alpha_water)
-    R = 10.7316
-    tau = (g - np.diag(g).reshape(1, N)) / (R * T)   # τ_ji = (g_ji - g_ii)/RT
-    # G^E/RT (ec. 4)
-    E = np.exp(-alpha * tau)                          # exp(-α_ji τ_ji)
-    num = (tau * (bi.reshape(1, N) * z.reshape(1, N)) * E)   # τ_ji b_j z_j exp(...)
-    # sumas por columna i: Σ_j
+
+    # g_ii de la ec. 7 (diagonal, base de la reducción cuadrática)
+    gii = -(aa/bi)*LN2
+    # matriz g: HC-HC por ec. 8 (reduce a cuadrático); pares con agua por PVTsim
+    g = np.zeros((N, N))
+    for i in range(N):
+        g[i, i] = gii[i]
+    # τ_ji = (g_ji - g_ii)/(R T). Para pares con agua, g de PVTsim está en
+    # cal/mol → τ_pvt = g_pvt/(Rcal·T_K). Para HC-HC, g está en base R_GAS·T_R.
+    Rcal = 1.98721                  # cal/(mol·K)
+    T_K = T_R/1.8
+    g_pvt = _g_matrix(eos, T_R)     # cal/mol
+    tau = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            if i == j:
+                continue
+            if i == IDX_AGUA or j == IDX_AGUA:
+                tau[j, i] = g_pvt[j, i]/(Rcal*T_K)
+            else:
+                fac = 2.0*np.sqrt(bi[i]*bi[j])/(bi[i]+bi[j])
+                g_ji = -fac*np.sqrt(gii[i]*gii[j])*(1.0 - kij_classic[i, j])
+                tau[j, i] = (g_ji - gii[i])/(R_GAS*T_R)
+    # α: 0 para HC-HC; para agua, α NRTL de PVTsim (~0.3).
+    # α: 0 para HC-HC (reduce a cuadrático); para agua, α de PVTsim (usamos KIJHV
+    # como α efectivo si aplica; PVTsim suele usar α fijo ~0.3 para agua)
+    alpha = np.zeros((N, N))
+    kijhv = _kij_hv(eos)
+    for i in range(N):
+        for j in range(N):
+            if i == IDX_AGUA or j == IDX_AGUA:
+                alpha[j, i] = 0.3      # α NRTL típico para agua (PVTsim)
+
+    E = np.exp(-alpha*tau)
     GE_RT = 0.0
     for i in range(N):
-        den_i = float(np.sum(bi * z * E[:, i]))
+        den_i = float(np.sum(bi*z*E[:, i]))
         if den_i <= 0:
             continue
-        num_i = float(np.sum(tau[:, i] * bi * z * E[:, i]))
-        GE_RT += z[i] * num_i / den_i
-    GE = GE_RT * R * T
-    # ec. 3: a = b [ Σ z_i a_i/b_i − G^E/ln2 ]
-    suma = float(np.sum(z * ai / bi))
-    am = bm * (suma - GE / LN2)
-    return am
+        num_i = float(np.sum(tau[:, i]*bi*z*E[:, i]))
+        GE_RT += z[i]*num_i/den_i
+    GE = GE_RT*R_GAS*T_R
+    suma = float(np.sum(z*aa/bi))
+    am = bm*(suma - GE/LN2)
+    return am, bm

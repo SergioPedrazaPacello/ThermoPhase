@@ -917,40 +917,54 @@ class TabEquilibrio(QWidget):
         import numpy as _np
         bV = rt['beta_V']; bL = rt['beta_L']; bW = rt['beta_W']
         y = rt['y']; x = rt['x']; w = rt['w']
+        hayV = bV > 1e-9; hayL = bL > 1e-9; hayW = bW > 1e-9
+
+        def _pinta_comp(row, col, val, activo):
+            """Escribe y colorea una celda de composición: blanco si la fase
+            existe (activo), gris si no."""
+            it = self.tbl_comp.item(row, col)
+            if it is None:
+                it = cell("", bg=GRAY_RES); self.tbl_comp.setItem(row, col, it)
+            if activo and val is not None:
+                it.setText(f"{val:.4f}")
+                it.setBackground(_brush(WHITE)); it.setForeground(_brush(TEXT_RES))
+            else:
+                it.setText("")
+                it.setBackground(_brush(GRAY_RES)); it.setForeground(_brush(TEXT))
 
         # ── Composiciones por fase en la tabla de componentes ───────────────
         self.tbl_comp.blockSignals(True)
         for i in range(NC+1):
             if self.tbl_comp.isRowHidden(i):
                 continue
-            self.tbl_comp.item(i,2).setText(f"{y[i]:.4f}" if y is not None else "")
-            self.tbl_comp.item(i,3).setText(f"{x[i]:.4f}" if (x is not None and bL>1e-9) else "")
-            self.tbl_comp.item(i,4).setText(f"{w[i]:.4f}" if w is not None else "")
+            _pinta_comp(i, 2, y[i] if y is not None else None, hayV)
+            _pinta_comp(i, 3, x[i] if x is not None else None, hayL)
+            _pinta_comp(i, 4, w[i] if w is not None else None, hayW)
+        # Sumatorias = 1 en cada fase presente (col 2,3,4), vacío si ausente.
+        for col, hay in ((2,hayV),(3,hayL),(4,hayW)):
+            _pinta_comp(self.sum_row, col, 1.0 if hay else None, hay)
         self.tbl_comp.blockSignals(False)
 
-        # ── Fracciones de fase en el resumen (fila frac_molar) ──────────────
-        # Localizar la fila 'frac_molar' entre las propiedades seleccionadas.
+        # ── Resumen: fracciones de fase, PM y Z por fase ────────────────────
         try:
             filas = [d for d in PROP_RESUMEN if d[0] in self._props_sel]
             for r, d in enumerate(filas):
                 if d[0] == 'frac_molar':
-                    self._paint_res(r, 2, f"{bV:.6f}")
-                    self._paint_res(r, 3, f"{bL:.6f}" if bL>1e-9 else "")
-                    self._paint_res(r, 4, f"{bW:.6f}")
+                    self._paint_res(r, 2, f"{bV:.6f}" if hayV else "")
+                    self._paint_res(r, 3, f"{bL:.6f}" if hayL else "")
+                    self._paint_res(r, 4, f"{bW:.6f}" if hayW else "")
                 elif d[0] == 'pm':
                     PM = rt['PM']
-                    pmV = float(_np.dot(y, PM)) if y is not None else None
-                    pmL = float(_np.dot(x, PM)) if (x is not None and bL>1e-9) else None
-                    pmW = float(_np.dot(w, PM)) if w is not None else None
-                    if pmV: self._paint_res(r,2,f"{pmV:.4f}")
-                    if pmL: self._paint_res(r,3,f"{pmL:.4f}")
-                    if pmW: self._paint_res(r,4,f"{pmW:.4f}")
+                    self._paint_res(r,2, f"{float(_np.dot(y,PM)):.4f}" if hayV else "")
+                    self._paint_res(r,3, f"{float(_np.dot(x,PM)):.4f}" if hayL else "")
+                    self._paint_res(r,4, f"{float(_np.dot(w,PM)):.4f}" if hayW else "")
                 elif d[0] == 'z':
-                    if rt.get('Z_V') is not None: self._paint_res(r,2,f"{rt['Z_V']:.4f}")
-                    if bL>1e-9 and rt.get('Z_L') is not None: self._paint_res(r,3,f"{rt['Z_L']:.4f}")
-                    if rt.get('Z_W') is not None: self._paint_res(r,4,f"{rt['Z_W']:.4f}")
+                    self._paint_res(r,2, f"{rt['Z_V']:.4f}" if (hayV and rt.get('Z_V')) else "")
+                    self._paint_res(r,3, f"{rt['Z_L']:.4f}" if (hayL and rt.get('Z_L')) else "")
+                    self._paint_res(r,4, f"{rt['Z_W']:.4f}" if (hayW and rt.get('Z_W')) else "")
         except Exception:
             pass
+        return
 
     def _on_result(self, r):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
