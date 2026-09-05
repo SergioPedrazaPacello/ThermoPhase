@@ -323,11 +323,19 @@ class NavigatorPanel(QWidget):
         self._nodo_comp.setData(0, Qt.ItemDataRole.UserRole, "componentes")
         self.tree_datos.addTopLevelItem(self._nodo_comp)
         self._comp_items = []      # hojas de componente en orden canonico
-        for nombre in _NOMBRES_COMP:
+        # 13 HC + agua (índice 13). El agua nace INACTIVA (hexágono por defecto).
+        try:
+            from eos import componente_etiqueta as _cet, NC as _NC
+            _etiquetas = [_cet(i) for i in range(_NC + 1)]
+        except Exception:
+            _etiquetas = list(_NOMBRES_COMP)
+        for i, nombre in enumerate(_etiquetas):
             txt = nombre.rstrip(':')
             hijo = QTreeWidgetItem([txt])
-            # Por defecto todos los componentes estan activos -> verde suave.
-            hijo.setIcon(0, icono("componente_hex_activo", 16))
+            # HC activos por defecto (verde); agua inactiva (hexágono azulado).
+            es_agua = (i == len(_etiquetas) - 1)
+            icono_ini = "componente_hex" if es_agua else "componente_hex_activo"
+            hijo.setIcon(0, icono(icono_ini, 16))
             hijo.setData(0, Qt.ItemDataRole.UserRole, ('comp', txt))
             self._nodo_comp.addChild(hijo)
             self._comp_items.append(hijo)

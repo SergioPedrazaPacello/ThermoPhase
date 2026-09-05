@@ -208,6 +208,14 @@ W_VAL  = 140   # columna de valor (Vapor o Líquido)
 W_COMP = 290   # columna nombre de componente
 ROW_H  = 22
 
+# Anchos en MODO AGUA (5 columnas: etiqueta + Mezcla/General + Vapor + Líquido +
+# Acuosa). Se conserva el ancho total de la tabla (W_COMP + 3·W_VAL = 710)
+# reduciendo la columna de nombres y las de valor para que entre la 5ª columna
+# sin cambiar el ancho de la ventana.
+#   W_COMP_A + 4·W_VAL_A = W_COMP + 3·W_VAL = 710
+W_COMP_A = 230
+W_VAL_A  = 120     # 230 + 4·120 = 710 (igual ancho total)
+
 # Propiedades del resumen de resultados (selector). Orden canonico:
 # (key, etiqueta_base, unidad_mag_o_None, decimales, tiene_valor_de_mezcla)
 PROP_RESUMEN = [
@@ -495,25 +503,14 @@ class TabEquilibrio(QWidget):
         res_hdr_row.addWidget(self.btn_props, 0)
         root.addLayout(res_hdr_row)
 
-        # Cabecera de columnas del resumen (plomo medio)
-        # Anchos del resumen = mismos que composicion para alinear columnas
-        WR0 = W_COMP        # 290 — etiqueta
-        WR1 = 100           # Mezcla
-        WR2 = W_VAL         # Vapor  (140)
-        WR3 = W_VAL         # Liquida(140)
-        # Total = 290+100+140+140 = 670 — coincide con W_COMP+3*W_VAL si W_VAL=126.6
-        # Ajustamos W_VAL para que todo sume igual:
-        # W_COMP + 3*W_VAL = WR0+WR1+WR2+WR3 → 290+3*W_VAL = 290+100+2*W_VAL → W_VAL=100
-        # Mejor: fijamos total = W_COMP+W_VAL*3 y distribuimos:
-        # WR0=W_COMP, WR1+WR2+WR3 = W_VAL*3 → WR1=W_VAL-40, WR2=WR3=(W_VAL*3-(W_VAL-40))/2
-        WR1 = W_VAL   # misma anchura que Vapor y Liquida
-        WR2 = W_VAL
-        WR3 = W_VAL
-        hdr_res = make_table(1, 4)
+        # Cabecera de columnas del resumen (plomo medio). 5 columnas: la 5ª
+        # (Fase Acuosa) nace OCULTA y se muestra al activar el agua.
+        hdr_res = make_table(1, 5)
         hdr_res.setColumnWidth(0, W_COMP)
-        hdr_res.setColumnWidth(1, WR1)
-        hdr_res.setColumnWidth(2, WR2)
-        hdr_res.setColumnWidth(3, WR3)
+        hdr_res.setColumnWidth(1, W_VAL)
+        hdr_res.setColumnWidth(2, W_VAL)
+        hdr_res.setColumnWidth(3, W_VAL)
+        hdr_res.setColumnWidth(4, W_VAL_A)
         hdr_res.setItem(0,0, cell("", bg=GRAY_LBL))
         hdr_res.setItem(0,1, cell("Mezcla", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
@@ -521,19 +518,21 @@ class TabEquilibrio(QWidget):
             align=Qt.AlignmentFlag.AlignCenter))
         hdr_res.setItem(0,3, cell("Fase Liquida", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
+        hdr_res.setItem(0,4, cell("Fase Acuosa", bg=GRAY_LBL,
+            align=Qt.AlignmentFlag.AlignCenter))
+        hdr_res.setColumnHidden(4, True)
+        self.hdr_res = hdr_res
         fix_table_size(hdr_res)
         root.addWidget(hdr_res)
 
-        # Tabla de datos del resumen
-        # Filas: ff_mol, ff_mas, grav, dens, Z, PM
-        # Tabla resumen: 4 columnas
-        # col0=etiqueta, col1=mezcla(solo dens y PM), col2=Fase Vapor, col3=Fase Liquida
-        # Para filas sin mezcla: col1 queda plomo/vacía, col2 y col3 tienen los valores
-        self.tbl_res = make_table(6, 4)
+        # Tabla de datos del resumen (5 columnas; acuosa oculta por defecto)
+        self.tbl_res = make_table(6, 5)
         self.tbl_res.setColumnWidth(0, W_COMP)
         self.tbl_res.setColumnWidth(1, W_VAL)
         self.tbl_res.setColumnWidth(2, W_VAL)
         self.tbl_res.setColumnWidth(3, W_VAL)
+        self.tbl_res.setColumnWidth(4, W_VAL_A)
+        self.tbl_res.setColumnHidden(4, True)
 
         # Propiedades seleccionadas (por defecto, las 6 clásicas)
         self._props_sel = list(PROP_DEFAULT)
@@ -546,12 +545,13 @@ class TabEquilibrio(QWidget):
         # ── BLOQUE COMPOSICIÓN ────────────────────────────────
         root.addWidget(section_label("Composicion de las fases:", left=True))
 
-        # Cabecera de composición (2 niveles)
-        hdr_comp = make_table(2, 4)
+        # Cabecera de composición (2 niveles), 5 columnas (acuosa oculta)
+        hdr_comp = make_table(2, 5)
         hdr_comp.setRowHeight(0, ROW_H)
         hdr_comp.setRowHeight(1, ROW_H)
         hdr_comp.setColumnWidth(0, W_COMP)
         for c in [1,2,3]: hdr_comp.setColumnWidth(c, W_VAL)
+        hdr_comp.setColumnWidth(4, W_VAL_A)
 
         hdr_comp.setItem(0,0, cell("Componente", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
@@ -561,6 +561,8 @@ class TabEquilibrio(QWidget):
             align=Qt.AlignmentFlag.AlignCenter))
         hdr_comp.setItem(0,3, cell("Fase Liquida", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
+        hdr_comp.setItem(0,4, cell("Fase Acuosa", bg=GRAY_LBL,
+            align=Qt.AlignmentFlag.AlignCenter))
 
         hdr_comp.setItem(1,0, cell("", bg=GRAY_LBL))
         self.hdr_comp_gen  = cell("Fraccion Molar", bg=GRAY_LBL,
@@ -569,16 +571,24 @@ class TabEquilibrio(QWidget):
             align=Qt.AlignmentFlag.AlignCenter)
         self.hdr_comp_liq  = cell("Fraccion molar", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter)
+        self.hdr_comp_aq   = cell("Fraccion molar", bg=GRAY_LBL,
+            align=Qt.AlignmentFlag.AlignCenter)
         hdr_comp.setItem(1,1, self.hdr_comp_gen)
         hdr_comp.setItem(1,2, self.hdr_comp_vap)
         hdr_comp.setItem(1,3, self.hdr_comp_liq)
+        hdr_comp.setItem(1,4, self.hdr_comp_aq)
+        hdr_comp.setColumnHidden(4, True)
+        self.hdr_comp = hdr_comp
         fix_table_size(hdr_comp)
         root.addWidget(hdr_comp)
 
-        # Tabla de componentes
-        self.tbl_comp = make_table(NC+1, 4)
+        # Tabla de componentes (NC+1 HC-filas + 1 fila agua + 1 fila suma).
+        # La fila del agua (índice NC) nace oculta; se muestra al activar agua.
+        self.tbl_comp = make_table(NC+2, 5)
         self.tbl_comp.setColumnWidth(0, W_COMP)
         for c in [1,2,3]: self.tbl_comp.setColumnWidth(c, W_VAL)
+        self.tbl_comp.setColumnWidth(4, W_VAL_A)
+        self.tbl_comp.setColumnHidden(4, True)
 
         for i in range(NC):
             self.tbl_comp.setItem(i, 0, cell(
@@ -587,14 +597,24 @@ class TabEquilibrio(QWidget):
             self.tbl_comp.setItem(i, 1, cell("", bg=WHITE, editable=True))
             self.tbl_comp.setItem(i, 2, cell("", bg=GRAY_RES, color=TEXT_RES))
             self.tbl_comp.setItem(i, 3, cell("", bg=GRAY_RES, color=TEXT_RES))
+            self.tbl_comp.setItem(i, 4, cell("", bg=GRAY_RES, color=TEXT_RES))
 
-        # Fila de sumatorias dentro de tbl_comp (fila NC)
-        self.tbl_comp.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_LBL,
+        # Fila del AGUA (índice NC = 13). Nace oculta; se muestra al activarla.
+        self.tbl_comp.setItem(NC, 0, cell(
+            _eng.componente_etiqueta(NC).rstrip(':'), bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
-        self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE))
-        self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_RES))
-        self.tbl_comp.setItem(NC, 3, cell("", bg=GRAY_RES))
-        self.sum_row = NC  # índice de la fila sumatoria dentro de tbl_comp
+        self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE, editable=True))
+        self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_RES, color=TEXT_RES))
+        self.tbl_comp.setItem(NC, 3, cell("", bg=GRAY_RES, color=TEXT_RES))
+        self.tbl_comp.setItem(NC, 4, cell("", bg=GRAY_RES, color=TEXT_RES))
+        self.tbl_comp.setRowHidden(NC, True)
+
+        # Fila de sumatorias dentro de tbl_comp (fila NC+1)
+        self.tbl_comp.setItem(NC+1, 0, cell("Sumatorias:", bg=GRAY_LBL,
+            align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
+        for c in [1,2,3,4]:
+            self.tbl_comp.setItem(NC+1, c, cell("", bg=GRAY_RES if c>1 else WHITE))
+        self.sum_row = NC+1  # índice de la fila sumatoria dentro de tbl_comp
         fix_table_size(self.tbl_comp)
         self.tbl_comp.itemChanged.connect(self._on_item_changed)
         root.addWidget(self.tbl_comp)
@@ -747,33 +767,58 @@ class TabEquilibrio(QWidget):
         self._upd_suma()
 
     def get_z(self):
+        """Composición de 14 componentes (índice 13 = agua). Un componente
+        oculto (no activo) cuenta como fracción 0."""
         z = []
-        for i in range(NC):
-            # Un componente oculto (quitado en el gestor) no entra en la
-            # mezcla: se comporta como fraccion 0 sin necesidad de tocar su
-            # celda ni el motor de calculo.
+        for i in range(NC+1):        # 13 HC + agua
             if self.tbl_comp.isRowHidden(i):
                 z.append(0.0); continue
             try: z.append(float(self.tbl_comp.item(i,1).text()))
             except: z.append(0.0)
         return z
 
+    def agua_activa(self):
+        """True si la fila del agua está visible (agua activada)."""
+        return not self.tbl_comp.isRowHidden(NC)
+
     def aplicar_componentes(self, activos):
-        """Muestra unicamente las filas de los componentes activos y reajusta
-        la tabla a su contenido (cambio puramente estetico: los ocultos no
-        entran en la mezcla porque get_z los devuelve como 0)."""
+        """Muestra las filas de los componentes activos (incluida el agua, si
+        está en la lista) y muestra/oculta la columna de Fase Acuosa. El ancho
+        de la ventana no cambia: las columnas se reajustan (modo agua = 5 col
+        más angostas). Cambio estético; los ocultos entran como fracción 0."""
         act = set(activos)
+        agua_on = NC in act
         for i in range(NC):
             self.tbl_comp.setRowHidden(i, i not in act)
-        # La fila de Sumatorias (indice NC) nunca se oculta.
+        self.tbl_comp.setRowHidden(NC, not agua_on)      # fila agua
+        # columna Fase Acuosa (col 4) en las tres tablas
+        for tb in (self.hdr_res, self.tbl_res, self.hdr_comp, self.tbl_comp):
+            tb.setColumnHidden(4, not agua_on)
+        # anchos: modo agua compacta la columna de nombres y las de valor
+        self._reajustar_anchos(agua_on)
         fix_table_size(self.tbl_comp)
+        fix_table_size(self.tbl_res)
+        fix_table_size(self.hdr_res)
+        fix_table_size(self.hdr_comp)
         self._upd_suma()
 
+    def _reajustar_anchos(self, agua_on):
+        """Redistribuye anchos de columna para que la 5ª (acuosa) entre sin
+        cambiar el ancho total de la ventana."""
+        wc = W_COMP_A if agua_on else W_COMP
+        wv = W_VAL_A if agua_on else W_VAL
+        for tb in (self.hdr_res, self.tbl_res, self.hdr_comp, self.tbl_comp):
+            tb.setColumnWidth(0, wc)
+            for c in (1,2,3,4):
+                tb.setColumnWidth(c, wv)
+
     def set_z(self, z):
-        """Carga una composicion (lista de NC fracciones) en la tabla."""
+        """Carga una composicion (lista de fracciones) en la tabla, incluida
+        el agua si viene el 14° valor."""
         self.tbl_comp.blockSignals(True)
-        for i in range(NC):
-            self.tbl_comp.item(i, 1).setText(f"{z[i] if i < len(z) else 0.0:.4f}")
+        for i in range(NC+1):
+            v = z[i] if i < len(z) else 0.0
+            self.tbl_comp.item(i, 1).setText(f"{v:.4f}")
         self.tbl_comp.blockSignals(False)
         self._upd_suma()
 
@@ -787,7 +832,7 @@ class TabEquilibrio(QWidget):
         z = self.get_z(); s = sum(z)
         if s <= 0: return
         self.tbl_comp.blockSignals(True)
-        for i in range(NC):
+        for i in range(NC+1):
             self.tbl_comp.item(i,1).setText(f"{z[i]/s:.4f}")
         self.tbl_comp.blockSignals(False)
         self._upd_suma()  # actualiza fila sumatorias
@@ -827,7 +872,8 @@ class TabEquilibrio(QWidget):
         _set_eos(eos_code)
         kij = self._kij_get() if self._kij_get is not None else kij_user
         # Contexto para calcular entalpia/entropia al recibir el resultado.
-        self._hs_ctx = (list(z), self.get_T(), self.get_P(), kij, eos_code)
+        # Sin agua se usan 13 componentes (el motor HS es de 13).
+        self._hs_ctx = (list(z[:NC]), self.get_T(), self.get_P(), kij, eos_code)
         # Método de densidad efectivo.  Cada ventana de equilibrio tiene su
         # propio selector de corrección de volumen: si está en Peneloux,
         # prevalece sobre el selector de densidad (bloqueado en EOS); si no,
@@ -837,7 +883,24 @@ class TabEquilibrio(QWidget):
         else:
             metodo_dens = self.cmb_dens.currentText()
         self._metodo_densidad_actual = metodo_dens
-        self.worker = Worker(z, self.get_T(), self.get_P(), kij,
+        # Si el agua está activa, usar el flash TRIFÁSICO (vapor-líquido-acuosa).
+        if self.agua_activa() and z[NC] > 1e-12:
+            try:
+                import flash_agua as _fa
+                import numpy as _np
+                zt = _np.array(z, dtype=float)
+                rt = _fa.flash_trifasico(zt, self.get_T(), self.get_P(),
+                                         eos=eos_code)
+                self.btn.setEnabled(True)
+                self.btn.setText(_i18n.t("Realizar Calculo"))
+                self._render_trifasico(rt, z, eos_code, kij)
+                return
+            except Exception as ex:
+                self.btn.setEnabled(True)
+                self.btn.setText(_i18n.t("Realizar Calculo"))
+                dialogos.error(self, f"Flash trifásico: {ex}")
+                return
+        self.worker = Worker(z[:NC], self.get_T(), self.get_P(), kij,
                              metodo_densidad=metodo_dens)
         self.worker.done.connect(self._on_result)
         self.worker.error.connect(self._on_error)
@@ -846,6 +909,48 @@ class TabEquilibrio(QWidget):
     def _on_error(self, msg):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
         dialogos.error(self, msg)
+
+    def _render_trifasico(self, rt, z, eos_code, kij):
+        """Puebla las tablas con el resultado del flash trifásico (V-L-W).
+        rt: dict de flash_agua.flash_trifasico. Muestra fracciones de fase y
+        composiciones en las columnas Vapor, Líquida y Acuosa (col 4)."""
+        import numpy as _np
+        bV = rt['beta_V']; bL = rt['beta_L']; bW = rt['beta_W']
+        y = rt['y']; x = rt['x']; w = rt['w']
+
+        # ── Composiciones por fase en la tabla de componentes ───────────────
+        self.tbl_comp.blockSignals(True)
+        for i in range(NC+1):
+            if self.tbl_comp.isRowHidden(i):
+                continue
+            self.tbl_comp.item(i,2).setText(f"{y[i]:.4f}" if y is not None else "")
+            self.tbl_comp.item(i,3).setText(f"{x[i]:.4f}" if (x is not None and bL>1e-9) else "")
+            self.tbl_comp.item(i,4).setText(f"{w[i]:.4f}" if w is not None else "")
+        self.tbl_comp.blockSignals(False)
+
+        # ── Fracciones de fase en el resumen (fila frac_molar) ──────────────
+        # Localizar la fila 'frac_molar' entre las propiedades seleccionadas.
+        try:
+            filas = [d for d in PROP_RESUMEN if d[0] in self._props_sel]
+            for r, d in enumerate(filas):
+                if d[0] == 'frac_molar':
+                    self._paint_res(r, 2, f"{bV:.6f}")
+                    self._paint_res(r, 3, f"{bL:.6f}" if bL>1e-9 else "")
+                    self._paint_res(r, 4, f"{bW:.6f}")
+                elif d[0] == 'pm':
+                    PM = rt['PM']
+                    pmV = float(_np.dot(y, PM)) if y is not None else None
+                    pmL = float(_np.dot(x, PM)) if (x is not None and bL>1e-9) else None
+                    pmW = float(_np.dot(w, PM)) if w is not None else None
+                    if pmV: self._paint_res(r,2,f"{pmV:.4f}")
+                    if pmL: self._paint_res(r,3,f"{pmL:.4f}")
+                    if pmW: self._paint_res(r,4,f"{pmW:.4f}")
+                elif d[0] == 'z':
+                    if rt.get('Z_V') is not None: self._paint_res(r,2,f"{rt['Z_V']:.4f}")
+                    if bL>1e-9 and rt.get('Z_L') is not None: self._paint_res(r,3,f"{rt['Z_L']:.4f}")
+                    if rt.get('Z_W') is not None: self._paint_res(r,4,f"{rt['Z_W']:.4f}")
+        except Exception:
+            pass
 
     def _on_result(self, r):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
@@ -2809,13 +2914,16 @@ class MainWindow(QMainWindow):
             if nom.rstrip(':') == nombre:
                 idx = i
                 break
+        # Agua (14° componente, índice 13)
+        if idx is None and nombre == _eng.AGUA_NOMBRE.rstrip(':'):
+            idx = _eng.IDX_AGUA
         if idx is None:
             return
         clave = f'componente@{idx}'
         sw = self._subventanas.get(clave)
         if sw is None:
             widget = _cui.VentanaPropComponente(idx)
-            titulo = NOMBRES[idx].rstrip(':')
+            titulo = _eng.componente_etiqueta(idx).rstrip(':')
             tam = widget.tam_ideal()
             sw = self._montar_subventana(clave, widget, titulo, tam=tam)
         self._mostrar_subventana(sw)

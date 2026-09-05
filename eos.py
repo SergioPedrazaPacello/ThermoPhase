@@ -60,6 +60,34 @@ KIJ_DEFAULT_PR = [
 ]
 NC = 13
 
+# ── Agua: componente OPCIONAL (índice 13, el 14°) ───────────────────────────
+# El agua no forma parte del motor base de NC=13 (flash VLE y envolventes
+# hidrocarburos siguen intactos). Se expone aquí para que la UI la muestre en el
+# árbol de componentes, el gestor y las tablas cuando el usuario la ACTIVE. El
+# flash trifásico con agua vive en el módulo flash_agua.py. Propiedades de HYSYS.
+IDX_AGUA = 13
+AGUA_COMPONENTE = "H₂O"
+AGUA_NOMBRE = "Agua [H₂O]:"
+AGUA_PM    = 18.015100479126
+AGUA_TC    = 1165.13822021484      # °R
+AGUA_PC    = 3208.233924           # psia
+AGUA_OMEGA = 0.34400001168251
+AGUA_NBP   = 671.666418457031      # °R (punto de ebullición normal del agua)
+
+def componente_nombre(i):
+    """Nombre corto del componente i (0..13). 13 = agua."""
+    return AGUA_COMPONENTE if i == IDX_AGUA else COMPONENTES[i]
+
+def componente_etiqueta(i):
+    """Etiqueta larga del componente i (0..13). 13 = agua."""
+    return AGUA_NOMBRE if i == IDX_AGUA else NOMBRES[i]
+
+def prop_agua(clave):
+    """Propiedad física del agua por clave ('PM','TC','PC','OMEGA','NBP')."""
+    return {'PM': AGUA_PM, 'TC': AGUA_TC, 'PC': AGUA_PC,
+            'OMEGA': AGUA_OMEGA, 'NBP': AGUA_NBP}.get(clave)
+
+
 # Matriz kij Soave-Redlich-Kwong extraída directamente de HYSYS.
 # Fuente: reporte de Fluid Package HYSYS con paquete SRK, 13 componentes
 # canonicos (N2, CO2, C1..C9). Simetrica; diagonal = 0.
