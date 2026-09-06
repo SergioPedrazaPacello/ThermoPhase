@@ -1000,9 +1000,9 @@ class TabEnvolvente(QWidget):
             crit=res.get('critico')
             if crit is not None:
                 ax.plot([_u.t_desde_R(crit[1])], [_u.p_desde_psia(crit[0])],
-                        linestyle='none', marker='o', markersize=5,
-                        color='#000000', markerfacecolor='#000000',
-                        markeredgecolor='#000000',
+                        linestyle='none', marker='^', markersize=5,
+                        color='#8e44ad', markerfacecolor='#8e44ad',
+                        markeredgecolor='#5b2c6f', markeredgewidth=0.5,
                         label=_i18n.t('Punto crítico'), zorder=5)
         else:
             # Estilo de las curvas de burbuja/rocío depende de si el mapa
