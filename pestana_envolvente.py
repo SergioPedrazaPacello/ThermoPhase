@@ -113,7 +113,14 @@ class EnvWorker(QThread):
         self.max_pts=max_pts
     def run(self):
         try:
-            from envolvente import curva_envolvente
+            from envolvente import curva_envolvente, es_puro, curva_pura
+            # Componente puro: no hay envolvente bifásica (área) sino una única
+            # curva de saturación (presión de vapor) que termina en el punto
+            # crítico. Se resuelve aparte, independientemente del método
+            # seleccionado (Ziervogel/Michelsen no aplican a un solo componente).
+            if es_puro(self.z):
+                self.done.emit(curva_pura(self.z, self.kij))
+                return
             # curva_envolvente implementa toda la lógica de selección de método:
             #  - Detecta mezclas casi-azeotrópicas (CO2/C2, iC5/nC5, etc.)
             #  - Para esas mezclas: anula kij del par, prueba Ziervogel primero,
@@ -577,6 +584,15 @@ class TabEnvolvente(QWidget):
                 "La suma de fracciones debe ser 1.0")
             return
 
+        # Un componente puro no tiene líneas de isocalidad: su saturación es
+        # una única curva (φ_L = φ_V) sin fracciones de vapor intermedias.
+        from envolvente import es_puro
+        if es_puro(z):
+            dialogos.info(self,
+                "Las curvas de isocalidad no están disponibles en "
+                "componentes puros.")
+            return
+
         calidades={}
         for i,ed in enumerate(self.ed_iso):
             txt=ed.text().strip()
@@ -651,6 +667,19 @@ class TabEnvolvente(QWidget):
         if abs(sum(z)-1.0) > 1e-3:
             dialogos.advertencia(self,
                 "La suma de fracciones debe ser 1.0")
+            self.chk_reg.blockSignals(True)
+            self.chk_reg.setChecked(False)
+            self.chk_reg.blockSignals(False)
+            return
+        # El mapa de densidad colorea el interior de la envolvente bifásica.
+        # Un componente puro no tiene área bifásica (sólo la línea de
+        # saturación), así que el mapa no aplica.
+        from envolvente import es_puro
+        if es_puro(z):
+            dialogos.info(self,
+                "El mapa de densidad no está disponible en componentes "
+                "puros (la saturación es una única curva, sin área "
+                "bifásica).")
             self.chk_reg.blockSignals(True)
             self.chk_reg.setChecked(False)
             self.chk_reg.blockSignals(False)
@@ -949,43 +978,66 @@ class TabEnvolvente(QWidget):
             cbar.outline.set_edgecolor('#000000')
             cbar.outline.set_linewidth(0.8)
 
+        # ¿El resultado corresponde a un componente PURO?  En ese caso se
+        # dibuja una única curva de saturación (presión de vapor) que termina
+        # en el punto crítico — no hay ramas de burbuja/rocío separadas, ni
+        # área bifásica, ni líneas de isocalidad.
+        es_puro_res = bool(res.get('puro'))
+
         burb=res.get('burbuja',[]); rocio=res.get('rocio',[])
         Tb=[_u.t_desde_R(t) for _,t in burb]; Pb=[_u.p_desde_psia(p) for p,_ in burb]
         Td=[_u.t_desde_R(t) for _,t in rocio]; Pd=[_u.p_desde_psia(p) for p,_ in rocio]
 
-        # Estilo de las curvas de burbuja/rocío depende de si el mapa
-        # está activo: con mapa → líneas continuas del mismo grosor que
-        # la de transición (pegadas al fill gris, sin espacios).
-        # Sin mapa → marcadores triangulares (estilo original).
-        if self._regiones is not None:
-            if Tb and Pb:
-                ax.plot(Tb, Pb, linestyle='-', color='#a83218',
-                        linewidth=0.9, label=_i18n.t('Curva de Burbuja'), zorder=5)
-            if Td and Pd:
-                ax.plot(Td, Pd, linestyle='-', color='#1a4fa8',
-                        linewidth=0.9, label=_i18n.t('Curva de Rocío'), zorder=5)
+        if es_puro_res:
+            # ── Componente puro: curva de saturación + punto crítico ──
+            curva = res.get('curva') or res.get('burbuja') or []
+            Ts=[_u.t_desde_R(t) for _,t in curva]
+            Ps=[_u.p_desde_psia(p) for p,_ in curva]
+            if Ts and Ps:
+                ax.plot(Ts, Ps, linestyle='-', linewidth=0.9,
+                        color='#a83218',
+                        label=_i18n.t('Curva de saturación'), zorder=3)
+            crit=res.get('critico')
+            if crit is not None:
+                ax.plot([_u.t_desde_R(crit[1])], [_u.p_desde_psia(crit[0])],
+                        linestyle='none', marker='o', markersize=5,
+                        color='#000000', markerfacecolor='#000000',
+                        markeredgecolor='#000000',
+                        label=_i18n.t('Punto crítico'), zorder=5)
         else:
-            if Tb and Pb:
-                ax.plot(Tb, Pb, linestyle='-', linewidth=0.7,
-                        color='#a83218', zorder=2)
-                ax.plot(Tb,Pb,linestyle='none',marker='^',
-                        color='#a83218',markersize=3,
-                        label=_i18n.t('Curva de Burbuja'))
-            if Td and Pd:
-                ax.plot(Td, Pd, linestyle='-', linewidth=0.7,
-                        color='#1a4fa8', zorder=2)
-                ax.plot(Td,Pd,linestyle='none',marker='^',
-                        color='#1a4fa8',markersize=3,
-                        label=_i18n.t('Curva de Rocío'))
+            # Estilo de las curvas de burbuja/rocío depende de si el mapa
+            # está activo: con mapa → líneas continuas del mismo grosor que
+            # la de transición (pegadas al fill gris, sin espacios).
+            # Sin mapa → marcadores triangulares (estilo original).
+            if self._regiones is not None:
+                if Tb and Pb:
+                    ax.plot(Tb, Pb, linestyle='-', color='#a83218',
+                            linewidth=0.9, label=_i18n.t('Curva de Burbuja'), zorder=5)
+                if Td and Pd:
+                    ax.plot(Td, Pd, linestyle='-', color='#1a4fa8',
+                            linewidth=0.9, label=_i18n.t('Curva de Rocío'), zorder=5)
+            else:
+                if Tb and Pb:
+                    ax.plot(Tb, Pb, linestyle='-', linewidth=0.7,
+                            color='#a83218', zorder=2)
+                    ax.plot(Tb,Pb,linestyle='none',marker='^',
+                            color='#a83218',markersize=3,
+                            label=_i18n.t('Curva de Burbuja'))
+                if Td and Pd:
+                    ax.plot(Td, Pd, linestyle='-', linewidth=0.7,
+                            color='#1a4fa8', zorder=2)
+                    ax.plot(Td,Pd,linestyle='none',marker='^',
+                            color='#1a4fa8',markersize=3,
+                            label=_i18n.t('Curva de Rocío'))
 
-        # Líneas de isocalidad (finas, un color distinto por línea)
-        for idx,pts in getattr(self,'_isocalidad',{}).items():
-            if not pts: continue
-            color=self.ISO_COLORS[idx % len(self.ISO_COLORS)]
-            Ti=[_u.t_desde_R(t) for _,t in pts]; Pi=[_u.p_desde_psia(p) for p,_ in pts]
-            txt=self.ed_iso[idx].text().strip()
-            ax.plot(Ti,Pi,linestyle='-',linewidth=0.7,
-                    color=color, label=f'{txt}% '+_i18n.t('vapor'), zorder=3)
+            # Líneas de isocalidad (finas, un color distinto por línea)
+            for idx,pts in getattr(self,'_isocalidad',{}).items():
+                if not pts: continue
+                color=self.ISO_COLORS[idx % len(self.ISO_COLORS)]
+                Ti=[_u.t_desde_R(t) for _,t in pts]; Pi=[_u.p_desde_psia(p) for p,_ in pts]
+                txt=self.ed_iso[idx].text().strip()
+                ax.plot(Ti,Pi,linestyle='-',linewidth=0.7,
+                        color=color, label=f'{txt}% '+_i18n.t('vapor'), zorder=3)
 
         # Punto marcado por el usuario (triángulo verde)
         if self._punto_usuario is not None:
@@ -1006,7 +1058,7 @@ class TabEnvolvente(QWidget):
         for s in ax.spines.values():
             s.set_edgecolor('#000000'); s.set_linewidth(1.4)
         ax.grid(True, linestyle='-', linewidth=0.8, alpha=1.0, color=GRAY_LBL)
-        if Tb or Td:
+        if ax.get_legend_handles_labels()[0]:
             leg = ax.legend(fontsize=8, framealpha=1.0, fancybox=False,
                             edgecolor='#000000', facecolor=GRAY_PLOT_BG)
             leg.get_frame().set_linewidth(1.0)
@@ -1153,13 +1205,15 @@ class TabEnvolvente(QWidget):
             except Exception: pass
 
     def _update_results(self,res):
+        es_puro_res=bool(res.get('puro'))
         burb=res.get('burbuja',[]); rocio=res.get('rocio',[])
         def fv(v): return f"{v:.1f}" if v is not None else ""
         Tb=[_u.t_desde_R(t) for _,t in burb]; Pb=[_u.p_desde_psia(p) for p,_ in burb]
         Td=[_u.t_desde_R(t) for _,t in rocio]; Pd=[_u.p_desde_psia(p) for p,_ in rocio]
         all_T=Tb+Td; all_P=Pb+Pd
         if self._modo_puntos=='critico':
-            # Punto crítico (P y T) en las dos mismas filas.
+            # Punto crítico (P y T) en las dos mismas filas.  Un componente
+            # puro SÍ tiene punto crítico, así que aquí se muestra normal.
             crit=res.get('critico')
             if crit is not None:
                 self.res_labels['cric_T'].setText(fv(_u.t_desde_R(crit[1])))
@@ -1167,6 +1221,11 @@ class TabEnvolvente(QWidget):
             else:
                 self.res_labels['cric_T'].setText("")
                 self.res_labels['cric_P'].setText("")
+        elif es_puro_res:
+            # Un componente puro NO tiene cricondentérmica ni cricondenbárica
+            # (esos puntos sólo existen en la envolvente cerrada de una mezcla).
+            self.res_labels['cric_T'].setText("-")
+            self.res_labels['cric_P'].setText("-")
         else:
             # Cricondentérmica = T máxima de la envolvente
             self.res_labels['cric_T'].setText(fv(max(all_T)) if all_T else "")
@@ -1182,10 +1241,16 @@ class TabEnvolvente(QWidget):
         try:
             with open(path,'w',encoding='utf-8') as f:
                 f.write("Curva,P (psia),T (R),T (F)\n")
-                for p,t in self.result.get('burbuja',[]):
-                    f.write(f"Burbuja,{p:.4f},{t:.4f},{t-459.67:.4f}\n")
-                for p,t in self.result.get('rocio',[]):
-                    f.write(f"Rocio,{p:.4f},{t:.4f},{t-459.67:.4f}\n")
+                if self.result.get('puro'):
+                    # Componente puro: una sola curva de saturación.
+                    for p,t in (self.result.get('curva')
+                                or self.result.get('burbuja',[])):
+                        f.write(f"Saturacion,{p:.4f},{t:.4f},{t-459.67:.4f}\n")
+                else:
+                    for p,t in self.result.get('burbuja',[]):
+                        f.write(f"Burbuja,{p:.4f},{t:.4f},{t-459.67:.4f}\n")
+                    for p,t in self.result.get('rocio',[]):
+                        f.write(f"Rocio,{p:.4f},{t:.4f},{t-459.67:.4f}\n")
                 for idx,pts in getattr(self,'_isocalidad',{}).items():
                     txt=self.ed_iso[idx].text().strip()
                     etiqueta=f"Isocalidad_{txt}pct"

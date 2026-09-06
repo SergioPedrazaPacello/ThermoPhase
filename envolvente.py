@@ -24,6 +24,7 @@ import copy
 from eos import (
     NC, TC, PC, OMEGA, KIJ_DEFAULT,
     am, bm, AB, solve_Z, ln_phi_i, ln_phi_vec,
+    crit_props, get_eos,
 )
 
 R_GAS = 10.7316
@@ -891,3 +892,118 @@ def curva_envolvente(z,kij=None,progress_cb=None,tol_cierre=15.0):
             'critico_burbuja': cb, 'critico_rocio': cd,
             'metodo': 'ziervogel'}
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# COMPONENTE PURO — curva de presión de vapor (línea de saturación)
+# ═══════════════════════════════════════════════════════════════════════════
+def _indices_activos(z, umbral=1e-8):
+    """Índices de los componentes presentes en la composición."""
+    return [i for i in range(len(z)) if z[i] > umbral]
+
+
+def es_puro(z, umbral=1e-8):
+    """True si la composición corresponde a un solo componente (puro).
+    Un componente puro no tiene envolvente bifásica (área), sino una única
+    curva de saturación (presión de vapor) que termina en el punto crítico."""
+    return len(_indices_activos(z, umbral)) == 1
+
+
+def curva_pura(z, kij=None, n_pts=200, Tr_min=0.45, Tr_max=0.9990):
+    """
+    Curva de presión de vapor de un componente PURO con la EOS activa.
+
+    En un componente puro las curvas de burbuja y de rocío coinciden en una
+    sola línea de saturación: la presión de vapor Ps(T).  Esta línea separa el
+    líquido (a la izquierda / por encima) del vapor (a la derecha / por debajo)
+    y termina en el punto crítico (Tc, Pc), donde ambas fases se vuelven
+    indistinguibles.  No existen cricondentérmica ni cricondenbárica (esos
+    puntos sólo tienen sentido en la envolvente cerrada de una mezcla) y las
+    líneas de isocalidad tampoco están definidas.
+
+    En cada temperatura T < Tc la presión de saturación es aquella en que la
+    fugacidad del líquido y del vapor del componente son iguales, es decir
+    φ_L(T,Ps) = φ_V(T,Ps).  Se resuelve por Newton sobre ln P (Michelsen &
+    Mollerup, *Thermodynamic Models*, cap. de equilibrio de sustancia pura):
+
+        ln P_{n+1} = ln P_n + [ln φ_L − ln φ_V] / (Z_V − Z_L)
+
+    partiendo del estimado de Wilson.  φ_L y φ_V se evalúan con la raíz líquida
+    (Z_L) y vapor (Z_V) de la cúbica de la EOS activa, de modo que la curva
+    respeta la ecuación de estado elegida (PR / SRK / PR_PVT / SRK_PVT).
+
+    Devuelve un dict compatible con la pestaña de envolvente:
+        {'puro': True,
+         'curva': [(P_psia, T_R), ...]   # ordenada por T ascendente,
+         'critico': (Pc_psia, Tc_R),
+         'burbuja': <misma curva>, 'rocio': [],  # compatibilidad de dibujo
+         'metodo': 'puro'}
+    """
+    if kij is None:
+        kij = copy.deepcopy(KIJ_DEFAULT)
+    else:
+        kij = copy.deepcopy(kij)
+
+    act = _indices_activos(z)
+    if not act:
+        return {'puro': True, 'curva': [], 'critico': None,
+                'burbuja': [], 'rocio': [], 'metodo': 'puro'}
+    ip = act[0]
+    comp = [0.0]*NC
+    comp[ip] = 1.0
+
+    # Propiedades críticas de la EOS activa (PR, SRK, PR_PVT o SRK_PVT).
+    TCa, PCa, OMa, _ = crit_props(get_eos())
+    Tc = float(TCa[ip]); Pc = float(PCa[ip]); om = float(OMa[ip])
+
+    def _ps_wilson(T):
+        """Presión de saturación estimada por Wilson (arranque de Newton)."""
+        return Pc*np.exp(5.373*(1.0 + om)*(1.0 - Tc/T))
+
+    def _resolver_ps(T, P0):
+        """Ps(T) que iguala φ_L = φ_V, por Newton sobre ln P."""
+        P = P0
+        for _ in range(80):
+            am_ = am(comp, T, kij); bm_ = bm(comp)
+            ZV, ZL = solve_Z(*AB(am_, bm_, T, P))
+            # Fuera de la región de dos raíces (cúbica con raíz única) no hay
+            # saturación resoluble a esta P: el arranque cayó demasiado lejos.
+            if not (ZV > ZL + 1e-9):
+                return None
+            lnfiV = float(ln_phi_vec(comp, T, P, ZV, am_, bm_, kij)[ip])
+            lnfiL = float(ln_phi_vec(comp, T, P, ZL, am_, bm_, kij)[ip])
+            dg = lnfiL - lnfiV                 # = ln(f_L / f_V)  (P se cancela)
+            if abs(dg) < 1e-11:
+                return P
+            dlnP = dg/(ZV - ZL)
+            dlnP = max(-2.0, min(2.0, dlnP))   # amortiguar saltos grandes
+            P = P*np.exp(dlnP)
+            if not (P > 0 and np.isfinite(P)):
+                return None
+        return P if (P > 0 and np.isfinite(P)) else None
+
+    # Marcha de Tr alto (cerca del crítico, con buen arranque) a Tr bajo,
+    # arrastrando la Ps anterior como estimado inicial (continuación de curva).
+    curva = []
+    P_prev = None
+    for k in range(n_pts):
+        Tr = Tr_max - (Tr_max - Tr_min)*k/(n_pts - 1)
+        T = Tr*Tc
+        P0 = P_prev if P_prev is not None else _ps_wilson(T)
+        Ps = _resolver_ps(T, P0)
+        if Ps is None:                          # reintento desde Wilson
+            Ps = _resolver_ps(T, _ps_wilson(T))
+        if Ps is None or Ps <= 0:
+            continue
+        curva.append((Ps, T))
+        P_prev = Ps
+
+    curva.sort(key=lambda pt: pt[1])            # por T ascendente
+    if curva:
+        curva.append((Pc, Tc))                  # cerrar en el punto crítico
+
+    return {'puro': True,
+            'curva': curva,
+            'critico': (Pc, Tc),
+            'burbuja': curva, 'rocio': [],
+            'critico_burbuja': True, 'critico_rocio': False,
+            'metodo': 'puro'}
