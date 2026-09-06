@@ -237,10 +237,23 @@ class RegionesWorker(QThread):
 
     def run(self):
         try:
+            import envolvente as _env
+            # Componente puro: no hay envolvente bifásica que trazar por
+            # Michelsen.  La "envolvente" es la curva de saturación y el mapa
+            # de densidad se calcula en modo puro (sin máscara bifásica ni
+            # polígono de relleno): sólo el coloreado de densidad + la curva
+            # de saturación como frontera líquido/vapor.
+            if _env.es_puro(self.z):
+                env_res = _env.curva_pura(self.z, self.kij)
+                reg_res = rf.calcular_mapa_densidad(
+                    self.z, self.kij, env_res,
+                    n_grid=self.n_grid, n_curva=self.n_curva,
+                    metodo=self.metodo, puro=True)
+                self.done.emit({'envolvente': env_res, 'regiones': reg_res})
+                return
             # 1) Envolvente por Michelsen (rápido y robusto con la
             #    composición actual)
             from envolvente_michelsen import construir_envolvente
-            import envolvente as _env
             r_mich = construir_envolvente(self.z, self.kij, max_pts=8000)
             env_pts = r_mich.get('envolvente', [])
             crit    = r_mich.get('critico')
@@ -671,19 +684,9 @@ class TabEnvolvente(QWidget):
             self.chk_reg.setChecked(False)
             self.chk_reg.blockSignals(False)
             return
-        # El mapa de densidad colorea el interior de la envolvente bifásica.
-        # Un componente puro no tiene área bifásica (sólo la línea de
-        # saturación), así que el mapa no aplica.
-        from envolvente import es_puro
-        if es_puro(z):
-            dialogos.info(self,
-                "El mapa de densidad no está disponible en componentes "
-                "puros (la saturación es una única curva, sin área "
-                "bifásica).")
-            self.chk_reg.blockSignals(True)
-            self.chk_reg.setChecked(False)
-            self.chk_reg.blockSignals(False)
-            return
+        # Nota: los componentes puros SÍ admiten mapa de densidad.  El worker
+        # (RegionesWorker) detecta el caso puro y lo calcula en modo dedicado
+        # (sin área bifásica), así que aquí no hay ningún trato especial.
         kij = self.get_kij()
         self.chk_reg.setEnabled(False)
         self.lbl_reg_cargando.setText(_i18n.t("(cargando)"))
