@@ -1195,7 +1195,7 @@ class TabParametros(QWidget):
         TCa, PCa, OMa, PMa = _eng.crit_props(self._eos_ctx())
         for i in range(NC):
             r = i + 1
-            self.tbl_p.setItem(r, 0, cell(NOMBRES[i], bg=GRAY_LBL,
+            self.tbl_p.setItem(r, 0, cell(_i18n.t(NOMBRES[i]), bg=GRAY_LBL,
                 align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter))
             tc = _u.abs_desde_R(TCa[i])       # °R -> °R/K
             pc = _u.p_desde_psia(PCa[i])      # psi -> psi/kPa
@@ -1251,12 +1251,16 @@ class TabParametros(QWidget):
         self.tbl_p = QTableWidget(NC+1, 5)  # fila 0=cabecera, filas 1..NC=datos
         self.tbl_p.horizontalHeader().hide()
         self.tbl_p.verticalHeader().hide()
-        self.tbl_p.setShowGrid(True)
+        self.tbl_p.setShowGrid(False)
         self.tbl_p.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        # Rejilla PLANA de 1px con bordes CSS por celda (mismo aspecto que las
+        # tablas de Equilibrio de fases; evita el gridline nativo biselado).
         self.tbl_p.setStyleSheet(
-            f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
-            f'QTableWidget::item {{ padding:2px 6px; }}')
+            f'QTableWidget {{ background:{WHITE};'
+            f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
+            f'QTableWidget::item {{ border-right:1px solid {BORDER};'
+            f'border-bottom:1px solid {BORDER};padding:2px 6px; }}')
         for c,w in enumerate(WP): self.tbl_p.setColumnWidth(c,w)
         for r in range(NC+1): self.tbl_p.setRowHeight(r, ROW_H)
 
@@ -1282,11 +1286,13 @@ class TabParametros(QWidget):
         self.tbl_k = QTableWidget(NC+1, NC+1)  # fila 0=cabecera
         self.tbl_k.horizontalHeader().hide()
         self.tbl_k.verticalHeader().hide()
-        self.tbl_k.setShowGrid(True)
+        self.tbl_k.setShowGrid(False)
         self.tbl_k.setStyleSheet(
-            f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
-            f'QTableWidget::item {{ padding:2px 4px; }}')
+            f'QTableWidget {{ background:{WHITE};'
+            f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
+            f'QTableWidget::item {{ border-right:1px solid {BORDER};'
+            f'border-bottom:1px solid {BORDER};padding:2px 4px; }}')
         self.tbl_k.setColumnWidth(0, WK)
         for c in range(1,NC+1): self.tbl_k.setColumnWidth(c, WK)
         for r in range(NC+1): self.tbl_k.setRowHeight(r, ROW_H)
@@ -1776,6 +1782,9 @@ class MainWindow(QMainWindow):
         self.gestor_edicion.registrar(self.tab_par.tbl_k)
         self._construir_menu()
         self._actualizar_titulo()
+        # Idioma por defecto: inglés. Se construye la UI en español (literales)
+        # y se traduce toda de una vez, igual que al pulsar "Inglés" en el menú.
+        self._cambiar_idioma('EN')
 
     def _construir_menu(self):
         """Barra de menu clasica (Win95): Archivo, Editar, Ver, Herramientas,
@@ -1879,12 +1888,14 @@ class MainWindow(QMainWindow):
             lambda: self._set_modo_puntos_env('critico'))
 
         # Mostrar / ocultar todos los iconos del programa (barra superior de
-        # selectores + árbol del navegador). Activado por defecto.
+        # selectores + árbol del navegador). DESACTIVADO por defecto.
         m_graf.addSeparator()
         self._act_iconos = QAction("Mostrar iconos", self, checkable=True)
-        self._act_iconos.setChecked(True)
+        self._act_iconos.setChecked(False)
         self._act_iconos.toggled.connect(self._toggle_iconos)
         m_graf.addAction(self._act_iconos)
+        # Aplicar el estado inicial (oculto) — ribbon y navegador ya existen.
+        self._toggle_iconos(self._act_iconos.isChecked())
 
         # ── Herramientas ─────────────────────────────────────
         m_herr = menubar.addMenu("&Herramientas")
@@ -2636,13 +2647,17 @@ class MainWindow(QMainWindow):
             if w is not None and hasattr(w, 'retraducir_grafico'):
                 try: w.retraducir_grafico()
                 except Exception: pass
-        # La ventana nace en el sistema de unidades activo
+        # La ventana nace con valores en FIELD y etiquetas en español. Llamar
+        # aplicar_unidades('FIELD') SIEMPRE: (1) convierte los valores al
+        # sistema activo (no-op si ya es FIELD) y (2) reconstruye TODAS las
+        # etiquetas con _i18n.t(...) en el idioma activo. Esto es necesario en
+        # inglés para etiquetas compuestas con unidad (p.ej. "Densidad masica
+        # [lb/ft3]"), que retraducir() no alcanza a traducir.
         import unidades as _u
-        if _u.sistema() != 'FIELD':
-            w = getattr(win, '_widget', None)
-            if w is not None and hasattr(w, 'aplicar_unidades'):
-                try: w.aplicar_unidades('FIELD')
-                except Exception: pass
+        w = getattr(win, '_widget', None)
+        if w is not None and hasattr(w, 'aplicar_unidades'):
+            try: w.aplicar_unidades('FIELD')
+            except Exception: pass
         # La ventana nace con el estado de cursor (activo/inactivo) actual
         w = getattr(win, '_widget', None)
         if w is not None and hasattr(w, 'set_cursor'):

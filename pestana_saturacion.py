@@ -300,10 +300,19 @@ class TabSaturacion(QWidget):
         self.tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        # Rejilla PLANA de 1px dibujada con bordes CSS por celda (no el gridline
+        # nativo de Windows, que se ve biselado/doble a ciertos DPI). Igual
+        # aspecto que las tablas de Equilibrio de fases: borde superior/izquierdo
+        # en la tabla y borde derecho/inferior en cada celda -> 1px sin duplicar.
+        self.tbl.setShowGrid(False)
         self.tbl.setStyleSheet(
-            f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
-            f'QHeaderView::section {{ background:{GRAY_HDR};border:1px solid {BORDER};'
+            f'QTableWidget {{ background:{WHITE};'
+            f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
+            f'QTableWidget::item {{ border-right:1px solid {BORDER};'
+            f'border-bottom:1px solid {BORDER};padding:0px 6px; }}'
+            f'QHeaderView::section {{ background:{GRAY_HDR};border:none;'
+            f'border-right:1px solid {BORDER};border-bottom:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px; }}')
         hh=self.tbl.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -352,7 +361,9 @@ class TabSaturacion(QWidget):
         prop_title.setStyleSheet(LBL_SEC); prop_title.setFixedHeight(20)
         prop_hdr.addWidget(prop_title, 1)
         self.btn_props = QPushButton("Propiedades")
-        self.btn_props.setFixedHeight(22); self.btn_props.setFixedWidth(120)
+        # Misma altura que el título "Propiedades del punto de saturación:"
+        # que tiene al lado (prop_title = 20 px).
+        self.btn_props.setFixedHeight(20); self.btn_props.setFixedWidth(120)
         self.btn_props.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_props.setStyleSheet(
             f'QPushButton {{ background:{GRAY_LBL}; border:1px solid {BORDER};'
@@ -369,10 +380,15 @@ class TabSaturacion(QWidget):
         self.tbl_prop.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl_prop.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.tbl_prop.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.tbl_prop.setShowGrid(False)
         self.tbl_prop.setStyleSheet(
-            f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
-            f'QHeaderView::section {{ background:{GRAY_HDR};border:1px solid {BORDER};'
+            f'QTableWidget {{ background:{WHITE};'
+            f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
+            f'QTableWidget::item {{ border-right:1px solid {BORDER};'
+            f'border-bottom:1px solid {BORDER};padding:0px 6px; }}'
+            f'QHeaderView::section {{ background:{GRAY_HDR};border:none;'
+            f'border-right:1px solid {BORDER};border-bottom:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px; }}')
         hp=self.tbl_prop.horizontalHeader()
         hp.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)

@@ -207,6 +207,8 @@ TRAD = {
     "Restaurar valores originales": "Restore original values",
     "Temperatura Critica (°R)": "Critical Temperature (°R)",
     "Presion Critica (psi)": "Critical Pressure (psi)",
+    "Temperatura Critica": "Critical Temperature",
+    "Presion Critica": "Critical Pressure",
     "Factor acentrico": "Acentric factor",
     "Peso Molecular (lb/lb-mol)": "Molecular Weight (lb/lb-mol)",
 
