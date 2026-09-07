@@ -245,9 +245,14 @@ class RegionesWorker(QThread):
             # de saturación como frontera líquido/vapor.
             if _env.es_puro(self.z):
                 env_res = _env.curva_pura(self.z, self.kij)
+                # Más resolución que en mezclas: el mapa puro se salta el
+                # análisis de estabilidad (lo más costoso), así que puede
+                # permitirse una malla más fina para que la transición
+                # líquido↔vapor quede nítida junto a la curva de saturación.
+                n_grid_puro = max(self.n_grid, 150)
                 reg_res = rf.calcular_mapa_densidad(
                     self.z, self.kij, env_res,
-                    n_grid=self.n_grid, n_curva=self.n_curva,
+                    n_grid=n_grid_puro, n_curva=self.n_curva,
                     metodo=self.metodo, puro=True)
                 self.done.emit({'envolvente': env_res, 'regiones': reg_res})
                 return
@@ -924,11 +929,19 @@ class TabEnvolvente(QWidget):
                 v_min = 0.0
             else:
                 v_max, v_min = 45.0, 0.0
+            # La densidad de un componente PURO es discontinua al cruzar la
+            # curva de saturación (salto líquido↔vapor).  Con 'bilinear' esa
+            # discontinuidad se promedia entre celdas y aparece una franja
+            # difuminada de valores intermedios inexistentes; 'nearest' respeta
+            # el salto y deja la transición nítida sobre la curva.  En mezclas
+            # el interior bifásico se tapa con el fill gris, así que allí se
+            # mantiene 'bilinear' (aspecto suave del fondo monofásico).
+            interp_mapa = 'nearest' if res.get('puro') else 'bilinear'
             im = ax.imshow(np.ma.masked_invalid(rho),
                            extent=[Tg_F[0], Tg_F[-1], Pg[0], Pg[-1]],
                            origin='lower', aspect='auto',
                            cmap=cmap, alpha=0.5, vmin=v_min, vmax=v_max,
-                           interpolation='bilinear', zorder=0)
+                           interpolation=interp_mapa, zorder=0)
             # Sombreado gris de la zona bifásica: relleno sólido del polígono
             # cerrado de la envolvente trazada (burbuja con cola + rocío, cerrado
             # por el borde inferior). Sigue exactamente las curvas dibujadas en
