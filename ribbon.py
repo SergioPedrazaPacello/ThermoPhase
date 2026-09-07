@@ -18,13 +18,18 @@ from PyQt6.QtWidgets import (
     QScrollArea, QTreeWidget, QTreeWidgetItem, QAbstractItemView, QListView
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtGui import QPalette, QColor, QIcon
 
 from iconos import icono
 try:
     from eos import NOMBRES as _NOMBRES_COMP
 except Exception:
     _NOMBRES_COMP = []
+
+# Rol de datos donde cada item del árbol guarda su icono "real" (el que le
+# corresponde). Permite ocultar/mostrar todos los iconos sin perder cuál va en
+# cada fila, incluso si el árbol se reconstruye mientras están ocultos.
+ROL_ICONO = Qt.ItemDataRole.UserRole + 100
 
 # ── Paleta clasica clara (monocromatica) ─────────────────────
 FUENTE_UI  = "Arial Narrow"
@@ -128,8 +133,11 @@ class BarraSelectores(QFrame):
         self._reflow()
 
     def _reflow(self):
-        # Reservamos ~34 px a la derecha para el boton de documentacion.
-        avail = self.width() - 18 - 34
+        # Reservamos ~34 px a la derecha para el boton de documentacion,
+        # sólo si está visible (al ocultar iconos ese botón desaparece).
+        reserva_doc = 34 if getattr(self, 'btn_doc', None) is not None \
+            and self.btn_doc.isVisible() else 0
+        avail = self.width() - 18 - reserva_doc
         used = 0
         ocultar = False
         for g in self._grupos:
@@ -140,6 +148,16 @@ class BarraSelectores(QFrame):
             else:
                 ocultar = True
                 g.setVisible(False)
+
+    def set_iconos_visibles(self, on):
+        """Muestra u oculta los iconos de la barra superior: los pictogramas
+        junto a cada selector y el botón de documentación técnica."""
+        on = bool(on)
+        for lbl in getattr(self, '_icon_labels', []):
+            lbl.setVisible(on)
+        if getattr(self, 'btn_doc', None) is not None:
+            self.btn_doc.setVisible(on)
+        self._reflow()
 
 
 def construir_ribbon(acciones=None):
@@ -165,6 +183,7 @@ def construir_ribbon(acciones=None):
               "envolvente": "envolvente", "unidades": "unidades"}
     combos = {}
     grupos = []
+    icon_labels = []
     for i, (clave, etiqueta, items) in enumerate(_SELECTORES):
         grupo = QWidget()
         grupo.setStyleSheet('background:transparent;')
@@ -188,6 +207,7 @@ def construir_ribbon(acciones=None):
             ic_lbl.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
             gl.addWidget(ic_lbl)
             gl.addSpacing(1)
+            icon_labels.append(ic_lbl)
         gl.addWidget(_lbl(etiqueta))
         cmb = QComboBox()
         cmb.addItems(items)
@@ -210,6 +230,7 @@ def construir_ribbon(acciones=None):
         grupos.append(grupo)
 
     barra = BarraSelectores(grupos)
+    barra._icon_labels = icon_labels
     return barra, combos
 
 
@@ -267,7 +288,14 @@ class NavigatorPanel(QWidget):
         self.setFixedWidth(self.ANCHO)
         self.setStyleSheet(f'background:{CARA};')
         self._leaf_por_clave = {}
+        self._mostrar_iconos = True   # estado del toggle "Mostrar iconos"
         self._build()
+
+    def _aplicar_icono(self, item, qicon):
+        """Asigna el icono a un item respetando el toggle mostrar/ocultar.
+        Guarda además el icono 'real' en ROL_ICONO para poder restaurarlo."""
+        item.setData(0, ROL_ICONO, qicon)
+        item.setIcon(0, qicon if self._mostrar_iconos else QIcon())
 
     def _build(self):
         outer = QVBoxLayout(self)
@@ -304,7 +332,7 @@ class NavigatorPanel(QWidget):
         self.tree_calc.addTopLevelItem(raiz)
         for clave, texto in NAV_CALCULOS:
             it = QTreeWidgetItem([texto])
-            it.setIcon(0, icono(clave, 16))
+            self._aplicar_icono(it, icono(clave, 16))
             it.setData(0, Qt.ItemDataRole.UserRole, clave)
             raiz.addChild(it)
             self._leaf_por_clave[clave] = it
@@ -319,7 +347,7 @@ class NavigatorPanel(QWidget):
         self.tree_datos.setRootIsDecorated(True)
         # Componentes (nodo expandible: muestra los 13 componentes)
         self._nodo_comp = QTreeWidgetItem(["Componentes"])
-        self._nodo_comp.setIcon(0, icono("componentes", 16))
+        self._aplicar_icono(self._nodo_comp, icono("componentes", 16))
         self._nodo_comp.setData(0, Qt.ItemDataRole.UserRole, "componentes")
         self.tree_datos.addTopLevelItem(self._nodo_comp)
         self._comp_items = []      # hojas de componente en orden canonico
@@ -327,14 +355,14 @@ class NavigatorPanel(QWidget):
             txt = nombre.rstrip(':')
             hijo = QTreeWidgetItem([txt])
             # Por defecto todos los componentes estan activos -> verde suave.
-            hijo.setIcon(0, icono("componente_hex_activo", 16))
+            self._aplicar_icono(hijo, icono("componente_hex_activo", 16))
             hijo.setData(0, Qt.ItemDataRole.UserRole, ('comp', txt))
             self._nodo_comp.addChild(hijo)
             self._comp_items.append(hijo)
         self._nodo_comp.setExpanded(False)
         # Fluidos (nodo raiz expandible; sus hijos son los fluidos)
         self._nodo_fluidos = QTreeWidgetItem(["Fluidos"])
-        self._nodo_fluidos.setIcon(0, icono("fluidos", 16))
+        self._aplicar_icono(self._nodo_fluidos, icono("fluidos", 16))
         self._nodo_fluidos.setData(0, Qt.ItemDataRole.UserRole, "fluidos")
         self.tree_datos.addTopLevelItem(self._nodo_fluidos)
         self._nodo_fluidos.setExpanded(True)
@@ -392,7 +420,7 @@ class NavigatorPanel(QWidget):
         act = set(activos)
         for i, it in enumerate(getattr(self, '_comp_items', [])):
             nombre = "componente_hex_activo" if i in act else "componente_hex"
-            it.setIcon(0, icono(nombre, 16))
+            self._aplicar_icono(it, icono(nombre, 16))
 
     def set_fluidos(self, nombres):
         """Reconstruye el arbol de fluidos: cada fluido con sus 4
@@ -405,7 +433,7 @@ class NavigatorPanel(QWidget):
             nodo.addChild(fl)
             for clave, texto in FUNC_FLUIDO:
                 hoja = QTreeWidgetItem([texto])
-                hoja.setIcon(0, icono(clave, 16))
+                self._aplicar_icono(hoja, icono(clave, 16))
                 hoja.setData(0, Qt.ItemDataRole.UserRole, ('calc', nombre, clave))
                 fl.addChild(hoja)
             fl.setExpanded(True)
@@ -424,6 +452,24 @@ class NavigatorPanel(QWidget):
         for i in range(self.tree_datos.topLevelItemCount()):
             total += contar(self.tree_datos.topLevelItem(i))
         self.tree_datos.setFixedHeight(24 + 22 * max(total, 1))
+
+    def set_iconos_visibles(self, on):
+        """Muestra u oculta TODOS los iconos del árbol (Cálculos y Datos),
+        conservando la estructura y el estado. Reaplica el icono real guardado
+        en ROL_ICONO o uno vacío según corresponda."""
+        self._mostrar_iconos = bool(on)
+        for tree in (getattr(self, 'tree_calc', None),
+                     getattr(self, 'tree_datos', None)):
+            if tree is not None:
+                self._recorrer_iconos(tree.invisibleRootItem())
+
+    def _recorrer_iconos(self, item):
+        for i in range(item.childCount()):
+            hijo = item.child(i)
+            real = hijo.data(0, ROL_ICONO)
+            if real is not None:
+                hijo.setIcon(0, real if self._mostrar_iconos else QIcon())
+            self._recorrer_iconos(hijo)
 
     def sincronizar(self, clave):
         it = self._leaf_por_clave.get(clave)

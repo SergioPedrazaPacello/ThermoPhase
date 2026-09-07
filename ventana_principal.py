@@ -1878,6 +1878,14 @@ class MainWindow(QMainWindow):
         self._act_pts_critico.triggered.connect(
             lambda: self._set_modo_puntos_env('critico'))
 
+        # Mostrar / ocultar todos los iconos del programa (barra superior de
+        # selectores + árbol del navegador). Activado por defecto.
+        m_graf.addSeparator()
+        self._act_iconos = QAction("Mostrar iconos", self, checkable=True)
+        self._act_iconos.setChecked(True)
+        self._act_iconos.toggled.connect(self._toggle_iconos)
+        m_graf.addAction(self._act_iconos)
+
         # ── Herramientas ─────────────────────────────────────
         m_herr = menubar.addMenu("&Herramientas")
         m_herr.addAction(_act("&Asociar archivos .tpsim con este programa",
@@ -1923,6 +1931,19 @@ class MainWindow(QMainWindow):
         """Activa/desactiva el cursor de lectura en TODOS los gráficos."""
         self._cursor_activo = bool(on)
         self._aplicar_cursor_tabs()
+
+    def _toggle_iconos(self, on):
+        """Muestra u oculta TODOS los iconos del programa: los de la barra
+        superior de selectores y los del árbol del navegador."""
+        on = bool(on)
+        barra = getattr(self, 'ribbon', None)
+        if barra is not None and hasattr(barra, 'set_iconos_visibles'):
+            try: barra.set_iconos_visibles(on)
+            except Exception: pass
+        nav = getattr(self, 'nav', None)
+        if nav is not None and hasattr(nav, 'set_iconos_visibles'):
+            try: nav.set_iconos_visibles(on)
+            except Exception: pass
 
     def _aplicar_cursor_tabs(self):
         for win in self._subventanas.values():

@@ -72,6 +72,7 @@ TRAD = {
     "Gráficos": "Graphics",
     "&Gráficos": "&Graphics",
     "Activar cursor": "Enable cursor",
+    "Mostrar iconos": "Show icons",
     "Análisis de sensibilidad": "Sensitivity analysis",
     "Análisis de Sensibilidad": "Sensitivity Analysis",
     "Sensibilidad": "Sensitivity",
