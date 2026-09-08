@@ -10,12 +10,12 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox, QGridLayout, QFrame, QHeaderView,
     QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox,
     QAbstractSpinBox, QMenuBar, QFileDialog, QSplitter,
-    QMdiArea, QMdiSubWindow, QListWidget, QInputDialog
+    QMdiArea, QMdiSubWindow, QListWidget, QInputDialog, QStyledItemDelegate
 )
 import matplotlib
 matplotlib.use('QtAgg')
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QEvent
-from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QActionGroup, QKeySequence
+from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QActionGroup, QKeySequence, QPen
 
 from eos import (
     COMPONENTES, NOMBRES, PM, TC, PC, OMEGA, KIJ_DEFAULT, NC,
@@ -151,6 +151,29 @@ def cell(text, bg=WHITE, color=TEXT,
     if not editable:
         it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
     return it
+
+
+class GridDelegate(QStyledItemDelegate):
+    """Dibuja la rejilla de la tabla como líneas PLANAS de 1px (borde derecho
+    e inferior de cada celda), respetando el color de fondo de cada celda
+    (setBackground). Reemplaza al gridline nativo de Qt —que a DPI fraccional
+    se ve biselado/doble— y, a diferencia de un borde por CSS (QTableWidget::item
+    {border}), NO pisa los colores por celda. El marco superior/izquierdo lo
+    aporta el 'border-top'/'border-left' de la tabla."""
+    def __init__(self, color=BORDER, parent=None):
+        super().__init__(parent)
+        self._pen = QPen(QColor(color))
+        self._pen.setWidth(1)
+        self._pen.setCosmetic(True)   # 1 pixel de dispositivo, nítido a cualquier DPI
+
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index)   # fondo (BackgroundRole) + texto
+        painter.save()
+        painter.setPen(self._pen)
+        r = option.rect
+        painter.drawLine(r.right(), r.top(), r.right(), r.bottom())
+        painter.drawLine(r.left(), r.bottom(), r.right(), r.bottom())
+        painter.restore()
 
 def title_label(text):
     """Barra de título oscura."""
@@ -1253,14 +1276,14 @@ class TabParametros(QWidget):
         self.tbl_p.verticalHeader().hide()
         self.tbl_p.setShowGrid(False)
         self.tbl_p.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        # Rejilla PLANA de 1px con bordes CSS por celda (mismo aspecto que las
-        # tablas de Equilibrio de fases; evita el gridline nativo biselado).
+        # Rejilla PLANA de 1px vía delegado (mismo aspecto que Equilibrio de
+        # fases; preserva el color de fondo de cada celda).
         self.tbl_p.setStyleSheet(
             f'QTableWidget {{ background:{WHITE};'
             f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
-            f'QTableWidget::item {{ border-right:1px solid {BORDER};'
-            f'border-bottom:1px solid {BORDER};padding:2px 6px; }}')
+            f'QTableWidget::item {{ padding:2px 6px; }}')
+        self.tbl_p.setItemDelegate(GridDelegate(BORDER, self.tbl_p))
         for c,w in enumerate(WP): self.tbl_p.setColumnWidth(c,w)
         for r in range(NC+1): self.tbl_p.setRowHeight(r, ROW_H)
 
@@ -1291,8 +1314,8 @@ class TabParametros(QWidget):
             f'QTableWidget {{ background:{WHITE};'
             f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
-            f'QTableWidget::item {{ border-right:1px solid {BORDER};'
-            f'border-bottom:1px solid {BORDER};padding:2px 4px; }}')
+            f'QTableWidget::item {{ padding:2px 4px; }}')
+        self.tbl_k.setItemDelegate(GridDelegate(BORDER, self.tbl_k))
         self.tbl_k.setColumnWidth(0, WK)
         for c in range(1,NC+1): self.tbl_k.setColumnWidth(c, WK)
         for r in range(NC+1): self.tbl_k.setRowHeight(r, ROW_H)
