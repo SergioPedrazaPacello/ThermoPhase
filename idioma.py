@@ -72,7 +72,6 @@ TRAD = {
     "Gráficos": "Graphics",
     "&Gráficos": "&Graphics",
     "Activar cursor": "Enable cursor",
-    "Mostrar iconos": "Show icons",
     "Análisis de sensibilidad": "Sensitivity analysis",
     "Análisis de Sensibilidad": "Sensitivity Analysis",
     "Sensibilidad": "Sensitivity",
@@ -207,8 +206,6 @@ TRAD = {
     "Restaurar valores originales": "Restore original values",
     "Temperatura Critica (°R)": "Critical Temperature (°R)",
     "Presion Critica (psi)": "Critical Pressure (psi)",
-    "Temperatura Critica": "Critical Temperature",
-    "Presion Critica": "Critical Pressure",
     "Factor acentrico": "Acentric factor",
     "Peso Molecular (lb/lb-mol)": "Molecular Weight (lb/lb-mol)",
 
@@ -326,16 +323,6 @@ TRAD = {
     "Curva de Burbuja": "Bubble Curve", "Curva de Rocío": "Dew Curve",
     "Curva de Rocio": "Dew Curve", "vapor": "vapour", "Punto": "Point",
     "Punto crítico": "Critical point", "Punto critico": "Critical point",
-    "Curva de saturación": "Saturation curve",
-    "Curva de saturacion": "Saturation curve",
-    "Las curvas de isocalidad no están disponibles en "
-    "componentes puros.":
-        "Quality lines are not available for pure components.",
-    "El mapa de densidad no está disponible en componentes "
-    "puros (la saturación es una única curva, sin área "
-    "bifásica).":
-        "The density map is not available for pure components "
-        "(saturation is a single curve, with no two-phase area).",
     # Diálogos emergentes (títulos y mensajes)
     "ThermoPhase — Advertencia": "ThermoPhase — Warning",
     "ThermoPhase — Error": "ThermoPhase — Error",

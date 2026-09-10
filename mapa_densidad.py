@@ -208,17 +208,10 @@ def _envolvente_polygon_TP(resultado_env):
 
 # ── Función principal ───────────────────────────────────────────
 def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
-                           progress_cb=None, metodo='COSTALD', puro=False):
+                           progress_cb=None, metodo='COSTALD'):
     """Genera el mapa de densidad + polígono envolvente + curva de
     transición.  Todo en un solo paso para minimizar el ida-y-vuelta
     con el worker.
-
-    Si `puro=True` (composición de un solo componente) el mapa se calcula
-    SIN análisis de estabilidad bifásica y SIN polígono de relleno: un
-    componente puro no tiene área bifásica, sólo la línea de saturación
-    (que la capa de dibujo superpone aparte).  Se colorea toda la malla con
-    la densidad de la fase estable (líquido, vapor o supercrítico) y la
-    curva de saturación queda como frontera visible entre líquido y vapor.
 
     Retorna dict con:
       'P_max'        : P máxima recomendada del gráfico (psia)
@@ -279,32 +272,20 @@ def calcular_mapa_densidad(z, kij, resultado_env, n_grid=100, n_curva=40,
                 rho_map[j, i] = _rho_kgm3_en_punto(z, float(T), float(P), kij, PM, metodo)
             except Exception:
                 rho_map[j, i] = np.nan
-            # En un componente puro no hay región bifásica de área: el test de
-            # estabilidad marcaría como "inestable" casi toda la malla (por la
-            # raíz metaestable de la cúbica), lo cual NO es una zona bifásica.
-            # Por eso se omite; mask_bif queda en False en todos los nodos.
-            if not puro:
-                try:
-                    est = e.analisis_estabilidad(z, float(T), float(P), kij, max_iter=30)
-                    mask_bif[j, i] = bool(est.get('inestable', False))
-                except Exception:
-                    mask_bif[j, i] = False
+            try:
+                est = e.analisis_estabilidad(z, float(T), float(P), kij, max_iter=30)
+                mask_bif[j, i] = bool(est.get('inestable', False))
+            except Exception:
+                mask_bif[j, i] = False
             N_done += 1
         if progress_cb and (j % 10 == 0):
             pct = 15 + int(70 * N_done / N_total)
             progress_cb(pct, "Calculando densidad…")
 
     if progress_cb: progress_cb(88, "Ensamblando envolvente y transición…")
-    if puro:
-        # Sin polígono de relleno (no hay área bifásica) ni curva de
-        # transición supercrítica (la frontera es la propia curva de
-        # saturación, que se dibuja aparte).
-        poly = None
-        curva = {'T': np.array([]), 'P': np.array([])}
-    else:
-        poly = _envolvente_polygon_TP(resultado_env)
-        P_min_curva = max(Pmax_env * 1.01, 10.0)
-        curva = calcular_curva_transicion(z, kij, P_min_curva, P_max, n_pts=n_curva)
+    poly = _envolvente_polygon_TP(resultado_env)
+    P_min_curva = max(Pmax_env * 1.01, 10.0)
+    curva = calcular_curva_transicion(z, kij, P_min_curva, P_max, n_pts=n_curva)
 
     if progress_cb: progress_cb(100, "Listo")
     return {

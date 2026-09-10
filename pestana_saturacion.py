@@ -6,10 +6,10 @@ Mismo estilo (Arial Narrow) que el resto del programa.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
     QDoubleSpinBox, QGridLayout, QFrame, QTableWidget, QTableWidgetItem,
-    QHeaderView, QAbstractItemView, QSizePolicy, QAbstractSpinBox, QStyledItemDelegate
+    QHeaderView, QAbstractItemView, QSizePolicy, QAbstractSpinBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QColor, QBrush, QPen
+from PyQt6.QtGui import QColor, QBrush
 
 from eos import NOMBRES, NC
 import dialogos as dialogos
@@ -18,23 +18,6 @@ import eos as _eng
 import unidades as _u
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"
 GRAY_RES="#E8E8E8"; BORDER="#888888"; TEXT="#000000"; TEXT_DIM="#555555"
-
-
-class GridDelegate(QStyledItemDelegate):
-    """Rejilla PLANA de 1px (borde derecho e inferior de cada celda) que
-    respeta el color de fondo por celda. Reemplaza al gridline nativo (que a
-    DPI fraccional se ve biselado) sin pisar los setBackground como sí lo hace
-    un borde por CSS."""
-    def __init__(self, color=BORDER, parent=None):
-        super().__init__(parent)
-        self._pen = QPen(QColor(color)); self._pen.setWidth(1); self._pen.setCosmetic(True)
-
-    def paint(self, painter, option, index):
-        super().paint(painter, option, index)
-        painter.save(); painter.setPen(self._pen); r = option.rect
-        painter.drawLine(r.right(), r.top(), r.right(), r.bottom())
-        painter.drawLine(r.left(), r.bottom(), r.right(), r.bottom())
-        painter.restore()
 TEXT_RES="#000080"; FONT_F="Arial Narrow"; FS=10
 ROW_H = 22
 
@@ -296,7 +279,6 @@ class TabSaturacion(QWidget):
 
         # Layout horizontal: entrada (izq) + resultado (der), repartido 50/50
         top_row=QHBoxLayout(); top_row.setSpacing(10)
-        top_row.setContentsMargins(0,0,0,0)
         in_wrap=QVBoxLayout(); in_wrap.setSpacing(3)
         in_title=QLabel("Datos de entrada:")
         in_title.setStyleSheet(LBL_SEC); in_title.setFixedHeight(20)
@@ -305,17 +287,11 @@ class TabSaturacion(QWidget):
         top_row.addLayout(in_wrap, 1)      # entrada ocupa mitad
         top_row.addLayout(res_outer, 1)    # resultado ocupa mitad
         top_row.setAlignment(Qt.AlignmentFlag.AlignTop)
-        # Envolver en un contenedor con política vertical Maximum para que el
-        # layout NO reserve más alto que el contenido (evita ~20 px de hueco
-        # muerto entre este panel y "Composicion de las fases en equilibrio").
-        top_wrap=QWidget(); top_wrap.setLayout(top_row)
-        top_wrap.setStyleSheet('background:transparent;')
-        top_wrap.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
-        root.addWidget(top_wrap)
+        root.addLayout(top_row)
 
         # ── Tabla de composiciones de las fases ───────────────
         comp_title=QLabel("Composicion de las fases en equilibrio:")
-        comp_title.setStyleSheet(LBL_SEC); comp_title.setFixedHeight(22)
+        comp_title.setStyleSheet(LBL_SEC); comp_title.setFixedHeight(20)
         root.addWidget(comp_title)
 
         self.tbl=QTableWidget(NC+1, 3)
@@ -324,20 +300,11 @@ class TabSaturacion(QWidget):
         self.tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        # Rejilla PLANA de 1px dibujada con bordes CSS por celda (no el gridline
-        # nativo de Windows, que se ve biselado/doble a ciertos DPI). Igual
-        # aspecto que las tablas de Equilibrio de fases: borde superior/izquierdo
-        # en la tabla y borde derecho/inferior en cada celda -> 1px sin duplicar.
-        self.tbl.setShowGrid(False)
         self.tbl.setStyleSheet(
-            f'QTableWidget {{ background:{WHITE};'
-            f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
-            f'QTableWidget::item {{ padding:0px 6px; }}'
-            f'QHeaderView::section {{ background:{GRAY_HDR};border:none;'
-            f'border-right:1px solid {BORDER};border-bottom:1px solid {BORDER};'
+            f'QTableWidget {{ border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
+            f'QHeaderView::section {{ background:{GRAY_HDR};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px; }}')
-        self.tbl.setItemDelegate(GridDelegate(BORDER, self.tbl))
         hh=self.tbl.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -352,7 +319,7 @@ class TabSaturacion(QWidget):
                                QSizePolicy.Policy.Fixed)
 
         GRIS_NOMBRE = QColor("#E8E8E8")   # gris claro para nombres
-        GRIS_RES = QColor(GRAY_RES)       # gris para celdas de resultado vacías
+        BLANCO = QColor(WHITE)
         for i in range(NC):
             it=QTableWidgetItem(NOMBRES[i].rstrip(':'))
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
@@ -361,7 +328,7 @@ class TabSaturacion(QWidget):
             for c in (1,2):
                 cell=QTableWidgetItem("")
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-                cell.setBackground(QBrush(GRIS_RES))
+                cell.setBackground(QBrush(BLANCO))
                 self.tbl.setItem(i,c,cell)
         # Fila sumatorias
         sit=QTableWidgetItem("Sumatorias:")
@@ -371,7 +338,7 @@ class TabSaturacion(QWidget):
         for c in (1,2):
             cell=QTableWidgetItem("")
             cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-            cell.setBackground(QBrush(GRIS_RES))
+            cell.setBackground(QBrush(BLANCO))
             self.tbl.setItem(NC,c,cell)
 
         root.addWidget(self.tbl)
@@ -382,11 +349,9 @@ class TabSaturacion(QWidget):
         prop_hdr = QHBoxLayout()
         prop_hdr.setContentsMargins(0, 0, 0, 0); prop_hdr.setSpacing(6)
         prop_title=QLabel("Propiedades del punto de saturacion:")
-        prop_title.setStyleSheet(LBL_SEC); prop_title.setFixedHeight(22)
+        prop_title.setStyleSheet(LBL_SEC); prop_title.setFixedHeight(20)
         prop_hdr.addWidget(prop_title, 1)
         self.btn_props = QPushButton("Propiedades")
-        # Misma altura que los encabezados de sección de Equilibrio de fases
-        # (section_label = 22 px) y que el título contiguo.
         self.btn_props.setFixedHeight(22); self.btn_props.setFixedWidth(120)
         self.btn_props.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_props.setStyleSheet(
@@ -404,16 +369,11 @@ class TabSaturacion(QWidget):
         self.tbl_prop.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl_prop.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.tbl_prop.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.tbl_prop.setShowGrid(False)
         self.tbl_prop.setStyleSheet(
-            f'QTableWidget {{ background:{WHITE};'
-            f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
-            f'QTableWidget::item {{ padding:0px 6px; }}'
-            f'QHeaderView::section {{ background:{GRAY_HDR};border:none;'
-            f'border-right:1px solid {BORDER};border-bottom:1px solid {BORDER};'
+            f'QTableWidget {{ border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
+            f'QHeaderView::section {{ background:{GRAY_HDR};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt;padding:2px; }}')
-        self.tbl_prop.setItemDelegate(GridDelegate(BORDER, self.tbl_prop))
         hp=self.tbl_prop.horizontalHeader()
         hp.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hp.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -453,7 +413,7 @@ class TabSaturacion(QWidget):
         seleccionadas, en el orden del catalogo. Solo arma etiquetas y celdas
         vacias; los valores los rellena _render."""
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
-        GRIS = QColor(GRAY_RES); GRIS_RES = QColor(GRAY_RES)
+        GRIS = QColor(GRAY_RES); BLANCO_P = QColor(WHITE)
         self.tbl_prop.setRowCount(len(sel))
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
             self.tbl_prop.setRowHeight(r, ROW_H)
@@ -465,7 +425,7 @@ class TabSaturacion(QWidget):
             for c in (1, 2):
                 cc = QTableWidgetItem("")
                 cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-                cc.setBackground(QBrush(GRIS_RES))
+                cc.setBackground(QBrush(BLANCO_P))
                 self.tbl_prop.setItem(r, c, cc)
         self._fit_table_heights()
 
@@ -744,8 +704,6 @@ class TabSaturacion(QWidget):
             self.tbl.item(i,2).setForeground(QBrush(QColor(TEXT_RES)))
         self.tbl.item(NC,1).setText(f"{sy:.4f}")
         self.tbl.item(NC,2).setText(f"{sx:.4f}")
-        self.tbl.item(NC,1).setBackground(QBrush(QColor(WHITE)))
-        self.tbl.item(NC,2).setBackground(QBrush(QColor(WHITE)))
 
         # Llenar panel de propiedades (solo las seleccionadas, en orden)
         p=res.get('props',{})
@@ -774,11 +732,6 @@ class TabSaturacion(QWidget):
             self.tbl_prop.item(r,2).setText(fmt.format(vl) if vl is not None else "")
             self.tbl_prop.item(r,1).setForeground(QBrush(QColor(TEXT_RES)))
             self.tbl_prop.item(r,2).setForeground(QBrush(QColor(TEXT_RES)))
-            # Fondo: blanco si hay valor, gris si vacío (igual que Equilibrio).
-            self.tbl_prop.item(r,1).setBackground(
-                QBrush(QColor(WHITE if vv is not None else GRAY_RES)))
-            self.tbl_prop.item(r,2).setBackground(
-                QBrush(QColor(WHITE if vl is not None else GRAY_RES)))
 
     # ── Guardar / restaurar estado ────────────────────────────
     def get_estado(self):

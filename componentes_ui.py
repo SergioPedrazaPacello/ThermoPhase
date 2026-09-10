@@ -97,6 +97,24 @@ def _valor_convertido(idx, nombre_array, magnitud, decimales):
     """Valor de una propiedad convertido al sistema activo, formateado."""
     if nombre_array is None:
         return ""
+    # Agua (índice 13): sus propiedades viven en constantes AGUA_* de eos.py.
+    # Se aplican tanto a la columna HYSYS como a la de PVTsim (mismos valores).
+    if idx == getattr(_eng, 'IDX_AGUA', 13):
+        mapa = {
+            'PM': _eng.AGUA_PM, 'PM_PVT': _eng.AGUA_PM,
+            'TC': _eng.AGUA_TC, 'TC_PVT': _eng.AGUA_TC,
+            'PC': _eng.AGUA_PC, 'PC_PVT': _eng.AGUA_PC,
+            'OMEGA': _eng.AGUA_OMEGA, 'OMEGA_SRK': _eng.AGUA_OMEGA,
+            'OMEGA_PVT': _eng.AGUA_OMEGA, 'NBP': _eng.AGUA_NBP,
+        }
+        if nombre_array not in mapa:
+            return ""             # propiedad sin dato para el agua (p.ej. VC)
+        val = mapa[nombre_array]
+        if magnitud == 'T_abs':
+            val = _u.abs_desde_R(val)
+        elif magnitud == 'P':
+            val = _u.p_desde_psia(val)
+        return str(val) if decimales is None else f"{val:.{decimales}f}"
     arr = getattr(_eng, nombre_array, None)
     if arr is None or idx >= len(arr):
         return ""
@@ -144,7 +162,7 @@ class VentanaPropComponente(QWidget):
         root.setContentsMargins(13, 9, 13, 9); root.setSpacing(3)
 
         # Título con el nombre del componente
-        nombre = _eng.NOMBRES[self.idx].rstrip(':')
+        nombre = _eng.componente_etiqueta(self.idx).rstrip(":")
         title = QLabel(f"ThermoPhase — {nombre}")
         title.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         title.setFixedHeight(22)
@@ -164,9 +182,9 @@ class VentanaPropComponente(QWidget):
                 if unidad:
                     et_full = f"{et_full} [{unidad}]"
                 if etiqueta == "Nombre":
-                    valor = _eng.NOMBRES[self.idx].rstrip(':')
+                    valor = _eng.componente_etiqueta(self.idx).rstrip(":")
                 elif etiqueta == "Símbolo":
-                    valor = _eng.COMPONENTES[self.idx]
+                    valor = _eng.componente_nombre(self.idx)
                 else:
                     valor = _valor_convertido(self.idx, arr, magnitud, dec)
                 filas.append(('prop', et_full, valor))
@@ -237,12 +255,16 @@ class VentanaGestorComponentes(QWidget):
 
     def __init__(self, seleccionados=None, on_cambio=None):
         super().__init__()
-        # Por defecto, todos los componentes están seleccionados
+        # Por defecto, los 13 HC están seleccionados y el AGUA (índice 13) NO.
+        # El total de componentes disponibles es NC+1 (13 HC + agua opcional).
         if seleccionados is None:
-            seleccionados = list(range(_eng.NC))
+            seleccionados = list(range(_eng.NC))   # sin agua
         self._sel = list(seleccionados)
         self._on_cambio = on_cambio    # callback(lista_indices) al cambiar
         self._build()
+
+    # Total de componentes disponibles en el gestor (13 HC + agua).
+    _N_TOTAL = property(lambda self: _eng.NC + 1)
 
     def _indices_seleccionados(self):
         """Índices de componentes actualmente en la lista de seleccionados,
@@ -294,10 +316,10 @@ class VentanaGestorComponentes(QWidget):
 
         root.addLayout(cols)
 
-        # Poblar listas
+        # Poblar listas (13 HC + agua opcional en índice 13)
         for i in self._sel:
             self._add_item(self.lista_sel, i)
-        for i in range(_eng.NC):
+        for i in range(_eng.NC + 1):
             if i not in self._sel:
                 self._add_item(self.lista_disp, i)
 
@@ -325,7 +347,7 @@ class VentanaGestorComponentes(QWidget):
         self._actualizar()
 
     def _add_item(self, lista, idx):
-        nombre = _eng.NOMBRES[idx].rstrip(':')
+        nombre = _eng.componente_etiqueta(idx).rstrip(':')
         it = QListWidgetItem(nombre)
         it.setData(Qt.ItemDataRole.UserRole, idx)
         # Insertar en orden canónico (por índice de componente)
@@ -337,7 +359,7 @@ class VentanaGestorComponentes(QWidget):
 
     def _actualizar(self):
         n = self.lista_sel.count()
-        self.contador.setText(_i18n.t("Seleccionados: ") + f"{n} / {_eng.NC}")
+        self.contador.setText(_i18n.t("Seleccionados: ") + f"{n} / {_eng.NC + 1}")
         self.btn_add.setEnabled(self.lista_disp.count() > 0)
         # No permitir quitar el último componente (siempre al menos 1)
         self.btn_rem.setEnabled(self.lista_sel.count() > 1)
