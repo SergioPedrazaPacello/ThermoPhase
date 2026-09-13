@@ -666,6 +666,35 @@ def _documentacion(p):
 
 
 # ── Registro nombre -> funcion de dibujo ─────────────────────
+def _hidratos(p):
+    # Copo de nieve / cristal hexagonal, alusivo al hidrato de gas (jaula de
+    # agua). Tres ejes a 60° con pequenas ramas, en verde (mismo verde de la
+    # curva de hidratos e isocalidades).
+    import math as _m
+    cx, cy, R = 17.0, 16.0, 11.0
+    p.setPen(_pen(QColor("#27ae60"), 1.8, cap=Qt.PenCapStyle.RoundCap))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    for k in range(3):
+        ang = _m.radians(60*k)
+        dx, dy = _m.cos(ang), _m.sin(ang)
+        x0, y0 = cx - R*dx, cy - R*dy
+        x1, y1 = cx + R*dx, cy + R*dy
+        p.drawLine(QPointF(x0, y0), QPointF(x1, y1))
+        # ramitas en cada extremo
+        for (ex, ey) in ((x0, y0), (x1, y1)):
+            for s in (+1, -1):
+                ba = ang + s*_m.radians(50)
+                p.drawLine(QPointF(ex, ey),
+                           QPointF(ex - 3.4*_m.cos(ba), ey - 3.4*_m.sin(ba))
+                           if (ex, ey) == (x1, y1) else
+                           QPointF(ex + 3.4*_m.cos(ba), ey + 3.4*_m.sin(ba)))
+    # nucleo hexagonal pequeno
+    hexp = [(cx + 3.0*_m.cos(_m.radians(60*i)),
+             cy + 3.0*_m.sin(_m.radians(60*i))) for i in range(6)]
+    p.setPen(_pen(QColor("#145214"), 1.3))
+    p.drawPolygon(_poly(hexp))
+
+
 _REGISTRO = {
     # archivo
     "nuevo": _nuevo_doc, "abrir": _abrir, "guardar": _guardar,
@@ -691,6 +720,7 @@ _REGISTRO = {
     # navegador / pestanas
     "equilibrio": _equilibrio, "envolvente": _envolvente,
     "saturacion": _saturacion, "propiedades": _propiedades,
+    "hidratos": _hidratos,
     "parametros": _parametros, "corriente": _corriente,
     # barra de herramientas
     "eos": _eos, "densidad": _densidad, "unidades": _unidades,

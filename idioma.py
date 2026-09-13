@@ -72,6 +72,7 @@ TRAD = {
     "Gráficos": "Graphics",
     "&Gráficos": "&Graphics",
     "Activar cursor": "Enable cursor",
+    "Mostrar iconos": "Show icons",
     "Análisis de sensibilidad": "Sensitivity analysis",
     "Análisis de Sensibilidad": "Sensitivity Analysis",
     "Sensibilidad": "Sensitivity",
@@ -206,6 +207,8 @@ TRAD = {
     "Restaurar valores originales": "Restore original values",
     "Temperatura Critica (°R)": "Critical Temperature (°R)",
     "Presion Critica (psi)": "Critical Pressure (psi)",
+    "Temperatura Critica": "Critical Temperature",
+    "Presion Critica": "Critical Pressure",
     "Factor acentrico": "Acentric factor",
     "Peso Molecular (lb/lb-mol)": "Molecular Weight (lb/lb-mol)",
 
@@ -321,8 +324,19 @@ TRAD = {
     "Temperatura (°F)": "Temperature (°F)", "Presión (psia)": "Pressure (psia)",
     "Presion (psia)": "Pressure (psia)", "Temperatura (°R)": "Temperature (°R)",
     "Curva de Burbuja": "Bubble Curve", "Curva de Rocío": "Dew Curve",
+    "Curva de Hidratos": "Hydrate Curve", "Hidratos": "Hydrates",
     "Curva de Rocio": "Dew Curve", "vapor": "vapour", "Punto": "Point",
     "Punto crítico": "Critical point", "Punto critico": "Critical point",
+    "Curva de saturación": "Saturation curve",
+    "Curva de saturacion": "Saturation curve",
+    "Las curvas de isocalidad no están disponibles en "
+    "componentes puros.":
+        "Quality lines are not available for pure components.",
+    "El mapa de densidad no está disponible en componentes "
+    "puros (la saturación es una única curva, sin área "
+    "bifásica).":
+        "The density map is not available for pure components "
+        "(saturation is a single curve, with no two-phase area).",
     # Diálogos emergentes (títulos y mensajes)
     "ThermoPhase — Advertencia": "ThermoPhase — Warning",
     "ThermoPhase — Error": "ThermoPhase — Error",
@@ -402,6 +416,17 @@ TRAD = {
     "Presion": "Pressure", "Temperatura": "Temperature",
     "Densidad masica": "Mass density", "Entalpia molar": "Molar enthalpy",
     "Entropia molar": "Molar entropy", "Sistema de unidades:": "Unit system:", "Equivalente": "Equivalent",
+    "Temperatura de Hidrato": "Hydrate Temperature", "Presion de Hidrato": "Hydrate Pressure",
+    "Formación de hidratos": "Hydrate Formation", "Formación de Hidratos": "Hydrate Formation",
+    "Estructura": "Structure",
+    "Calcular formacion de hidrato": "Calculate hydrate formation",
+    "Agregar curva de formacion de hidrato": "Add hydrate formation curve",
+    "Quitar curva de formacion de hidrato": "Remove hydrate formation curve",
+    "Datos de entrada:": "Input data:",
+    "Composicion de las fases en equilibrio:": "Equilibrium phase composition:",
+    "Propiedades del punto de hidrato:": "Hydrate point properties:",
+    "No se encontró punto de formación de hidrato en el rango.":
+        "No hydrate formation point found in range.",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

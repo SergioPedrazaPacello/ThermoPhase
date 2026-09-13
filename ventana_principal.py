@@ -10,12 +10,12 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox, QGridLayout, QFrame, QHeaderView,
     QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox,
     QAbstractSpinBox, QMenuBar, QFileDialog, QSplitter,
-    QMdiArea, QMdiSubWindow, QListWidget, QInputDialog
+    QMdiArea, QMdiSubWindow, QListWidget, QInputDialog, QStyledItemDelegate
 )
 import matplotlib
 matplotlib.use('QtAgg')
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QEvent
-from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QActionGroup, QKeySequence
+from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QActionGroup, QKeySequence, QPen
 
 from eos import (
     COMPONENTES, NOMBRES, PM, TC, PC, OMEGA, KIJ_DEFAULT, NC,
@@ -24,6 +24,7 @@ from eos import (
 import eos as _eng
 from pestana_envolvente import TabEnvolvente
 from pestana_saturacion import TabSaturacion
+from pestana_hidratos import TabHidratos
 from pestana_propiedades import TabPropiedades
 import dialogos as dialogos
 from rutas import ruta_recurso
@@ -152,6 +153,29 @@ def cell(text, bg=WHITE, color=TEXT,
         it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
     return it
 
+
+class GridDelegate(QStyledItemDelegate):
+    """Dibuja la rejilla de la tabla como líneas PLANAS de 1px (borde derecho
+    e inferior de cada celda), respetando el color de fondo de cada celda
+    (setBackground). Reemplaza al gridline nativo de Qt —que a DPI fraccional
+    se ve biselado/doble— y, a diferencia de un borde por CSS (QTableWidget::item
+    {border}), NO pisa los colores por celda. El marco superior/izquierdo lo
+    aporta el 'border-top'/'border-left' de la tabla."""
+    def __init__(self, color=BORDER, parent=None):
+        super().__init__(parent)
+        self._pen = QPen(QColor(color))
+        self._pen.setWidth(1)
+        self._pen.setCosmetic(True)   # 1 pixel de dispositivo, nítido a cualquier DPI
+
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index)   # fondo (BackgroundRole) + texto
+        painter.save()
+        painter.setPen(self._pen)
+        r = option.rect
+        painter.drawLine(r.right(), r.top(), r.right(), r.bottom())
+        painter.drawLine(r.left(), r.bottom(), r.right(), r.bottom())
+        painter.restore()
+
 def title_label(text):
     """Barra de título oscura."""
     lbl = QLabel(text)
@@ -207,14 +231,6 @@ W_LBL  = 255   # columna de etiqueta
 W_VAL  = 140   # columna de valor (Vapor o Líquido)
 W_COMP = 290   # columna nombre de componente
 ROW_H  = 22
-
-# Anchos en MODO AGUA (5 columnas: etiqueta + Mezcla/General + Vapor + Líquido +
-# Acuosa). Se conserva el ancho total de la tabla (W_COMP + 3·W_VAL = 710)
-# reduciendo la columna de nombres y las de valor para que entre la 5ª columna
-# sin cambiar el ancho de la ventana.
-#   W_COMP_A + 4·W_VAL_A = W_COMP + 3·W_VAL = 710
-W_COMP_A = 230
-W_VAL_A  = 120     # 230 + 4·120 = 710 (igual ancho total)
 
 # Propiedades del resumen de resultados (selector). Orden canonico:
 # (key, etiqueta_base, unidad_mag_o_None, decimales, tiene_valor_de_mezcla)
@@ -503,14 +519,25 @@ class TabEquilibrio(QWidget):
         res_hdr_row.addWidget(self.btn_props, 0)
         root.addLayout(res_hdr_row)
 
-        # Cabecera de columnas del resumen (plomo medio). 5 columnas: la 5ª
-        # (Fase Acuosa) nace OCULTA y se muestra al activar el agua.
-        hdr_res = make_table(1, 5)
+        # Cabecera de columnas del resumen (plomo medio)
+        # Anchos del resumen = mismos que composicion para alinear columnas
+        WR0 = W_COMP        # 290 — etiqueta
+        WR1 = 100           # Mezcla
+        WR2 = W_VAL         # Vapor  (140)
+        WR3 = W_VAL         # Liquida(140)
+        # Total = 290+100+140+140 = 670 — coincide con W_COMP+3*W_VAL si W_VAL=126.6
+        # Ajustamos W_VAL para que todo sume igual:
+        # W_COMP + 3*W_VAL = WR0+WR1+WR2+WR3 → 290+3*W_VAL = 290+100+2*W_VAL → W_VAL=100
+        # Mejor: fijamos total = W_COMP+W_VAL*3 y distribuimos:
+        # WR0=W_COMP, WR1+WR2+WR3 = W_VAL*3 → WR1=W_VAL-40, WR2=WR3=(W_VAL*3-(W_VAL-40))/2
+        WR1 = W_VAL   # misma anchura que Vapor y Liquida
+        WR2 = W_VAL
+        WR3 = W_VAL
+        hdr_res = make_table(1, 4)
         hdr_res.setColumnWidth(0, W_COMP)
-        hdr_res.setColumnWidth(1, W_VAL)
-        hdr_res.setColumnWidth(2, W_VAL)
-        hdr_res.setColumnWidth(3, W_VAL)
-        hdr_res.setColumnWidth(4, W_VAL_A)
+        hdr_res.setColumnWidth(1, WR1)
+        hdr_res.setColumnWidth(2, WR2)
+        hdr_res.setColumnWidth(3, WR3)
         hdr_res.setItem(0,0, cell("", bg=GRAY_LBL))
         hdr_res.setItem(0,1, cell("Mezcla", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
@@ -518,21 +545,19 @@ class TabEquilibrio(QWidget):
             align=Qt.AlignmentFlag.AlignCenter))
         hdr_res.setItem(0,3, cell("Fase Liquida", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
-        hdr_res.setItem(0,4, cell("Fase Acuosa", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter))
-        hdr_res.setColumnHidden(4, True)
-        self.hdr_res = hdr_res
         fix_table_size(hdr_res)
         root.addWidget(hdr_res)
 
-        # Tabla de datos del resumen (5 columnas; acuosa oculta por defecto)
-        self.tbl_res = make_table(6, 5)
+        # Tabla de datos del resumen
+        # Filas: ff_mol, ff_mas, grav, dens, Z, PM
+        # Tabla resumen: 4 columnas
+        # col0=etiqueta, col1=mezcla(solo dens y PM), col2=Fase Vapor, col3=Fase Liquida
+        # Para filas sin mezcla: col1 queda plomo/vacía, col2 y col3 tienen los valores
+        self.tbl_res = make_table(6, 4)
         self.tbl_res.setColumnWidth(0, W_COMP)
         self.tbl_res.setColumnWidth(1, W_VAL)
         self.tbl_res.setColumnWidth(2, W_VAL)
         self.tbl_res.setColumnWidth(3, W_VAL)
-        self.tbl_res.setColumnWidth(4, W_VAL_A)
-        self.tbl_res.setColumnHidden(4, True)
 
         # Propiedades seleccionadas (por defecto, las 6 clásicas)
         self._props_sel = list(PROP_DEFAULT)
@@ -545,13 +570,12 @@ class TabEquilibrio(QWidget):
         # ── BLOQUE COMPOSICIÓN ────────────────────────────────
         root.addWidget(section_label("Composicion de las fases:", left=True))
 
-        # Cabecera de composición (2 niveles), 5 columnas (acuosa oculta)
-        hdr_comp = make_table(2, 5)
+        # Cabecera de composición (2 niveles)
+        hdr_comp = make_table(2, 4)
         hdr_comp.setRowHeight(0, ROW_H)
         hdr_comp.setRowHeight(1, ROW_H)
         hdr_comp.setColumnWidth(0, W_COMP)
         for c in [1,2,3]: hdr_comp.setColumnWidth(c, W_VAL)
-        hdr_comp.setColumnWidth(4, W_VAL_A)
 
         hdr_comp.setItem(0,0, cell("Componente", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
@@ -561,8 +585,6 @@ class TabEquilibrio(QWidget):
             align=Qt.AlignmentFlag.AlignCenter))
         hdr_comp.setItem(0,3, cell("Fase Liquida", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter))
-        hdr_comp.setItem(0,4, cell("Fase Acuosa", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter))
 
         hdr_comp.setItem(1,0, cell("", bg=GRAY_LBL))
         self.hdr_comp_gen  = cell("Fraccion Molar", bg=GRAY_LBL,
@@ -571,24 +593,16 @@ class TabEquilibrio(QWidget):
             align=Qt.AlignmentFlag.AlignCenter)
         self.hdr_comp_liq  = cell("Fraccion molar", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter)
-        self.hdr_comp_aq   = cell("Fraccion molar", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignCenter)
         hdr_comp.setItem(1,1, self.hdr_comp_gen)
         hdr_comp.setItem(1,2, self.hdr_comp_vap)
         hdr_comp.setItem(1,3, self.hdr_comp_liq)
-        hdr_comp.setItem(1,4, self.hdr_comp_aq)
-        hdr_comp.setColumnHidden(4, True)
-        self.hdr_comp = hdr_comp
         fix_table_size(hdr_comp)
         root.addWidget(hdr_comp)
 
-        # Tabla de componentes (NC+1 HC-filas + 1 fila agua + 1 fila suma).
-        # La fila del agua (índice NC) nace oculta; se muestra al activar agua.
-        self.tbl_comp = make_table(NC+2, 5)
+        # Tabla de componentes
+        self.tbl_comp = make_table(NC+1, 4)
         self.tbl_comp.setColumnWidth(0, W_COMP)
         for c in [1,2,3]: self.tbl_comp.setColumnWidth(c, W_VAL)
-        self.tbl_comp.setColumnWidth(4, W_VAL_A)
-        self.tbl_comp.setColumnHidden(4, True)
 
         for i in range(NC):
             self.tbl_comp.setItem(i, 0, cell(
@@ -597,24 +611,14 @@ class TabEquilibrio(QWidget):
             self.tbl_comp.setItem(i, 1, cell("", bg=WHITE, editable=True))
             self.tbl_comp.setItem(i, 2, cell("", bg=GRAY_RES, color=TEXT_RES))
             self.tbl_comp.setItem(i, 3, cell("", bg=GRAY_RES, color=TEXT_RES))
-            self.tbl_comp.setItem(i, 4, cell("", bg=GRAY_RES, color=TEXT_RES))
 
-        # Fila del AGUA (índice NC = 13). Nace oculta; se muestra al activarla.
-        self.tbl_comp.setItem(NC, 0, cell(
-            _eng.componente_etiqueta(NC).rstrip(':'), bg=GRAY_LBL,
+        # Fila de sumatorias dentro de tbl_comp (fila NC)
+        self.tbl_comp.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
-        self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE, editable=True))
-        self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_RES, color=TEXT_RES))
-        self.tbl_comp.setItem(NC, 3, cell("", bg=GRAY_RES, color=TEXT_RES))
-        self.tbl_comp.setItem(NC, 4, cell("", bg=GRAY_RES, color=TEXT_RES))
-        self.tbl_comp.setRowHidden(NC, True)
-
-        # Fila de sumatorias dentro de tbl_comp (fila NC+1)
-        self.tbl_comp.setItem(NC+1, 0, cell("Sumatorias:", bg=GRAY_LBL,
-            align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
-        for c in [1,2,3,4]:
-            self.tbl_comp.setItem(NC+1, c, cell("", bg=GRAY_RES if c>1 else WHITE))
-        self.sum_row = NC+1  # índice de la fila sumatoria dentro de tbl_comp
+        self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE))
+        self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_RES))
+        self.tbl_comp.setItem(NC, 3, cell("", bg=GRAY_RES))
+        self.sum_row = NC  # índice de la fila sumatoria dentro de tbl_comp
         fix_table_size(self.tbl_comp)
         self.tbl_comp.itemChanged.connect(self._on_item_changed)
         root.addWidget(self.tbl_comp)
@@ -767,58 +771,33 @@ class TabEquilibrio(QWidget):
         self._upd_suma()
 
     def get_z(self):
-        """Composición de 14 componentes (índice 13 = agua). Un componente
-        oculto (no activo) cuenta como fracción 0."""
         z = []
-        for i in range(NC+1):        # 13 HC + agua
+        for i in range(NC):
+            # Un componente oculto (quitado en el gestor) no entra en la
+            # mezcla: se comporta como fraccion 0 sin necesidad de tocar su
+            # celda ni el motor de calculo.
             if self.tbl_comp.isRowHidden(i):
                 z.append(0.0); continue
             try: z.append(float(self.tbl_comp.item(i,1).text()))
             except: z.append(0.0)
         return z
 
-    def agua_activa(self):
-        """True si la fila del agua está visible (agua activada)."""
-        return not self.tbl_comp.isRowHidden(NC)
-
     def aplicar_componentes(self, activos):
-        """Muestra las filas de los componentes activos (incluida el agua, si
-        está en la lista) y muestra/oculta la columna de Fase Acuosa. El ancho
-        de la ventana no cambia: las columnas se reajustan (modo agua = 5 col
-        más angostas). Cambio estético; los ocultos entran como fracción 0."""
+        """Muestra unicamente las filas de los componentes activos y reajusta
+        la tabla a su contenido (cambio puramente estetico: los ocultos no
+        entran en la mezcla porque get_z los devuelve como 0)."""
         act = set(activos)
-        agua_on = NC in act
         for i in range(NC):
             self.tbl_comp.setRowHidden(i, i not in act)
-        self.tbl_comp.setRowHidden(NC, not agua_on)      # fila agua
-        # columna Fase Acuosa (col 4) en las tres tablas
-        for tb in (self.hdr_res, self.tbl_res, self.hdr_comp, self.tbl_comp):
-            tb.setColumnHidden(4, not agua_on)
-        # anchos: modo agua compacta la columna de nombres y las de valor
-        self._reajustar_anchos(agua_on)
+        # La fila de Sumatorias (indice NC) nunca se oculta.
         fix_table_size(self.tbl_comp)
-        fix_table_size(self.tbl_res)
-        fix_table_size(self.hdr_res)
-        fix_table_size(self.hdr_comp)
         self._upd_suma()
 
-    def _reajustar_anchos(self, agua_on):
-        """Redistribuye anchos de columna para que la 5ª (acuosa) entre sin
-        cambiar el ancho total de la ventana."""
-        wc = W_COMP_A if agua_on else W_COMP
-        wv = W_VAL_A if agua_on else W_VAL
-        for tb in (self.hdr_res, self.tbl_res, self.hdr_comp, self.tbl_comp):
-            tb.setColumnWidth(0, wc)
-            for c in (1,2,3,4):
-                tb.setColumnWidth(c, wv)
-
     def set_z(self, z):
-        """Carga una composicion (lista de fracciones) en la tabla, incluida
-        el agua si viene el 14° valor."""
+        """Carga una composicion (lista de NC fracciones) en la tabla."""
         self.tbl_comp.blockSignals(True)
-        for i in range(NC+1):
-            v = z[i] if i < len(z) else 0.0
-            self.tbl_comp.item(i, 1).setText(f"{v:.4f}")
+        for i in range(NC):
+            self.tbl_comp.item(i, 1).setText(f"{z[i] if i < len(z) else 0.0:.4f}")
         self.tbl_comp.blockSignals(False)
         self._upd_suma()
 
@@ -832,7 +811,7 @@ class TabEquilibrio(QWidget):
         z = self.get_z(); s = sum(z)
         if s <= 0: return
         self.tbl_comp.blockSignals(True)
-        for i in range(NC+1):
+        for i in range(NC):
             self.tbl_comp.item(i,1).setText(f"{z[i]/s:.4f}")
         self.tbl_comp.blockSignals(False)
         self._upd_suma()  # actualiza fila sumatorias
@@ -872,8 +851,7 @@ class TabEquilibrio(QWidget):
         _set_eos(eos_code)
         kij = self._kij_get() if self._kij_get is not None else kij_user
         # Contexto para calcular entalpia/entropia al recibir el resultado.
-        # Sin agua se usan 13 componentes (el motor HS es de 13).
-        self._hs_ctx = (list(z[:NC]), self.get_T(), self.get_P(), kij, eos_code)
+        self._hs_ctx = (list(z), self.get_T(), self.get_P(), kij, eos_code)
         # Método de densidad efectivo.  Cada ventana de equilibrio tiene su
         # propio selector de corrección de volumen: si está en Peneloux,
         # prevalece sobre el selector de densidad (bloqueado en EOS); si no,
@@ -883,24 +861,7 @@ class TabEquilibrio(QWidget):
         else:
             metodo_dens = self.cmb_dens.currentText()
         self._metodo_densidad_actual = metodo_dens
-        # Si el agua está activa, usar el flash TRIFÁSICO (vapor-líquido-acuosa).
-        if self.agua_activa() and z[NC] > 1e-12:
-            try:
-                import flash_agua as _fa
-                import numpy as _np
-                zt = _np.array(z, dtype=float)
-                rt = _fa.flash_trifasico(zt, self.get_T(), self.get_P(),
-                                         eos=eos_code)
-                self.btn.setEnabled(True)
-                self.btn.setText(_i18n.t("Realizar Calculo"))
-                self._render_trifasico(rt, z, eos_code, kij)
-                return
-            except Exception as ex:
-                self.btn.setEnabled(True)
-                self.btn.setText(_i18n.t("Realizar Calculo"))
-                dialogos.error(self, f"Flash trifásico: {ex}")
-                return
-        self.worker = Worker(z[:NC], self.get_T(), self.get_P(), kij,
+        self.worker = Worker(z, self.get_T(), self.get_P(), kij,
                              metodo_densidad=metodo_dens)
         self.worker.done.connect(self._on_result)
         self.worker.error.connect(self._on_error)
@@ -909,62 +870,6 @@ class TabEquilibrio(QWidget):
     def _on_error(self, msg):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
         dialogos.error(self, msg)
-
-    def _render_trifasico(self, rt, z, eos_code, kij):
-        """Puebla las tablas con el resultado del flash trifásico (V-L-W).
-        rt: dict de flash_agua.flash_trifasico. Muestra fracciones de fase y
-        composiciones en las columnas Vapor, Líquida y Acuosa (col 4)."""
-        import numpy as _np
-        bV = rt['beta_V']; bL = rt['beta_L']; bW = rt['beta_W']
-        y = rt['y']; x = rt['x']; w = rt['w']
-        hayV = bV > 1e-9; hayL = bL > 1e-9; hayW = bW > 1e-9
-
-        def _pinta_comp(row, col, val, activo):
-            """Escribe y colorea una celda de composición: blanco si la fase
-            existe (activo), gris si no."""
-            it = self.tbl_comp.item(row, col)
-            if it is None:
-                it = cell("", bg=GRAY_RES); self.tbl_comp.setItem(row, col, it)
-            if activo and val is not None:
-                it.setText(f"{val:.4f}")
-                it.setBackground(_brush(WHITE)); it.setForeground(_brush(TEXT_RES))
-            else:
-                it.setText("")
-                it.setBackground(_brush(GRAY_RES)); it.setForeground(_brush(TEXT))
-
-        # ── Composiciones por fase en la tabla de componentes ───────────────
-        self.tbl_comp.blockSignals(True)
-        for i in range(NC+1):
-            if self.tbl_comp.isRowHidden(i):
-                continue
-            _pinta_comp(i, 2, y[i] if y is not None else None, hayV)
-            _pinta_comp(i, 3, x[i] if x is not None else None, hayL)
-            _pinta_comp(i, 4, w[i] if w is not None else None, hayW)
-        # Sumatorias = 1 en cada fase presente (col 2,3,4), vacío si ausente.
-        for col, hay in ((2,hayV),(3,hayL),(4,hayW)):
-            _pinta_comp(self.sum_row, col, 1.0 if hay else None, hay)
-        self.tbl_comp.blockSignals(False)
-
-        # ── Resumen: fracciones de fase, PM y Z por fase ────────────────────
-        try:
-            filas = [d for d in PROP_RESUMEN if d[0] in self._props_sel]
-            for r, d in enumerate(filas):
-                if d[0] == 'frac_molar':
-                    self._paint_res(r, 2, f"{bV:.6f}" if hayV else "")
-                    self._paint_res(r, 3, f"{bL:.6f}" if hayL else "")
-                    self._paint_res(r, 4, f"{bW:.6f}" if hayW else "")
-                elif d[0] == 'pm':
-                    PM = rt['PM']
-                    self._paint_res(r,2, f"{float(_np.dot(y,PM)):.4f}" if hayV else "")
-                    self._paint_res(r,3, f"{float(_np.dot(x,PM)):.4f}" if hayL else "")
-                    self._paint_res(r,4, f"{float(_np.dot(w,PM)):.4f}" if hayW else "")
-                elif d[0] == 'z':
-                    self._paint_res(r,2, f"{rt['Z_V']:.4f}" if (hayV and rt.get('Z_V')) else "")
-                    self._paint_res(r,3, f"{rt['Z_L']:.4f}" if (hayL and rt.get('Z_L')) else "")
-                    self._paint_res(r,4, f"{rt['Z_W']:.4f}" if (hayW and rt.get('Z_W')) else "")
-        except Exception:
-            pass
-        return
 
     def _on_result(self, r):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
@@ -1314,7 +1219,7 @@ class TabParametros(QWidget):
         TCa, PCa, OMa, PMa = _eng.crit_props(self._eos_ctx())
         for i in range(NC):
             r = i + 1
-            self.tbl_p.setItem(r, 0, cell(NOMBRES[i], bg=GRAY_LBL,
+            self.tbl_p.setItem(r, 0, cell(_i18n.t(NOMBRES[i]), bg=GRAY_LBL,
                 align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter))
             tc = _u.abs_desde_R(TCa[i])       # °R -> °R/K
             pc = _u.p_desde_psia(PCa[i])      # psi -> psi/kPa
@@ -1370,12 +1275,16 @@ class TabParametros(QWidget):
         self.tbl_p = QTableWidget(NC+1, 5)  # fila 0=cabecera, filas 1..NC=datos
         self.tbl_p.horizontalHeader().hide()
         self.tbl_p.verticalHeader().hide()
-        self.tbl_p.setShowGrid(True)
+        self.tbl_p.setShowGrid(False)
         self.tbl_p.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        # Rejilla PLANA de 1px vía delegado (mismo aspecto que Equilibrio de
+        # fases; preserva el color de fondo de cada celda).
         self.tbl_p.setStyleSheet(
-            f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
+            f'QTableWidget {{ background:{WHITE};'
+            f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
             f'QTableWidget::item {{ padding:2px 6px; }}')
+        self.tbl_p.setItemDelegate(GridDelegate(BORDER, self.tbl_p))
         for c,w in enumerate(WP): self.tbl_p.setColumnWidth(c,w)
         for r in range(NC+1): self.tbl_p.setRowHeight(r, ROW_H)
 
@@ -1401,11 +1310,13 @@ class TabParametros(QWidget):
         self.tbl_k = QTableWidget(NC+1, NC+1)  # fila 0=cabecera
         self.tbl_k.horizontalHeader().hide()
         self.tbl_k.verticalHeader().hide()
-        self.tbl_k.setShowGrid(True)
+        self.tbl_k.setShowGrid(False)
         self.tbl_k.setStyleSheet(
-            f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
+            f'QTableWidget {{ background:{WHITE};'
+            f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
             f'QTableWidget::item {{ padding:2px 4px; }}')
+        self.tbl_k.setItemDelegate(GridDelegate(BORDER, self.tbl_k))
         self.tbl_k.setColumnWidth(0, WK)
         for c in range(1,NC+1): self.tbl_k.setColumnWidth(c, WK)
         for r in range(NC+1): self.tbl_k.setRowHeight(r, ROW_H)
@@ -1703,6 +1614,7 @@ class TabFluidos(QWidget):
         for txt, clave in [("Equilibrio de fases", "equilibrio"),
                            ("Envolvente de fases", "envolvente"),
                            ("Puntos de saturación", "saturacion"),
+                           ("Formación de hidratos", "hidratos"),
                            ("Análisis de sensibilidad", "propiedades"),
                            ("Parámetros EOS", "parametros")]:
             b = QPushButton(txt); b.setStyleSheet(BTN)
@@ -1895,6 +1807,9 @@ class MainWindow(QMainWindow):
         self.gestor_edicion.registrar(self.tab_par.tbl_k)
         self._construir_menu()
         self._actualizar_titulo()
+        # Idioma por defecto: inglés. Se construye la UI en español (literales)
+        # y se traduce toda de una vez, igual que al pulsar "Inglés" en el menú.
+        self._cambiar_idioma('EN')
 
     def _construir_menu(self):
         """Barra de menu clasica (Win95): Archivo, Editar, Ver, Herramientas,
@@ -1997,6 +1912,16 @@ class MainWindow(QMainWindow):
         self._act_pts_critico.triggered.connect(
             lambda: self._set_modo_puntos_env('critico'))
 
+        # Mostrar / ocultar todos los iconos del programa (barra superior de
+        # selectores + árbol del navegador). DESACTIVADO por defecto.
+        m_graf.addSeparator()
+        self._act_iconos = QAction("Mostrar iconos", self, checkable=True)
+        self._act_iconos.setChecked(False)
+        self._act_iconos.toggled.connect(self._toggle_iconos)
+        m_graf.addAction(self._act_iconos)
+        # Aplicar el estado inicial (oculto) — ribbon y navegador ya existen.
+        self._toggle_iconos(self._act_iconos.isChecked())
+
         # ── Herramientas ─────────────────────────────────────
         m_herr = menubar.addMenu("&Herramientas")
         m_herr.addAction(_act("&Asociar archivos .tpsim con este programa",
@@ -2042,6 +1967,19 @@ class MainWindow(QMainWindow):
         """Activa/desactiva el cursor de lectura en TODOS los gráficos."""
         self._cursor_activo = bool(on)
         self._aplicar_cursor_tabs()
+
+    def _toggle_iconos(self, on):
+        """Muestra u oculta TODOS los iconos del programa: los de la barra
+        superior de selectores y los del árbol del navegador."""
+        on = bool(on)
+        barra = getattr(self, 'ribbon', None)
+        if barra is not None and hasattr(barra, 'set_iconos_visibles'):
+            try: barra.set_iconos_visibles(on)
+            except Exception: pass
+        nav = getattr(self, 'nav', None)
+        if nav is not None and hasattr(nav, 'set_iconos_visibles'):
+            try: nav.set_iconos_visibles(on)
+            except Exception: pass
 
     def _aplicar_cursor_tabs(self):
         for win in self._subventanas.values():
@@ -2225,6 +2163,7 @@ class MainWindow(QMainWindow):
                 'equilibrio':  self.tab_eq.get_estado(),
                 'envolvente':  self.tab_env.get_estado(),
                 'saturacion':  self.tab_sat.get_estado(),
+                'hidratos':    self.tab_hid.get_estado(),
                 'propiedades': self.tab_prop.get_estado(),
             },
         }
@@ -2266,6 +2205,8 @@ class MainWindow(QMainWindow):
             self.tab_env.set_estado(tabs['envolvente'])
         if 'saturacion' in tabs:
             self.tab_sat.set_estado(tabs['saturacion'])
+        if 'hidratos' in tabs:
+            self.tab_hid.set_estado(tabs['hidratos'])
         if 'propiedades' in tabs:
             self.tab_prop.set_estado(tabs['propiedades'])
 
@@ -2310,6 +2251,7 @@ class MainWindow(QMainWindow):
         }, 'resultado': None})
         self.tab_env.set_estado({'entrada': {}, 'resultado': None})
         self.tab_sat.set_estado({'entrada': {}, 'resultado': None})
+        self.tab_hid.set_estado({'entrada': {}, 'resultado': None})
         self.tab_prop.set_estado({'entrada': {'T_R':0.0,'P_psi':0.0},'resultado':None})
         if hasattr(self, 'tab_par'):
             self.tab_par.refrescar_tabla()
@@ -2385,6 +2327,11 @@ class MainWindow(QMainWindow):
         self.tab_sat  = TabSaturacion(get_z=self._getz_main,
                                       get_kij=lambda: kij_user)
         self.tab_sat._on_props_resize = self._on_props_change
+        self.tab_hid  = TabHidratos(get_z=self._getz_main,
+                                    get_kij=lambda: kij_user,
+                                    get_envolvente=lambda: self.tab_env,
+                                    get_eos_nombre=lambda: _eng.get_eos())
+        self.tab_hid._on_props_resize = self._on_props_change
         self.tab_prop = TabPropiedades(get_z=self._getz_main,
                                        get_kij=lambda: kij_user)
         self.tab_par  = TabParametros()
@@ -2394,6 +2341,7 @@ class MainWindow(QMainWindow):
             'equilibrio':  (self.tab_eq,   "Equilibrio de fases",                 "equilibrio"),
             'envolvente':  (self.tab_env,  "Envolvente de fases",                 "envolvente"),
             'saturacion':  (self.tab_sat,  "Puntos de saturación",                "saturacion"),
+            'hidratos':    (self.tab_hid,  "Formación de hidratos",               "hidratos"),
             'propiedades': (self.tab_prop, "Análisis de sensibilidad",             "propiedades"),
             'parametros':  (self.tab_par,  "Parámetros de la ecuación de estado", "parametros"),
         }
@@ -2407,6 +2355,7 @@ class MainWindow(QMainWindow):
         self._tabs_comp = {
             'equilibrio': self.tab_eq,
             'saturacion': self.tab_sat,
+            'hidratos':   self.tab_hid,
             'parametros': self.tab_par,
         }
         # Tamaño estandar de las ventanas de calculo, fijado AHORA (con los 13
@@ -2734,13 +2683,17 @@ class MainWindow(QMainWindow):
             if w is not None and hasattr(w, 'retraducir_grafico'):
                 try: w.retraducir_grafico()
                 except Exception: pass
-        # La ventana nace en el sistema de unidades activo
+        # La ventana nace con valores en FIELD y etiquetas en español. Llamar
+        # aplicar_unidades('FIELD') SIEMPRE: (1) convierte los valores al
+        # sistema activo (no-op si ya es FIELD) y (2) reconstruye TODAS las
+        # etiquetas con _i18n.t(...) en el idioma activo. Esto es necesario en
+        # inglés para etiquetas compuestas con unidad (p.ej. "Densidad masica
+        # [lb/ft3]"), que retraducir() no alcanza a traducir.
         import unidades as _u
-        if _u.sistema() != 'FIELD':
-            w = getattr(win, '_widget', None)
-            if w is not None and hasattr(w, 'aplicar_unidades'):
-                try: w.aplicar_unidades('FIELD')
-                except Exception: pass
+        w = getattr(win, '_widget', None)
+        if w is not None and hasattr(w, 'aplicar_unidades'):
+            try: w.aplicar_unidades('FIELD')
+            except Exception: pass
         # La ventana nace con el estado de cursor (activo/inactivo) actual
         w = getattr(win, '_widget', None)
         if w is not None and hasattr(w, 'set_cursor'):
@@ -2928,16 +2881,13 @@ class MainWindow(QMainWindow):
             if nom.rstrip(':') == nombre:
                 idx = i
                 break
-        # Agua (14° componente, índice 13)
-        if idx is None and nombre == _eng.AGUA_NOMBRE.rstrip(':'):
-            idx = _eng.IDX_AGUA
         if idx is None:
             return
         clave = f'componente@{idx}'
         sw = self._subventanas.get(clave)
         if sw is None:
             widget = _cui.VentanaPropComponente(idx)
-            titulo = _eng.componente_etiqueta(idx).rstrip(':')
+            titulo = NOMBRES[idx].rstrip(':')
             tam = widget.tam_ideal()
             sw = self._montar_subventana(clave, widget, titulo, tam=tam)
         self._mostrar_subventana(sw)
