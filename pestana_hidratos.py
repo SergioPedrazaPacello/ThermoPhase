@@ -458,16 +458,13 @@ class TabHidratos(QWidget):
         self.last_result = res
         T = res['T_R']; P = res['P_psia']
         self._tipo_txt = self.cmb_tipo.currentText()
-        est = res.get('estructura', '?')
-        # Sufijo con la estructura de hidrato que cristaliza (sI / sII).
-        suf = f"  —  s{est}" if est in ('I', 'II') else ""
         if self._res_unit == 'T':
-            self.lbl_res_label.setText(f"{_i18n.t('Temperatura de Hidrato')} ({_u.u('T')}){suf}:")
+            self.lbl_res_label.setText(f"{_i18n.t('Temperatura de Hidrato')} ({_u.u('T')}):")
             self.lbl_res_val.setText(f"{_u.t_desde_R(T):.2f}")
             self.lbl_res2_label.setText(f"{_i18n.t('Equivalente')} ({_u.u_abs()}):")
             self.lbl_res2_val.setText(f"{_u.abs_desde_R(T):.2f}")
         else:
-            self.lbl_res_label.setText(f"{_i18n.t('Presion de Hidrato')} ({_u.u('P')}){suf}:")
+            self.lbl_res_label.setText(f"{_i18n.t('Presion de Hidrato')} ({_u.u('P')}):")
             self.lbl_res_val.setText(f"{_u.p_desde_psia(P):.2f}")
             self.lbl_res2_label.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
             self.lbl_res2_val.setText(f"{_u.t_desde_R(T):.2f}")

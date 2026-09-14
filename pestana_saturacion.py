@@ -712,9 +712,9 @@ class TabSaturacion(QWidget):
     def _on_done(self, res):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular punto de saturacion"))
         if not res or not res.get('exito'):
-            self.lbl_estado.setText(_i18n.t("No se encontro punto de saturacion"))
             self.lbl_res_val.setText(""); self.lbl_res2_val.setText("")
             self.last_result = None
+            dialogos.advertencia(self, _i18n.t("No se encontro punto de saturacion"))
             return
         self.last_result = res
         self._render(res)
@@ -735,8 +735,6 @@ class TabSaturacion(QWidget):
             self.lbl_res_val.setText(f"{_u.p_desde_psia(P):.2f}")
             self.lbl_res2_label.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
             self.lbl_res2_val.setText(f"{_u.t_desde_R(T):.2f}")
-
-        self.lbl_estado.setText(_i18n.t("Convergencia exitosa."))
 
         # ── Composición: Mezcla (col1) | Vapor (col2) | Líquido (col3) ──
         x=res.get('x',[0]*NC); y=res.get('y',[0]*NC)

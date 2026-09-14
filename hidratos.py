@@ -265,12 +265,40 @@ def _brentq(func, a, b, xtol=1e-6, max_iter=80):
     return 0.5 * (a + b)
 
 
+def _raices_en_rango(func, a, b, n=48):
+    """Devuelve todas las raíces de func en [a,b] detectando cambios de signo
+    sobre una rejilla y refinando cada uno con brentq. Robusto para curvas de
+    hidrato con forma cerrada (dos ramas) como ocurre sin metano."""
+    xs = [a + (b - a) * i / n for i in range(n + 1)]
+    fs = []
+    for x in xs:
+        try:
+            fs.append(func(x))
+        except Exception:
+            fs.append(None)
+    raices = []
+    for i in range(n):
+        f0, f1 = fs[i], fs[i + 1]
+        if f0 is None or f1 is None:
+            continue
+        if f0 == 0.0:
+            raices.append(xs[i])
+        elif f0 * f1 < 0.0:
+            try:
+                raices.append(_brentq(func, xs[i], xs[i + 1], xtol=1e-5))
+            except ValueError:
+                pass
+    return raices
+
+
 def temperatura_hidrato(z, P_psia, kij=None, nombre_eos=None,
                         T_min=300.0, T_max=560.0):
     """Temperatura de formación de hidrato [°R] a presión dada.
 
-    Devuelve None si no hay curva en el rango (la presión es demasiado baja
-    para formar hidrato en el intervalo de T explorado).
+    La curva de hidratos puede ser monótona (con metano) o de forma cerrada
+    con dos ramas (p. ej. sin metano). La frontera de formación es la raíz de
+    MAYOR temperatura: por debajo de ella el hidrato es estable. Devuelve None
+    si no hay ninguna raíz en el rango.
     """
     if nombre_eos is None:
         nombre_eos = eos.get_eos()
@@ -279,15 +307,17 @@ def temperatura_hidrato(z, P_psia, kij=None, nombre_eos=None,
 
     def f(T_R):
         return criterio(z, T_R, P_psia, kij, nombre_eos)
-    try:
-        return _brentq(f, T_min, T_max, xtol=1e-5)
-    except ValueError:
-        return None
+    raices = _raices_en_rango(f, T_min, T_max)
+    return max(raices) if raices else None
 
 
 def presion_hidrato(z, T_R, kij=None, nombre_eos=None,
                     P_min=1e-3, P_max=12000.0):
-    """Presión de formación de hidrato [psia] a temperatura dada."""
+    """Presión de formación de hidrato [psia] a temperatura dada.
+
+    La frontera de formación es la raíz de MENOR presión: por encima de ella
+    el hidrato es estable. Devuelve None si no hay raíz en el rango.
+    """
     if nombre_eos is None:
         nombre_eos = eos.get_eos()
     if kij is None:
@@ -295,10 +325,29 @@ def presion_hidrato(z, T_R, kij=None, nombre_eos=None,
 
     def f(P):
         return criterio(z, T_R, P, kij, nombre_eos)
-    try:
-        return _brentq(f, P_min, P_max, xtol=1e-4)
-    except ValueError:
-        return None
+    # Rejilla log en presión: la curva cambia rápido a baja P.
+    import math as _m
+    n = 48
+    xs = [P_min * (P_max / P_min) ** (i / n) for i in range(n + 1)]
+    fs = []
+    for x in xs:
+        try:
+            fs.append(f(x))
+        except Exception:
+            fs.append(None)
+    raices = []
+    for i in range(n):
+        f0, f1 = fs[i], fs[i + 1]
+        if f0 is None or f1 is None:
+            continue
+        if f0 == 0.0:
+            raices.append(xs[i])
+        elif f0 * f1 < 0.0:
+            try:
+                raices.append(_brentq(f, xs[i], xs[i + 1], xtol=1e-4))
+            except ValueError:
+                pass
+    return min(raices) if raices else None
 
 
 def punto_hidrato(z, modo, valor, kij=None, nombre_eos=None):
