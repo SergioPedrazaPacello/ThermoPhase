@@ -112,6 +112,7 @@ TRAD = {
     "ThermoPhase — Equilibrio de Fases": "ThermoPhase — Phase Equilibrium",
     "ThermoPhase — Envolvente de Fases": "ThermoPhase — Phase Envelope",
     "ThermoPhase — Puntos de Saturación": "ThermoPhase — Saturation Points",
+    "ThermoPhase — Formación de Hidratos": "ThermoPhase — Hydrate Formation",
     "ThermoPhase — Propiedades Termodinamicas (Entalpia / Entropia)":
         "ThermoPhase — Thermodynamic Properties (Enthalpy / Entropy)",
     "ThermoPhase — Fluidos": "ThermoPhase — Fluids",

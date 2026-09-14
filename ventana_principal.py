@@ -2728,7 +2728,7 @@ class MainWindow(QMainWindow):
             w0, h0 = widget.tam_ideal()
             # 2 tablas dependientes de componentes (propiedades criticas + kij)
             return (w0, h0 - quitados * ROW_H * 2)
-        if clave_base in ('equilibrio', 'saturacion'):
+        if clave_base in ('equilibrio', 'saturacion', 'hidratos'):
             w0, h0 = self._tam_sub
             h0 -= quitados * ROW_H
             # Delta por propiedades respecto al numero por defecto (6).
@@ -2915,6 +2915,7 @@ class MainWindow(QMainWindow):
             'equilibrio':  "Equilibrio",
             'envolvente':  "Envolvente",
             'saturacion':  "Saturacion",
+            'hidratos':    "Hidratos",
             'propiedades': "Sensibilidad",
             'parametros':  "Parametros",
         }
@@ -2984,6 +2985,17 @@ class MainWindow(QMainWindow):
             return TabEnvolvente(get_z=gz, get_kij=gk, get_metodo_densidad=gm)
         if clave == 'saturacion':
             w = TabSaturacion(get_z=gz, get_kij=gk)
+            w._on_props_resize = self._on_props_change
+            return w
+        if clave == 'hidratos':
+            # La curva de hidratos del fluido se dibuja sobre la envolvente
+            # de ESE fluido (si está abierta); la EOS es la del fluido.
+            def _env_fluido(f=fluido):
+                sub = self._subventanas.get(f"envolvente@{f['nombre']}")
+                return getattr(sub, '_widget', None) if sub is not None else None
+            w = TabHidratos(get_z=gz, get_kij=gk,
+                            get_envolvente=_env_fluido,
+                            get_eos_nombre=lambda f=fluido: f.get('eos', 'PR'))
             w._on_props_resize = self._on_props_change
             return w
         if clave == 'propiedades':

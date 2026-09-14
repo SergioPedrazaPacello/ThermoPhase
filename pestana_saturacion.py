@@ -454,7 +454,7 @@ class TabSaturacion(QWidget):
         seleccionadas, en el orden del catalogo. Solo arma etiquetas y celdas
         vacias; los valores los rellena _render."""
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
-        GRIS = QColor(GRAY_RES); GRIS_RES = QColor(GRAY_RES)
+        GRIS = QColor(GRAY_LBL); GRIS_RES = QColor(GRAY_RES)
         self.tbl_prop.setRowCount(len(sel))
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
             self.tbl_prop.setRowHeight(r, ROW_H)

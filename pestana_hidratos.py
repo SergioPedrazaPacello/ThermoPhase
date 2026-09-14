@@ -153,12 +153,6 @@ class TabHidratos(QWidget):
         self.btn.clicked.connect(self.calcular)
         gl.addWidget(self.btn, 2, 0, 1, 2)
 
-        # Botón agregar/quitar curva de hidratos en la envolvente
-        self.btn_curva = QPushButton("Agregar curva de formacion de hidrato")
-        self.btn_curva.setStyleSheet(BTN_STYLE); self.btn_curva.setFixedHeight(24)
-        self.btn_curva.clicked.connect(self._toggle_curva)
-        gl.addWidget(self.btn_curva, 3, 0, 1, 2)
-
         gl.setColumnStretch(0,0); gl.setColumnStretch(1,1)
 
         # ── Panel de resultados ───────────────────────────────
@@ -183,10 +177,22 @@ class TabHidratos(QWidget):
         self.lbl_res2_val.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         rl.addWidget(self.lbl_res2_val, 1, 1)
 
+        # Fila 2 (a la altura del botón "Calcular" del panel izquierdo): botón
+        # para agregar/quitar la curva de hidratos sobre la envolvente. Ocupa
+        # el hueco que en Puntos de saturación queda libre (donde esa pestaña
+        # muestra el mensaje de convergencia), de modo que esta pestaña
+        # mantiene EXACTAMENTE la misma altura.
+        self.btn_curva = QPushButton("Agregar curva de formacion de hidrato")
+        self.btn_curva.setStyleSheet(BTN_STYLE); self.btn_curva.setFixedHeight(24)
+        self.btn_curva.clicked.connect(self._toggle_curva)
+        rl.addWidget(self.btn_curva, 2, 0, 1, 2)
+
+        # El estado (convergencia / estructura) NO se muestra como texto suelto
+        # como en saturación: el resultado ya deja claro el punto calculado y la
+        # estructura se anexa al valor. Se conserva el atributo para no romper
+        # las llamadas existentes, pero oculto y sin reservar espacio.
         self.lbl_estado = QLabel("")
-        self.lbl_estado.setStyleSheet(
-            f'color:{TEXT_DIM};font-family:"{FONT_F}";font-size:9pt;background:transparent;')
-        rl.addWidget(self.lbl_estado, 2, 0, 1, 2)
+        self.lbl_estado.setVisible(False)
 
         rl.setColumnStretch(0,1); rl.setColumnStretch(1,0)
         res_outer.addWidget(res_box)
@@ -321,7 +327,7 @@ class TabHidratos(QWidget):
 
     def _rebuild_prop_table(self):
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
-        GRIS = QColor(GRAY_RES)
+        GRIS = QColor(GRAY_LBL)
         self.tbl_prop.setRowCount(len(sel))
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
             self.tbl_prop.setRowHeight(r, ROW_H)
@@ -407,7 +413,9 @@ class TabHidratos(QWidget):
         self.btn.setEnabled(True)
         self.btn.setText(_i18n.t("Calcular formacion de hidrato"))
         if not res:
-            self.lbl_estado.setText(_i18n.t(
+            self.lbl_res_val.setText(""); self.lbl_res2_val.setText("")
+            self.last_result = None
+            dialogos.advertencia(self, _i18n.t(
                 "No se encontró punto de formación de hidrato en el rango."))
             return
         self.last_result = res
@@ -440,21 +448,22 @@ class TabHidratos(QWidget):
 
     # ══════════════════════════════════════════════════════════
     def _render(self, res):
+        self.last_result = res
         T = res['T_R']; P = res['P_psia']
         self._tipo_txt = self.cmb_tipo.currentText()
+        est = res.get('estructura', '?')
+        # Sufijo con la estructura de hidrato que cristaliza (sI / sII).
+        suf = f"  —  s{est}" if est in ('I', 'II') else ""
         if self._res_unit == 'T':
-            self.lbl_res_label.setText(f"{_i18n.t('Temperatura de Hidrato')} ({_u.u('T')}):")
+            self.lbl_res_label.setText(f"{_i18n.t('Temperatura de Hidrato')} ({_u.u('T')}){suf}:")
             self.lbl_res_val.setText(f"{_u.t_desde_R(T):.2f}")
             self.lbl_res2_label.setText(f"{_i18n.t('Equivalente')} ({_u.u_abs()}):")
             self.lbl_res2_val.setText(f"{_u.abs_desde_R(T):.2f}")
         else:
-            self.lbl_res_label.setText(f"{_i18n.t('Presion de Hidrato')} ({_u.u('P')}):")
+            self.lbl_res_label.setText(f"{_i18n.t('Presion de Hidrato')} ({_u.u('P')}){suf}:")
             self.lbl_res_val.setText(f"{_u.p_desde_psia(P):.2f}")
             self.lbl_res2_label.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
             self.lbl_res2_val.setText(f"{_u.t_desde_R(T):.2f}")
-        est = res.get('estructura', '?')
-        self.lbl_estado.setText(
-            _i18n.t("Convergencia exitosa.") + f"  {_i18n.t('Estructura')} {est}")
 
         # Tabla de composición (flash)
         flash = res.get('flash', {}) or {}
