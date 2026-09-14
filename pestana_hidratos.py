@@ -213,8 +213,9 @@ class TabHidratos(QWidget):
         comp_title.setStyleSheet(LBL_SEC); comp_title.setFixedHeight(22)
         root.addWidget(comp_title)
 
-        self.tbl = QTableWidget(NC+1, 3)
-        self.tbl.setHorizontalHeaderLabels(["Componente","Fase Vapor","Fase Liquida"])
+        self.tbl = QTableWidget(NC+1, 4)
+        self.tbl.setHorizontalHeaderLabels(
+            ["Componente","Mezcla","Fase Vapor","Fase Liquida"])
         self.tbl.verticalHeader().setVisible(False)
         self.tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -233,7 +234,9 @@ class TabHidratos(QWidget):
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.tbl.setColumnWidth(1,130); self.tbl.setColumnWidth(2,130)
+        hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.tbl.setColumnWidth(1,120)
+        self.tbl.setColumnWidth(2,120); self.tbl.setColumnWidth(3,120)
         self.tbl.verticalHeader().setDefaultSectionSize(22)
         self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -245,7 +248,7 @@ class TabHidratos(QWidget):
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             it.setBackground(QBrush(GRIS_NOMBRE))
             self.tbl.setItem(i,0,it)
-            for c in (1,2):
+            for c in (1,2,3):
                 cell = QTableWidgetItem("")
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 cell.setBackground(QBrush(GRIS_RES))
@@ -254,7 +257,7 @@ class TabHidratos(QWidget):
         sit.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         sit.setBackground(QBrush(GRIS_NOMBRE))
         self.tbl.setItem(NC,0,sit)
-        for c in (1,2):
+        for c in (1,2,3):
             cell = QTableWidgetItem("")
             cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             cell.setBackground(QBrush(GRIS_RES))
@@ -277,8 +280,9 @@ class TabHidratos(QWidget):
         prop_hdr.addWidget(self.btn_props, 0)
         root.addLayout(prop_hdr)
 
-        self.tbl_prop = QTableWidget(0, 3)
-        self.tbl_prop.setHorizontalHeaderLabels(["Propiedad","Fase Vapor","Fase Liquida"])
+        self.tbl_prop = QTableWidget(0, 4)
+        self.tbl_prop.setHorizontalHeaderLabels(
+            ["Propiedad","Mezcla","Fase Vapor","Fase Liquida"])
         self.tbl_prop.verticalHeader().setVisible(False)
         self.tbl_prop.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl_prop.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -297,7 +301,9 @@ class TabHidratos(QWidget):
         hp.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hp.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         hp.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.tbl_prop.setColumnWidth(1,130); self.tbl_prop.setColumnWidth(2,130)
+        hp.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.tbl_prop.setColumnWidth(1,120)
+        self.tbl_prop.setColumnWidth(2,120); self.tbl_prop.setColumnWidth(3,120)
         self.tbl_prop.verticalHeader().setDefaultSectionSize(ROW_H)
         self.tbl_prop.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -337,7 +343,7 @@ class TabHidratos(QWidget):
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             it.setBackground(QBrush(GRIS_NOMBRE))
             self.tbl_prop.setItem(r, 0, it)
-            for c in (1, 2):
+            for c in (1, 2, 3):
                 cc = QTableWidgetItem("")
                 cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 cc.setBackground(QBrush(GRIS_VACIA))
@@ -466,61 +472,79 @@ class TabHidratos(QWidget):
             self.lbl_res2_label.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
             self.lbl_res2_val.setText(f"{_u.t_desde_R(T):.2f}")
 
-        # Tabla de composición (flash)
+        # ── Composición: Mezcla (col1) | Vapor (col2) | Líquido (col3) ──
         flash = res.get('flash', {}) or {}
         x = flash.get('x', [0]*NC); y = flash.get('y', [0]*NC)
+        z = flash.get('z') or self.get_z()
         V = flash.get('V', None)
-        # Qué fases existen realmente en el punto de hidrato.
         hay_vap = (V is None) or (V > 1e-9)
         hay_liq = (V is None) or (V < 1.0 - 1e-9)
-        sx = sum(x); sy = sum(y)
+        sx = sum(x); sy = sum(y); sz = sum(z)
         VAC = QColor(GRAY_RES)   # celda sombreada (fase ausente / sin valor)
         BLN = QColor(WHITE)
-        for i in range(NC):
-            cv, cl = self.tbl.item(i,1), self.tbl.item(i,2)
-            if hay_vap:
-                cv.setText(f"{y[i]:.4f}"); cv.setBackground(QBrush(BLN))
-                cv.setForeground(QBrush(QColor(TEXT_RES)))
-            else:
-                cv.setText(""); cv.setBackground(QBrush(VAC))
-            if hay_liq:
-                cl.setText(f"{x[i]:.4f}"); cl.setBackground(QBrush(BLN))
-                cl.setForeground(QBrush(QColor(TEXT_RES)))
-            else:
-                cl.setText(""); cl.setBackground(QBrush(VAC))
-        # Fila de sumatorias
-        sv, sl = self.tbl.item(NC,1), self.tbl.item(NC,2)
-        if hay_vap:
-            sv.setText(f"{sy:.4f}"); sv.setBackground(QBrush(BLN))
-        else:
-            sv.setText(""); sv.setBackground(QBrush(VAC))
-        if hay_liq:
-            sl.setText(f"{sx:.4f}"); sl.setBackground(QBrush(BLN))
-        else:
-            sl.setText(""); sl.setBackground(QBrush(VAC))
 
-        # Tabla de propiedades
+        def _set(cell, txt, ok):
+            if ok:
+                cell.setText(txt); cell.setBackground(QBrush(BLN))
+                cell.setForeground(QBrush(QColor(TEXT_RES)))
+            else:
+                cell.setText(""); cell.setBackground(QBrush(VAC))
+
+        for i in range(NC):
+            _set(self.tbl.item(i,1), f"{z[i]:.4f}", sz > 0)
+            _set(self.tbl.item(i,2), f"{y[i]:.4f}", hay_vap)
+            _set(self.tbl.item(i,3), f"{x[i]:.4f}", hay_liq)
+        _set(self.tbl.item(NC,1), f"{sz:.4f}", sz > 0)
+        _set(self.tbl.item(NC,2), f"{sy:.4f}", hay_vap)
+        _set(self.tbl.item(NC,3), f"{sx:.4f}", hay_liq)
+
+        # ── Propiedades: Mezcla | Vapor | Líquido ──
         import math as _math
+        import eos as _eng
         p = res.get('props', {}) or {}
         import poder_calorifico as _pc
         _pc_v = _pc.poder_calorifico_fase(y, p.get('PM_v')) if hay_vap else {}
         _pc_l = _pc.poder_calorifico_fase(x, p.get('PM_l')) if hay_liq else {}
+        _pc_z = _pc.poder_calorifico_fase(z, None) if sz > 0 else {}
         _gpm_v = _pc.gpm_c3(y) if hay_vap else None
+        _gpm_z = _pc.gpm_c3(z) if sz > 0 else None
+        _pm_z = sum(z[i]*_eng.PM[i] for i in range(NC)) if sz > 0 else None
+        # Densidad de mezcla por regla de volúmenes de las fases presentes.
+        _rho_z = None
+        rho_v = p.get('rho_v'); rho_l = p.get('rho_l')
+        Vm = flash.get('Vm'); Lm = flash.get('Lm')
+        if hay_vap and hay_liq and rho_v and rho_l and Vm is not None and Lm is not None:
+            inv = (Vm/rho_v if rho_v>0 else 0)+(Lm/rho_l if rho_l>0 else 0)
+            if inv>0: _rho_z = 1.0/inv
+        elif hay_liq and rho_l:
+            _rho_z = rho_l
+        elif hay_vap and rho_v:
+            _rho_z = rho_v
 
         def _es_valido(v):
             return v is not None and not (isinstance(v, float)
                                           and (_math.isnan(v) or _math.isinf(v)))
 
-        def _valor_prop(kf, phase_pc, conv, existe):
+        def _valor_prop(kf, phase_pc, conv, gpm_val, existe):
             if not existe:
                 return None
             if isinstance(kf, str) and kf.startswith('PCAL:'):
                 v = phase_pc.get(kf.split(':', 1)[1])
             elif isinstance(kf, str) and kf.startswith('GPM:'):
-                v = _gpm_v if kf == 'GPM:v' else None
+                v = gpm_val if kf == 'GPM:v' else None
             else:
                 v = _conv_prop(conv, p.get(kf))
             return v if _es_valido(v) else None
+
+        def _valor_mezcla(key, conv):
+            if sz <= 0:
+                return None
+            if key == 'pm':        return _conv_prop(conv, _pm_z)
+            if key == 'densidad':  return _conv_prop(conv, _rho_z) if _rho_z else None
+            if key in ('hhv_mas','lhv_mas','hhv_vol','lhv_vol'):
+                v = _pc_z.get(key); return v if _es_valido(v) else None
+            if key == 'gpm':       return _gpm_z if _es_valido(_gpm_z) else None
+            return None   # z, sg, entalpía, entropía, viscosidad: sin mezcla
 
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
@@ -528,10 +552,11 @@ class TabHidratos(QWidget):
             it_lbl = self.tbl_prop.item(r, 0)
             if it_lbl is not None:
                 it_lbl.setText(f"{_i18n.t(base)}{unidad}:")
-            vv = _valor_prop(kv, _pc_v, conv, hay_vap)
-            vl = _valor_prop(kl, _pc_l, conv, hay_liq)
+            vz = _valor_mezcla(key, conv)
+            vv = _valor_prop(kv, _pc_v, conv, _gpm_v, hay_vap)
+            vl = _valor_prop(kl, _pc_l, conv, None, hay_liq)
             fmt = f"{{:.{dec}f}}"
-            for c, vw in ((1, vv), (2, vl)):
+            for c, vw in ((1, vz), (2, vv), (3, vl)):
                 cell = self.tbl_prop.item(r, c)
                 if vw is not None:
                     cell.setText(fmt.format(vw))

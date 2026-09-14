@@ -318,8 +318,9 @@ class TabSaturacion(QWidget):
         comp_title.setStyleSheet(LBL_SEC); comp_title.setFixedHeight(22)
         root.addWidget(comp_title)
 
-        self.tbl=QTableWidget(NC+1, 3)
-        self.tbl.setHorizontalHeaderLabels(["Componente","Fase Vapor","Fase Liquida"])
+        self.tbl=QTableWidget(NC+1, 4)
+        self.tbl.setHorizontalHeaderLabels(
+            ["Componente","Mezcla","Fase Vapor","Fase Liquida"])
         self.tbl.verticalHeader().setVisible(False)
         self.tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -342,7 +343,9 @@ class TabSaturacion(QWidget):
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.tbl.setColumnWidth(1,130); self.tbl.setColumnWidth(2,130)
+        hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.tbl.setColumnWidth(1,120)
+        self.tbl.setColumnWidth(2,120); self.tbl.setColumnWidth(3,120)
         self.tbl.verticalHeader().setDefaultSectionSize(22)
         self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -359,7 +362,7 @@ class TabSaturacion(QWidget):
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             it.setBackground(QBrush(GRIS_NOMBRE))
             self.tbl.setItem(i,0,it)
-            for c in (1,2):
+            for c in (1,2,3):
                 cell=QTableWidgetItem("")
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 cell.setBackground(QBrush(GRIS_RES))
@@ -369,7 +372,7 @@ class TabSaturacion(QWidget):
         sit.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         sit.setBackground(QBrush(GRIS_NOMBRE))
         self.tbl.setItem(NC,0,sit)
-        for c in (1,2):
+        for c in (1,2,3):
             cell=QTableWidgetItem("")
             cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             cell.setBackground(QBrush(GRIS_RES))
@@ -398,9 +401,9 @@ class TabSaturacion(QWidget):
         prop_hdr.addWidget(self.btn_props, 0)
         root.addLayout(prop_hdr)
 
-        self.tbl_prop=QTableWidget(0, 3)
+        self.tbl_prop=QTableWidget(0, 4)
         self.tbl_prop.setHorizontalHeaderLabels(
-            ["Propiedad","Fase Vapor","Fase Liquida"])
+            ["Propiedad","Mezcla","Fase Vapor","Fase Liquida"])
         self.tbl_prop.verticalHeader().setVisible(False)
         self.tbl_prop.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl_prop.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -419,7 +422,9 @@ class TabSaturacion(QWidget):
         hp.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hp.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         hp.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        self.tbl_prop.setColumnWidth(1,130); self.tbl_prop.setColumnWidth(2,130)
+        hp.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.tbl_prop.setColumnWidth(1,120)
+        self.tbl_prop.setColumnWidth(2,120); self.tbl_prop.setColumnWidth(3,120)
         self.tbl_prop.verticalHeader().setDefaultSectionSize(22)
         self.tbl_prop.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -463,7 +468,7 @@ class TabSaturacion(QWidget):
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             it.setBackground(QBrush(GRIS))
             self.tbl_prop.setItem(r, 0, it)
-            for c in (1, 2):
+            for c in (1, 2, 3):
                 cc = QTableWidgetItem("")
                 cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 cc.setBackground(QBrush(GRIS_RES))
@@ -733,53 +738,80 @@ class TabSaturacion(QWidget):
 
         self.lbl_estado.setText(_i18n.t("Convergencia exitosa."))
 
-        # Llenar tabla de composiciones
+        # ── Composición: Mezcla (col1) | Vapor (col2) | Líquido (col3) ──
         x=res.get('x',[0]*NC); y=res.get('y',[0]*NC)
-        sx=sum(x); sy=sum(y)
+        z=res.get('z') or self.get_z()
+        sx=sum(x); sy=sum(y); sz=sum(z)
+        WHT=QColor(WHITE)
         for i in range(NC):
-            self.tbl.item(i,1).setText(f"{y[i]:.4f}")
-            self.tbl.item(i,2).setText(f"{x[i]:.4f}")
-            self.tbl.item(i,1).setBackground(QBrush(QColor(WHITE)))
-            self.tbl.item(i,2).setBackground(QBrush(QColor(WHITE)))
-            self.tbl.item(i,1).setForeground(QBrush(QColor(TEXT_RES)))
-            self.tbl.item(i,2).setForeground(QBrush(QColor(TEXT_RES)))
-        self.tbl.item(NC,1).setText(f"{sy:.4f}")
-        self.tbl.item(NC,2).setText(f"{sx:.4f}")
-        self.tbl.item(NC,1).setBackground(QBrush(QColor(WHITE)))
-        self.tbl.item(NC,2).setBackground(QBrush(QColor(WHITE)))
+            self.tbl.item(i,1).setText(f"{z[i]:.4f}")
+            self.tbl.item(i,2).setText(f"{y[i]:.4f}")
+            self.tbl.item(i,3).setText(f"{x[i]:.4f}")
+            for c in (1,2,3):
+                self.tbl.item(i,c).setBackground(QBrush(WHT))
+                self.tbl.item(i,c).setForeground(QBrush(QColor(TEXT_RES)))
+        self.tbl.item(NC,1).setText(f"{sz:.4f}")
+        self.tbl.item(NC,2).setText(f"{sy:.4f}")
+        self.tbl.item(NC,3).setText(f"{sx:.4f}")
+        for c in (1,2,3):
+            self.tbl.item(NC,c).setBackground(QBrush(WHT))
 
-        # Llenar panel de propiedades (solo las seleccionadas, en orden)
+        # ── Propiedades: Mezcla | Vapor | Líquido ──
         p=res.get('props',{})
-        # Poder calorífico (GPSA-87) de vapor y líquido a partir de composición.
         import poder_calorifico as _pc
+        import eos as _eng
         _pc_v = _pc.poder_calorifico_fase(y, p.get('PM_v'))
         _pc_l = _pc.poder_calorifico_fase(x, p.get('PM_l'))
+        _pc_z = _pc.poder_calorifico_fase(z, None) if sz > 0 else {}
         _gpm_v = _pc.gpm_c3(y)
-        def _valor_prop(kf, phase_pc):
-            """Resuelve el valor de una propiedad: marcador PCAL/GPM o key props."""
+        _gpm_z = _pc.gpm_c3(z) if sz > 0 else None
+        # Peso molecular de la mezcla desde la composición global.
+        _pm_z = sum(z[i]*_eng.PM[i] for i in range(NC)) if sz > 0 else None
+        # En un punto de saturación una fase es incipiente (fracción → 0), así
+        # que la mezcla coincide con la fase saturada. Densidad/SG/Z de mezcla =
+        # los de esa fase (rocío → vapor; burbuja → líquido).
+        tipo = self._tipo_es()
+        es_rocio = 'rocio' in tipo.lower() or 'rocío' in tipo.lower()
+        _rho_z = p.get('rho_v') if es_rocio else p.get('rho_l')
+        _sg_z  = p.get('sg_v')  if es_rocio else p.get('sg_l')
+        _z_z   = p.get('ZV')    if es_rocio else p.get('ZL')
+
+        def _valor_prop(kf, phase_pc, gpm_val):
             if isinstance(kf, str) and kf.startswith('PCAL:'):
                 return phase_pc.get(kf.split(':', 1)[1])
             if isinstance(kf, str) and kf.startswith('GPM:'):
-                return _gpm_v if kf == 'GPM:v' else None
+                return gpm_val if kf == 'GPM:v' else None
             return _conv_prop(conv, p.get(kf))
+
+        def _valor_mezcla(key, conv):
+            if key == 'pm':        return _conv_prop(conv, _pm_z)
+            if key == 'densidad':  return _conv_prop(conv, _rho_z)
+            if key == 'sg':        return _sg_z
+            if key == 'z':         return _z_z
+            if key in ('hhv_mas','lhv_mas','hhv_vol','lhv_vol'):
+                return _pc_z.get(key)
+            if key == 'gpm':       return _gpm_z
+            return None   # entalpía, entropía, viscosidad: sin valor de mezcla
+
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
             unidad = f" [{_u.u(mag)}]" if mag else ""
             it_lbl = self.tbl_prop.item(r, 0)
             if it_lbl is not None:
                 it_lbl.setText(f"{_i18n.t(base)}{unidad}:")
-            vv = _valor_prop(kv, _pc_v)
-            vl = _valor_prop(kl, _pc_l)
+            vz = _valor_mezcla(key, conv)
+            vv = _valor_prop(kv, _pc_v, _gpm_v)
+            vl = _valor_prop(kl, _pc_l, None)
             fmt = f"{{:.{dec}f}}"
-            self.tbl_prop.item(r,1).setText(fmt.format(vv) if vv is not None else "")
-            self.tbl_prop.item(r,2).setText(fmt.format(vl) if vl is not None else "")
-            self.tbl_prop.item(r,1).setForeground(QBrush(QColor(TEXT_RES)))
-            self.tbl_prop.item(r,2).setForeground(QBrush(QColor(TEXT_RES)))
-            # Fondo: blanco si hay valor, gris si vacío (igual que Equilibrio).
-            self.tbl_prop.item(r,1).setBackground(
-                QBrush(QColor(WHITE if vv is not None else GRAY_RES)))
-            self.tbl_prop.item(r,2).setBackground(
-                QBrush(QColor(WHITE if vl is not None else GRAY_RES)))
+            for c, vw in ((1, vz), (2, vv), (3, vl)):
+                cell = self.tbl_prop.item(r, c)
+                if vw is not None:
+                    cell.setText(fmt.format(vw))
+                    cell.setForeground(QBrush(QColor(TEXT_RES)))
+                    cell.setBackground(QBrush(WHT))
+                else:
+                    cell.setText("")
+                    cell.setBackground(QBrush(QColor(GRAY_RES)))
 
     # ── Guardar / restaurar estado ────────────────────────────
     def get_estado(self):
