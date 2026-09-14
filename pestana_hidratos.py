@@ -327,19 +327,20 @@ class TabHidratos(QWidget):
 
     def _rebuild_prop_table(self):
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
-        GRIS = QColor(GRAY_LBL)
+        GRIS_NOMBRE = QColor(GRAY_LBL)   # nombre de propiedad (col 0)
+        GRIS_VACIA  = QColor(GRAY_RES)   # celda de valor vacía (col 1 y 2)
         self.tbl_prop.setRowCount(len(sel))
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
             self.tbl_prop.setRowHeight(r, ROW_H)
             unidad = f" [{_u.u(mag)}]" if mag else ""
             it = QTableWidgetItem(f"{_i18n.t(base)}{unidad}:")
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-            it.setBackground(QBrush(GRIS))
+            it.setBackground(QBrush(GRIS_NOMBRE))
             self.tbl_prop.setItem(r, 0, it)
             for c in (1, 2):
                 cc = QTableWidgetItem("")
                 cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-                cc.setBackground(QBrush(GRIS))
+                cc.setBackground(QBrush(GRIS_VACIA))
                 self.tbl_prop.setItem(r, c, cc)
         self._fit_table_heights()
 
@@ -468,45 +469,77 @@ class TabHidratos(QWidget):
         # Tabla de composición (flash)
         flash = res.get('flash', {}) or {}
         x = flash.get('x', [0]*NC); y = flash.get('y', [0]*NC)
+        V = flash.get('V', None)
+        # Qué fases existen realmente en el punto de hidrato.
+        hay_vap = (V is None) or (V > 1e-9)
+        hay_liq = (V is None) or (V < 1.0 - 1e-9)
         sx = sum(x); sy = sum(y)
+        VAC = QColor(GRAY_RES)   # celda sombreada (fase ausente / sin valor)
+        BLN = QColor(WHITE)
         for i in range(NC):
-            self.tbl.item(i,1).setText(f"{y[i]:.4f}")
-            self.tbl.item(i,2).setText(f"{x[i]:.4f}")
-            for c in (1,2):
-                self.tbl.item(i,c).setBackground(QBrush(QColor(WHITE)))
-                self.tbl.item(i,c).setForeground(QBrush(QColor(TEXT_RES)))
-        self.tbl.item(NC,1).setText(f"{sy:.4f}")
-        self.tbl.item(NC,2).setText(f"{sx:.4f}")
-        self.tbl.item(NC,1).setBackground(QBrush(QColor(WHITE)))
-        self.tbl.item(NC,2).setBackground(QBrush(QColor(WHITE)))
+            cv, cl = self.tbl.item(i,1), self.tbl.item(i,2)
+            if hay_vap:
+                cv.setText(f"{y[i]:.4f}"); cv.setBackground(QBrush(BLN))
+                cv.setForeground(QBrush(QColor(TEXT_RES)))
+            else:
+                cv.setText(""); cv.setBackground(QBrush(VAC))
+            if hay_liq:
+                cl.setText(f"{x[i]:.4f}"); cl.setBackground(QBrush(BLN))
+                cl.setForeground(QBrush(QColor(TEXT_RES)))
+            else:
+                cl.setText(""); cl.setBackground(QBrush(VAC))
+        # Fila de sumatorias
+        sv, sl = self.tbl.item(NC,1), self.tbl.item(NC,2)
+        if hay_vap:
+            sv.setText(f"{sy:.4f}"); sv.setBackground(QBrush(BLN))
+        else:
+            sv.setText(""); sv.setBackground(QBrush(VAC))
+        if hay_liq:
+            sl.setText(f"{sx:.4f}"); sl.setBackground(QBrush(BLN))
+        else:
+            sl.setText(""); sl.setBackground(QBrush(VAC))
 
         # Tabla de propiedades
+        import math as _math
         p = res.get('props', {}) or {}
         import poder_calorifico as _pc
-        _pc_v = _pc.poder_calorifico_fase(y, p.get('PM_v'))
-        _pc_l = _pc.poder_calorifico_fase(x, p.get('PM_l'))
-        _gpm_v = _pc.gpm_c3(y)
-        def _valor_prop(kf, phase_pc, conv):
+        _pc_v = _pc.poder_calorifico_fase(y, p.get('PM_v')) if hay_vap else {}
+        _pc_l = _pc.poder_calorifico_fase(x, p.get('PM_l')) if hay_liq else {}
+        _gpm_v = _pc.gpm_c3(y) if hay_vap else None
+
+        def _es_valido(v):
+            return v is not None and not (isinstance(v, float)
+                                          and (_math.isnan(v) or _math.isinf(v)))
+
+        def _valor_prop(kf, phase_pc, conv, existe):
+            if not existe:
+                return None
             if isinstance(kf, str) and kf.startswith('PCAL:'):
-                return phase_pc.get(kf.split(':', 1)[1])
-            if isinstance(kf, str) and kf.startswith('GPM:'):
-                return _gpm_v if kf == 'GPM:v' else None
-            return _conv_prop(conv, p.get(kf))
+                v = phase_pc.get(kf.split(':', 1)[1])
+            elif isinstance(kf, str) and kf.startswith('GPM:'):
+                v = _gpm_v if kf == 'GPM:v' else None
+            else:
+                v = _conv_prop(conv, p.get(kf))
+            return v if _es_valido(v) else None
+
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
             unidad = f" [{_u.u(mag)}]" if mag else ""
             it_lbl = self.tbl_prop.item(r, 0)
             if it_lbl is not None:
                 it_lbl.setText(f"{_i18n.t(base)}{unidad}:")
-            vv = _valor_prop(kv, _pc_v, conv)
-            vl = _valor_prop(kl, _pc_l, conv)
+            vv = _valor_prop(kv, _pc_v, conv, hay_vap)
+            vl = _valor_prop(kl, _pc_l, conv, hay_liq)
             fmt = f"{{:.{dec}f}}"
-            self.tbl_prop.item(r,1).setText(fmt.format(vv) if vv is not None else "")
-            self.tbl_prop.item(r,2).setText(fmt.format(vl) if vl is not None else "")
             for c, vw in ((1, vv), (2, vl)):
-                self.tbl_prop.item(r,c).setForeground(QBrush(QColor(TEXT_RES)))
-                self.tbl_prop.item(r,c).setBackground(
-                    QBrush(QColor(WHITE if vw is not None else GRAY_RES)))
+                cell = self.tbl_prop.item(r, c)
+                if vw is not None:
+                    cell.setText(fmt.format(vw))
+                    cell.setForeground(QBrush(QColor(TEXT_RES)))
+                    cell.setBackground(QBrush(BLN))
+                else:
+                    cell.setText("")
+                    cell.setBackground(QBrush(VAC))
 
     # ══════════════════════════════════════════════════════════
     # Curva de hidratos sobre la envolvente

@@ -667,32 +667,28 @@ def _documentacion(p):
 
 # ── Registro nombre -> funcion de dibujo ─────────────────────
 def _hidratos(p):
-    # Copo de nieve / cristal hexagonal, alusivo al hidrato de gas (jaula de
-    # agua). Tres ejes a 60° con pequenas ramas, en verde (mismo verde de la
-    # curva de hidratos e isocalidades).
+    # Clatrato: jaula de agua (celda hexagonal) con una molécula de gas
+    # atrapada dentro. Tono azul hielo, sin el copo verde anterior.
     import math as _m
-    cx, cy, R = 17.0, 16.0, 11.0
-    p.setPen(_pen(QColor("#27ae60"), 1.8, cap=Qt.PenCapStyle.RoundCap))
+    cx, cy, R = 17.0, 16.5, 10.5
+    ICE = QColor("#3E6E9E")     # azul hielo para la jaula
+    GAS = QColor("#D98A2B")     # ámbar para la molécula de gas atrapada
+    # Jaula hexagonal exterior
+    hexo = [(cx + R*_m.cos(_m.radians(60*i - 90)),
+             cy + R*_m.sin(_m.radians(60*i - 90))) for i in range(6)]
+    p.setPen(_pen(ICE, 1.8, join=Qt.PenJoinStyle.RoundJoin))
     p.setBrush(Qt.BrushStyle.NoBrush)
-    for k in range(3):
-        ang = _m.radians(60*k)
-        dx, dy = _m.cos(ang), _m.sin(ang)
-        x0, y0 = cx - R*dx, cy - R*dy
-        x1, y1 = cx + R*dx, cy + R*dy
-        p.drawLine(QPointF(x0, y0), QPointF(x1, y1))
-        # ramitas en cada extremo
-        for (ex, ey) in ((x0, y0), (x1, y1)):
-            for s in (+1, -1):
-                ba = ang + s*_m.radians(50)
-                p.drawLine(QPointF(ex, ey),
-                           QPointF(ex - 3.4*_m.cos(ba), ey - 3.4*_m.sin(ba))
-                           if (ex, ey) == (x1, y1) else
-                           QPointF(ex + 3.4*_m.cos(ba), ey + 3.4*_m.sin(ba)))
-    # nucleo hexagonal pequeno
-    hexp = [(cx + 3.0*_m.cos(_m.radians(60*i)),
-             cy + 3.0*_m.sin(_m.radians(60*i))) for i in range(6)]
-    p.setPen(_pen(QColor("#145214"), 1.3))
-    p.drawPolygon(_poly(hexp))
+    p.drawPolygon(_poly(hexo))
+    # Aristas internas hacia el centro (efecto jaula 3D)
+    p.setPen(_pen(QColor("#6E97BE"), 1.0))
+    for i in (0, 2, 4):
+        p.drawLine(QPointF(hexo[i][0], hexo[i][1]), QPointF(cx, cy))
+    # Molécula de gas atrapada (esfera central con brillo)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(GAS))
+    p.drawEllipse(QRectF(cx - 3.6, cy - 3.6, 7.2, 7.2))
+    p.setBrush(QBrush(QColor("#F0C38A")))
+    p.drawEllipse(QRectF(cx - 2.6, cy - 2.9, 2.6, 2.6))
 
 
 _REGISTRO = {
