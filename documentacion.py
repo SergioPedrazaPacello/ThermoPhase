@@ -119,7 +119,7 @@ intermolecular. Esa atracción tiende a juntarlas y, en consecuencia, reduce la
 presión que ejercen sobre las paredes del recipiente respecto de la que
 ejercería un gas ideal. Por eso al término repulsivo se le resta un término
 atractivo:</p>
-""" + _eq(r"P = \frac{n\,R\,T}{V - n\,b}\; -\; \left(\text{termino atractivo}\right)") + """
+""" + _eq(r"P = \frac{n\,R\,T}{V - n\,b}\; -\; \left(\text{attractive term}\right)") + """
 <p>Una forma intuitiva de verlo: una molécula que está a punto de golpear la
 pared del recipiente es frenada por la atracción de las moléculas que quedan
 detrás de ella. Ese tirón hacia adentro disminuye la fuerza del impacto y, por
@@ -664,7 +664,7 @@ supera la unidad, existe una fase incipiente con menor energía de Gibbs y la
 mezcla es inestable, es decir, bifásica. Por otro, para distinguir la solución
 trivial de una genuina, se evalúa la suma de los logaritmos de los coeficientes
 al cuadrado, considerando sólo los componentes presentes:</p>
-""" + _eq(r"\sum_{i:\,z_i > 0} \left(\ln K_i\right)^{2} < \varepsilon \;\Rightarrow\; \text{solucion trivial}") + """
+""" + _eq(r"\sum_{i:\,z_i > 0} \left(\ln K_i\right)^{2} < \varepsilon \;\Rightarrow\; \text{trivial solution}") + """
 <p>El punto clave es qué coeficientes de reparto quedan para el flash. Cuando el
 análisis concluye que la mezcla es inestable, los coeficientes que se pasan al
 flash no son los de Wilson, sino el producto de los dos juegos refinados durante
@@ -696,7 +696,7 @@ fases la produce el propio algoritmo.</p>
 <p>Con los coeficientes de reparto del paso anterior, el algoritmo entra en un
 lazo iterativo. En cada iteración se evalúan primero dos sumatorios que actúan
 como criterio de fase:</p>
-""" + _eq(r"\sum_i K_i\,z_i \leq 1 \;\Rightarrow\; \text{liquido} \qquad \sum_i \frac{z_i}{K_i} \leq 1 \;\Rightarrow\; \text{vapor}") + """
+""" + _eq(r"\sum_i K_i\,z_i \leq 1 \;\Rightarrow\; \text{liquid} \qquad \sum_i \frac{z_i}{K_i} \leq 1 \;\Rightarrow\; \text{vapor}") + """
 <p>Si el primer sumatorio no supera la unidad, toda la mezcla es líquida y se
 asigna x_i = z_i; si el segundo no supera la unidad, toda la mezcla es vapor y
 se asigna y_i = z_i. Cuando ninguno de los dos criterios se cumple, la mezcla es
@@ -748,7 +748,7 @@ una gota incipiente acaba de aparecer.</li>
 </ul>
 <p>En ambos casos la condición matemática es la misma que la del flash monofásico
 fronterizo:</p>
-""" + _eq(r"\text{burbuja:}\quad \sum_i K_i\,z_i = 1 \qquad \text{rocio:}\quad \sum_i \frac{z_i}{K_i} = 1") + """
+""" + _eq(r"\text{bubble:}\quad \sum_i K_i\,z_i = 1 \qquad \text{dew:}\quad \sum_i \frac{z_i}{K_i} = 1") + """
 <p>La envolvente es uno de los resultados más valiosos de la termodinámica de
 mezclas porque permite conocer, de un solo vistazo, si una mezcla producida en
 un yacimiento estará en una o dos fases en cualquier punto del sistema de
@@ -768,10 +768,10 @@ impone desde el punto anterior.</p>
 (x_i = z_i) y el vapor incipiente tiene una composición que hay que calcular.
 La condición de saturación exige que las fracciones molares del vapor sumen la
 unidad, lo que equivale a la ecuación:</p>
-""" + _eq(r"F_{\text{burbuja}} = \sum_i K_i\,z_i - 1 = 0") + """
+""" + _eq(r"F_{\text{bubble}} = \sum_i K_i\,z_i - 1 = 0") + """
 <p>En un punto de rocío el rol se invierte: el vapor tiene la composición global
 (y_i = z_i) y el líquido incipiente es el que se calcula:</p>
-""" + _eq(r"F_{\text{rocio}} = \sum_i \frac{z_i}{K_i} - 1 = 0") + """
+""" + _eq(r"F_{\text{dew}} = \sum_i \frac{z_i}{K_i} - 1 = 0") + """
 <p>El detalle clave de la implementación es que la composición de la fase
 incipiente se mantiene <b>fija</b> durante cada GoalSeek: solo la variable de
 búsqueda (temperatura o presión) se mueve, mientras la composición de la fase
@@ -1014,7 +1014,7 @@ adimensionales de la EOS:</p>
 frontera sea independiente de la presión. La transición ocurre cuando A/B
 iguala la razón de las constantes universales de la ecuación de estado,
 Ω_a/Ω_b:</p>
-""" + _eq(r"\frac{A}{B} = \frac{\Omega_a}{\Omega_b} \quad\Longrightarrow\quad T_{\text{frontera}} = \frac{a_m(T)}{b_m\,R\,(\Omega_a/\Omega_b)}") + """
+""" + _eq(r"\frac{A}{B} = \frac{\Omega_a}{\Omega_b} \quad\Longrightarrow\quad T_{\text{boundary}} = \frac{a_m(T)}{b_m\,R\,(\Omega_a/\Omega_b)}") + """
 <p>Cuando A/B supera el umbral Ω_a/Ω_b, el término atractivo de la mezcla
 domina sobre la energía cinética y el fluido tiene carácter líquido; por
 debajo del umbral el término repulsivo prevalece y el fluido puede ser
@@ -1353,7 +1353,7 @@ de una atmósfera:</p>
 Para la mezcla, las contribuciones ideales se suman ponderadas por las
 fracciones molares y la entropía incorpora además el término de mezclado
 ideal, que refleja el aumento de entropía al combinar componentes puros:</p>
-""" + _eq(r"S^{ID}_{\text{mez}} = \sum_i x_i S^{ID}_i - R\sum_i x_i\ln x_i") + """
+""" + _eq(r"S^{ID}_{\text{mix}} = \sum_i x_i S^{ID}_i - R\sum_i x_i\ln x_i") + """
 """
 
 S7_3 = """
@@ -1385,10 +1385,10 @@ S7_4 = """
 <p>La entalpía de una fase reúne la contribución ideal de cada componente y
 la desviación de la mezcla evaluada con el factor de compresibilidad de esa
 fase:</p>
-""" + _eq(r"H_{\text{fase}} = \sum_i x_i H^{ID}_i(T) + \left[H - H^{ID}\right]_{\text{mez}}") + """
+""" + _eq(r"H_{\text{phase}} = \sum_i x_i H^{ID}_i(T) + \left[H - H^{ID}\right]_{\text{mix}}") + """
 <p>La entropía de una fase reúne las contribuciones ideales por componente,
 el término de mezclado ideal y la desviación de la mezcla:</p>
-""" + _eq(r"S_{\text{fase}} = \sum_i x_i S^{ID}_i(T,P) - R\sum_i x_i\ln x_i + \left[S - S^{ID}\right]_{\text{mez}}") + """
+""" + _eq(r"S_{\text{phase}} = \sum_i x_i S^{ID}_i(T,P) - R\sum_i x_i\ln x_i + \left[S - S^{ID}\right]_{\text{mix}}") + """
 <p>Cuando el sistema se encuentra en equilibrio de dos fases, la entalpía y
 la entropía globales se obtienen combinando las propiedades de cada fase
 ponderadas por la fracción de vapor. La base de entalpía y de entropía es la
@@ -1515,6 +1515,239 @@ Technical Gas Mixtures from the Viscosity of the Individual Gases.
 Petroleum Reservoir Fluids</em>. CRC Press.</p>
 """
 
+S9_1 = """
+<h2>9.1 Poder calorífico y riqueza del gas</h2>
+<p>El poder calorífico o valor calorífico de un gas cuantifica la energía
+liberada por la combustión completa de una unidad de gas. Es una de las
+propiedades comerciales más importantes en la industria del gas natural,
+ya que fija el precio del gas vendido y determina si una corriente cumple
+las especificaciones de un contrato de venta o de un gasoducto. El
+programa calcula el poder calorífico para la fase vapor, la fase líquida
+y la mezcla global en cada punto calculado.</p>
+<p>Se reportan dos definiciones del poder calorífico. El poder calorífico
+superior o bruto (HHV, por <em>higher heating value</em>) supone que el
+agua producida en la combustión condensa a líquido, de modo que se
+recupera su calor latente de vaporización. El poder calorífico inferior o
+neto (LHV, por <em>lower heating value</em>) supone que el agua
+permanece como vapor y no se recupera ese calor. La diferencia entre
+ambos es precisamente el calor latente del agua formada.</p>
+<p>Cada definición se expresa en dos bases. La base volumétrica se reporta
+en BTU por pie cúbico de gas ideal a las condiciones estándar de 60 °F y
+14.696 psia, que es la convención de las tablas GPSA y del software de
+referencia. La base másica se reporta en BTU por libra. Adicionalmente se
+reporta la riqueza en licuables mediante el GPM, que se describe en la
+sección 9.4.</p>
+"""
+
+S9_2 = """
+<h2>9.2 Cálculo del poder calorífico volumétrico</h2>
+<p>El poder calorífico volumétrico de una fase se obtiene como el promedio
+molar de los valores caloríficos de sus componentes puros, tal como
+establece la referencia GPSA:</p>
+""" + _eq(r"VC = \sum_{i=1}^{N} z_i \, VC_i") + """
+<p>donde z<sub>i</sub> es la fracción molar del componente i en la fase
+considerada (vapor, líquido o mezcla) y VC<sub>i</sub> es el valor
+calorífico volumétrico del componente puro en base gas ideal, tabulado a
+60 °F y 14.696 psia. La ponderación por fracción molar es exacta en base
+gas ideal porque el volumen molar es el mismo para todos los componentes
+a esas condiciones.</p>
+<p>Los valores por componente se toman de la tabla GPSA-87. Los
+combustibles principales tienen, en BTU por pie cúbico, los valores netos
+y brutos siguientes: metano 909.4 / 1010.0, etano 1618.7 / 1769.6,
+propano 2314.9 / 2516.1, isobutano 3000.4 / 3251.9 y n-butano
+3010.8 / 3262.3, creciendo de forma aproximadamente lineal con el número
+de carbonos. El nitrógeno y el dióxido de carbono no son combustibles y
+tienen valor calorífico nulo: actúan como diluyentes que reducen el poder
+calorífico de la mezcla en proporción a su fracción molar.</p>
+"""
+
+S9_3 = """
+<h2>9.3 Conversión a base másica</h2>
+<p>Para obtener el poder calorífico en base másica se pasa primero de la
+base volumétrica a la base molar multiplicando por el volumen molar del
+gas ideal a condiciones estándar:</p>
+""" + _eq(r"V_m = \frac{R\,T_{std}}{P_{std}} = \frac{10.7316 \times 519.67}{14.696} \approx 379.48 \ \text{ft}^3/\text{lbmol}") + """
+<p>El valor calorífico molar es entonces el volumétrico multiplicado por
+ese volumen molar, y el valor másico se obtiene dividiendo por el peso
+molecular de la fase:</p>
+""" + _eq(r"VC_{molar} = VC \cdot V_m \qquad VC_{m\acute{a}sico} = \frac{VC_{molar}}{M_{fase}}") + """
+<p>donde M<sub>fase</sub> es el peso molecular de la fase, calculado como
+el promedio molar de los pesos moleculares de sus componentes. El poder
+calorífico volumétrico se expresa siempre en base gas ideal, de manera
+que el valor de la fase líquida corresponde al que tendría su composición
+si se evaporase a gas ideal, coherente con la convención de las tablas
+GPSA y del software de referencia.</p>
+"""
+
+S9_4 = """
+<h2>9.4 Contenido de licuables (GPM)</h2>
+<p>El GPM, del inglés <em>gallons per thousand cubic feet</em>, mide el
+contenido de hidrocarburos licuables recuperables de una corriente de
+gas. Expresa cuántos galones de líquido se obtendrían a partir de mil
+pies cúbicos de gas si se recuperasen los componentes de propano y más
+pesados. Es un indicador directo de la riqueza del gas y del atractivo
+económico de instalar una planta de extracción de licuables.</p>
+<p>El GPM se calcula sumando la contribución de cada componente C3+
+ponderada por su fracción molar en el gas y por su factor de galones por
+libra-mol, y refiriendo el resultado a mil pies cúbicos de gas ideal:</p>
+""" + _eq(r"GPM = \frac{1000}{V_m} \sum_{i \geq C_3} z_i \, G_i") + """
+<p>donde G<sub>i</sub> es el volumen líquido en galones por libra-mol del
+componente i y V<sub>m</sub> es el volumen molar del gas ideal a
+condiciones estándar. Los factores G<sub>i</sub> crecen con el tamaño
+molecular: propano 10.433, isobutano 12.386, n-butano 11.937, isopentano
+13.853 y n-pentano 13.712 galones por libra-mol, y así sucesivamente para
+los más pesados.</p>
+<p>Solo los componentes de propano en adelante se contabilizan en el GPM,
+puesto que el metano y el etano no se recuperan habitualmente como
+líquido en las plantas de procesamiento convencionales. El nitrógeno y el
+dióxido de carbono tampoco contribuyen. Por convención el GPM se reporta
+para la fase gas, que es la corriente de la que se extraen los
+licuables.</p>
+<h3>Referencias</h3>
+<p>Gas Processors Suppliers Association (1987). <em>GPSA Engineering
+Data Book</em>, 10.ª edición. Tulsa, Oklahoma.</p>
+<p>Campbell, J.M. (1992). <em>Gas Conditioning and Processing</em>,
+volumen 1. Campbell Petroleum Series.</p>
+"""
+
+S10_1 = """
+<h2>10.1 Formación de hidratos de gas</h2>
+<p>Los hidratos de gas son compuestos cristalinos de inclusión en los que
+moléculas de agua forman una red de jaulas mediante enlaces de hidrógeno,
+y moléculas de gas ligero quedan atrapadas dentro de esas cavidades. Se
+forman cuando hidrocarburos ligeros u otros gases como el nitrógeno o el
+dióxido de carbono están en contacto con agua a temperaturas bajas,
+típicamente por debajo de unos 35 °C, y a presión elevada. A diferencia
+del hielo, los hidratos pueden existir muy por encima del punto de
+congelación del agua, de modo que constituyen un riesgo operativo aun a
+temperaturas templadas.</p>
+<p>En la industria del gas los hidratos son un problema recurrente porque
+pueden taponar tuberías, válvulas, estranguladores y equipos de
+separación, con paradas de producción y riesgos de seguridad. Predecir
+las condiciones de presión y temperatura a las que se forman permite
+diseñar la deshidratación del gas o la inyección de inhibidores. El
+programa calcula, para la composición del fluido, la temperatura de
+formación de hidrato a una presión dada o la presión de formación a una
+temperatura dada, siguiendo el modelo del software de referencia
+PVTsim.</p>
+<p>El programa considera las estructuras de hidrato I y II, que se
+diferencian en el número y el tamaño de sus cavidades. La estructura I
+tiene 46 moléculas de agua por celda unitaria, con 2 cavidades pequeñas y
+6 grandes; la estructura II tiene 136 moléculas de agua, con 16 cavidades
+pequeñas y 8 grandes. Para una composición dada, el programa determina
+cuál de las dos estructuras es la estable en cada condición como aquella
+de menor potencial químico del agua.</p>
+"""
+
+S10_2 = """
+<h2>10.2 El modelo de van der Waals y Platteeuw</h2>
+<p>El cálculo de hidratos se basa en el modelo estadístico de adsorción de
+van der Waals y Platteeuw (1959), en la forma práctica propuesta por
+Munck y colaboradores (1988). La formación de hidrato se plantea como el
+paso del agua desde su estado puro (líquido o hielo, estado α) hasta el
+hidrato lleno (estado H), pasando por un estado intermedio hipotético de
+red vacía (estado β). La diferencia de potencial químico del agua entre
+el hidrato y el agua pura se descompone así en dos contribuciones:</p>
+""" + _eq(r"\mu^H - \mu^\alpha = \left(\mu^H - \mu^\beta\right) + \left(\mu^\beta - \mu^\alpha\right)") + """
+<p>El primer término representa la estabilización de la red causada por la
+adsorción de las moléculas de gas en las cavidades, y siempre reduce el
+potencial químico. El segundo término es la diferencia entre la red vacía
+hipotética y el agua pura, y se obtiene por termodinámica clásica. La
+curva de formación de hidrato es el lugar de puntos de presión y
+temperatura donde ambas contribuciones se cancelan:</p>
+""" + _eq(r"\mu^H - \mu^\alpha = 0") + """
+<p>A la izquierda de la curva la diferencia es negativa y el hidrato es
+estable; a la derecha es positiva y el agua permanece como líquido o
+hielo sin formar hidrato.</p>
+"""
+
+S10_3 = """
+<h2>10.3 Término de adsorción de Langmuir</h2>
+<p>La estabilización de la red por el gas atrapado se calcula con la
+teoría de adsorción de Langmuir. La diferencia de potencial químico entre
+la red vacía y la red llena se expresa como:</p>
+""" + _eq(r"\frac{\mu^H - \mu^\beta}{RT} = \sum_{i} \nu_i \, \ln\!\left(1 - \sum_{K} Y_{Ki}\right)") + """
+<p>donde ν<sub>i</sub> es el número de cavidades de tipo i por molécula de
+agua e Y<sub>Ki</sub> es la probabilidad de que una cavidad de tipo i esté
+ocupada por una molécula de gas de tipo K. Esta probabilidad de ocupación
+sigue la isoterma de Langmuir:</p>
+""" + _eq(r"Y_{Ki} = \frac{C_{Ki}\,f_K}{1 + \sum_{j} C_{ji}\,f_j}") + """
+<p>donde f<sub>K</sub> es la fugacidad del componente K en la fase de
+hidrocarburos y C<sub>Ki</sub> es la constante de adsorción de Langmuir,
+específica de cada componente, cada tipo de cavidad y cada estructura. La
+constante de adsorción depende de la temperatura según la expresión de
+dos parámetros de Munck:</p>
+""" + _eq(r"C_{Ki} = \frac{A_{Ki}}{T}\,\exp\!\left(\frac{B_{Ki}}{T}\right)") + """
+<p>Los parámetros A<sub>Ki</sub> y B<sub>Ki</sub> se determinan por ajuste
+a datos experimentales de formación de hidratos y son específicos de la
+ecuación de estado seleccionada. El programa emplea los parámetros de la
+base de datos de PVTsim, con un juego para las ecuaciones de la familia
+Peng-Robinson y otro para las de la familia Soave-Redlich-Kwong, ya que
+las fugacidades calculadas por cada ecuación son ligeramente distintas.</p>
+"""
+
+S10_4 = """
+<h2>10.4 Término de referencia del agua</h2>
+<p>La diferencia de potencial químico entre la red vacía y el agua pura se
+obtiene por integración de la relación termodinámica fundamental entre
+los estados β y α, con la presión de referencia tomada como cero:</p>
+""" + _eq(r"\frac{\mu^\beta - \mu^\alpha}{RT} = \frac{\Delta\mu_0}{R\,T_0} - \int_{T_0}^{T} \frac{\Delta H_0 + \Delta C_p (T - T_0)}{R\,T^2}\,dT + \frac{\Delta V \cdot P}{R\,\bar{T}}") + """
+<p>donde T<sub>0</sub> es la temperatura de referencia de 273.15 K, Δμ<sub>0</sub>
+es la diferencia de potencial químico a esa temperatura, ΔH<sub>0</sub> es
+la diferencia de entalpía, ΔC<sub>p</sub> la diferencia de capacidad
+calorífica, ΔV la diferencia de volumen molar y T̄ = (T + T<sub>0</sub>)/2
+la temperatura media que aproxima la dependencia del término de presión.
+Los valores de ΔH y ΔV distinguen si el agua de referencia está como
+líquido o como hielo, con el cambio a 273.15 K.</p>
+<p>Las constantes de referencia son específicas de cada estructura y de la
+ecuación de estado. Para la estructura I se emplean los valores de
+Erickson: Δμ<sub>0</sub> = 1264 J/mol, ΔH<sub>0</sub> = −4858 J/mol en
+agua líquida y ΔV = 4.6 cm³/mol. Para la estructura II el programa usa
+constantes ligeramente ajustadas por ecuación de estado, próximas a
+Δμ<sub>0</sub> = 883 J/mol, que reproducen las curvas de referencia de
+PVTsim con una precisión del orden de la centésima de grado Rankine.</p>
+"""
+
+S10_5 = """
+<h2>10.5 Fugacidad de mezcla y flujo de cálculo</h2>
+<p>La adsorción de Langmuir usa la fugacidad de cada componente formador
+en la fase de hidrocarburos. Un aspecto decisivo del cálculo es que a lo
+largo de la curva de hidratos la mezcla de hidrocarburos no está
+necesariamente en una sola fase: con frecuencia coexisten una fase gas y
+una fase líquida de hidrocarburos, o el fluido es un líquido denso. Por
+ello el programa realiza un cálculo flash bien convergido en cada punto y
+emplea la fugacidad de mezcla, es decir, el promedio molar de la fugacidad
+de cada componente sobre las fases de hidrocarburos presentes. En
+equilibrio la fugacidad de un componente es igual en todas las fases, de
+modo que este promedio es consistente. Evaluar la fugacidad tratando la
+composición global como una sola fase produciría errores apreciables en
+la zona donde la mezcla es bifásica.</p>
+<p>Para trazar un punto de la curva se fija una de las dos variables,
+presión o temperatura, y se resuelve la otra buscando la condición en que
+el potencial químico del hidrato iguala al del agua pura. La curva de
+hidratos puede ser monótona, como ocurre en gases ricos en metano, o
+tener forma cerrada con dos ramas, como sucede en mezclas sin metano; el
+programa localiza las raíces del criterio mediante un barrido que detecta
+los cambios de signo y toma la frontera de formación correspondiente. Se
+evalúan las estructuras I y II y se reporta la de menor potencial químico
+como la estable.</p>
+<p>El resultado del cálculo incluye la temperatura o presión de formación
+de hidrato y, en esas condiciones, el flash de la mezcla de hidrocarburos
+con la composición de cada fase y sus propiedades. El efecto del contenido
+de agua de la mezcla sobre la curva es despreciable, por lo que el cálculo
+se realiza sin necesidad de resolver la fase acuosa.</p>
+<h3>Referencias</h3>
+<p>van der Waals, J.H. y Platteeuw, J.C. (1959). Clathrate Solutions.
+<em>Advances in Chemical Physics</em>, 2, pp. 1-57.</p>
+<p>Munck, J., Skjold-Jørgensen, S. y Rasmussen, P. (1988). Computations of
+the Formation of Gas Hydrates. <em>Chemical Engineering Science</em>, 43,
+pp. 2661-2672.</p>
+<p>Michelsen, M.L. (1991). Calculation of Hydrate Fugacities.
+<em>Chemical Engineering Science</em>, 46, pp. 1192-1193.</p>
+<p>Erickson, D.D. (1983). Development of a Natural Gas Hydrate Prediction
+Computer Program. Tesis de maestría, Colorado School of Mines.</p>
+"""
+
 SECCIONES = [
     ("1. Fundamentos de las EOS cúbicas", [
         ("1.1 Ecuación de estado", S1_1),
@@ -1579,6 +1812,19 @@ SECCIONES = [
         ("8.2 Viscosidad de gas diluido por componente", S8_2),
         ("8.3 Parámetro reductor y densidad crítica", S8_3),
         ("8.4 Polinomio LBC y viscosidad de la mezcla", S8_4),
+    ]),
+    ("9. Poder calorífico y GPM", [
+        ("9.1 Poder calorífico y riqueza del gas", S9_1),
+        ("9.2 Cálculo del poder calorífico volumétrico", S9_2),
+        ("9.3 Conversión a base másica", S9_3),
+        ("9.4 Contenido de licuables (GPM)", S9_4),
+    ]),
+    ("10. Formación de hidratos", [
+        ("10.1 Formación de hidratos de gas", S10_1),
+        ("10.2 El modelo de van der Waals y Platteeuw", S10_2),
+        ("10.3 Término de adsorción de Langmuir", S10_3),
+        ("10.4 Término de referencia del agua", S10_4),
+        ("10.5 Fugacidad de mezcla y flujo de cálculo", S10_5),
     ]),
 ]
 import re
@@ -1839,16 +2085,25 @@ class DocTecnica(QWidget):
     def retraducir(self):
         """Traduce los textos de la ventana (barra, etiquetas, títulos)."""
         import idioma as _i18n
+        import documentacion_i18n as _doc_i18n
+        lang = _i18n.get_idioma()
         vis = getattr(self, '_arbol_visible', True)
         self.lbl_contenido.setText(_i18n.t("Contenido"))
         self.btn_ocultar.setText(_i18n.t("Ocultar") if vis else _i18n.t("Mostrar"))
         self.btn_atras.setText(_i18n.t("Atrás"))
         self.btn_adelante.setText(_i18n.t("Adelante"))
+        def _tt(titulo):
+            # Traduce el título del árbol: primero el diccionario general de
+            # idioma, luego el de la documentación (por texto sin número).
+            t = _i18n.t(titulo)
+            if t == titulo:
+                t = _doc_i18n.traducir_titulo_rapido(titulo, lang)
+            return t
         for si, (sec_titulo, subs) in enumerate(SECCIONES):
             top = self._tops[si]
-            top.setText(0, _i18n.t(_sin_num(sec_titulo)))
+            top.setText(0, _tt(_sin_num(sec_titulo)))
             for ci, (sub_titulo, _h) in enumerate(subs):
-                top.child(ci).setText(0, _i18n.t(_sin_num(sub_titulo)))
+                top.child(ci).setText(0, _tt(_sin_num(sub_titulo)))
         if 0 <= self._idx < len(self._orden):
             self._mostrar_indice(self._idx)
 
@@ -1902,6 +2157,11 @@ class DocTecnica(QWidget):
         item = self._orden[idx]
         self.tree.setCurrentItem(item)
         html = self._contenido.get(id(item), "")
+        # Traducir el contenido al idioma activo (los bloques sin traducción
+        # quedan en español).
+        import idioma as _i18n
+        import documentacion_i18n as _doc_i18n
+        html = _doc_i18n.traducir_html(html, _i18n.get_idioma())
         # el titulo (h2) va sin numero
         html = re.sub(r'(<h2>)\s*[\d]+(\.[\d]+)*\.?\s+', r'\1', html)
         # renderizar las ecuaciones a imagen nítida

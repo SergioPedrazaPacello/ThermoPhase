@@ -428,6 +428,17 @@ TRAD = {
     "Propiedades del punto de hidrato:": "Hydrate point properties:",
     "No se encontró punto de formación de hidrato en el rango.":
         "No hydrate formation point found in range.",
+    "Poder calorífico y GPM": "Heating Value and GPM",
+    "Poder calorífico y riqueza del gas": "Heating value and gas richness",
+    "Cálculo del poder calorífico volumétrico": "Calculation of the volumetric heating value",
+    "Conversión a base másica": "Conversion to a mass basis",
+    "Contenido de licuables (GPM)": "Liquefiable content (GPM)",
+    "Formación de hidratos": "Hydrate Formation",
+    "Formación de hidratos de gas": "Gas hydrate formation",
+    "El modelo de van der Waals y Platteeuw": "The van der Waals and Platteeuw model",
+    "Término de adsorción de Langmuir": "Langmuir adsorption term",
+    "Término de referencia del agua": "Water reference term",
+    "Fugacidad de mezcla y flujo de cálculo": "Mixture fugacity and calculation flow",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.
