@@ -56,6 +56,8 @@ WHITE    = "#FFFFFF"
 GRAY_TIT = "#A8A8A8"   # plomo oscuro para títulos / cabeceras
 GRAY_LBL = "#D0D0D0"   # plomo medio para etiquetas
 GRAY_RES = "#E8E8E8"   # plomo claro para celdas de resultado (vacías)
+GRAY_EMPTY = "#F6F6F6" # gris aún más claro para celdas vacías ANTES de
+                       # calcular (contraste con el fondo de la ventana)
 BORDER   = "#888888"
 TEXT     = "#000000"
 TEXT_DIM = "#555555"
@@ -609,15 +611,15 @@ class TabEquilibrio(QWidget):
                 NOMBRES[i], bg=GRAY_LBL,
                 align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
             self.tbl_comp.setItem(i, 1, cell("", bg=WHITE, editable=True))
-            self.tbl_comp.setItem(i, 2, cell("", bg=GRAY_RES, color=TEXT_RES))
-            self.tbl_comp.setItem(i, 3, cell("", bg=GRAY_RES, color=TEXT_RES))
+            self.tbl_comp.setItem(i, 2, cell("", bg=GRAY_EMPTY, color=TEXT_RES))
+            self.tbl_comp.setItem(i, 3, cell("", bg=GRAY_EMPTY, color=TEXT_RES))
 
         # Fila de sumatorias dentro de tbl_comp (fila NC)
         self.tbl_comp.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
         self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE))
-        self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_RES))
-        self.tbl_comp.setItem(NC, 3, cell("", bg=GRAY_RES))
+        self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_EMPTY))
+        self.tbl_comp.setItem(NC, 3, cell("", bg=GRAY_EMPTY))
         self.sum_row = NC  # índice de la fila sumatoria dentro de tbl_comp
         fix_table_size(self.tbl_comp)
         self.tbl_comp.itemChanged.connect(self._on_item_changed)
@@ -886,15 +888,15 @@ class TabEquilibrio(QWidget):
         self.last_result = r
         self._render(r)
 
-    def _paint_res(self, row, col, txt):
+    def _paint_res(self, row, col, txt, empty_bg=GRAY_RES):
         it = self.tbl_res.item(row, col)
         if it is None:
-            it = cell("", bg=GRAY_RES); self.tbl_res.setItem(row, col, it)
+            it = cell("", bg=empty_bg); self.tbl_res.setItem(row, col, it)
         it.setText(txt)
         if txt:
             it.setBackground(_brush(WHITE)); it.setForeground(_brush(TEXT_RES))
         else:
-            it.setBackground(_brush(GRAY_RES)); it.setForeground(_brush(TEXT))
+            it.setBackground(_brush(empty_bg)); it.setForeground(_brush(TEXT))
 
     def _rebuild_resumen(self, valores=None):
         """(Re)construye la tabla de resumen mostrando solo las propiedades
@@ -911,11 +913,13 @@ class TabEquilibrio(QWidget):
             self.tbl_res.setItem(i, 0, cell(etq, bg=GRAY_LBL))
             if valores is not None and key in valores:
                 mix, vap, liq = valores[key]
+                _eb = GRAY_RES
             else:
                 mix = vap = liq = ""
-            self._paint_res(i, 1, mix if has_mix else "")
-            self._paint_res(i, 2, vap)
-            self._paint_res(i, 3, liq)
+                _eb = GRAY_EMPTY   # estado sin cálculo: gris más claro
+            self._paint_res(i, 1, mix if has_mix else "", empty_bg=_eb)
+            self._paint_res(i, 2, vap, empty_bg=_eb)
+            self._paint_res(i, 3, liq, empty_bg=_eb)
         fix_table_size(self.tbl_res)
 
     def _abrir_selector_props(self):

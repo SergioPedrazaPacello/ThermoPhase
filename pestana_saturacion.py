@@ -18,6 +18,10 @@ import eos as _eng
 import unidades as _u
 WHITE="#FFFFFF"; GRAY_TIT="#A8A8A8"; GRAY_HDR="#C8C8C8"; GRAY_LBL="#D0D0D0"
 GRAY_RES="#E8E8E8"; BORDER="#888888"; TEXT="#000000"; TEXT_DIM="#555555"
+# Gris más claro (sin llegar al blanco) para las celdas vacías ANTES de
+# calcular: contrasta con el fondo de la ventana y evita la saturación de
+# grises. Tras un cálculo, las celdas usan GRAY_RES/WHITE como siempre.
+GRAY_EMPTY="#F6F6F6"
 
 
 class GridDelegate(QStyledItemDelegate):
@@ -356,7 +360,8 @@ class TabSaturacion(QWidget):
 
         GRIS_NOMBRE = QColor(GRAY_LBL)    # mismo gris que los nombres de la
                                           # pestaña de Equilibrio de Fases
-        GRIS_RES = QColor(GRAY_RES)       # gris para celdas de resultado vacías
+        GRIS_RES = QColor(GRAY_EMPTY)     # gris claro para celdas vacías
+                                          # (estado inicial, sin cálculo)
         for i in range(NC):
             it=QTableWidgetItem(NOMBRES[i].rstrip(':'))
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
@@ -459,7 +464,7 @@ class TabSaturacion(QWidget):
         seleccionadas, en el orden del catalogo. Solo arma etiquetas y celdas
         vacias; los valores los rellena _render."""
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
-        GRIS = QColor(GRAY_LBL); GRIS_RES = QColor(GRAY_RES)
+        GRIS = QColor(GRAY_LBL); GRIS_RES = QColor(GRAY_EMPTY)
         self.tbl_prop.setRowCount(len(sel))
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
             self.tbl_prop.setRowHeight(r, ROW_H)

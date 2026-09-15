@@ -27,7 +27,7 @@ import unidades as _u
 # Reutilizar estilos, helpers y catálogo de propiedades de la pestaña de
 # saturación para mantener un aspecto idéntico y no duplicar código.
 from pestana_saturacion import (
-    WHITE, GRAY_TIT, GRAY_LBL, GRAY_RES, BORDER, TEXT, TEXT_DIM, TEXT_RES,
+    WHITE, GRAY_TIT, GRAY_LBL, GRAY_RES, GRAY_EMPTY, BORDER, TEXT, TEXT_DIM, TEXT_RES,
     FONT_F, FS, ROW_H, GridDelegate,
     BTN_STYLE, LBL_TIT, LBL_SEC,
     _aplicar_estilo_combo, _conv_prop,
@@ -242,7 +242,7 @@ class TabHidratos(QWidget):
         self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
-        GRIS_NOMBRE = QColor(GRAY_LBL); GRIS_RES = QColor(GRAY_RES)
+        GRIS_NOMBRE = QColor(GRAY_LBL); GRIS_RES = QColor(GRAY_EMPTY)
         for i in range(NC):
             it = QTableWidgetItem(NOMBRES[i].rstrip(':'))
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
@@ -334,7 +334,7 @@ class TabHidratos(QWidget):
     def _rebuild_prop_table(self):
         sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
         GRIS_NOMBRE = QColor(GRAY_LBL)   # nombre de propiedad (col 0)
-        GRIS_VACIA  = QColor(GRAY_RES)   # celda de valor vacía (col 1 y 2)
+        GRIS_VACIA  = QColor(GRAY_EMPTY) # celda de valor vacía (col 1,2,3)
         self.tbl_prop.setRowCount(len(sel))
         for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
             self.tbl_prop.setRowHeight(r, ROW_H)
