@@ -86,13 +86,13 @@ _registrar_fuente()
 # mesura: banda de título, acentos de sección, encabezados de tabla.
 from reportlab.lib.colors import HexColor
 
-_AZUL      = HexColor('#2c5aa0')   # azul acero principal (banda, acentos)
-_AZUL_OSC  = HexColor('#1f3f70')   # azul profundo (texto de título sobre banda)
-_GRIS_HDR  = HexColor('#e8edf5')   # fondo tenue de encabezados de tabla
-_GRIS_ZEB  = HexColor('#f5f7fa')   # zebra muy sutil de filas
-_GRIS_LIN  = HexColor('#c9d4e5')   # líneas divisorias finas
+_AZUL      = HexColor('#4a4a4a')   # gris medio principal (banda, acentos)
+_AZUL_OSC  = HexColor('#2b2b2b')   # gris profundo (texto de título sobre banda)
+_GRIS_HDR  = HexColor('#e6e6e6')   # fondo tenue de encabezados de tabla
+_GRIS_ZEB  = HexColor('#f5f5f5')   # zebra muy sutil de filas
+_GRIS_LIN  = HexColor('#c4c4c4')   # líneas divisorias finas
 _TXT       = HexColor('#1a1a1a')   # texto principal
-_TXT_TENUE = HexColor('#5a6b85')   # texto secundario (fecha, pie)
+_TXT_TENUE = HexColor('#6a6a6a')   # texto secundario (fecha, pie)
 _BLANCO    = HexColor('#ffffff')
 
 
@@ -104,7 +104,7 @@ def _estilos():
                                    textColor=_BLANCO),
         'subtitulo':ParagraphStyle('subtitulo', fontName=_FONT, fontSize=9,
                                    leading=11, alignment=TA_RIGHT,
-                                   textColor=HexColor('#d5e0f2')),
+                                   textColor=HexColor('#dcdcdc')),
         'seccion':  ParagraphStyle('seccion', fontName=_FONT, fontSize=13,
                                    leading=16, alignment=TA_LEFT,
                                    textColor=_AZUL_OSC),
@@ -186,39 +186,14 @@ def _dibujar_marco(canvas, doc):
     canvas.setFillColor(_AZUL_OSC)
     canvas.rect(0, y0, W, 0.035*inch, fill=1, stroke=0)
 
-    # ── Logo: campana de fases estilizada dentro de un círculo claro ──
-    cx = 0.45*inch + 0.20*inch
     cy = y0 + banda_h/2
-    R  = 0.21*inch
-    canvas.setFillColor(_BLANCO)
-    canvas.circle(cx, cy, R, fill=1, stroke=0)
-    # curva tipo campana (envolvente de fases) trazada con líneas
-    canvas.setStrokeColor(_AZUL)
-    canvas.setLineWidth(1.4)
-    p = canvas.beginPath()
-    import math as _m
-    pts = []
-    for k in range(25):
-        a = _m.pi * k / 24.0          # 0..pi (media campana espejada)
-        xx = cx - R*0.62*_m.cos(a)
-        yy = cy - R*0.55 + R*0.9*_m.sin(a)
-        pts.append((xx, yy))
-    p.moveTo(*pts[0])
-    for pt in pts[1:]:
-        p.lineTo(*pt)
-    canvas.drawPath(p, stroke=1, fill=0)
-    # punto crítico (vértice)
-    canvas.setFillColor(_AZUL)
-    canvas.circle(cx, cy + R*0.35, 1.3, fill=1, stroke=0)
-
-    canvas.restoreState()
 
     # ── Título dentro de la banda ──
-    canvas.saveState()
     canvas.setFillColor(_BLANCO)
     canvas.setFont(_FONT, 17)
     canvas.drawRightString(W - 0.80*inch, cy - 1,
                            _i18n.t("Reporte de Simulacion - ThermoPhase"))
+
     canvas.restoreState()
 
     # ── Pie de página ──

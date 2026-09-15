@@ -2026,6 +2026,11 @@ class DocTecnica(QWidget):
         self._idx = -1
         self.view.setHtml("")
 
+        # Sincroniza los títulos del árbol con el idioma activo desde el
+        # arranque (el árbol se construye en español; si el idioma es inglés
+        # hay que traducirlo ya, sin esperar a un cambio manual de idioma).
+        self.retraducir()
+
     # ── Barra ───────────────────────────────────────────────────
     def _crear_barra(self):
         import idioma as _i18n
