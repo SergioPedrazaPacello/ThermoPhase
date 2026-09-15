@@ -439,6 +439,9 @@ TRAD = {
     "Término de adsorción de Langmuir": "Langmuir adsorption term",
     "Término de referencia del agua": "Water reference term",
     "Fugacidad de mezcla y flujo de cálculo": "Mixture fugacity and calculation flow",
+    "Generado": "Generated",
+    "Página": "Page",
+    "Simulador termodinámico": "Thermodynamic simulator",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

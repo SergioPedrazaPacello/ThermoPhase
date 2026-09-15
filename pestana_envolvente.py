@@ -1127,9 +1127,18 @@ class TabEnvolvente(QWidget):
             Ts=[_u.t_desde_R(t) for _,t in curva]
             Ps=[_u.p_desde_psia(p) for p,_ in curva]
             if Ts and Ps:
-                ax.plot(Ts, Ps, linestyle='-', linewidth=0.9,
-                        color='#a83218',
-                        label=_i18n.t('Curva de saturación'), zorder=3)
+                # Mismo estilo que las curvas de burbuja/rocío en mezclas sin
+                # mapa: línea fina + marcadores triangulares encima.
+                if self._regiones is not None:
+                    ax.plot(Ts, Ps, linestyle='-', linewidth=0.9,
+                            color='#c0392b',
+                            label=_i18n.t('Curva de saturación'), zorder=3)
+                else:
+                    ax.plot(Ts, Ps, linestyle='-', linewidth=0.7,
+                            color='#c0392b', zorder=2)
+                    ax.plot(Ts, Ps, linestyle='none', marker='^',
+                            color='#c0392b', markersize=3,
+                            label=_i18n.t('Curva de saturación'), zorder=3)
             crit=res.get('critico')
             if crit is not None:
                 ax.plot([_u.t_desde_R(crit[1])], [_u.p_desde_psia(crit[0])],
@@ -1144,7 +1153,7 @@ class TabEnvolvente(QWidget):
             # Sin mapa → marcadores triangulares (estilo original).
             if self._regiones is not None:
                 if Tb and Pb:
-                    ax.plot(Tb, Pb, linestyle='-', color='#a83218',
+                    ax.plot(Tb, Pb, linestyle='-', color='#c0392b',
                             linewidth=0.9, label=_i18n.t('Curva de Burbuja'), zorder=5)
                 if Td and Pd:
                     ax.plot(Td, Pd, linestyle='-', color='#1a4fa8',
@@ -1152,9 +1161,9 @@ class TabEnvolvente(QWidget):
             else:
                 if Tb and Pb:
                     ax.plot(Tb, Pb, linestyle='-', linewidth=0.7,
-                            color='#a83218', zorder=2)
+                            color='#c0392b', zorder=2)
                     ax.plot(Tb,Pb,linestyle='none',marker='^',
-                            color='#a83218',markersize=3,
+                            color='#c0392b',markersize=3,
                             label=_i18n.t('Curva de Burbuja'))
                 if Td and Pd:
                     ax.plot(Td, Pd, linestyle='-', linewidth=0.7,

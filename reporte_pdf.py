@@ -81,32 +81,82 @@ def _registrar_fuente():
 _registrar_fuente()
 
 
+# ── Paleta de color del reporte ──────────────────────────────────────────
+# Azul acero sobrio, coherente con la identidad de ThermoPhase. Se usa con
+# mesura: banda de título, acentos de sección, encabezados de tabla.
+from reportlab.lib.colors import HexColor
+
+_AZUL      = HexColor('#2c5aa0')   # azul acero principal (banda, acentos)
+_AZUL_OSC  = HexColor('#1f3f70')   # azul profundo (texto de título sobre banda)
+_GRIS_HDR  = HexColor('#e8edf5')   # fondo tenue de encabezados de tabla
+_GRIS_ZEB  = HexColor('#f5f7fa')   # zebra muy sutil de filas
+_GRIS_LIN  = HexColor('#c9d4e5')   # líneas divisorias finas
+_TXT       = HexColor('#1a1a1a')   # texto principal
+_TXT_TENUE = HexColor('#5a6b85')   # texto secundario (fecha, pie)
+_BLANCO    = HexColor('#ffffff')
+
+
 # ── Estilos de parrafo ───────────────────────────────────────────────────
 def _estilos():
     return {
-        'titulo':  ParagraphStyle('titulo',  fontName=_FONT, fontSize=14,
-                                  leading=17, alignment=TA_RIGHT),
-        'seccion': ParagraphStyle('seccion', fontName=_FONT, fontSize=14,
-                                  leading=17, alignment=TA_LEFT),
-        'lbl':     ParagraphStyle('lbl',     fontName=_FONT, fontSize=11,
-                                  leading=14, alignment=TA_RIGHT),
-        'val':     ParagraphStyle('val',     fontName=_FONT, fontSize=11,
-                                  leading=14, alignment=TA_CENTER),
-        'val_izq': ParagraphStyle('val_izq', fontName=_FONT, fontSize=11,
-                                  leading=14, alignment=TA_LEFT),
-        'hdr':     ParagraphStyle('hdr',     fontName=_FONT, fontSize=11,
-                                  leading=14, alignment=TA_CENTER),
+        'titulo':   ParagraphStyle('titulo', fontName=_FONT, fontSize=17,
+                                   leading=20, alignment=TA_RIGHT,
+                                   textColor=_BLANCO),
+        'subtitulo':ParagraphStyle('subtitulo', fontName=_FONT, fontSize=9,
+                                   leading=11, alignment=TA_RIGHT,
+                                   textColor=HexColor('#d5e0f2')),
+        'seccion':  ParagraphStyle('seccion', fontName=_FONT, fontSize=13,
+                                   leading=16, alignment=TA_LEFT,
+                                   textColor=_AZUL_OSC),
+        'lbl':      ParagraphStyle('lbl', fontName=_FONT, fontSize=10,
+                                   leading=12.5, alignment=TA_RIGHT,
+                                   textColor=_TXT),
+        'val':      ParagraphStyle('val', fontName=_FONT, fontSize=10,
+                                   leading=12.5, alignment=TA_CENTER,
+                                   textColor=_TXT),
+        'val_izq':  ParagraphStyle('val_izq', fontName=_FONT, fontSize=10,
+                                   leading=12.5, alignment=TA_LEFT,
+                                   textColor=_TXT),
+        'hdr':      ParagraphStyle('hdr', fontName=_FONT, fontSize=10,
+                                   leading=12.5, alignment=TA_CENTER,
+                                   textColor=_AZUL_OSC),
+        'pie':      ParagraphStyle('pie', fontName=_FONT, fontSize=8,
+                                   leading=10, alignment=TA_CENTER,
+                                   textColor=_TXT_TENUE),
     }
 
 
-# Tabla sin bordes, sin fondos, sin lineas — como el original
+# Tabla de pares etiqueta/valor (condiciones, modelo): sin bordes, limpia.
 _TBL = TableStyle([
-    ('LEFTPADDING',   (0, 0), (-1, -1), 2),
-    ('RIGHTPADDING',  (0, 0), (-1, -1), 2),
-    ('TOPPADDING',    (0, 0), (-1, -1), 2),
-    ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ('LEFTPADDING',   (0, 0), (-1, -1), 3),
+    ('RIGHTPADDING',  (0, 0), (-1, -1), 6),
+    ('TOPPADDING',    (0, 0), (-1, -1), 2.5),
+    ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
     ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
 ])
+
+
+def _estilo_tabla_datos(n_filas, n_hdr=1):
+    """Estilo de tabla de resultados: encabezado con fondo tenue, filas
+    zebra sutiles, líneas divisorias finas. n_hdr = nº de filas de encabezado."""
+    cmds = [
+        ('LEFTPADDING',   (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 5),
+        ('TOPPADDING',    (0, 0), (-1, -1), 2.3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.3),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        # Encabezado: fondo tenue y línea inferior azul
+        ('BACKGROUND',    (0, 0), (-1, n_hdr-1), _GRIS_HDR),
+        ('LINEBELOW',     (0, n_hdr-1), (-1, n_hdr-1), 0.8, _AZUL),
+        ('LINEABOVE',     (0, 0), (-1, 0), 0.8, _AZUL),
+    ]
+    # Zebra: filas de datos alternas con fondo muy sutil
+    for r in range(n_hdr, n_filas):
+        if (r - n_hdr) % 2 == 1:
+            cmds.append(('BACKGROUND', (0, r), (-1, r), _GRIS_ZEB))
+    # Línea de cierre inferior
+    cmds.append(('LINEBELOW', (0, n_filas-1), (-1, n_filas-1), 0.6, _GRIS_LIN))
+    return TableStyle(cmds)
 
 
 def _f(v, d=4):
@@ -117,6 +167,92 @@ def _f(v, d=4):
         return f"{float(v):.{d}f}"
     except (TypeError, ValueError):
         return str(v)
+
+
+# ── Logo vectorial y banda de encabezado / pie de pagina ─────────────────
+def _dibujar_marco(canvas, doc):
+    """Dibuja la banda de título superior (con logo) y el pie de página en
+    cada hoja. Se invoca como onPage de ReportLab."""
+    from reportlab.lib.pagesizes import letter as _LT
+    W, H = _LT
+    canvas.saveState()
+
+    # ── Banda superior de título ──
+    banda_h = 0.62 * inch
+    y0 = H - 0.45*inch - banda_h
+    canvas.setFillColor(_AZUL)
+    canvas.rect(0, y0, W, banda_h, fill=1, stroke=0)
+    # franja de acento más oscura en el borde inferior de la banda
+    canvas.setFillColor(_AZUL_OSC)
+    canvas.rect(0, y0, W, 0.035*inch, fill=1, stroke=0)
+
+    # ── Logo: campana de fases estilizada dentro de un círculo claro ──
+    cx = 0.45*inch + 0.20*inch
+    cy = y0 + banda_h/2
+    R  = 0.21*inch
+    canvas.setFillColor(_BLANCO)
+    canvas.circle(cx, cy, R, fill=1, stroke=0)
+    # curva tipo campana (envolvente de fases) trazada con líneas
+    canvas.setStrokeColor(_AZUL)
+    canvas.setLineWidth(1.4)
+    p = canvas.beginPath()
+    import math as _m
+    pts = []
+    for k in range(25):
+        a = _m.pi * k / 24.0          # 0..pi (media campana espejada)
+        xx = cx - R*0.62*_m.cos(a)
+        yy = cy - R*0.55 + R*0.9*_m.sin(a)
+        pts.append((xx, yy))
+    p.moveTo(*pts[0])
+    for pt in pts[1:]:
+        p.lineTo(*pt)
+    canvas.drawPath(p, stroke=1, fill=0)
+    # punto crítico (vértice)
+    canvas.setFillColor(_AZUL)
+    canvas.circle(cx, cy + R*0.35, 1.3, fill=1, stroke=0)
+
+    canvas.restoreState()
+
+    # ── Título dentro de la banda ──
+    canvas.saveState()
+    canvas.setFillColor(_BLANCO)
+    canvas.setFont(_FONT, 17)
+    canvas.drawRightString(W - 0.80*inch, cy - 1,
+                           _i18n.t("Reporte de Simulacion - ThermoPhase"))
+    canvas.restoreState()
+
+    # ── Pie de página ──
+    canvas.saveState()
+    canvas.setStrokeColor(_GRIS_LIN)
+    canvas.setLineWidth(0.6)
+    yf = 0.55*inch
+    canvas.line(0.80*inch, yf, W - 0.80*inch, yf)
+    canvas.setFillColor(_TXT_TENUE)
+    canvas.setFont(_FONT, 8)
+    # izquierda: marca; derecha: página
+    canvas.drawString(0.80*inch, yf - 12,
+                      "ThermoPhase — " + _i18n.t("Simulador termodinámico"))
+    canvas.drawRightString(W - 0.80*inch, yf - 12,
+                           f"{_i18n.t('Página')} {canvas.getPageNumber()}")
+    canvas.restoreState()
+
+
+def _titulo_seccion(texto, W):
+    """Devuelve una tabla de una celda que renderiza un título de sección con
+    una barra de acento azul a la izquierda y una línea inferior fina."""
+    E = _estilos()
+    par = Paragraph("&nbsp;&nbsp;" + texto, E['seccion'])
+    t = Table([[par]], colWidths=[W], hAlign='LEFT')
+    t.setStyle(TableStyle([
+        ('LEFTPADDING',   (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 0),
+        ('TOPPADDING',    (0, 0), (-1, -1), 1),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LINEBELOW',     (0, 0), (-1, -1), 0.8, _GRIS_LIN),
+        # barra de acento azul a la izquierda del título
+        ('LINEBEFORE',    (0, 0), (0, -1), 2.5, _AZUL),
+    ]))
+    return t
 
 
 # ── API publica ──────────────────────────────────────────────────────────
@@ -163,7 +299,7 @@ def generar_pdf(estado, path):
         doc = SimpleDocTemplate(
             path, pagesize=letter,
             leftMargin=0.80*inch, rightMargin=0.80*inch,
-            topMargin=0.60*inch, bottomMargin=0.55*inch,
+            topMargin=1.22*inch, bottomMargin=0.75*inch,
             title="Reporte de Simulacion - ThermoPhase",
             author="ThermoPhase",
         )
@@ -171,14 +307,20 @@ def generar_pdf(estado, path):
 
         story = []
 
-        # ═══ Titulo ══════════════════════════════════════════════
-        story.append(Paragraph(_i18n.t("Reporte de Simulacion - ThermoPhase"),
-                               E['titulo']))
-        story.append(Spacer(1, 14))
+        # ═══ Fecha de generación (bajo la banda) ═════════════════
+        # El título va dibujado en la banda azul por _dibujar_marco. Aquí solo
+        # se coloca la fecha de generación, alineada a la derecha.
+        import datetime as _dt
+        fecha = _dt.datetime.now().strftime('%d/%m/%Y  %H:%M')
+        story.append(Paragraph(
+            f"{_i18n.t('Generado')}: {fecha}",
+            ParagraphStyle('fecha', fontName=_FONT, fontSize=9, leading=11,
+                           alignment=TA_RIGHT, textColor=_TXT_TENUE)))
+        story.append(Spacer(1, 7))
 
         # ═══ Condiones de calculo ════════════════════════════════
-        story.append(Paragraph(_i18n.t("Condiones de calculo:"), E['seccion']))
-        story.append(Spacer(1, 7))
+        story.append(_titulo_seccion(_i18n.t("Condiones de calculo:"), W))
+        story.append(Spacer(1, 6))
 
         import unidades as _u
         T_R = float(ent.get('T_R', 0) or 0)
@@ -195,11 +337,11 @@ def generar_pdf(estado, path):
         t = Table(cond, colWidths=[W*0.34, W*0.30], hAlign='LEFT')
         t.setStyle(_TBL)
         story.append(t)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 9))
 
         # ═══ Modelo de calculo ocupado ═══════════════════════════
-        story.append(Paragraph(_i18n.t("Modelo de calculo ocupado:"), E['seccion']))
-        story.append(Spacer(1, 7))
+        story.append(_titulo_seccion(_i18n.t("Modelo de calculo ocupado:"), W))
+        story.append(Spacer(1, 6))
 
         modelo = [
             [Paragraph(_i18n.t("Ecuacion de estado ocupada:"), E['lbl']),
@@ -210,11 +352,11 @@ def generar_pdf(estado, path):
         t = Table(modelo, colWidths=[W*0.42, W*0.30], hAlign='LEFT')
         t.setStyle(_TBL)
         story.append(t)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 9))
 
         # ═══ Resumen de los calculos ═════════════════════════════
-        story.append(Paragraph(_i18n.t("Resumen de los calculos:"), E['seccion']))
-        story.append(Spacer(1, 7))
+        story.append(_titulo_seccion(_i18n.t("Resumen de los calculos:"), W))
+        story.append(Spacer(1, 6))
 
         V  = res.get('V')  or 0.0
         L  = res.get('L')  or 0.0
@@ -266,13 +408,13 @@ def generar_pdf(estado, path):
         ]
         t = Table(resumen, colWidths=[W*0.34, W*0.22, W*0.22, W*0.22],
                   hAlign='CENTER')
-        t.setStyle(_TBL)
+        t.setStyle(_estilo_tabla_datos(len(resumen), n_hdr=1))
         story.append(t)
-        story.append(Spacer(1, 14))
+        story.append(Spacer(1, 11))
 
         # ═══ Composicion de las fases ════════════════════════════
-        story.append(Paragraph(_i18n.t("Composicion de las fases:"), E['seccion']))
-        story.append(Spacer(1, 7))
+        story.append(_titulo_seccion(_i18n.t("Composicion de las fases:"), W))
+        story.append(Spacer(1, 6))
 
         z = list(ent.get('composicion') or [0.0]*NC)
         x = list(res.get('x') or [0.0]*NC)
@@ -296,10 +438,15 @@ def generar_pdf(estado, path):
             ])
         t = Table(comp, colWidths=[W*0.34, W*0.22, W*0.22, W*0.22],
                   hAlign='CENTER')
-        t.setStyle(_TBL)
+        est = _estilo_tabla_datos(len(comp), n_hdr=2)
+        # Nombres de componentes alineados a la derecha (como el original),
+        # con un poco más de aire a la izquierda.
+        est.add('LEFTPADDING', (0, 2), (0, -1), 8)
+        t.setStyle(est)
         story.append(t)
 
-        doc.build(story)
+        doc.build(story, onFirstPage=_dibujar_marco,
+                  onLaterPages=_dibujar_marco)
         return True, _i18n.t("PDF exportado correctamente:") + f"\n{os.path.basename(path)}"
 
     except Exception as ex:
