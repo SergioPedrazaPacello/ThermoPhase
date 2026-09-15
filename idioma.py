@@ -442,6 +442,8 @@ TRAD = {
     "Generado": "Generated",
     "Página": "Page",
     "Simulador termodinámico": "Thermodynamic simulator",
+    "Tipo de calculo": "Calculation type",
+    "Propiedades del punto:": "Point properties:",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.
