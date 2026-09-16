@@ -655,11 +655,23 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
         P = valor
         # Wilson correcto para rocío: SUM(z/Kw)=1
         T_w = T_wilson_rocio(z, P)
-        # Arranques múltiples alrededor del estimado Wilson
-        arranques = [T_w, T_w+40, T_w-40, T_w+80, T_w-80, 450, 550, 650]
+        # Arranques múltiples alrededor del estimado Wilson. En gases muy
+        # ricos en metano el Wilson sobreestima la T de rocío y la cola de
+        # rocío cae a temperaturas bajas, así que se añaden arranques fríos
+        # (hasta ~250 °R) para atrapar esa rama; si no, el solver no la halla.
+        arranques = [T_w, T_w+40, T_w-40, T_w+80, T_w-80,
+                     T_w-120, T_w-160, 250, 300, 350, 400, 450, 550, 650]
         T,P,Ki,comp,ok = _resolver_con_reintentos(
             'D','T',P,z,kij,arranques,
             lambda Ti,Pi: _comp_inicial('D',z,Ti,Pi))
+        if not ok:
+            # Fallback: cerca de la cricondenbar la rama de rocío es casi
+            # vertical y el GoalSeek de composición incipiente no converge.
+            # La envolvente completa (Michelsen) sí traza esa zona: se
+            # interpola el punto de rocío a la presión pedida.
+            T2, comp2 = _saturacion_por_envolvente('rocio', 'P', P, z, kij)
+            if T2 is not None:
+                T, comp, ok = T2, comp2, True
         props = propiedades_punto(T,P,comp,list(z),kij) if ok else {}
         return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok,'props':props}
 
@@ -667,10 +679,15 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
         P = valor
         # Wilson correcto para burbuja: SUM(z*Kw)=1
         T_w = T_inicial_wilson(z, P)
-        arranques = [T_w, T_w+40, T_w-40, T_w+80, T_w-80, 350, 450, 550]
+        arranques = [T_w, T_w+40, T_w-40, T_w+80, T_w-80,
+                     T_w-120, T_w+120, 250, 300, 350, 450, 550]
         T,P,Ki,comp,ok = _resolver_con_reintentos(
             'B','T',P,z,kij,arranques,
             lambda Ti,Pi: _comp_inicial('B',z,Ti,Pi))
+        if not ok:
+            T2, comp2 = _saturacion_por_envolvente('burbuja', 'P', P, z, kij)
+            if T2 is not None:
+                T, comp, ok = T2, comp2, True
         props = propiedades_punto(T,P,list(z),comp,kij) if ok else {}
         return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok,'props':props}
 
@@ -682,6 +699,10 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
         T,P,Ki,comp,ok = _resolver_con_reintentos(
             'D','P',T,z,kij,arranques,
             lambda Ti,Pi: _comp_inicial('D',z,Ti,Pi))
+        if not ok:
+            P2, comp2 = _saturacion_por_envolvente('rocio', 'T', T, z, kij)
+            if P2 is not None:
+                P, comp, ok = P2, comp2, True
         props = propiedades_punto(T,P,comp,list(z),kij) if ok else {}
         return {'T':T,'P':P,'y':list(z),'x':comp,'Ki':Ki,'exito':ok,'props':props}
 
@@ -693,10 +714,60 @@ def punto_saturacion(tipo_calc, valor, z, kij=None):
         T,P,Ki,comp,ok = _resolver_con_reintentos(
             'B','P',T,z,kij,arranques,
             lambda Ti,Pi: _comp_inicial('B',z,Ti,Pi))
+        if not ok:
+            P2, comp2 = _saturacion_por_envolvente('burbuja', 'T', T, z, kij)
+            if P2 is not None:
+                P, comp, ok = P2, comp2, True
         props = propiedades_punto(T,P,list(z),comp,kij) if ok else {}
         return {'T':T,'P':P,'x':list(z),'y':comp,'Ki':Ki,'exito':ok,'props':props}
 
     return None
+
+
+def _saturacion_por_envolvente(rama, var_fija, valor, z, kij):
+    """Fallback robusto: traza la envolvente completa (que usa Michelsen en
+    la zona crítica) e interpola el punto de saturación de la rama pedida a
+    la condición fija dada. Devuelve (valor_buscado, comp_incipiente) o
+    (None, None) si la condición cae fuera del rango de la rama.
+
+    rama      : 'rocio' o 'burbuja'
+    var_fija  : 'P' → se fija presión [psia] y se devuelve T [°R];
+                'T' → se fija temperatura [°R] y se devuelve P [psia].
+    """
+    try:
+        env = curva_envolvente(list(z), kij)
+    except Exception:
+        return None, None
+    pts = (env or {}).get(rama) or []
+    if len(pts) < 2:
+        return None, None
+    # pts: lista de (P, T). Interpola la variable buscada segun var_fija.
+    if var_fija == 'P':
+        # ordenar por P y buscar el tramo que contiene la presion pedida
+        seq = sorted(pts, key=lambda pt: pt[0])
+        xs = [p for p, _ in seq]; ys = [t for _, t in seq]
+    else:
+        seq = sorted(pts, key=lambda pt: pt[1])
+        xs = [t for _, t in seq]; ys = [p for p, _ in seq]
+    if valor < xs[0] or valor > xs[-1]:
+        return None, None
+    # interpolacion lineal en el tramo
+    buscado = None
+    for i in range(len(xs) - 1):
+        if xs[i] <= valor <= xs[i+1]:
+            x0, x1 = xs[i], xs[i+1]; y0, y1 = ys[i], ys[i+1]
+            buscado = y0 if x1 == x0 else y0 + (y1-y0)*(valor-x0)/(x1-x0)
+            break
+    if buscado is None:
+        return None, None
+    # Con (T,P) sobre la rama, la composicion incipiente se estima con Wilson.
+    if var_fija == 'P':
+        T_out, P_out = buscado, valor
+    else:
+        T_out, P_out = valor, buscado
+    tipo = 'D' if rama == 'rocio' else 'B'
+    comp = _comp_inicial(tipo, z, T_out, P_out)
+    return buscado, comp
 
 
 def _cerrar_por_interseccion(burb, rocio):
