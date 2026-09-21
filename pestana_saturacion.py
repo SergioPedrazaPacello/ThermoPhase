@@ -687,11 +687,17 @@ class TabSaturacion(QWidget):
         # No forzar valor — dejar lo que el usuario haya puesto o vacío
 
     def calcular(self):
-        z=self.get_z()
-        if abs(sum(z)-1.0)>1e-3:
+        zf=self.get_z()
+        if abs(sum(zf)-1.0)>1e-3:
             dialogos.advertencia(self,
                 "La suma de fracciones debe ser 1.0")
             return
+        # Los puntos de saturación (rocío/burbuja) se refieren SIEMPRE a la
+        # envolvente HIDROCARBURO: se usa la mezcla de 13 comp. renormalizada
+        # sin agua (la curva del agua no entra en el punto de saturación).
+        z13 = list(zf[:13]); s13 = sum(z13)
+        if s13 > 0: z13 = [v/s13 for v in z13]
+        z = z13
         kij=self.get_kij()
         tipo, unidad, etiqueta, res_unit = self.TIPOS[self._tipo_es()]
         valor=self.sp_cond.value()

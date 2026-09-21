@@ -347,7 +347,19 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
         if metodo_densidad == 'COSTALD':
             rho_w = _rho_costald14(list(w), PMw, T, Tc14, rho_w_eos)
         sg_w = rho_w/62.4 if rho_w else None
-        mu_w = _visc_LBC14(list(w), T, rho_w, PMw, Tc14, Pc14, PM14, VC14)
+        # Viscosidad de la fase acuosa por la correlación de AGUA de PVTsim
+        # (Meyer/Schmidt), no por LBC (que es de hidrocarburos). Se evalúa con
+        # la densidad de la fase (lb/ft³) y (T,P); en el rango de agua líquida
+        # (T>0°C) reproduce la viscosidad del agua de PVTsim.
+        mu_w = None
+        try:
+            import agua_pura as _apure
+            T_K = T/1.8; P_MN = P*0.00689476
+            mu_w = _apure.viscosidad_cP(T_K, P_MN, (rho_w or 0.0)/62.427960576)
+        except Exception:
+            mu_w = None
+        if mu_w is None or mu_w <= 0:
+            mu_w = _visc_LBC14(list(w), T, rho_w, PMw, Tc14, Pc14, PM14, VC14)
         try:
             Hw = _H_fase14(list(w), T, P, ZW, eos, Tc14, Pc14, om14, kij14)
             Sw = _S_fase14(list(w), T, P, ZW, eos, Tc14, Pc14, om14, kij14)

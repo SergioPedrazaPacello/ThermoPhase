@@ -1122,6 +1122,10 @@ class TabEquilibrio(QWidget):
             self._paint_res(i, 1, mix if has_mix else "", empty_bg=_eb)
             self._paint_res(i, 2, vap, empty_bg=_eb)
             self._paint_res(i, 3, liq, empty_bg=_eb)
+            # Columna acuosa (col 4): mismo color de fondo que las demás, para
+            # que no se vea más oscura antes/después del cálculo. El resultado
+            # trifásico la sobrescribe con los valores del agua.
+            self._paint_res(i, 4, "", empty_bg=_eb)
         fix_table_size(self.tbl_res)
 
     def _abrir_selector_props(self):
@@ -1258,7 +1262,12 @@ class TabEquilibrio(QWidget):
                 nuevos = list(PROP_DEFAULT)
             # Mantener el orden canonico del catalogo.
             self._props_sel = [k for k, *_ in PROP_RESUMEN if k in nuevos]
-            if getattr(self, 'last_result', None) is not None:
+            # Re-renderizar desde el resultado YA calculado (sin recalcular):
+            # las propiedades se calculan TODAS en cada cálculo, así que al
+            # mostrar una nueva basta re-pintar el resumen con lo cacheado.
+            if getattr(self, '_ultimo_trifasico', None) is not None:
+                self._render_trifasico(*self._ultimo_trifasico)
+            elif getattr(self, 'last_result', None) is not None:
                 self._render(self.last_result)
             else:
                 self._rebuild_resumen()
@@ -1385,7 +1394,15 @@ class TabParametros(QWidget):
         self._objetivo = objetivo
         self._WK = 65
         self._agua_on = False   # fila/col del agua (idx 13) visible o no
+        self._n_hc_activos = NC # HC activos (para decidir el ancho de la ventana)
+        self._extra_w = 0       # ancho extra aplicado a la ventana (px)
         self._build()
+
+    def _requiere_ancho_extra(self):
+        """El ancho de la ventana solo crece (por la columna del agua) cuando
+        están TODOS los HC activos Y el agua; con menos componentes el tamaño
+        original alcanza (las columnas ocultas liberan ancho)."""
+        return self._agua_on and self._n_hc_activos >= NC
 
     def _kij(self):
         """Matriz kij que edita esta tabla (global o la del fluido)."""
@@ -1435,7 +1452,7 @@ class TabParametros(QWidget):
                 self.tbl_p.setItem(r, c+1, cell(v, bg=WHITE, color=TEXT_RES))
         # Fila NC+1: agua (idx 13). Mismas conversiones de unidades que el resto.
         ra = NC + 1
-        self.tbl_p.setItem(ra, 0, cell(_eng.componente_nombre(_eng.IDX_AGUA),
+        self.tbl_p.setItem(ra, 0, cell(_eng.componente_etiqueta(_eng.IDX_AGUA),
             bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter))
         tca = _u.abs_desde_R(_eng.AGUA_TC)
@@ -1470,10 +1487,11 @@ class TabParametros(QWidget):
         scrollbars ni espacio sobrante.  El ancho es el de las tablas (912 px:
         columnas + borde) más los márgenes laterales del layout."""
         WK = self._WK
-        # Con el agua activa hay una columna mas en la matriz kij y una fila
-        # mas en cada tabla; inactiva, el tamaño es EXACTAMENTE el original.
-        extra_c = 1 if self._agua_on else 0   # columna del agua (kij)
-        extra_f = 1 if self._agua_on else 0   # fila del agua (ambas tablas)
+        # El tamaño solo crece cuando están TODOS los componentes activos + agua
+        # (14). Con menos, el tamaño original es el correcto.
+        crece = self._requiere_ancho_extra()
+        extra_c = 1 if crece else 0   # columna del agua (kij)
+        extra_f = 1 if crece else 0   # fila del agua (ambas tablas)
         ancho_tabla = (NC + 1 + extra_c) * WK + 2  # columnas kij + borde (1 px por lado)
         margen_lat = 13                    # margen lateral izquierdo/derecho
         ancho = ancho_tabla + 2*margen_lat
@@ -1574,13 +1592,17 @@ class TabParametros(QWidget):
         ra = NC + 1
         self.tbl_k.setItem(ra, 0, cell(_eng.componente_nombre(_eng.IDX_AGUA),
             bg=GRAY_LBL, align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
+        # Celdas kij del agua: mismo aspecto que las demás (fondo blanco, texto
+        # de resultado); solo lectura (el par agua-gas usa HV, no kij editable).
+        # La diagonal agua-agua va en gris como las otras diagonales.
         for c in range(1, NC+2):
-            it = cell("", bg=GRAY_LBL, color=TEXT_DIM,
-                      align=Qt.AlignmentFlag.AlignCenter)
+            bgc = GRAY_LBL if c == ra else WHITE
+            colc = TEXT_DIM if c == ra else TEXT_RES
+            it = cell("", bg=bgc, color=colc, align=Qt.AlignmentFlag.AlignCenter)
             it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.tbl_k.setItem(ra, c, it)
         for r in range(1, NC+1):
-            it = cell("", bg=GRAY_LBL, color=TEXT_DIM,
+            it = cell("", bg=WHITE, color=TEXT_RES,
                       align=Qt.AlignmentFlag.AlignCenter)
             it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.tbl_k.setItem(r, ra, it)
@@ -1681,8 +1703,8 @@ class TabParametros(QWidget):
             self.tbl_k.setColumnHidden(i+1, oculto)
         # ── Agua (idx 13): fila en tbl_p, fila+columna en tbl_k ──
         agua_on = _eng.IDX_AGUA in act
-        agua_cambio = (agua_on != self._agua_on)
         self._agua_on = agua_on
+        self._n_hc_activos = len([i for i in act if i < NC])
         self.tbl_p.setRowHidden(NC+1, not agua_on)
         self.tbl_k.setRowHidden(NC+1, not agua_on)
         self.tbl_k.setColumnHidden(NC+1, not agua_on)
@@ -1690,16 +1712,17 @@ class TabParametros(QWidget):
         # asi ambas tablas quedan del tamaño exacto de su contenido visible.
         fix_table_size(self.tbl_p)
         fix_table_size(self.tbl_k)
-        # El alto de la ventana lo reajusta el gestor (por numero de activos,
-        # que ya cuenta el agua). El ANCHO no lo toca nadie mas, asi que al
-        # aparecer/desaparecer la columna del agua en la matriz kij, ajustamos
-        # aqui el ancho fijo de la ventana en ±WK para que entre sin scrollbar.
-        if agua_cambio:
+        # El ANCHO de la ventana solo crece (por la columna del agua en la matriz
+        # kij) cuando están TODOS los HC activos + agua; con menos componentes,
+        # el ancho original es suficiente. Se aplica el delta respecto al extra
+        # actualmente puesto para no acumular.
+        extra = self._WK if self._requiere_ancho_extra() else 0
+        if extra != self._extra_w:
             win = self.window()
             if win is not None and win is not self:
-                d = self._WK if agua_on else -self._WK
                 s = win.size()
-                win.setFixedSize(s.width() + d, s.height())
+                win.setFixedSize(s.width() + (extra - self._extra_w), s.height())
+            self._extra_w = extra
 
     def _reset(self):
         # Restaura al default de la EOS-fuente seleccionada.
