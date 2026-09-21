@@ -1046,6 +1046,29 @@ class TabEquilibrio(QWidget):
         hz = lambda v: _u.H_desde(v)    if v is not None else None
         sz = lambda v: _u.S_desde(v)    if v is not None else None
 
+        # ── Poder calorífico (GPSA-87) y GPM por fase ────────────────────────
+        # El poder calorífico y el GPM se calculan sobre la composición HC
+        # (13 comp. renormalizados sin agua), igual que en el flash bifásico;
+        # el agua es inerte a la combustión, por eso su columna va en blanco.
+        import poder_calorifico as _pc
+        def _hc13(comp):
+            c = list(comp[:NC]); s = sum(c)
+            return ([v/s for v in c] if s > 0 else c), s
+        y13,_ = _hc13(y) if (y is not None and hayV) else (None,0)
+        x13,_ = _hc13(x) if (x is not None and hayL) else (None,0)
+        zg = rt.get('z');  zg = list(z) if zg is None else list(zg)
+        z13,_ = _hc13(zg)
+        PMv_hc = float(sum(y13[i]*PM[i] for i in range(NC))) if y13 else None
+        PMl_hc = float(sum(x13[i]*PM[i] for i in range(NC))) if x13 else None
+        PMz_hc = float(sum(z13[i]*PM[i] for i in range(NC)))
+        pcv = _pc.poder_calorifico_fase(y13, PMv_hc) if y13 else {}
+        pcl = _pc.poder_calorifico_fase(x13, PMl_hc) if x13 else {}
+        pcz = _pc.poder_calorifico_fase(z13, PMz_hc)
+        gpm_v = _pc.gpm_c3(y13) if y13 else None
+        def pcf(dd, k, hay=True, dg=1):
+            v = dd.get(k) if dd else None
+            return (f"{v:.{dg}f}") if (v is not None and hay) else ""
+
         valores = {
             'frac_molar':  ("",             cf(bV,hayV,6), cf(bL,hayL,6), cf(bW,hayW,6)),
             'frac_masica': ("",             cf(fmV,hayV),  cf(fmL,hayL),  cf(fmW,hayW)),
@@ -1056,21 +1079,25 @@ class TabEquilibrio(QWidget):
             'entalpia':    (ff(hz(H_mix),2),cf(hz(pV.get('H')),hayV,2), cf(hz(pL.get('H')),hayL,2), cf(hz(pW.get('H')),hayW,2)),
             'entropia':    (ff(sz(S_mix)),  cf(sz(pV.get('S')),hayV), cf(sz(pL.get('S')),hayL), cf(sz(pW.get('S')),hayW)),
             'viscosidad':  ("",             cf(pV.get('mu'),hayV,5), cf(pL.get('mu'),hayL,5), cf(pW.get('mu'),hayW,5)),
+            'hhv_mas':     (pcf(pcz,'hhv_mas'), pcf(pcv,'hhv_mas',hayV), pcf(pcl,'hhv_mas',hayL), ""),
+            'lhv_mas':     (pcf(pcz,'lhv_mas'), pcf(pcv,'lhv_mas',hayV), pcf(pcl,'lhv_mas',hayL), ""),
+            'hhv_vol':     (pcf(pcz,'hhv_vol'), pcf(pcv,'hhv_vol',hayV), pcf(pcl,'hhv_vol',hayL), ""),
+            'lhv_vol':     (pcf(pcz,'lhv_vol'), pcf(pcv,'lhv_vol',hayV), pcf(pcl,'lhv_vol',hayL), ""),
+            'gpm':         ("",             pcf({'g':gpm_v},'g',hayV,4) if gpm_v is not None else "", "", ""),
         }
+        # Reconstruir las FILAS del resumen según la selección actual (evita los
+        # huecos al agregar/quitar propiedades tras el cálculo) y luego pintar
+        # las 4 columnas de cada fila desde 'valores'.
         try:
+            self._rebuild_resumen()
             filas=[d for d in PROP_RESUMEN if d[0] in self._props_sel]
             for r,d in enumerate(filas):
                 key=d[0]; has_mix=d[4]
-                if key in valores:
-                    mix,vap,liq,aq = valores[key]
-                    self._paint_res(r,1, mix if has_mix else "")
-                    self._paint_res(r,2, vap)
-                    self._paint_res(r,3, liq)
-                    self._paint_res(r,4, aq)
-                else:
-                    # Propiedades sin definición para la fase acuosa (p.ej.
-                    # poder calorífico, GPM): se dejan en blanco en col. acuosa.
-                    self._paint_res(r,4, "")
+                mix,vap,liq,aq = valores.get(key, ("","","",""))
+                self._paint_res(r,1, mix if has_mix else "")
+                self._paint_res(r,2, vap)
+                self._paint_res(r,3, liq)
+                self._paint_res(r,4, aq)
         except Exception:
             pass
 
