@@ -257,12 +257,11 @@ def _ai_bi(eos, Tc, Pc, omega, T):
         b0 = 0.07780
     bi = b0*R_GAS*Tc/Pc
 
-    # α estándar de PR/SRK para todos los componentes.  Se evaluó Mathias-Copeman
-    # (coeficientes de la base de datos de PVTsim): en los HC desplaza el
-    # equilibrio V/L y en el agua no mejora la solubilidad mutua (el residuo de
-    # solubilidad agua-HC lo gobierna el modelo de solubilidad de PVTsim, no la
-    # α del agua), por lo que se mantiene la α estándar, que da el mejor calce
-    # global del reparto de fases (≈0.03 %).
+    # α de Soave/PR estándar para todos los componentes.  (Se evaluó Mathias-
+    # Copeman para el agua con los coeficientes de la base de datos: con el HV
+    # corregido empeora el reparto, porque su α del agua resulta ~4 % mayor que
+    # la estándar, en dirección opuesta a la esperada; se mantiene la estándar,
+    # que da el mejor calce con el HV de Pedersen 2001.)
     m = _m_srk(omega) if es_srk else _m_pr(omega)
     alpha = (1.0 + m*(1.0 - np.sqrt(T/Tc)))**2
     return ai*alpha, bi
@@ -568,9 +567,14 @@ def _es_vapor(comp, aa, bi, kij, T, P, es_srk, Tc=None):
         gV = _gibbs(comp, aa,bi,kij,T,P,es_srk,'V')
         gL = _gibbs(comp, aa,bi,kij,T,P,es_srk,'L')
         return gV is not None and (gL is None or gV <= gL)
-    # raíz única (fase densa): combinar densidad y Tpc de la mezcla.
+    # raíz única (fase densa): combinar Z, densidad y Tpc de la mezcla.
     Z = Zs[0]
     v = Z*R_GAS*T/P
+    # Un factor de compresibilidad alto es propio de una fase gaseosa aunque la
+    # regla de Kay dé T<Tpc (p.ej. mezclas ricas en CO₂/C1 a baja T, donde Tpc
+    # sube pero la fase sigue siendo vapor).  Z≥0.5 ⇒ vapor.
+    if Z >= 0.5:
+        return True
     if Tc is not None:
         comp = np.asarray(comp)
         Tpc = float(comp @ np.asarray(Tc))        # T pseudo-crítica (Kay)
