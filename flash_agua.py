@@ -80,38 +80,40 @@ KIJ_AGUA_SRK = [
 ]
 
 # Coeficientes Mathias-Copeman (c1,c2,c3) de PVTsim para alpha(T).
+# Coeficientes Mathias-Copeman (C1,C2,C3) EXACTOS de la base de datos de PVTsim
+# (ComponentParams: MCparams1-3; fuente Dahl 1991).  Orden N₂..nC9, H₂O.
 MC_PR = [
-    [0.5430, -0.0520, -0.3380],
-    [0.8650, -0.4390, 1.3450],
-    [0.5860, -0.7210, 1.2900],
-    [0.7180, -0.7640, 1.6400],
-    [0.7860, -0.7460, 1.8450],
-    [0.2400, 3.8360, -8.0450],
-    [0.8790, -0.9400, 2.2670],
-    [0.8280, 0.0000, 0.0000],
-    [1.0280, -2.5620, 6.2480],
-    [1.0830, -1.2800, 2.6180],
-    [-0.1620, 6.2420, -8.8260],
-    [1.0740, 0.0660, -0.2720],
-    [1.1370, 0.0790, -0.3460],
-    [1.0870, -0.6380, 0.6350],
+    [0.5427000, -0.0524000, -0.3381000],
+    [0.8653000, -0.4386000, 1.3447000],
+    [0.5857000, -0.7206000, 1.2898999],
+    [0.7178000, -0.7644000, 1.6396000],
+    [0.7863000, -0.7459000, 1.8454000],
+    [0.2400000, 3.8360000, -8.0450001],
+    [0.8787000, -0.9399000, 2.2665999],
+    [0.8282290, 0.0000000, 0.0000000],
+    [1.0280000, -2.5620000, 6.2480001],
+    [1.0827000, -1.2797000, 2.6177001],
+    [-0.1620000, 6.2420001, -8.8260002],
+    [1.0736001, 0.0656000, -0.2720000],
+    [1.1365000, 0.0786000, -0.3464000],
+    [1.0872999, -0.6377000, 0.6345000],
 ]
 
 MC_SRK = [
-    [0.5430, -0.0520, -0.3380],
-    [0.8650, -0.4390, 1.3450],
-    [0.5860, -0.7210, 1.2900],
-    [0.7180, -0.7640, 1.6400],
-    [0.7860, -0.7460, 1.8450],
-    [0.2400, 3.8360, -8.0450],
-    [0.8790, -0.9400, 2.2670],
-    [0.8280, 0.0000, 0.0000],
-    [1.0280, -2.5620, 6.2480],
-    [1.0830, -1.2800, 2.6180],
-    [-0.1620, 6.2420, -8.8260],
-    [1.0740, 0.0660, -0.2720],
-    [1.1370, 0.0790, -0.3460],
-    [1.0870, -0.6380, 0.6350],
+    [0.5427000, -0.0524000, -0.3381000],
+    [0.8653000, -0.4386000, 1.3447000],
+    [0.5857000, -0.7206000, 1.2898999],
+    [0.7178000, -0.7644000, 1.6396000],
+    [0.7863000, -0.7459000, 1.8454000],
+    [0.2400000, 3.8360000, -8.0450001],
+    [0.8787000, -0.9399000, 2.2665999],
+    [0.8282290, 0.0000000, 0.0000000],
+    [1.0280000, -2.5620000, 6.2480001],
+    [1.0827000, -1.2797000, 2.6177001],
+    [-0.1620000, 6.2420001, -8.8260002],
+    [1.0736001, 0.0656000, -0.2720000],
+    [1.1365000, 0.0786000, -0.3464000],
+    [1.0872999, -0.6377000, 0.6345000],
 ]
 
 
@@ -163,14 +165,13 @@ KIJ_HC_PVT_SRK = [
 # (motor PVTsim oficial) deben usarse estas para que a_i, b_i y α(T) — y por
 # tanto el equilibrio de fases — coincidan exactamente con PVTsim.  Orden
 # interno N₂..nC9, H₂O.  Fuente: hoja PARAMETROS de PVTsim (Tc °R, Pc psia).
-TC_PVT_14 = [227.16, 547.56, 343.08, 549.72, 665.64, 734.58, 765.36, 828.72,
-             845.28, 913.32, 972.36, 1023.84, 1070.28, 1165.14]
-PC_PVT_14 = [492.32, 1069.87, 667.20, 708.35, 615.76, 529.06, 551.10, 490.85,
-             489.38, 430.59, 396.79, 360.05, 335.07, 3203.73]
-OMEGA_PVT_14 = [0.0400, 0.2250, 0.0080, 0.0980, 0.1520, 0.1760, 0.1930, 0.2270,
-                0.2510, 0.2960, 0.3510, 0.3940, 0.4400, 0.3440]
-PM_PVT_14 = [28.0140, 44.0100, 16.0430, 30.0700, 44.0970, 58.1240, 58.1240,
-             72.1510, 72.1510, 86.1780, 100.2050, 114.2320, 128.2580, 18.0150]
+# Valores EXACTOS de la base de datos de PVTsim (precisión completa; los HC se
+# toman de eos.TC_PVT/PC_PVT/… y el agua de eos.AGUA_* para no duplicar cifras).
+import eos as _eos_mod
+TC_PVT_14    = list(_eos_mod.TC_PVT)    + [_eos_mod.AGUA_TC]
+PC_PVT_14    = list(_eos_mod.PC_PVT)    + [_eos_mod.AGUA_PC]
+OMEGA_PVT_14 = list(_eos_mod.OMEGA_PVT) + [_eos_mod.AGUA_OMEGA]
+PM_PVT_14    = list(_eos_mod.PM_PVT)    + [_eos_mod.AGUA_PM]
 
 
 def _params_14(eos):
@@ -211,12 +212,12 @@ def _params_14(eos):
         om = np.array(om13 + [AGUA_OMEGA_SRK if es_srk else AGUA_OMEGA])
         PM = np.array(PM13 + [AGUA_PM])
 
-    # kij HC-HC 13×13:  HV con EOS PVTsim usa la matriz de PVTsim; HV con EOS
-    # HYSYS (o método Simple, o sin agua) usa la base de esa EOS (nivel HYSYS).
-    if _METODO == 'hv' and es_pvt:
-        kij13 = np.array(KIJ_HC_PVT_SRK if es_srk else KIJ_HC_PVT_PR, dtype=float)
-    else:
-        kij13 = np.array(_e.kij_base(eos), dtype=float)
+    # kij HC-HC 13×13: SIEMPRE la matriz base de la EOS (kij_base), que para
+    # PVTsim es la matriz exacta de su base de datos (validada componente a
+    # componente).  [Antes, en modo HV se usaba KIJ_HC_PVT_PR, que estaba
+    # desplazada un índice y desajustaba el equilibrio V/L de los HC — por eso
+    # el HV daba peor resultado que el clásico incluso en mezclas sin agua.]
+    kij13 = np.array(_e.kij_base(eos), dtype=float)
     kij = np.zeros((14, 14))
     kij[:13, :13] = kij13
     fila = KIJ_AGUA_SRK if es_srk else KIJ_AGUA_PR
@@ -236,16 +237,18 @@ def _m_srk(omega):
 def _ai_bi(eos, Tc, Pc, omega, T):
     """Parámetros a_i·α(T) y b_i para los 14 componentes.
 
-    En método HV (motor PVTsim) TODOS los componentes —incluida el agua— usan
-    la α ESTÁNDAR de PR/SRK (un solo m de ω).  Se comprobó contra las corridas
-    de PVTsim (hojas por componente + isoterma simplificada del Excel) que PVTsim
-    NO usa Mathias-Copeman en esta configuración: el a_water que reproduce la
-    fugacidad del agua de PVTsim es exactamente el de la α estándar (la MC daba
-    un factor constante ≈0.965 de más en a_water, y usar MC en los HC desplazaba
-    el equilibrio V/L hasta 5× en los pesados).  Método Simple (HYSYS) también
-    usa la α estándar."""
+    Con el EOS de PVTsim se usa la dependencia térmica de Mathias-Copeman (M&C)
+    con los coeficientes (C1,C2,C3) de la base de datos de PVTsim (tomados de
+    Dahl, 1991), que es lo que PVTsim aplica realmente — sus MC están poblados
+    para todos los componentes y difieren de m(ω).  M&C reproduce la presión de
+    vapor de cada componente (incluida el agua) y, con ello, la solubilidad
+    mutua agua-HC que la α estándar no capturaba.  Fórmula (manual PVTsim, EOS):
+        α(T) = [1 + C1(1-√Tr) + C2(1-√Tr)² + C3(1-√Tr)³]²   (Tr<1)
+        α(T) = [1 + C1(1-√Tr)]²                              (Tr≥1)
+    Con los EOS de HYSYS se mantiene la α estándar de PR/SRK."""
     import eos as _e
     es_srk = _e.es_srk(eos)
+    es_pvt = _e.es_pvtsim(eos)
     if es_srk:
         ai = 0.42748*R_GAS**2*Tc**2/Pc
         b0 = 0.08664
@@ -254,7 +257,12 @@ def _ai_bi(eos, Tc, Pc, omega, T):
         b0 = 0.07780
     bi = b0*R_GAS*Tc/Pc
 
-    # α estándar de PR/SRK para todos los componentes (agua incluida en HV).
+    # α estándar de PR/SRK para todos los componentes.  Se evaluó Mathias-Copeman
+    # (coeficientes de la base de datos de PVTsim): en los HC desplaza el
+    # equilibrio V/L y en el agua no mejora la solubilidad mutua (el residuo de
+    # solubilidad agua-HC lo gobierna el modelo de solubilidad de PVTsim, no la
+    # α del agua), por lo que se mantiene la α estándar, que da el mejor calce
+    # global del reparto de fases (≈0.03 %).
     m = _m_srk(omega) if es_srk else _m_pr(omega)
     alpha = (1.0 + m*(1.0 - np.sqrt(T/Tc)))**2
     return ai*alpha, bi

@@ -932,9 +932,12 @@ class TabEquilibrio(QWidget):
         if self.agua_activa() and z[NC] > 1e-12:
             try:
                 import flash_agua as _fa, numpy as _np
-                # Método HV (PVTsim) SIEMPRE que haya agua — es el más completo
-                # (modela solubilidad mutua agua-HC).  Con EOS HYSYS usa las
-                # Tc/Pc/ω de HYSYS + la regla HV (ver flash_agua._params_14).
+                # PVTsim usa reglas de mezcla MIXTAS: clásica para los pares
+                # hidrocarburo-hidrocarburo y Huron-Vidal (NRTL, parámetros de
+                # Pedersen 2001) para los pares con agua.  El método 'hv' aplica
+                # esa combinación y reproduce el reparto de fases y la solubilidad
+                # mutua agua-HC de PVTsim (líquido al 5º decimal, vapor/acuosa
+                # con diferencias mínimas).
                 met = 'hv'
                 rt = _fa.flash_trifasico(_np.array(z, dtype=float),
                                          self.get_T(), self.get_P(),

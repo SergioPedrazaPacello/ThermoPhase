@@ -59,9 +59,13 @@ J_TO_BTUlbmol  = 453.59237/1055.05585
 J_TO_BTUlbmolR = J_TO_BTUlbmol*(5.0/9.0)
 SQRT2  = math.sqrt(2.0)
 
-# VC extendido a 14 componentes (13 HC de eos.py + agua)
-def _vc14():
+# VC extendido a 14 componentes (13 HC de eos.py + agua).  Con el EOS de PVTsim
+# se usan los volúmenes críticos exactos de su base de datos (VC_PVT), que
+# calzan mejor la viscosidad LBC de la fase líquida con pesados.
+def _vc14(eos=None):
     import eos as _e
+    if eos is not None and _e.es_pvtsim(eos):
+        return np.array(list(_e.VC_PVT) + [_e.AGUA_VC_PVT], dtype=float)
     return np.array(list(_e.VC) + [AGUA_VC], dtype=float)
 
 
@@ -164,6 +168,11 @@ def _visc_LBC14(comp, T_R, rho_masa, PM_fase, TC, PC, PM, VC):
     Vc_m = sum(z[i]*VC[i]*_CM3MOL_A_FT3LBMOL for i in range(n) if z[i] != 0)
     rho_molar = rho_masa/PM_fase
     rho_r = rho_molar*Vc_m
+    # El polinomio LBC (grado 4 elevado a la 4) sólo es fiable hasta ρr≈2.5-3;
+    # más allá diverge sin sentido físico.  A T muy baja la densidad de la EOS
+    # puede sobreestimarse y disparar ρr: se limita al borde de validez.
+    if rho_r > 3.0:
+        rho_r = 3.0
     a1, a2, a3, a4, a5 = _LBC_A
     poly = a1 + a2*rho_r + a3*rho_r**2 + a4*rho_r**3 + a5*rho_r**4
     val = poly**4 - 1.0e-4
@@ -279,7 +288,7 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
 
     es_srk = _e.es_srk(eos)
     Tc14, Pc14, om14, PM14, kij14 = _fa._params_14(eos)
-    VC14 = _vc14()
+    VC14 = _vc14(eos)
 
     y = rt.get('y'); x = rt.get('x'); w = rt.get('w')
     bV = rt.get('beta_V', 0.0); bL = rt.get('beta_L', 0.0); bW = rt.get('beta_W', 0.0)

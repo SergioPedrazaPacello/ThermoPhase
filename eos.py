@@ -9,7 +9,7 @@ import math
 
 R_GAS = 10.7316
 
-COMPONENTES = ["N₂","CO₂","C1","C2","C3","iC4","nC4","iC5","nC5","C6","C7","C8","C9"]
+COMPONENTES = ["N₂","CO₂","C1","C2","C3","iC4","nC4","iC5","nC5","nC6","nC7","nC8","nC9"]
 NOMBRES = [
     "Nitrógeno [N₂]:",
     "Dióxido de carbono [CO₂]:",
@@ -20,10 +20,10 @@ NOMBRES = [
     "n-Butano [nC4]:",
     "Isopentano (2-metilbutano) [iC5]:",
     "n-Pentano [nC5]:",
-    "Hexano [C6]:",
-    "Heptano [C7]:",
-    "Octano [C8]:",
-    "Nonano [C9]:"
+    "n-Hexano [nC6]:",
+    "n-Heptano [nC7]:",
+    "n-Octano [nC8]:",
+    "n-Nonano [nC9]:"
 ]
 PM = [28.013,44.0097,16.0429,30.0699,44.097,58.124,58.124,
       72.151,72.151,86.1779,100.205,114.232,128.259]
@@ -120,6 +120,14 @@ KIJ_DEFAULT = KIJ_DEFAULT_PR
 # con los V* de COSTALD ya presentes en el motor dentro del 2.3%.
 VC = [89.8, 93.9, 99.2, 148.3, 200.0, 262.7, 255.0,
       306.0, 313.0, 370.0, 428.0, 486.0, 544.0]
+
+# Volúmenes críticos EXACTOS de PVTsim (base de datos ComponentParams, columna
+# Vc), convertidos a cm³/mol (factor 82.0).  Se usan en la viscosidad LBC cuando
+# el EOS activo es PVTsim: difieren del banco genérico sobre todo en los pesados
+# (nC7-nC9), que es donde la viscosidad de la fase líquida se apartaba de PVTsim.
+VC_PVT = [89.734, 93.931, 98.928, 147.892, 202.852, 262.808, 254.814,
+          305.776, 303.778, 369.729, 431.684, 491.640, 547.599]   # cm³/mol
+AGUA_VC_PVT = 55.959                                              # cm³/mol
 
 
 def kij_chueh_prausnitz(n=1.0):
