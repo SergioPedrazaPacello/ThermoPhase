@@ -108,9 +108,37 @@ LBL_RES=(f'background:{GRAY_RES};border:1px solid {BORDER};'
 
 class EnvWorker(QThread):
     done=pyqtSignal(dict); error=pyqtSignal(str)
-    def __init__(self, z, kij, metodo='ziervogel', max_pts=10000):
+    def __init__(self, z, kij, metodo='ziervogel', max_pts=10000,
+                 z_full=None, eos_code=None, agua_on=False):
         super().__init__(); self.z=z; self.kij=kij; self.metodo=metodo
         self.max_pts=max_pts
+        # Contexto para la curva de agua (estilo PVTsim, VLW): composición
+        # completa de 14 comp., EOS activa y si el agua está activada.
+        self.z_full=z_full; self.eos_code=eos_code; self.agua_on=agua_on
+    def _linea_agua(self, res):
+        """Calcula la curva de aparición de fase acuosa (β_W=0) y los puntos
+        trifásicos, y los agrega al resultado. Sólo con agua activada."""
+        try:
+            if not self.agua_on or self.z_full is None:
+                return
+            import eos as _e
+            eos_code = self.eos_code or _e.get_eos()
+            met = 'hv'   # método HV (PVTsim) para toda EOS (más completo)
+            import envolvente_agua as _ea
+            Tmin, Tmax, Pmax = _ea.rango_desde_envolvente(res)
+            pts = _ea.linea_aparicion_agua(self.z_full, eos_code, met,
+                                           Tmin, Tmax, P_max=Pmax,
+                                           nT=80, nP=40, t_max_s=55.0)
+            if pts:
+                res['agua'] = pts
+                try:
+                    p3f = _ea.puntos_trifasicos(res, pts)
+                    if p3f:
+                        res['puntos_3f'] = p3f
+                except Exception:
+                    pass
+        except Exception:
+            pass
     def run(self):
         try:
             from envolvente import curva_envolvente, es_puro, curva_pura
@@ -119,7 +147,9 @@ class EnvWorker(QThread):
             # crítico. Se resuelve aparte, independientemente del método
             # seleccionado (Ziervogel/Michelsen no aplican a un solo componente).
             if es_puro(self.z):
-                self.done.emit(curva_pura(self.z, self.kij))
+                rp = curva_pura(self.z, self.kij)
+                self._linea_agua(rp)
+                self.done.emit(rp)
                 return
             # curva_envolvente implementa toda la lógica de selección de método:
             #  - Detecta mezclas casi-azeotrópicas (CO2/C2, iC5/nC5, etc.)
@@ -162,6 +192,7 @@ class EnvWorker(QThread):
                            'critico': crit}
             else:
                 res = curva_envolvente(self.z, self.kij)
+            self._linea_agua(res)
             self.done.emit(res)
         except Exception as e:
             self.error.emit(str(e))
@@ -309,10 +340,12 @@ class HidratosCurvaWorker(QThread):
     done  = pyqtSignal(list)
     error = pyqtSignal(str)
 
-    def __init__(self, z, kij, nombre_eos, P_tope, T_min_R, n_puntos=55):
+    def __init__(self, z, kij, nombre_eos, P_tope, T_min_R, n_puntos=55,
+                 z_full=None):
         super().__init__()
         self.z = z; self.kij = kij; self.nombre_eos = nombre_eos
         self.P_tope = P_tope; self.T_min_R = T_min_R; self.n_puntos = n_puntos
+        self.z_full = z_full
 
     def run(self):
         try:
@@ -323,7 +356,7 @@ class HidratosCurvaWorker(QThread):
             pts = _hid.curva_hidratos(
                 self.z, self.kij, self.nombre_eos,
                 P_tope=self.P_tope, T_min_R=self.T_min_R,
-                n_puntos=self.n_puntos)
+                n_puntos=self.n_puntos, z_full=self.z_full)
             self.done.emit(pts)
         except Exception as e:
             self.error.emit(str(e))
@@ -589,12 +622,24 @@ class TabEnvolvente(QWidget):
         root.addLayout(content, stretch=1)
 
 
+    def _z_hc(self):
+        """Composición de los 13 componentes HC (sin agua), renormalizada.
+        La envolvente HC se traza sin agua (nivel HYSYS); la curva del agua
+        (VLW) se superpone aparte con la composición completa de 14 comp."""
+        z = list(self.get_z())
+        z13 = z[:13]
+        s = sum(z13)
+        if s > 0:
+            z13 = [v/s for v in z13]
+        return z13
+
     def calcular(self):
-        z=self.get_z()
-        if abs(sum(z)-1.0)>1e-3:
+        zf_all=list(self.get_z())
+        if sum(zf_all)<=0 or abs(sum(zf_all)-1.0)>1e-3:
             dialogos.advertencia(self,
                 "La suma de fracciones debe ser 1.0")
             return
+        z=self._z_hc()
         kij=self.get_kij()
         metodo = 'michelsen' if self.cmb_metodo.currentIndex()==1 else 'ziervogel'
         # Una nueva envolvente puede venir de una composición distinta: las
@@ -603,7 +648,12 @@ class TabEnvolvente(QWidget):
         self._isocalidad = {}
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.prog.setVisible(True)
-        self.worker=EnvWorker(z,kij,metodo,max_pts=10000)
+        # Contexto para la curva de agua (VLW, estilo PVTsim).
+        import eos as _eng
+        agua_on = len(zf_all) > 13 and zf_all[13] > 1e-12
+        self.worker=EnvWorker(z,kij,metodo,max_pts=10000,
+                              z_full=zf_all, eos_code=_eng.get_eos(),
+                              agua_on=agua_on)
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
         self.worker.start()
@@ -663,15 +713,18 @@ class TabEnvolvente(QWidget):
 
     def _lanzar_curva_hidratos(self):
         """Lanza el cálculo en segundo plano de la curva de hidratos."""
-        z = self.get_z()
-        if abs(sum(z) - 1.0) > 1e-3:
+        if abs(sum(self.get_z()) - 1.0) > 1e-3:
             dialogos.advertencia(self, "La suma de fracciones debe ser 1.0")
             return
+        z = self._z_hc()
+        zf = list(self.get_z())
+        z_full = zf if (len(zf) > 13 and zf[13] > 1e-12) else None
         kij = self.get_kij()
         P_tope, T_min = self._topes_hidratos()
         eos_nombre = self._eos_nombre_actual()
         self._hidratos_worker = HidratosCurvaWorker(
-            list(z), kij, eos_nombre, P_tope, T_min, n_puntos=55)
+            list(z), kij, eos_nombre, P_tope, T_min, n_puntos=55,
+            z_full=z_full)
         self._hidratos_worker.done.connect(self._on_hidratos_done)
         self._hidratos_worker.error.connect(self._on_hidratos_error)
         self._hidratos_worker.start()
@@ -713,11 +766,11 @@ class TabEnvolvente(QWidget):
         actual antes de trazar las líneas — la composición pudo cambiar
         desde el último cálculo de envolvente, así que no se reutiliza una
         envolvente guardada."""
-        z=self.get_z()
-        if abs(sum(z)-1.0)>1e-3:
+        if abs(sum(self.get_z())-1.0)>1e-3:
             dialogos.advertencia(self,
                 "La suma de fracciones debe ser 1.0")
             return
+        z=self._z_hc()
 
         # Un componente puro no tiene líneas de isocalidad: su saturación es
         # una única curva (φ_L = φ_V) sin fracciones de vapor intermedias.
@@ -798,14 +851,14 @@ class TabEnvolvente(QWidget):
                 self._plot(self.result)
             return
         # Lanzar cálculo (envelope + mapa) con la composición actual
-        z = self.get_z()
-        if abs(sum(z)-1.0) > 1e-3:
+        if abs(sum(self.get_z())-1.0) > 1e-3:
             dialogos.advertencia(self,
                 "La suma de fracciones debe ser 1.0")
             self.chk_reg.blockSignals(True)
             self.chk_reg.setChecked(False)
             self.chk_reg.blockSignals(False)
             return
+        z = self._z_hc()
         # Nota: los componentes puros SÍ admiten mapa de densidad.  El worker
         # (RegionesWorker) detecta el caso puro y lo calcula en modo dedicado
         # (sin área bifásica), así que aquí no hay ningún trato especial.
@@ -1180,6 +1233,31 @@ class TabEnvolvente(QWidget):
                 txt=self.ed_iso[idx].text().strip()
                 ax.plot(Ti,Pi,linestyle='-',linewidth=0.7,
                         color=color, label=f'{txt}% '+_i18n.t('vapor'), zorder=3)
+
+            # Curva de agua (aparición de fase acuosa, β_W=0) — estilo PVTsim.
+            # MISMA estética que burbuja/rocío, en púrpura (no verde).
+            AGUA_COL = '#8e2fb0'
+            agua = res.get('agua', [])
+            if agua:
+                Ta=[_u.t_desde_R(t) for _,t in agua]
+                Pa=[_u.p_desde_psia(p) for p,_ in agua]
+                if self._regiones is not None:
+                    ax.plot(Ta, Pa, linestyle='-', color=AGUA_COL,
+                            linewidth=0.9, label=_i18n.t('Curva de agua'), zorder=5)
+                else:
+                    ax.plot(Ta, Pa, linestyle='-', linewidth=0.7,
+                            color=AGUA_COL, zorder=2)
+                    ax.plot(Ta, Pa, linestyle='none', marker='^',
+                            color=AGUA_COL, markersize=3,
+                            label=_i18n.t('Curva de agua'))
+            p3f = res.get('puntos_3f', [])
+            if p3f:
+                T3=[_u.t_desde_R(t) for _,t in p3f]
+                P3=[_u.p_desde_psia(p) for p,_ in p3f]
+                ax.plot(T3, P3, linestyle='none', marker='o', markersize=5,
+                        color=AGUA_COL, markeredgecolor='#4a1560',
+                        markeredgewidth=0.6,
+                        label=_i18n.t('Punto trifásico'), zorder=6)
 
         # Curva de formación de hidratos (verde, marcador triangular — mismo
         # estilo que rocío/burbuja).  Solo si está activada y calculada.

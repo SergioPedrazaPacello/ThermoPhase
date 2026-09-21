@@ -30,6 +30,21 @@ R_GAS = 10.7316           # psia·ft³/(lbmol·°R)
 R_SI = 8.314             # J/(mol·K), para g en unidades consistentes con PVTsim
 IDX_AGUA = 13
 
+# Índices HC (orden interno N₂,CO₂,C1..C9) que usan Huron-Vidal con el agua.
+# PVTsim usa HV para agua con N₂..nC5 (índices 0-8) y la regla clásica (kij)
+# para agua con nC6..nC9 (índices 9-12).  Ver la matriz de modo de la hoja
+# PARAMETROS de PVTsim.  Aplicar HV a los pesados con las energías G0 grandes
+# los expulsa por completo de la fase acuosa (fugacidad ~1e-40) y arruina la
+# solubilidad; con la regla clásica (kij≈0.5) la solubilidad es finita y correcta.
+HV_AGUA_IDX = set(range(0, 9))          # N₂,CO₂,C1,C2,C3,iC4,nC4,iC5,nC5
+
+# kij clásico del agua (orden interno N₂..nC9), hoja PARAMETROS de PVTsim.
+# Solo se usa para los pares Classic (agua-nC6..nC9), pero se define completo.
+KIJ_AGUA_CLASSIC_PR = np.array(
+    [-0.48, 0.0952, 0.45, 0.45, 0.53, 0.52, 0.52, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+KIJ_AGUA_CLASSIC_SRK = np.array(
+    [-0.48, 0.10, 0.45, 0.45, 0.53, 0.52, 0.52, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+
 G0_PR = [
     [0.0000, 539.8400, 186.0800, 605.5800, 954.3700, 1202.4300, 1292.0400, 1555.6600, 1639.7100, 1995.4700, 2319.5000, 2590.9600, 2902.5800, 5330.1800],
     [-274.4900, 0.0000, -126.0700, 158.7700, 436.4800, 657.1900, 741.6000, 985.5100, 1056.5000, 1373.7000, 1663.0700, 1972.0700, 2279.0500, 4104.1300],
@@ -215,28 +230,55 @@ def _tau_alpha(eos, T_R, aa, bi, kij_classic):
         return c
     N = len(bi)
     import eos as _e
-    lam = _lambda_eos(eos)
-    Rcal = 1.98721
     T_K = T_R/1.8
     G0 = _g_matrix_delta0(eos)
     GT = _g_matrix_deltaT(eos)
     kijhv = _kij_hv(eos)
     ALPHA = np.array(ALPHA_SRK if _e.es_srk(eos) else ALPHA_PR)
-    gii = -(aa/bi)*lam
+    kij_ag = KIJ_AGUA_CLASSIC_SRK if _e.es_srk(eos) else KIJ_AGUA_CLASSIC_PR
+    # Formulación EXACTA de Pedersen (2024), cap. 16, ec. 16.10-16.13:
+    #   G^E/RT = Σ_i z_i · [Σ_j τ_ji b_j z_j exp(-α_ji τ_ji)] / [Σ_k b_k z_k exp(-α_ki τ_ki)]
+    #   τ_ji = (g_ji - g_ii)/(R T)      (ec. 16.2 vía 16.10)
+    #   g_ii = -a_i/b_i                 (ec. 16.12)  ← SIN λ (el λ solo aparece en
+    #                                    la conversión a↔G^E, no en g_ii)
+    #   g_ji (HC-HC) = (2 b_i b_j/(b_i+b_j))·(-√(g_ii g_jj))·(1-k_ij)  (ec. 16.13),
+    #     que da τ_ji = (g_ji-g_ii)/(RT) reproduciendo la regla clásica.
+    # Para pares agua-HC(HV), (g_ji-g_ii)/R viene de las matrices del Excel
+    # "HV g/R (K)" (G0) y "HV g-T/R" (GT) con dependencia lineal en T (ec.
+    # 16.19-16.20), T de referencia 0 K (T absoluta):  τ_ji = (G0 + GT·T_K)/T_K.
+    # g_ii para los pares CLÁSICOS dentro de HV (HC-HC y agua-pesados).  El
+    # manual de PVTsim (Equations of State, regla H&V) da g_ii = a_i/(b_i·λ) y,
+    # con esa forma, la regla H&V se reduce EXACTAMENTE a la cuadrática clásica
+    # cuando α=0.  Verificado numéricamente: sin el factor λ, a_m(HV) difería de
+    # a_m(clásica) en 0.16 % para una mezcla HC pura (el factor que restaura la
+    # identidad es exactamente λ).  Los pares agua-HV NO usan g_ii (su τ viene de
+    # las matrices G0/GT del Excel), así que este factor no los afecta.
+    lam = _lambda_eos(eos)
+    gii = -(aa/bi)*lam                 # g_ii = -a_i·λ/b_i (reduce HV→clásica exacto)
     tau = np.zeros((N, N)); alpha = np.zeros((N, N))
     for i in range(N):
         for j in range(N):
             if i == j:
                 continue
-            if i == IDX_AGUA or j == IDX_AGUA:
-                dg = G0[j, i] + GT[j, i]*T_K
-                tau[j, i] = dg/(Rcal*T_K)
-                alpha[j, i] = ALPHA[j, i]          # no-aleatoriedad NRTL real
+            # ¿es un par agua-HC que PVTsim trata con Huron-Vidal?
+            hc = j if i == IDX_AGUA else (i if j == IDX_AGUA else None)
+            if hc is not None and hc in HV_AGUA_IDX:
+                # Par agua-HC (HV).  G0 = (g_ji-g_ii)/R en K; GT adimensional.
+                #   τ_ji = (g_ji - g_ii)/(R·T) = [(g_ji-g_ii)/R]/T_K = (G0+GT·T_K)/T_K
+                tau[j, i] = (G0[j, i] + GT[j, i]*T_K)/T_K
+                alpha[j, i] = ALPHA[j, i]          # no-aleatoriedad NRTL (ec. 16.10)
+            elif hc is not None:
+                # Par agua-HC pesado (nC6..nC9): regla CLÁSICA (α=0) con kij agua.
+                fac = 2.0*np.sqrt(bi[i]*bi[j])/(bi[i]+bi[j])
+                kij_w = kij_ag[hc]
+                g_ji = -fac*np.sqrt(gii[i]*gii[j])*(1.0 - kij_w)
+                tau[j, i] = (g_ji - gii[i])/(R_GAS*T_R)
             else:
+                # Par HC-HC: regla clásica (α=0) con kij HC-HC (ec. 16.13).
                 fac = 2.0*np.sqrt(bi[i]*bi[j])/(bi[i]+bi[j])
                 g_ji = -fac*np.sqrt(gii[i]*gii[j])*(1.0 - kij_classic[i, j])
                 tau[j, i] = (g_ji - gii[i])/(R_GAS*T_R)
-    E = np.exp(-alpha*tau)
+    E = np.exp(-np.clip(alpha*tau, -300, 300))
     TE = tau*E                       # τ_ji·exp(-α_ji τ_ji)
     _TAU_CACHE[key] = (tau, alpha, E, TE)
     if len(_TAU_CACHE) > 200:        # evitar crecimiento ilimitado

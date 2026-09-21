@@ -43,35 +43,40 @@ AGUA_OMEGA_SRK = 0.34400001168251
 
 # ── Matriz kij del agua (fila/columna 14) para HYSYS ────────────────────────
 # Orden: N₂, CO₂, C1, C2, C3, iC4, nC4, iC5, nC5, C6, C7, C8, C9  (agua-agua=0)
+# Estos kij clásicos del agua se toman de la hoja PARAMETROS de PVTsim (matriz
+# de interacción binaria clásica, fila del agua). PVTsim usa la regla clásica
+# con estos kij SOLO para los pares agua-{nC6,nC7,nC8,nC9}; los pares agua con
+# los 9 primeros HC (N₂..nC5) usan Huron-Vidal (matrices G0/GT/α). Ver la matriz
+# de modo de PARAMETROS: HV para agua-N₂..agua-nC5, Classic para agua-nC6..nC9.
 KIJ_AGUA_PR = [
-    -0.3156,  # N₂
-     0.0445,  # CO₂
-     0.5,     # C1
-     0.5,     # C2
-     0.5,     # C3
-     0.5,     # iC4
-     0.5,     # nC4
-     0.5,     # iC5
-     0.48,    # nC5
-     0.5,     # C6
-     0.5,     # C7
-     0.5,     # C8
-     0.5,     # C9
-]
-KIJ_AGUA_SRK = [
-    -0.4907,  # N₂
-     0.0392,  # CO₂
-     0.5,     # C1
-     0.5,     # C2
-     0.4819,  # C3
-     0.518,   # iC4
-     0.518,   # nC4
+    -0.48,    # N₂
+     0.0952,  # CO₂
+     0.45,    # C1
+     0.45,    # C2
+     0.53,    # C3
+     0.52,    # iC4
+     0.52,    # nC4
      0.5,     # iC5
      0.5,     # nC5
-     0.5109,  # C6
-     0.5,     # C7
-     0.5,     # C8
-     0.5,     # C9
+     0.5,     # nC6
+     0.5,     # nC7
+     0.5,     # nC8
+     0.5,     # nC9
+]
+KIJ_AGUA_SRK = [
+    -0.48,    # N₂
+     0.1,     # CO₂
+     0.45,    # C1
+     0.45,    # C2
+     0.53,    # C3
+     0.52,    # iC4
+     0.52,    # nC4
+     0.5,     # iC5
+     0.5,     # nC5
+     0.5,     # nC6
+     0.5,     # nC7
+     0.5,     # nC8
+     0.5,     # nC9
 ]
 
 # Coeficientes Mathias-Copeman (c1,c2,c3) de PVTsim para alpha(T).
@@ -112,29 +117,106 @@ MC_SRK = [
 
 
 
+# ── Matriz kij HC-HC de PVTsim (13×13, sin agua) ────────────────────────────
+# PVTsim usa su PROPIA base de kij binarios (Knapp et al. 1982), distinta de la
+# que ThermoPhase usa para el flash sin agua (nivel HYSYS).  Cuando el agua está
+# activa (método HV = PVTsim oficial), el equilibrio HC debe usar los kij de
+# PVTsim para reproducir el reparto vapor/líquido exacto; de lo contrario el
+# cociente de fugacidades fV/fL de los HC no cierra (difería hasta 3× para los
+# pesados).  Extraídos de la hoja PARAMETROS de PVTsim (matriz clásica).
+# Orden interno: N₂,CO₂,C1,C2,C3,iC4,nC4,iC5,nC5,nC6,nC7,nC8,nC9.
+KIJ_HC_PVT_PR = [
+    [0.0000, 0.0311, 0.0515, 0.0852, 0.1033, 0.0800, 0.0922, 0.1000, 0.1496, 0.1441, 0.0800, 0.0800, 0.0000],
+    [0.0311, 0.0000, 0.1200, 0.1200, 0.1200, 0.1200, 0.1200, 0.1200, 0.1200, 0.1000, 0.1000, 0.1000, 0.0000],
+    [0.0515, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0352, 0.0496, 0.0474, 0.0000],
+    [0.0852, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0067, 0.0185, 0.0000, 0.0000],
+    [0.1033, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0056, 0.0000, 0.0000, 0.0000],
+    [0.0800, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0922, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0033, 0.0000, 0.0000, 0.0000],
+    [0.1000, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.1496, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0074, 0.0000, 0.0000, 0.0000],
+    [0.1441, 0.1000, 0.0352, 0.0067, 0.0056, 0.0000, 0.0033, 0.0000, 0.0074, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0800, 0.1000, 0.0496, 0.0185, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0800, 0.1000, 0.0474, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+]
+KIJ_HC_PVT_SRK = [
+    [0.0000, 0.0278, 0.0407, 0.0763, 0.0944, 0.0700, 0.0867, 0.0878, 0.1496, 0.1422, 0.0800, 0.0800, 0.0000],
+    [0.0278, 0.0000, 0.1200, 0.1200, 0.1200, 0.1200, 0.1200, 0.1200, 0.1200, 0.1100, 0.1000, 0.1000, 0.0000],
+    [0.0407, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0307, 0.0448, 0.0448, 0.0000],
+    [0.0763, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0041, 0.0170, 0.0000, 0.0000],
+    [0.0944, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0044, 0.0000, 0.0000, 0.0000],
+    [0.0700, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0867, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, -0.0004, 0.0000, 0.0000, 0.0000],
+    [0.0878, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.1496, 0.1200, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0019, -0.0022, 0.0000, 0.0000],
+    [0.1422, 0.1100, 0.0307, 0.0041, 0.0044, 0.0000, -0.0004, 0.0000, 0.0019, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0800, 0.1000, 0.0448, 0.0170, 0.0000, 0.0000, 0.0000, 0.0000, -0.0022, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0800, 0.1000, 0.0448, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+    [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000],
+]
+
+
+# ── Propiedades críticas de PVTsim (14 componentes, incluye agua) ───────────
+# PVTsim usa su propia base de propiedades críticas, que difiere de la de HYSYS
+# en varios componentes (CO₂, C1, iC5, nC6…), hasta ~9 psia en Pc.  En método HV
+# (motor PVTsim oficial) deben usarse estas para que a_i, b_i y α(T) — y por
+# tanto el equilibrio de fases — coincidan exactamente con PVTsim.  Orden
+# interno N₂..nC9, H₂O.  Fuente: hoja PARAMETROS de PVTsim (Tc °R, Pc psia).
+TC_PVT_14 = [227.16, 547.56, 343.08, 549.72, 665.64, 734.58, 765.36, 828.72,
+             845.28, 913.32, 972.36, 1023.84, 1070.28, 1165.14]
+PC_PVT_14 = [492.32, 1069.87, 667.20, 708.35, 615.76, 529.06, 551.10, 490.85,
+             489.38, 430.59, 396.79, 360.05, 335.07, 3203.73]
+OMEGA_PVT_14 = [0.0400, 0.2250, 0.0080, 0.0980, 0.1520, 0.1760, 0.1930, 0.2270,
+                0.2510, 0.2960, 0.3510, 0.3940, 0.4400, 0.3440]
+PM_PVT_14 = [28.0140, 44.0100, 16.0430, 30.0700, 44.0970, 58.1240, 58.1240,
+             72.1510, 72.1510, 86.1780, 100.2050, 114.2320, 128.2580, 18.0150]
+
+
 def _params_14(eos):
     """Devuelve (Tc, Pc, omega, PM, kij) de 14 componentes para la EOS dada.
-    Los 13 HC se toman de eos.py; el agua se añade en el índice 13."""
+    Los 13 HC se toman de eos.py; el agua se añade en el índice 13.
+
+    En método HV (agua activa, motor PVTsim) se usan las propiedades críticas
+    y la matriz kij de PVTsim (TC/PC/OMEGA_PVT_14, KIJ_HC_PVT_*), no las del
+    flash sin agua, para reproducir el equilibrio exacto de PVTsim."""
     import eos as _e
     es_srk = _e.es_srk(eos)
     es_pvt = _e.es_pvtsim(eos)
-    if es_pvt:
-        Tc13 = list(_e.TC_PVT); Pc13 = list(_e.PC_PVT)
-        om13 = list(_e.OMEGA_PVT); PM13 = list(_e.PM_PVT)
-    elif es_srk:
-        Tc13 = list(_e.TC_SRK); Pc13 = list(_e.PC_SRK)
-        om13 = list(_e.OMEGA_SRK); PM13 = list(_e.PM)
+
+    # Propiedades críticas de 14 comp. según la EOS ELEGIDA:
+    #  • EOS PVTsim  → arreglos de PVTsim (reproduce el flash PVTsim exacto).
+    #  • EOS HYSYS   → Tc/Pc/ω de HYSYS + agua.  El método HV (regla de mezcla +
+    #    matrices agua-gas G0/GT/α del Excel) se aplica IGUAL sobre estas props,
+    #    de modo que "el método PVTsim corre también con las EOS de HYSYS" —
+    #    resultado coherente con la EOS elegida, distinto de PVTsim puro pero
+    #    físicamente fundamentado.
+    if _METODO == 'hv' and es_pvt:
+        Tc = np.array(TC_PVT_14, dtype=float)
+        Pc = np.array(PC_PVT_14, dtype=float)
+        om = np.array(OMEGA_PVT_14, dtype=float)
+        PM = np.array(PM_PVT_14, dtype=float)
     else:
-        Tc13 = list(_e.TC); Pc13 = list(_e.PC)
-        om13 = list(_e.OMEGA); PM13 = list(_e.PM)
+        if es_pvt:
+            Tc13 = list(_e.TC_PVT); Pc13 = list(_e.PC_PVT)
+            om13 = list(_e.OMEGA_PVT); PM13 = list(_e.PM_PVT)
+        elif es_srk:
+            Tc13 = list(_e.TC_SRK); Pc13 = list(_e.PC_SRK)
+            om13 = list(_e.OMEGA_SRK); PM13 = list(_e.PM)
+        else:
+            Tc13 = list(_e.TC); Pc13 = list(_e.PC)
+            om13 = list(_e.OMEGA); PM13 = list(_e.PM)
+        Tc = np.array(Tc13 + [AGUA_TC])
+        Pc = np.array(Pc13 + [AGUA_PC])
+        om = np.array(om13 + [AGUA_OMEGA_SRK if es_srk else AGUA_OMEGA])
+        PM = np.array(PM13 + [AGUA_PM])
 
-    Tc = np.array(Tc13 + [AGUA_TC])
-    Pc = np.array(Pc13 + [AGUA_PC])
-    om = np.array(om13 + [AGUA_OMEGA_SRK if es_srk else AGUA_OMEGA])
-    PM = np.array(PM13 + [AGUA_PM])
-
-    # kij base 13×13 según EOS
-    kij13 = np.array(_e.kij_base(eos), dtype=float)
+    # kij HC-HC 13×13:  HV con EOS PVTsim usa la matriz de PVTsim; HV con EOS
+    # HYSYS (o método Simple, o sin agua) usa la base de esa EOS (nivel HYSYS).
+    if _METODO == 'hv' and es_pvt:
+        kij13 = np.array(KIJ_HC_PVT_SRK if es_srk else KIJ_HC_PVT_PR, dtype=float)
+    else:
+        kij13 = np.array(_e.kij_base(eos), dtype=float)
     kij = np.zeros((14, 14))
     kij[:13, :13] = kij13
     fila = KIJ_AGUA_SRK if es_srk else KIJ_AGUA_PR
@@ -154,9 +236,14 @@ def _m_srk(omega):
 def _ai_bi(eos, Tc, Pc, omega, T):
     """Parámetros a_i·α(T) y b_i para los 14 componentes.
 
-    Con el método Huron-Vidal (PVTsim) se usa la función α de Mathias-Copeman
-    (tres coeficientes c1,c2,c3 por componente) que es la que emplea PVTsim; con
-    el método Simple (HYSYS) se usa la α estándar de PR/SRK (un solo m de ω)."""
+    En método HV (motor PVTsim) TODOS los componentes —incluida el agua— usan
+    la α ESTÁNDAR de PR/SRK (un solo m de ω).  Se comprobó contra las corridas
+    de PVTsim (hojas por componente + isoterma simplificada del Excel) que PVTsim
+    NO usa Mathias-Copeman en esta configuración: el a_water que reproduce la
+    fugacidad del agua de PVTsim es exactamente el de la α estándar (la MC daba
+    un factor constante ≈0.965 de más en a_water, y usar MC en los HC desplazaba
+    el equilibrio V/L hasta 5× en los pesados).  Método Simple (HYSYS) también
+    usa la α estándar."""
     import eos as _e
     es_srk = _e.es_srk(eos)
     if es_srk:
@@ -167,21 +254,9 @@ def _ai_bi(eos, Tc, Pc, omega, T):
         b0 = 0.07780
     bi = b0*R_GAS*Tc/Pc
 
-    if _METODO == 'hv':
-        # Mathias-Copeman: α = [1 + c1·τ + c2·τ² + c3·τ³]², τ = 1-√Tr.
-        # Para T > Tc, PVTsim usa solo el término c1 (forma de Soave) por
-        # continuidad; aquí se mantiene la forma completa (válida cerca de Tr<1).
-        MC = np.array(MC_SRK if es_srk else MC_PR)
-        Tr = T/Tc
-        tau = 1.0 - np.sqrt(Tr)
-        c1 = MC[:, 0]; c2 = MC[:, 1]; c3 = MC[:, 2]
-        raiz = 1.0 + c1*tau + c2*tau**2 + c3*tau**3
-        # por encima de Tc, usar forma monoparamétrica (evita α creciente)
-        raiz_sc = 1.0 + c1*tau
-        alpha = np.where(Tr <= 1.0, raiz**2, raiz_sc**2)
-    else:
-        m = _m_srk(omega) if es_srk else _m_pr(omega)
-        alpha = (1.0 + m*(1.0 - np.sqrt(T/Tc)))**2
+    # α estándar de PR/SRK para todos los componentes (agua incluida en HV).
+    m = _m_srk(omega) if es_srk else _m_pr(omega)
+    alpha = (1.0 + m*(1.0 - np.sqrt(T/Tc)))**2
     return ai*alpha, bi
 
 
@@ -362,6 +437,20 @@ def flash_trifasico(z, T, P, eos='PR', metodo='simple', max_iter=400, tol=1e-11)
     y, x, w = comps[0], comps[1], comps[2]
     ZV, ZL, ZW = Zs[0], Zs[1], Zs[2]
 
+    # Si el líquido HC colapsó (β_L despreciable), el flash de 3 fases puede
+    # dejar una fase L espuria que descuadra el balance de materia del agua.
+    # Se re-resuelve con las 2 fases reales (vapor + acuosa) para un balance
+    # exacto, que es lo físico cuando el HC no condensa.
+    if bL < 1e-4 and bW > 1e-4:
+        res2 = _flash_multifase(z, aa,bi,kij,T,P,es_srk,Tc,Pc,om,PM,
+                                ['V','L'], [y0, w0], max_iter, tol)
+        if res2 is not None:
+            b2, c2, Z2 = res2
+            if c2[1][IDX_AGUA] > 0.5 and b2[0] > 1e-4:
+                bV, bW, bL = b2[0], b2[1], 0.0
+                y, w, x = c2[0], c2[1], np.zeros(14)
+                ZV, ZW, ZL = Z2[0], Z2[1], None
+
     # Verificación de consistencia: si la fase "acuosa" no es rica en agua o la
     # fase "líquido HC" contiene demasiada agua, el flash cayó en un mínimo
     # local con clasificación errónea. Se reintenta descartando el líquido HC
@@ -376,8 +465,22 @@ def flash_trifasico(z, T, P, eos='PR', metodo='simple', max_iter=400, tol=1e-11)
                 y, w = c2[0], c2[1]; x = np.zeros(14)
                 ZV, ZW = Z2[0], Z2[1]; ZL = None
 
-    # Descartar fases despreciables (beta ~ 0) — Michelsen ec. 11.
+    # ── Fusionar fases acuosas duplicadas ───────────────────────────────────
+    # Si el "líquido HC" (x) resultó rico en agua, es en realidad una segunda
+    # fase acuosa espuria: se fusiona con la acuosa (w) para que el balance de
+    # agua cierre. Sin esto, el flash puede "perder" agua al desaparecer el
+    # líquido HC cerca del punto de rocío del HC.
     UMB = 1e-5
+    if bL > 0 and x[IDX_AGUA] > 0.5:
+        if bW > 0:
+            b_ac = bL + bW
+            w = (bL*x + bW*w)/b_ac; w = w/w.sum()
+            bW = b_ac
+        else:
+            bW = bL; w = x
+        bL = 0.0; x = np.zeros(14)
+
+    # Descartar fases despreciables (beta ~ 0) — Michelsen ec. 11.
     # ¿la "acuosa" es realmente acuosa?
     if w[IDX_AGUA] < 0.5 or bW < UMB:
         bW = 0.0

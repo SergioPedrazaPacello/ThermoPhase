@@ -208,10 +208,64 @@ def _dmu_beta_alpha(estruct, T_R, P_psia, fase_agua, REF):
     return r['dmu0'] / (R * T0) - intH + t_pv
 
 
-def criterio(z, T_R, P_psia, kij=None, nombre_eos=None):
+def actividad_agua(z_full, T_R, P_psia, nombre_eos=None, kij_full=None):
+    """Actividad del agua a_w en la mezcla a (T,P), vía el flash trifásico.
+
+    • Si hay fase acuosa libre (β_W > 0) el agua está saturada → a_w = 1.
+    • Si NO hay agua libre (subsaturado, toda el agua disuelta en el gas/HC)
+      → a_w = f_w(sistema)/f_w(agua líquida pura) < 1, y la curva de hidratos
+      se desplaza (menos agua ⇒ hidrato más difícil), como en PVTsim.
+
+    z_full: composición de 14 comp. (índice 13 = agua).  Devuelve 1.0 si no hay
+    agua o si el cálculo falla (comportamiento conservador = agua saturada)."""
+    import numpy as _np
+    z_full = _np.asarray(z_full, dtype=float)
+    if len(z_full) <= 13 or z_full[13] <= 1e-12:
+        return 1.0
+    if nombre_eos is None:
+        nombre_eos = eos.get_eos()
+    try:
+        import flash_agua as _fa
+        met = 'hv'
+        r = _fa.flash_trifasico(z_full/ z_full.sum(), float(T_R), float(P_psia),
+                                eos=nombre_eos, metodo=met)
+        if r.get('beta_W', 0.0) > 1e-6:
+            return 1.0                      # agua libre → saturada
+        # Sin agua libre: a_w = (x_w·φ_w) en la fase HC / φ_w(agua pura líquida)
+        _fa._METODO = met; _fa._EOS_CTX = nombre_eos; _fa._T_CTX = float(T_R)
+        Tc, Pc, om, PM, kij = _fa._params_14(nombre_eos)
+        es_srk = eos.es_srk(nombre_eos)
+        aa, bi = _fa._ai_bi(nombre_eos, Tc, Pc, om, float(T_R))
+        # fase que contiene el agua (vapor si β_V>0, si no líquido HC)
+        if r.get('beta_V', 0.0) > 1e-9 and r.get('y') is not None:
+            fase = _np.asarray(r['y']); tipo = 'V'
+        else:
+            fase = _np.asarray(r['x']); tipo = 'L'
+        lnp, _ = _fa._ln_phi(fase, aa, bi, kij, float(T_R), float(P_psia), es_srk, tipo)
+        if lnp is None:
+            return 1.0
+        f_w_sist = fase[13]*_np.exp(lnp[13])*P_psia
+        # agua líquida pura
+        wpure = _np.zeros(14); wpure[13] = 1.0
+        lnpw, _ = _fa._ln_phi(wpure, aa, bi, kij, float(T_R), float(P_psia), es_srk, 'L')
+        if lnpw is None:
+            return 1.0
+        f_w_pure = _np.exp(lnpw[13])*P_psia
+        if f_w_pure <= 0:
+            return 1.0
+        a = f_w_sist/f_w_pure
+        return float(min(max(a, 1e-6), 1.0))
+    except Exception:
+        return 1.0
+
+
+def criterio(z, T_R, P_psia, kij=None, nombre_eos=None, a_w=1.0):
     """Δμ = (μH − μα)/RT del hidrato más estable.
 
     Cero → punto sobre la curva de hidratos.  < 0 → se forma hidrato.
+    a_w: actividad del agua en la fase α (1 = agua pura/saturada).  Con a_w<1
+    (agua subsaturada) el potencial del agua baja en RT·ln(a_w), por lo que la
+    formación de hidrato exige más presión / menor temperatura.
     """
     if nombre_eos is None:
         nombre_eos = eos.get_eos()
@@ -220,13 +274,14 @@ def criterio(z, T_R, P_psia, kij=None, nombre_eos=None):
     AB, REF = _params(nombre_eos)
     fase_agua = 'liq' if T_R >= T0_R else 'ice'
     f = fugacidad_mezcla(z, T_R, P_psia, kij)
+    corr = 0.0 if a_w >= 1.0 else -np.log(max(a_w, 1e-12))
     vals = [(_dmu_H_beta(s, T_R, f, AB)
-             + _dmu_beta_alpha(s, T_R, P_psia, fase_agua, REF))
+             + _dmu_beta_alpha(s, T_R, P_psia, fase_agua, REF) + corr)
             for s in ('I', 'II')]
     return min(vals)
 
 
-def estructura_estable(z, T_R, P_psia, kij=None, nombre_eos=None):
+def estructura_estable(z, T_R, P_psia, kij=None, nombre_eos=None, a_w=1.0):
     """Devuelve ('I'|'II', Δμ) de la estructura de menor potencial."""
     if nombre_eos is None:
         nombre_eos = eos.get_eos()
@@ -235,8 +290,9 @@ def estructura_estable(z, T_R, P_psia, kij=None, nombre_eos=None):
     AB, REF = _params(nombre_eos)
     fase_agua = 'liq' if T_R >= T0_R else 'ice'
     f = fugacidad_mezcla(z, T_R, P_psia, kij)
-    dI = _dmu_H_beta('I', T_R, f, AB) + _dmu_beta_alpha('I', T_R, P_psia, fase_agua, REF)
-    dII = _dmu_H_beta('II', T_R, f, AB) + _dmu_beta_alpha('II', T_R, P_psia, fase_agua, REF)
+    corr = 0.0 if a_w >= 1.0 else -np.log(max(a_w, 1e-12))
+    dI = _dmu_H_beta('I', T_R, f, AB) + _dmu_beta_alpha('I', T_R, P_psia, fase_agua, REF) + corr
+    dII = _dmu_H_beta('II', T_R, f, AB) + _dmu_beta_alpha('II', T_R, P_psia, fase_agua, REF) + corr
     return ('I', dI) if dI < dII else ('II', dII)
 
 
@@ -292,13 +348,17 @@ def _raices_en_rango(func, a, b, n=48):
 
 
 def temperatura_hidrato(z, P_psia, kij=None, nombre_eos=None,
-                        T_min=300.0, T_max=560.0):
+                        T_min=300.0, T_max=560.0, a_w=1.0):
     """Temperatura de formación de hidrato [°R] a presión dada.
 
     La curva de hidratos puede ser monótona (con metano) o de forma cerrada
     con dos ramas (p. ej. sin metano). La frontera de formación es la raíz de
     MAYOR temperatura: por debajo de ella el hidrato es estable. Devuelve None
     si no hay ninguna raíz en el rango.
+
+    a_w: actividad del agua (1 = saturada). Con a_w<1 la curva se desplaza.
+    Se pasa fija (no se recalcula en cada evaluación) para no encarecer la
+    resolución — a_w varía muy poco en la pequeña ventana de T de la raíz.
     """
     if nombre_eos is None:
         nombre_eos = eos.get_eos()
@@ -306,13 +366,13 @@ def temperatura_hidrato(z, P_psia, kij=None, nombre_eos=None,
         kij = eos.kij_base(nombre_eos)
 
     def f(T_R):
-        return criterio(z, T_R, P_psia, kij, nombre_eos)
+        return criterio(z, T_R, P_psia, kij, nombre_eos, a_w=a_w)
     raices = _raices_en_rango(f, T_min, T_max)
     return max(raices) if raices else None
 
 
 def presion_hidrato(z, T_R, kij=None, nombre_eos=None,
-                    P_min=1e-3, P_max=12000.0):
+                    P_min=1e-3, P_max=12000.0, a_w=1.0):
     """Presión de formación de hidrato [psia] a temperatura dada.
 
     La frontera de formación es la raíz de MENOR presión: por encima de ella
@@ -324,7 +384,7 @@ def presion_hidrato(z, T_R, kij=None, nombre_eos=None,
         kij = eos.kij_base(nombre_eos)
 
     def f(P):
-        return criterio(z, T_R, P, kij, nombre_eos)
+        return criterio(z, T_R, P, kij, nombre_eos, a_w=a_w)
     # Rejilla log en presión: la curva cambia rápido a baja P.
     import math as _m
     n = 48
@@ -350,11 +410,14 @@ def presion_hidrato(z, T_R, kij=None, nombre_eos=None,
     return min(raices) if raices else None
 
 
-def punto_hidrato(z, modo, valor, kij=None, nombre_eos=None):
+def punto_hidrato(z, modo, valor, kij=None, nombre_eos=None, z_full=None):
     """Calcula un punto de la curva de hidratos.
 
     modo='T'  → 'valor' es P [psia], se resuelve T [°R].
     modo='P'  → 'valor' es T [°R],   se resuelve P [psia].
+
+    z_full: composición de 14 comp. (con agua). Si se da y hay agua, el punto
+    considera la actividad del agua a_w (subsaturado desplaza la curva).
 
     Devuelve dict con T_R, P_psia, estructura, flash (composiciones y fracción
     de fase) y propiedades del flash en ese punto, o None si no hay solución.
@@ -364,18 +427,30 @@ def punto_hidrato(z, modo, valor, kij=None, nombre_eos=None):
     if kij is None:
         kij = eos.kij_base(nombre_eos)
 
+    usar_aw = (z_full is not None and len(np.asarray(z_full)) > 13
+               and np.asarray(z_full, dtype=float)[13] > 1e-12)
+
     if modo == 'T':
         P = float(valor)
         T = temperatura_hidrato(z, P, kij, nombre_eos)
+        if T is not None and usar_aw:
+            a_w = actividad_agua(z_full, float(T), P, nombre_eos)
+            if a_w < 1.0:
+                T = temperatura_hidrato(z, P, kij, nombre_eos, a_w=a_w)
         if T is None:
             return None
     else:
         T = float(valor)
         P = presion_hidrato(z, T, kij, nombre_eos)
+        if P is not None and usar_aw:
+            a_w = actividad_agua(z_full, T, float(P), nombre_eos)
+            if a_w < 1.0:
+                P = presion_hidrato(z, T, kij, nombre_eos, a_w=a_w)
         if P is None:
             return None
 
-    est, dmu = estructura_estable(z, T, P, kij, nombre_eos)
+    a_w_fin = actividad_agua(z_full, T, P, nombre_eos) if usar_aw else 1.0
+    est, dmu = estructura_estable(z, T, P, kij, nombre_eos, a_w=a_w_fin)
     return {'T_R': T, 'P_psia': P, 'estructura': est, 'dmu': dmu,
             'fase_agua': 'liq' if T >= T0_R else 'ice'}
 
@@ -385,7 +460,7 @@ def punto_hidrato(z, modo, valor, kij=None, nombre_eos=None):
 # ══════════════════════════════════════════════════════════════════════
 def curva_hidratos(z, kij=None, nombre_eos=None,
                    P_tope=None, T_min_R=None, n_puntos=60,
-                   P_piso=5.0):
+                   P_piso=5.0, z_full=None):
     """Genera la curva de formación de hidratos como lista de (T_R, P_psia).
 
     La curva se traza barriendo presión (resolviendo T en cada P), que es la
@@ -413,10 +488,21 @@ def curva_hidratos(z, kij=None, nombre_eos=None,
     P_lo = max(P_piso, 1.0)
     presiones = np.geomspace(P_lo, P_tope, n_puntos)
 
+    usar_aw = (z_full is not None and len(np.asarray(z_full)) > 13
+               and np.asarray(z_full, dtype=float)[13] > 1e-12)
     pts = []
     for P in presiones:
+        # Primero la T con agua saturada (a_w=1); luego, si hay agua definida,
+        # se calcula a_w UNA vez en esa (T,P) y se reresuelve. Barato (1-2 flash
+        # por punto) y correcto: a_w apenas cambia en la ventana de la raíz.
         T = temperatura_hidrato(z, float(P), kij, nombre_eos,
                                 T_min=max(T_min_R, 290.0), T_max=560.0)
+        if T is not None and usar_aw:
+            a_w = actividad_agua(z_full, float(T), float(P), nombre_eos)
+            if a_w < 1.0:
+                T = temperatura_hidrato(z, float(P), kij, nombre_eos,
+                                        T_min=max(T_min_R, 290.0), T_max=560.0,
+                                        a_w=a_w)
         if T is None:
             continue
         if T < T_min_R:

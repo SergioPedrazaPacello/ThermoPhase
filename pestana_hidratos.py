@@ -40,10 +40,11 @@ class HidratoWorker(QThread):
     done  = pyqtSignal(dict)
     error = pyqtSignal(str)
 
-    def __init__(self, modo, valor, z, kij, eos_nombre=None):
+    def __init__(self, modo, valor, z, kij, eos_nombre=None, z_full=None):
         super().__init__()
         self.modo = modo; self.valor = valor
         self.z = z; self.kij = kij; self.eos_nombre = eos_nombre
+        self.z_full = z_full
 
     def run(self):
         try:
@@ -52,7 +53,8 @@ class HidratoWorker(QThread):
                 _eng2.set_eos(self.eos_nombre)
             import hidratos as _hid
             pt = _hid.punto_hidrato(self.z, self.modo, self.valor,
-                                    self.kij, self.eos_nombre)
+                                    self.kij, self.eos_nombre,
+                                    z_full=self.z_full)
             if pt is None:
                 self.done.emit({})
                 return
@@ -213,9 +215,12 @@ class TabHidratos(QWidget):
         comp_title.setStyleSheet(LBL_SEC); comp_title.setFixedHeight(22)
         root.addWidget(comp_title)
 
-        self.tbl = QTableWidget(NC+1, 4)
+        # 5 columnas (col 4 = Fase Acuosa) y NC+2 filas (fila del agua en el
+        # indice NC, Sumatorias en NC+1). Col 4 y la fila del agua ocultas por
+        # defecto: con agua inactiva la tabla se ve identica al original.
+        self.tbl = QTableWidget(NC+2, 5)
         self.tbl.setHorizontalHeaderLabels(
-            ["Componente","Mezcla","Fase Vapor","Fase Liquida"])
+            ["Componente","Mezcla","Fase Vapor","Fase Liquida","Fase Acuosa"])
         self.tbl.verticalHeader().setVisible(False)
         self.tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -235,11 +240,14 @@ class TabHidratos(QWidget):
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         self.tbl.setColumnWidth(1,120)
         self.tbl.setColumnWidth(2,120); self.tbl.setColumnWidth(3,120)
+        self.tbl.setColumnWidth(4,120)
         self.tbl.verticalHeader().setDefaultSectionSize(22)
         self.tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.tbl.setColumnHidden(4, True)
         self.tbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         GRIS_NOMBRE = QColor(GRAY_LBL); GRIS_RES = QColor(GRAY_EMPTY)
@@ -248,20 +256,32 @@ class TabHidratos(QWidget):
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             it.setBackground(QBrush(GRIS_NOMBRE))
             self.tbl.setItem(i,0,it)
-            for c in (1,2,3):
+            for c in (1,2,3,4):
                 cell = QTableWidgetItem("")
                 cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 cell.setBackground(QBrush(GRIS_RES))
                 self.tbl.setItem(i,c,cell)
-        sit = QTableWidgetItem("Sumatorias:")
-        sit.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
-        sit.setBackground(QBrush(GRIS_NOMBRE))
-        self.tbl.setItem(NC,0,sit)
-        for c in (1,2,3):
+        # Fila del agua (indice NC): visible solo con agua activa.
+        wit = QTableWidgetItem(_eng.componente_nombre(_eng.IDX_AGUA))
+        wit.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        wit.setBackground(QBrush(GRIS_NOMBRE))
+        self.tbl.setItem(NC,0,wit)
+        for c in (1,2,3,4):
             cell = QTableWidgetItem("")
             cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             cell.setBackground(QBrush(GRIS_RES))
             self.tbl.setItem(NC,c,cell)
+        self.tbl.setRowHidden(NC, True)
+        # Fila Sumatorias (ahora en el indice NC+1)
+        sit = QTableWidgetItem("Sumatorias:")
+        sit.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+        sit.setBackground(QBrush(GRIS_NOMBRE))
+        self.tbl.setItem(NC+1,0,sit)
+        for c in (1,2,3,4):
+            cell = QTableWidgetItem("")
+            cell.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
+            cell.setBackground(QBrush(GRIS_RES))
+            self.tbl.setItem(NC+1,c,cell)
         root.addWidget(self.tbl)
 
         # ── Tabla de propiedades del punto ────────────────────
@@ -280,9 +300,9 @@ class TabHidratos(QWidget):
         prop_hdr.addWidget(self.btn_props, 0)
         root.addLayout(prop_hdr)
 
-        self.tbl_prop = QTableWidget(0, 4)
+        self.tbl_prop = QTableWidget(0, 5)
         self.tbl_prop.setHorizontalHeaderLabels(
-            ["Propiedad","Mezcla","Fase Vapor","Fase Liquida"])
+            ["Propiedad","Mezcla","Fase Vapor","Fase Liquida","Fase Acuosa"])
         self.tbl_prop.verticalHeader().setVisible(False)
         self.tbl_prop.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tbl_prop.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -302,11 +322,14 @@ class TabHidratos(QWidget):
         hp.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         hp.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         hp.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        hp.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         self.tbl_prop.setColumnWidth(1,120)
         self.tbl_prop.setColumnWidth(2,120); self.tbl_prop.setColumnWidth(3,120)
+        self.tbl_prop.setColumnWidth(4,120)
         self.tbl_prop.verticalHeader().setDefaultSectionSize(ROW_H)
         self.tbl_prop.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.tbl_prop.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.tbl_prop.setColumnHidden(4, True)
         self.tbl_prop.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._rebuild_prop_table()
         root.addWidget(self.tbl_prop)
@@ -317,7 +340,7 @@ class TabHidratos(QWidget):
         self._fit_table_heights()
 
     def _fit_table_heights(self):
-        for tbl, nrows in [(self.tbl, NC+1),
+        for tbl, nrows in [(self.tbl, NC+2),
                            (self.tbl_prop, self.tbl_prop.rowCount())]:
             h = tbl.horizontalHeader().height()
             for r in range(nrows):
@@ -329,6 +352,12 @@ class TabHidratos(QWidget):
         act = set(activos)
         for i in range(NC):
             self.tbl.setRowHidden(i, i not in act)
+        # Agua (idx 13): muestra/oculta fila del agua (indice NC) y la columna
+        # de Fase Acuosa (col 4). Sumatorias (indice NC+1) nunca se oculta.
+        agua_on = _eng.IDX_AGUA in act
+        self.tbl.setRowHidden(NC, not agua_on)
+        self.tbl.setColumnHidden(4, not agua_on)
+        self.tbl_prop.setColumnHidden(4, not agua_on)
         self._fit_table_heights()
 
     def _rebuild_prop_table(self):
@@ -343,7 +372,7 @@ class TabHidratos(QWidget):
             it.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
             it.setBackground(QBrush(GRIS_NOMBRE))
             self.tbl_prop.setItem(r, 0, it)
-            for c in (1, 2, 3):
+            for c in (1, 2, 3, 4):
                 cc = QTableWidgetItem("")
                 cc.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
                 cc.setBackground(QBrush(GRIS_VACIA))
@@ -398,7 +427,12 @@ class TabHidratos(QWidget):
         kij = self.get_kij()
         eos_nombre = self._eos_nombre()
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
-        self.worker = HidratoWorker(modo, valor, list(z), kij, eos_nombre)
+        # z13 = HC renormalizado (motor de hidratos = 13 comp); z_full = 14 comp
+        # con agua, para el acople de actividad del agua (a_w).
+        z13 = list(z[:13]); s13 = sum(z13)
+        if s13 > 0: z13 = [v/s13 for v in z13]
+        z_full = list(z) if (len(z) > 13 and z[13] > 1e-12) else None
+        self.worker = HidratoWorker(modo, valor, z13, kij, eos_nombre, z_full)
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
         self.worker.start()
@@ -491,9 +525,10 @@ class TabHidratos(QWidget):
             _set(self.tbl.item(i,1), f"{z[i]:.4f}", sz > 0)
             _set(self.tbl.item(i,2), f"{y[i]:.4f}", hay_vap)
             _set(self.tbl.item(i,3), f"{x[i]:.4f}", hay_liq)
-        _set(self.tbl.item(NC,1), f"{sz:.4f}", sz > 0)
-        _set(self.tbl.item(NC,2), f"{sy:.4f}", hay_vap)
-        _set(self.tbl.item(NC,3), f"{sx:.4f}", hay_liq)
+        # Fila Sumatorias (indice NC+1)
+        _set(self.tbl.item(NC+1,1), f"{sz:.4f}", sz > 0)
+        _set(self.tbl.item(NC+1,2), f"{sy:.4f}", hay_vap)
+        _set(self.tbl.item(NC+1,3), f"{sx:.4f}", hay_liq)
 
         # ── Propiedades: Mezcla | Vapor | Líquido ──
         import math as _math
@@ -562,6 +597,88 @@ class TabHidratos(QWidget):
                 else:
                     cell.setText("")
                     cell.setBackground(QBrush(VAC))
+
+        # ── Fase Acuosa (col 4): flash trifásico en el punto (T,P) ──
+        self._render_acuosa(T, P)
+
+    # ══════════════════════════════════════════════════════════
+    def _limpiar_acuosa(self):
+        """Vacía la columna de Fase Acuosa (col 4) en ambas tablas."""
+        GR = QColor(GRAY_RES)
+        for r in range(self.tbl.rowCount()):
+            it = self.tbl.item(r, 4)
+            if it is not None:
+                it.setText(""); it.setBackground(QBrush(GR))
+        for r in range(self.tbl_prop.rowCount()):
+            it = self.tbl_prop.item(r, 4)
+            if it is not None:
+                it.setText(""); it.setBackground(QBrush(GR))
+
+    def _render_acuosa(self, T_R, P_psia):
+        """Corre el flash trifásico en el punto (T_R,P_psia) y llena la columna
+        de Fase Acuosa (col 4) de composición y propiedades, con el mismo
+        formato que _render_trifasico de ventana_principal.py. Si el agua está
+        inactiva, el flash falla o beta_W≈0, deja la columna vacía."""
+        if self.tbl.isColumnHidden(4):
+            return
+        z14 = self.get_z()
+        if len(z14) <= _eng.IDX_AGUA or z14[_eng.IDX_AGUA] <= 1e-12:
+            self._limpiar_acuosa(); return
+        if not (T_R and P_psia and T_R > 0 and P_psia > 0):
+            self._limpiar_acuosa(); return
+        try:
+            import flash_agua as _fa, numpy as _np, propiedades_agua as _pa
+            eos_nombre = self._eos_nombre()
+            z = _np.array(z14, dtype=float); z = z / z.sum()
+            rt = _fa.flash_trifasico(z, T_R, P_psia, eos=eos_nombre, metodo='hv')
+            bW = rt.get('beta_W', 0.0)
+            if not bW or bW <= 1e-9:
+                self._limpiar_acuosa(); return
+            props = _pa.propiedades_fases(rt, T_R, P_psia, eos_nombre,
+                                          metodo_densidad='COSTALD')
+            pW = props.get('W', {}) or {}
+        except Exception:
+            self._limpiar_acuosa(); return
+
+        WHT = QColor(WHITE); GR = QColor(GRAY_RES)
+        w = rt.get('w')
+        sw = 0.0
+        for i in range(NC + 1):   # 0..NC-1 HC, NC = agua
+            it = self.tbl.item(i, 4)
+            if it is None:
+                continue
+            val = float(w[i]) if (w is not None and i < len(w)) else None
+            if val is not None:
+                it.setText(f"{val:.4f}")
+                it.setBackground(QBrush(WHT)); it.setForeground(QBrush(QColor(TEXT_RES)))
+                sw += val
+            else:
+                it.setText(""); it.setBackground(QBrush(GR))
+        it_s = self.tbl.item(NC + 1, 4)
+        if it_s is not None:
+            it_s.setText(f"{sw:.4f}"); it_s.setBackground(QBrush(WHT))
+
+        _mapa = {
+            'pm':        pW.get('PM'),
+            'z':         pW.get('Z'),
+            'densidad':  _u.dens_desde(pW.get('rho')) if pW.get('rho') is not None else None,
+            'sg':        pW.get('sg'),
+            'entalpia':  _u.H_desde(pW.get('H')) if pW.get('H') is not None else None,
+            'entropia':  _u.S_desde(pW.get('S')) if pW.get('S') is not None else None,
+            'viscosidad':pW.get('mu'),
+        }
+        sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
+        for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
+            cell = self.tbl_prop.item(r, 4)
+            if cell is None:
+                continue
+            vw = _mapa.get(key)
+            if vw is not None:
+                cell.setText(f"{{:.{dec}f}}".format(vw))
+                cell.setForeground(QBrush(QColor(TEXT_RES)))
+                cell.setBackground(QBrush(WHT))
+            else:
+                cell.setText(""); cell.setBackground(QBrush(GR))
 
     # ══════════════════════════════════════════════════════════
     # Curva de hidratos sobre la envolvente
