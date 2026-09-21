@@ -68,10 +68,10 @@ NC = 13
 IDX_AGUA = 13
 AGUA_COMPONENTE = "H₂O"
 AGUA_NOMBRE = "Agua [H₂O]:"
-AGUA_PM    = 18.015100479126
-AGUA_TC    = 1165.13822021484      # °R
-AGUA_PC    = 3208.233924           # psia
-AGUA_OMEGA = 0.34400001168251
+AGUA_PM    = 18.015341             # PVTsim (base de datos)
+AGUA_TC    = 1165.14009            # °R  (647.30005 K × 1.8, PVTsim)
+AGUA_PC    = 3203.71683            # psia (218 atm × 14.69594878, PVTsim)
+AGUA_OMEGA = 0.34400001            # PVTsim
 AGUA_NBP   = 671.666418457031      # °R (punto de ebullición normal del agua)
 
 def componente_nombre(i):
@@ -307,15 +307,20 @@ PC_SRK = list(PC)
 # Provistas por el usuario desde la base de datos de PVTsim.
 # Tc en °F (convertida a °R sumando 459.67), Pc en psia, factor acentrico
 # UNICO para PR y SRK (PVTsim no separa omega por EOS, a diferencia de HYSYS).
-_TC_PVT_F = [-232.51, 87.89, -116.59, 90.05, 205.97, 274.91, 305.69,
-             369.05, 385.61, 453.65, 512.69, 564.17, 610.61]
-TC_PVT = [t + 459.67 for t in _TC_PVT_F]                     # °R
-PC_PVT = [492.32, 1069.87, 667.2, 708.35, 615.76, 529.06, 551.1,
-          490.85, 489.38, 430.59, 396.79, 360.05, 335.07]     # psia
-OMEGA_PVT = [0.04, 0.225, 0.008, 0.098, 0.152, 0.176, 0.193,
-             0.227, 0.251, 0.296, 0.351, 0.394, 0.44]
-PM_PVT = [28.014, 44.01, 16.043, 30.07, 44.097, 58.124, 58.124,
-          72.151, 72.151, 86.178, 100.205, 114.232, 128.258]
+# Valores EXACTOS extraídos de la base de datos de PVTsim (ComponentParams),
+# con toda la precisión almacenada.  Tc: K×1.8 → °R.  Pc: atm×14.69594878 → psia.
+TC_PVT = [227.16, 547.56002, 343.08002, 549.71998, 665.64004, 734.57996,
+          765.36002, 828.71998, 845.27996, 913.31993, 972.36002,
+          1023.84009, 1070.28007]                              # °R
+PC_PVT = [492.31417, 1069.86534, 667.1961, 708.3448, 615.76039, 529.05427,
+          551.09808, 490.84472, 489.37502, 430.59109, 396.79062,
+          360.05075, 335.06762]                                # psia
+OMEGA_PVT = [0.039999999, 0.22499999, 0.0080000004, 0.097999997, 0.152,
+             0.176, 0.193, 0.227, 0.25099999, 0.296, 0.35100001,
+             0.39399999, 0.44]
+PM_PVT = [28.013519, 44.0098, 16.042879, 30.06982, 44.09676, 58.123699,
+          58.123699, 72.150642, 72.150642, 86.177582, 100.2045,
+          114.2315, 128.25841]
 
 # ── Parámetros individuales SRK (Soave-Redlich-Kwong 1972) ───────
 # Constantes EXACTAS derivadas de las condiciones criticas:

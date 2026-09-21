@@ -643,7 +643,7 @@ class TabEquilibrio(QWidget):
 
         # Fila del AGUA (índice NC=13). Nace oculta; se muestra al activarla.
         self.tbl_comp.setItem(NC, 0, cell(
-            _eng.componente_etiqueta(NC).rstrip(':'), bg=GRAY_LBL,
+            _eng.componente_etiqueta(NC), bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter))
         self.tbl_comp.setItem(NC, 1, cell("", bg=WHITE, editable=True))
         self.tbl_comp.setItem(NC, 2, cell("", bg=GRAY_EMPTY, color=TEXT_RES))

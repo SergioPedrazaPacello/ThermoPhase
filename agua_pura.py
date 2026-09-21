@@ -52,55 +52,47 @@ _A = [
  [-410.30848, 337.3118000,-137.4661800,    6.7874983, 136.8731700,  79.8479700, 13.0411253],
  [-416.05860, 209.8886600, 733.9684800,   10.4017170, 645.8188000, 399.1757000, 71.5313530],
 ]
-RHO_A = 0.634    # g/cm³
-RHO_B = 1.0      # g/cm³
-TAU_A = 2.5      # K⁻¹  (α en el exp(-α·ρ))
-TAU_C = 1.544912 # K⁻¹  (τ_c)
-E_Q   = 4.8      # cm³/g
+# Anclas de densidad por columna j (g/cm³): 0.634 para j=1..6, 1.0 para j=7
+# (constantes "aa" y "ab" del manual).  Estructura Keenan-Keyes-Hill-Moore 1969.
+RHO_AJ = [0.634, 0.634, 0.634, 0.634, 0.634, 0.634, 1.0]
+TAU_AA = 2.5      # K⁻¹  (τaa, factor externo (τ−τaa))
+TAU_C  = 1.544912 # K⁻¹  (τc = 1000/Tc, potencias (τ−τc)^(j-1))
+E_Q    = 4.8      # cm³/g
 
 
 def _Q_and_derivs(rho, tau):
-    """Devuelve (Q, dQ/dρ, dQ/dτ) de la función Q(ρ,τ) de Keyes.
+    """Devuelve (Q, dQ/dρ, dQ/dτ) de la función Q(ρ,τ) de Keyes (KKHM 1969).
 
-    Q = Σ_{i=1..8} A_{i,1}·(ρ−ρa)^{i-1}  +  e^{−E·ρ}·(A_{9,1}+A_{10,1}·ρ)
-      + (τ−τc)·Σ_{j=2..7} (τ−τa)^{j-2}·[ Σ_{i=1..8} A_{i,j}·(ρ−ρb)^{i-1}
-                                         + e^{−E·ρ}·(A_{9,j}+A_{10,j}·ρ) ]
-    (índices de A en base 1 como en el manual; aquí _A[i-1][j-1]).
+    Q = (τ−τaa)·Σ_{j=1..7} (τ−τc)^{j-1}·[ Σ_{i=1..8} A_{i,j}·(ρ−ρaj)^{i-1}
+                                          + e^{−E·ρ}·(A_{9,j}+A_{10,j}·ρ) ]
+
+    donde ρaj = 0.634 para j=1..6 y ρa7 = 1.0.  Índices de A en base 1 como en
+    el manual (_A[i-1][j-1], i=1..10 filas, j=1..7 columnas).
     """
-    da = rho - RHO_A
-    db = rho - RHO_B
     eEp = math.exp(-E_Q*rho)
-    # j=1 (término independiente de τ)
-    S1 = 0.0; dS1 = 0.0
-    for i in range(1, 9):
-        S1 += _A[i-1][0]*da**(i-1)
-        if i >= 2:
-            dS1 += _A[i-1][0]*(i-1)*da**(i-2)
-    g1 = _A[8][0] + _A[9][0]*rho                      # A9,1 + A10,1·ρ
-    S1 += eEp*g1
-    dS1 += eEp*(_A[9][0]) + (-E_Q*eEp)*g1             # d/dρ del término exp
-    Q = S1
-    dQ_drho = dS1
-    dQ_dtau = 0.0
-    # j=2..7  (dependencia en τ)
-    outer = 0.0; d_outer_drho = 0.0; d_outer_dtau = 0.0
-    for j in range(2, 8):
-        Sj = 0.0; dSj = 0.0
+    inner = 0.0          # Σ_j (τ−τc)^{j-1}·bracket_j
+    d_inner_drho = 0.0
+    d_inner_dtau = 0.0   # ∂/∂τ de inner (solo por las potencias (τ−τc)^{j-1})
+    for j in range(1, 8):
+        rhoaj = RHO_AJ[j-1]
+        da = rho - rhoaj
+        Bj = 0.0; dBj = 0.0                     # bracket_j y su ∂/∂ρ
         for i in range(1, 9):
-            Sj += _A[i-1][j-1]*db**(i-1)
+            Bj += _A[i-1][j-1]*da**(i-1)
             if i >= 2:
-                dSj += _A[i-1][j-1]*(i-1)*db**(i-2)
-        gj = _A[8][j-1] + _A[9][j-1]*rho
-        Sj += eEp*gj
-        dSj += eEp*(_A[9][j-1]) + (-E_Q*eEp)*gj
-        w = (tau - TAU_A)**(j-2)
-        outer += w*Sj
-        d_outer_drho += w*dSj
-        dw = 0.0 if j == 2 else (j-2)*(tau - TAU_A)**(j-3)
-        d_outer_dtau += dw*Sj
-    Q += (tau - TAU_C)*outer
-    dQ_drho += (tau - TAU_C)*d_outer_drho
-    dQ_dtau += outer + (tau - TAU_C)*d_outer_dtau
+                dBj += _A[i-1][j-1]*(i-1)*da**(i-2)
+        gj = _A[8][j-1] + _A[9][j-1]*rho        # A9,j + A10,j·ρ
+        Bj += eEp*gj
+        dBj += eEp*(_A[9][j-1]) + (-E_Q*eEp)*gj
+        w  = (tau - TAU_C)**(j-1)
+        inner        += w*Bj
+        d_inner_drho += w*dBj
+        dw = 0.0 if j == 1 else (j-1)*(tau - TAU_C)**(j-2)
+        d_inner_dtau += dw*Bj
+    fac = (tau - TAU_AA)
+    Q       = fac*inner
+    dQ_drho = fac*d_inner_drho
+    dQ_dtau = inner + fac*d_inner_dtau
     return Q, dQ_drho, dQ_dtau
 
 
@@ -202,10 +194,21 @@ def viscosidad_cP(T_K, P_MN, rho_gcm3):
         psat = _psat_MN(T_K)
     except Exception:
         psat = 0.0
-    # Región 1: Psat<P<80 MN/m² y 273.15<T<573.15 K  (η en poise)
-    if 273.15 < T_K < 573.15 and psat < P_MN < 80.0:
-        eta = 1e-6*_a[1]*(1.0 + (rho_gcm3/RHO_C - P_MN/PC_MN)*_a[4]*(Tr - _a[5])) \
-              * 10.0**(_a[2]/(Tr - _a[3]))
+    # Región 1: Psat<P<80 MN/m² y 273.15<T<573.15 K  (η en poise).
+    # PVTsim (opción Multiflash) mantiene la fórmula de agua líquida por
+    # debajo de 273.15 K congelando la temperatura en el punto de fusión
+    # (agua subenfriada); así se evita el blow-up de la exponencial y se
+    # reproduce el valor prácticamente constante que reporta PVTsim en la
+    # fase acuosa a T bajo cero.
+    liquido = rho_gcm3 > 0.7      # densidad típica de agua líquida (g/cm³)
+    # Bajo 0°C la correlación de Psat se dispara; para el chequeo de región del
+    # líquido subenfriado se usa un Psat efectivo despreciable.
+    psat_ef = psat if T_K > 273.15 else 0.0
+    if (273.15 < T_K < 573.15 or (liquido and T_K <= 273.15)) \
+            and psat_ef < P_MN < 80.0:
+        Tr1 = Tr if T_K > 273.15 else (273.15/TC_K)
+        eta = 1e-6*_a[1]*(1.0 + (rho_gcm3/RHO_C - P_MN/PC_MN)*_a[4]*(Tr1 - _a[5])) \
+              * 10.0**(_a[2]/(Tr1 - _a[3]))
         return eta*P2CP
     # Región 2: 0.1<P<Psat y 373.15<T<573.15   (η1 atmosférica − corrección)
     if 373.15 < T_K < 573.15 and 0.1 < P_MN < psat:
