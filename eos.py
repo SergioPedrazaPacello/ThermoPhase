@@ -122,12 +122,16 @@ VC = [89.8, 93.9, 99.2, 148.3, 200.0, 262.7, 255.0,
       306.0, 313.0, 370.0, 428.0, 486.0, 544.0]
 
 # Volúmenes críticos EXACTOS de PVTsim (base de datos ComponentParams, columna
-# Vc), convertidos a cm³/mol (factor 82.0).  Se usan en la viscosidad LBC cuando
-# el EOS activo es PVTsim: difieren del banco genérico sobre todo en los pesados
-# (nC7-nC9), que es donde la viscosidad de la fase líquida se apartaba de PVTsim.
-VC_PVT = [89.734, 93.931, 98.928, 147.892, 202.852, 262.808, 254.814,
-          305.776, 303.778, 369.729, 431.684, 491.640, 547.599]   # cm³/mol
-AGUA_VC_PVT = 55.959                                              # cm³/mol
+# Vc).  La columna Vc de la base está en unidades reducidas Vc/R; se convierte a
+# cm³/mol multiplicando por R = 82.05736 cm³·atm/(mol·K), la constante de gases
+# en esas unidades.  Con esta conversión física los valores coinciden con los de
+# literatura (Reid 1977) que PVTsim usa, y la viscosidad LBC calza a ~0.1 %.
+_R_CM3ATM = 82.05736
+_VC_BASE = [1.0943213, 1.1455033, 1.2064346, 1.8035583, 2.4737997, 3.204972,
+            3.1074824, 3.7289789, 3.7046063, 4.5088959, 5.2644405, 5.9956131,
+            6.6780405]
+VC_PVT = [v*_R_CM3ATM for v in _VC_BASE]                          # cm³/mol
+AGUA_VC_PVT = 0.68242735*_R_CM3ATM                               # cm³/mol
 
 
 def kij_chueh_prausnitz(n=1.0):

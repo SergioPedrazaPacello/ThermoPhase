@@ -171,11 +171,12 @@ _D = [None, 2.9304370, -2309.5789, 0.34522497e-1, -0.13621289e-3,
 
 
 def _psat_MN(T_K):
-    """Presión de vapor del agua (MN/m²) — correlación del manual PVTsim."""
-    t = T_K - 273.15
-    s = (1.0 + _D[1]) + _D[2]/t
-    # términos Dj·(T-273.15)^(j)  para j=3..7 (exponente j-2 sobre t según manual)
-    s += (_D[3]*t + _D[4]*t**2 + _D[5]*t**3 + _D[6]*t**4 + _D[7]*t**5)
+    """Presión de vapor del agua (MN/m²) — correlación del manual PVTsim.
+    log10(Psat) = (D1−1) + D2/T + Σ_{j=3}^{7} Dj·T^(j−2), con T en Kelvin
+    absoluta y Psat en MN/m² (verificado <0.1 % contra Psat del agua)."""
+    T = T_K
+    s = (_D[1] - 1.0) + _D[2]/T
+    s += (_D[3]*T + _D[4]*T**2 + _D[5]*T**3 + _D[6]*T**4 + _D[7]*T**5)
     return 10.0**s
 
 
@@ -206,10 +207,15 @@ def viscosidad_cP(T_K, P_MN, rho_gcm3):
     psat_ef = psat if T_K > 273.15 else 0.0
     if (273.15 < T_K < 573.15 or (liquido and T_K <= 273.15)) \
             and psat_ef < P_MN < 80.0:
-        Tr1 = Tr if T_K > 273.15 else (273.15/TC_K)
-        eta = 1e-6*_a[1]*(1.0 + (rho_gcm3/RHO_C - P_MN/PC_MN)*_a[4]*(Tr1 - _a[5])) \
-              * 10.0**(_a[2]/(Tr1 - _a[3]))
-        return eta*P2CP
+        # Región 1 de Meyer/Schmidt (manual PVTsim, Water Phase Properties):
+        #   η = 10⁻⁶·a₁·[1 + (ρ/ρc − Psat/Pc)·a₄·(T/Tc − a₅)]·10^(a₂/((T/Tc)−a₃))
+        # con los coeficientes a1-a5 de la base de datos de PVTsim (η en poise).
+        # Bajo 273.15 K (agua subenfriada) PVTsim extrapola con la T real y
+        # satura en ~7.26 cP.
+        eta = 1e-6*_a[1]*(1.0 + (rho_gcm3/RHO_C - psat/PC_MN)*_a[4]*(Tr - _a[5])) \
+              * 10.0**(_a[2]/(Tr - _a[3]))
+        mu = eta*P2CP
+        return mu if mu < 7.2551 else 7.2551
     # Región 2: 0.1<P<Psat y 373.15<T<573.15   (η1 atmosférica − corrección)
     if 373.15 < T_K < 573.15 and 0.1 < P_MN < psat:
         e1 = _eta1_atm(T_K)      # poise

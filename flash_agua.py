@@ -26,6 +26,11 @@ R_GAS = 10.7316
 SQRT2 = np.sqrt(2.0)
 IDX_AGUA = 13
 
+# Constantes internas de PVTsim (ver _ai_bi).
+PSIA_ATM_PVT = 14.696          # conversión psia→atm que usa PVTsim
+PSIA_ATM_STD = 14.69594878     # la usada para pasar las Pc de la base a psia
+OMEGA_A_PR_EXACTO = 0.4572355289   # Ωa de PR exacto (PVTsim)
+
 
 # ── Propiedades críticas extendidas (13 HC + agua) ──────────────────────────
 # Los 13 primeros se toman de eos.py según la EOS; el agua se añade aquí con las
@@ -249,9 +254,25 @@ def _ai_bi(eos, Tc, Pc, omega, T):
     import eos as _e
     es_srk = _e.es_srk(eos)
     es_pvt = _e.es_pvtsim(eos)
+    if es_pvt:
+        # PVTsim trabaja internamente en atm y convierte la presión del usuario
+        # con 1 atm = 14.696 psia (manual: "1 atm/14.696 psia"), mientras que las
+        # Pc de su base están en atm.  Nuestras Pc en psia se obtuvieron con
+        # 14.69594878; para reproducir el cociente P/Pc de PVTsim se re-escalan
+        # a Pc_atm·14.696.  Confirmado con los volúmenes molares de la corrida
+        # PRUEBA: V = Z·R·T/P con R = 0.08206 L·atm/(mol·K) y P = psia/14.696
+        # reproduce el volumen reportado a 8e-8.
+        Pc = Pc*(PSIA_ATM_PVT/PSIA_ATM_STD)
     if es_srk:
         ai = 0.42748*R_GAS**2*Tc**2/Pc
         b0 = 0.08664
+    elif es_pvt:
+        # PR de PVTsim: Ωa EXACTO (0.4572355289) y Ωb redondeado (0.07780).
+        # El manual imprime 0.45724/0.07780, pero el ajuste contra PRUEBA es
+        # inequívoco: con Ωa=0.45724 el error máx. en fracción molar es 1.6e-5;
+        # con Ωa exacto y Ωb=0.07780, 1.7e-7 (Ωb exacto lo empeora a 5e-5).
+        ai = OMEGA_A_PR_EXACTO*R_GAS**2*Tc**2/Pc
+        b0 = 0.07780
     else:
         ai = 0.45724*R_GAS**2*Tc**2/Pc
         b0 = 0.07780

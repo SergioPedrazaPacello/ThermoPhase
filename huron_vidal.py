@@ -31,15 +31,18 @@ R_SI = 8.314             # J/(mol·K), para g en unidades consistentes con PVTsi
 IDX_AGUA = 13
 
 # Índices HC (orden interno N₂,CO₂,C1..C9) que usan Huron-Vidal con el agua.
-# PVTsim usa HV para agua con N₂..nC5 (índices 0-8) y la regla clásica (kij)
-# para agua con nC6..nC9 (índices 9-12).  Ver la matriz de modo de la hoja
-# PARAMETROS de PVTsim.  Aplicar HV a los pesados con las energías G0 grandes
-# los expulsa por completo de la fase acuosa (fugacidad ~1e-40) y arruina la
-# solubilidad; con la regla clásica (kij≈0.5) la solubilidad es finita y correcta.
-HV_AGUA_IDX = set(range(0, 9))          # N₂,CO₂,C1,C2,C3,iC4,nC4,iC5,nC5
+# PVTsim usa HV para agua con N₂..nC6 (índices 0-9) y la regla clásica (kij)
+# para agua con nC7..nC9 (índices 10-12).  Así lo indica la base de datos de
+# PVTsim: α(agua-nC6)=0.1459 (PR) y G0 propio (720.17 / 2514.46 K), mientras que
+# nC7..nC9 tienen α=0.  Verificado contra la corrida PRUEBA (500 psia, 300-700 °R):
+# con nC6 en regla clásica el nC6 disuelto en la fase acuosa salía ~1e-44 frente
+# a 2.4e-7 de PVTsim; con nC6 en HV calza al 5° decimal (y el agua disuelta en el
+# líquido HC pasa de 0.81-0.98× a 1.0000×).  nC7..nC9 con kij≈0.5 reproducen los
+# valores ~1e-50 de PVTsim en la fase acuosa.
+HV_AGUA_IDX = set(range(0, 10))         # N₂,CO₂,C1,C2,C3,iC4,nC4,iC5,nC5,nC6
 
 # kij clásico del agua (orden interno N₂..nC9), hoja PARAMETROS de PVTsim.
-# Solo se usa para los pares Classic (agua-nC6..nC9), pero se define completo.
+# Solo se usa para los pares Classic (agua-nC7..nC9), pero se define completo.
 KIJ_AGUA_CLASSIC_PR = np.array(
     [-0.48, 0.0952, 0.45, 0.45, 0.53, 0.52, 0.52, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
 KIJ_AGUA_CLASSIC_SRK = np.array(
@@ -148,7 +151,7 @@ KIJHV_SRK = [
 
 # Matriz α (no-aleatoriedad NRTL) EXACTA de la base de datos de PVTsim (tabla
 # InteractionParameters_PR_alpha).  Es simétrica; los únicos pares con α≠0 son
-# los agua-HC (N₂..nC5 con H₂O); nC6..nC9-agua usan regla clásica (α=0).
+# los agua-HC (N₂..nC6 con H₂O); nC7..nC9-agua usan regla clásica (α=0).
 # [Corregido: la versión anterior tenía un corrimiento de un índice que asignaba
 #  α(H₂O-H₂O)=0.1474 al par N₂-H₂O y desplazaba todos los demás.]
 ALPHA_PR = [
@@ -273,7 +276,7 @@ def _tau_alpha(eos, T_R, aa, bi, kij_classic):
                 tau[j, i] = (G0[j, i] + GT[j, i]*T_K)/T_K
                 alpha[j, i] = ALPHA[j, i]          # no-aleatoriedad NRTL (ec. 16.10)
             elif hc is not None:
-                # Par agua-HC pesado (nC6..nC9): regla CLÁSICA (α=0) con kij agua.
+                # Par agua-HC pesado (nC7..nC9): regla CLÁSICA (α=0) con kij agua.
                 fac = 2.0*np.sqrt(bi[i]*bi[j])/(bi[i]+bi[j])
                 kij_w = kij_ag[hc]
                 g_ji = -fac*np.sqrt(gii[i]*gii[j])*(1.0 - kij_w)
