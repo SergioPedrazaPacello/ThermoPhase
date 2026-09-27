@@ -39,7 +39,12 @@ import math
 import eos as eng
 
 # --- Constantes / conversiones (sistema ingles) --------------------
-R_BTU    = 1.98588            # BTU/(lbmol.R)
+# Constante de gases de PVTsim: R = 0.08206 L·atm/(mol·K) = 8.3147295 J/(mol·K)
+# (confirmada con los volúmenes molares de las corridas PRUEBA: V = Z·R·T/P a
+# 8e-8).  En BTU/(lbmol·°R): 8.3147295 · 0.2388459 = 1.985939.  Con 1.98588 la
+# entropía quedaba +0.00018 BTU/lbmol·°R sistemáticamente sobre PVTsim.
+R_J_PVT  = 0.08206*101.325                                   # J/(mol·K)
+R_BTU    = R_J_PVT*(453.59237/1055.05585)/1.8               # BTU/(lbmol.R)
 CONV     = 144.0 / 778.169    # 1 psi.ft3 -> BTU  = 0.185053
 PREF     = 14.696             # 1 atm en psia (valor usado por PVTsim)
 TREF_K   = 273.15             # K  (0 C / 32 F) -- referencia de PVTsim
@@ -69,6 +74,45 @@ CP_REID = [
     (-8.374e+0,  8.729e-1, -4.823e-4,  1.031e-7),   # C9
 ]
 
+# Coeficientes Cp⁰/R EXACTOS de la base de datos de PVTsim (ComponentParams,
+# CpCoefficient1-4; T en K).  Son los de Reid et al. (1977) divididos por R, con
+# toda la precisión almacenada.  PVTsim evalúa Cp⁰ = R·(C1+C2T+C3T²+C4T³).
+# nC7: Reid (reproduce PVTsim).
+# nC8 y nC9: identificados con las 4 corridas PRUEBA de PVTsim (PR y SRK, con y
+#      sin agua; 72 fases HC, 300-750 °R).  El Cp⁰ del nC9 de PVTsim NO es el
+#      de Reid para el n-nonano: es ~11 % más bajo (prácticamente la curva del
+#      nC8).  El del nC8 difiere de Reid solo ~0.1 % (precisión de la base).  Con
+#      estos coeficientes H calza a 0.006 BTU/lbmol y S a 1e-5 BTU/lbmol·°R en
+#      todas las fases; con Reid el error llegaba a 433 BTU/lbmol en el líquido
+#      pesado.  Reemplazar por los del registro de PVTsim cuando se tengan.
+CP_PVT_R = [
+    (3.7462244, -0.0016314193, 3.2225582e-06, -1.4048339e-09),   # N2
+    (2.3806651, 0.0088318232, -6.7371611e-06, 2.0629407e-09),    # CO2
+    (2.3152068, 0.0062688836, 1.4400817e-06, -1.3610271e-09),    # C1
+    (0.650554, 0.021419942, -8.3434052e-06, 1.0478349e-09),      # C2
+    (-0.5080564, 0.036832836, -1.9078554e-05, 3.8660621e-09),    # C3
+    (-0.1671702, 0.04626888, -2.2200396e-05, 3.4818728e-09),     # iC4
+    (1.1409869, 0.039843913, -1.3328302e-05, -3.3937561e-10),    # nC4
+    (-1.1455189, 0.060926471, -3.2824766e-05, 6.8831811e-09),    # iC5
+    (-0.43605244, 0.058610283, -3.1032232e-05, 6.3796581e-09),   # nC5
+    (-0.53071505, 0.06998992, -3.7507551e-05, 7.8096685e-09),    # nC6
+    None,                                                        # nC7 (Reid)
+    (-0.74717143, 0.092914095, -5.1131273e-05, 1.1536517e-08),   # nC8 (PVTsim)
+    (0.431201, 0.080935648, -2.1417071e-05, -5.5203767e-09),     # nC9 (PVTsim)
+]
+
+
+def _cp_coefs(i, eos=None):
+    """Coeficientes Cp⁰ (J/mol·K, T en K) del componente i.
+    EOS de PVTsim → base de datos de PVTsim (CP_PVT_R·R).  EOS de HYSYS → Reid."""
+    if eos is None or not eng.es_pvtsim(eos):
+        return CP_REID[i]
+    c = CP_PVT_R[i] if i < len(CP_PVT_R) else None
+    if c is not None:
+        return tuple(R_J_PVT*v for v in c)
+    return CP_REID[i]
+
+
 # Correlacion Aly-Lee (DIPPR 107) -- se conserva como alternativa/contraste.
 CP_ALYLEE = [
     ( 29.11,   8.615,  1702.0,   0.1035,  909.8),   # N2
@@ -90,11 +134,11 @@ CP_ALYLEE = [
 # ============================================================
 # 1) PARTE DE GAS IDEAL  (unica para PR y SRK)
 # ============================================================
-def cp_ideal(i, T_K):
+def cp_ideal(i, T_K, eos=None):
     """Cp0 del componente i [J/(mol.K)] a T en K.
     Polinomio de 3er grado con coeficientes de Reid et al. (1977), tal como
     lo usa PVTsim por defecto."""
-    C1, C2, C3, C4 = CP_REID[i]
+    C1, C2, C3, C4 = _cp_coefs(i, eos)
     return C1 + C2 * T_K + C3 * T_K ** 2 + C4 * T_K ** 3
 
 
@@ -119,26 +163,30 @@ def _simpson(f, Ta, Tb, N=2000):
     return s * h / 3.0
 
 
-def _int_Cp(i, Ta_K, Tb_K):
-    """int Cp0 dT  [J/mol]."""
-    return _simpson(lambda T: cp_ideal(i, T), Ta_K, Tb_K)
+def _int_Cp(i, Ta_K, Tb_K, eos=None):
+    """int Cp0 dT  [J/mol]  (analítica, polinomio cúbico)."""
+    C1, C2, C3, C4 = _cp_coefs(i, eos)
+    F = lambda T: C1*T + C2*T**2/2.0 + C3*T**3/3.0 + C4*T**4/4.0
+    return F(Tb_K) - F(Ta_K)
 
 
-def _int_CpT(i, Ta_K, Tb_K):
-    """int Cp0/T dT  [J/(mol.K)]."""
-    return _simpson(lambda T: cp_ideal(i, T) / T, Ta_K, Tb_K)
+def _int_CpT(i, Ta_K, Tb_K, eos=None):
+    """int Cp0/T dT  [J/(mol.K)]  (analítica)."""
+    C1, C2, C3, C4 = _cp_coefs(i, eos)
+    F = lambda T: C1*math.log(T) + C2*T + C3*T**2/2.0 + C4*T**3/3.0
+    return F(Tb_K) - F(Ta_K)
 
 
-def H_ideal_i(i, T_R):
+def H_ideal_i(i, T_R, eos=None):
     """H_ig del componente i puro [BTU/lbmol], referencia 0 a Tref."""
     T_K = T_R * 5.0 / 9.0
-    return _int_Cp(i, TREF_K, T_K) * J_TO_BTUlbmol
+    return _int_Cp(i, TREF_K, T_K, eos) * J_TO_BTUlbmol
 
 
-def S_ideal_i(i, T_R, P):
+def S_ideal_i(i, T_R, P, eos=None):
     """S_ig del componente i puro [BTU/(lbmol.R)], referencia 0 a Tref,Pref."""
     T_K = T_R * 5.0 / 9.0
-    return (_int_CpT(i, TREF_K, T_K) * J_TO_BTUlbmolR
+    return (_int_CpT(i, TREF_K, T_K, eos) * J_TO_BTUlbmolR
             - R_BTU * math.log(P / PREF))
 
 
@@ -191,16 +239,19 @@ def _params_eos(comp, T_R, eos, kij=None):
 # ============================================================
 def H_departure(T_R, P, Z, am, bm, da_dT, d1, d2):
     """(H - H_ig) [BTU/lbmol]."""
+    # Forma adimensional (H_res/RT) evaluada con R_GAS y multiplicada por la R de
+    # PVTsim, para que la constante de gases sea una sola (como en PVTsim).
     B  = bm * P / (eng.R_GAS * T_R)
     lt = math.log((Z + d1 * B) / (Z + d2 * B))
-    return R_BTU * T_R * (Z - 1.0) + ((T_R * da_dT - am) / ((d1 - d2) * bm)) * lt * CONV
+    h = (Z - 1.0) + (T_R * da_dT - am) / ((d1 - d2) * bm * eng.R_GAS * T_R) * lt
+    return R_BTU * T_R * h
 
 
 def S_departure(T_R, P, Z, am, bm, da_dT, d1, d2):
     """(S - S_ig) [BTU/(lbmol.R)] (el termino -R ln(P/Pref) va en la parte ideal)."""
     B  = bm * P / (eng.R_GAS * T_R)
     lt = math.log((Z + d1 * B) / (Z + d2 * B))
-    return R_BTU * math.log(Z - B) + (da_dT / ((d1 - d2) * bm)) * lt * CONV
+    return R_BTU * (math.log(Z - B) + da_dT / ((d1 - d2) * bm * eng.R_GAS) * lt)
 
 
 # ============================================================
@@ -208,13 +259,13 @@ def S_departure(T_R, P, Z, am, bm, da_dT, d1, d2):
 # ============================================================
 def H_fase(comp, T_R, P, Z, eos, kij=None):
     am, bm, da_dT, d1, d2 = _params_eos(comp, T_R, eos, kij)
-    H_id = sum(comp[i] * H_ideal_i(i, T_R) for i in range(eng.NC) if comp[i] > 0)
+    H_id = sum(comp[i] * H_ideal_i(i, T_R, eos) for i in range(eng.NC) if comp[i] > 0)
     return H_id + H_departure(T_R, P, Z, am, bm, da_dT, d1, d2)
 
 
 def S_fase(comp, T_R, P, Z, eos, kij=None):
     am, bm, da_dT, d1, d2 = _params_eos(comp, T_R, eos, kij)
-    S_id = sum(comp[i] * S_ideal_i(i, T_R, P) for i in range(eng.NC) if comp[i] > 0)
+    S_id = sum(comp[i] * S_ideal_i(i, T_R, P, eos) for i in range(eng.NC) if comp[i] > 0)
     S_mix = 0.0
     for i in range(eng.NC):
         if comp[i] > 1e-15:

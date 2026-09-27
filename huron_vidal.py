@@ -41,8 +41,9 @@ IDX_AGUA = 13
 # valores ~1e-50 de PVTsim en la fase acuosa.
 HV_AGUA_IDX = set(range(0, 10))         # N₂,CO₂,C1,C2,C3,iC4,nC4,iC5,nC5,nC6
 
-# kij clásico del agua (orden interno N₂..nC9), hoja PARAMETROS de PVTsim.
-# Solo se usa para los pares Classic (agua-nC7..nC9), pero se define completo.
+# kij clásico del agua de PVTsim (orden interno N₂..nC9).  Solo como referencia:
+# _tau_alpha toma el kij agua-HC de la matriz que recibe (flash_agua.kij_agua_fila),
+# de modo que las EOS de HYSYS usan su propia fila de kij del agua.
 KIJ_AGUA_CLASSIC_PR = np.array(
     [-0.48, 0.0952, 0.45, 0.45, 0.53, 0.52, 0.52, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
 KIJ_AGUA_CLASSIC_SRK = np.array(
@@ -232,7 +233,9 @@ _TAU_CACHE = {}
 def _tau_alpha(eos, T_R, aa, bi, kij_classic):
     """(tau, alpha) de Huron-Vidal. Cacheado por (eos, T_R redondeada) — no
     dependen de la composición, así que se calculan una sola vez por T."""
-    key = (eos, round(T_R, 4), round(float(aa[0]), 6), round(float(bi[0]), 6))
+    # Clave con T EXACTA: redondear T rompía las derivadas numéricas en T
+    # (envolvente, H_res) al devolver τ de otra temperatura.
+    key = (eos, float(T_R), float(aa[0]), float(bi[0]))
     c = _TAU_CACHE.get(key)
     if c is not None:
         return c
@@ -243,7 +246,6 @@ def _tau_alpha(eos, T_R, aa, bi, kij_classic):
     GT = _g_matrix_deltaT(eos)
     kijhv = _kij_hv(eos)
     ALPHA = np.array(ALPHA_SRK if _e.es_srk(eos) else ALPHA_PR)
-    kij_ag = KIJ_AGUA_CLASSIC_SRK if _e.es_srk(eos) else KIJ_AGUA_CLASSIC_PR
     # Formulación EXACTA de Pedersen (2024), cap. 16, ec. 16.10-16.13:
     #   G^E/RT = Σ_i z_i · [Σ_j τ_ji b_j z_j exp(-α_ji τ_ji)] / [Σ_k b_k z_k exp(-α_ki τ_ki)]
     #   τ_ji = (g_ji - g_ii)/(R T)      (ec. 16.2 vía 16.10)
@@ -278,7 +280,9 @@ def _tau_alpha(eos, T_R, aa, bi, kij_classic):
             elif hc is not None:
                 # Par agua-HC pesado (nC7..nC9): regla CLÁSICA (α=0) con kij agua.
                 fac = 2.0*np.sqrt(bi[i]*bi[j])/(bi[i]+bi[j])
-                kij_w = kij_ag[hc]
+                # kij clásico agua-HC de la matriz recibida (fila del agua de
+                # la EOS en uso: HYSYS o PVTsim, ver flash_agua.kij_agua_fila).
+                kij_w = kij_classic[i, j]
                 g_ji = -fac*np.sqrt(gii[i]*gii[j])*(1.0 - kij_w)
                 tau[j, i] = (g_ji - gii[i])/(R_GAS*T_R)
             else:

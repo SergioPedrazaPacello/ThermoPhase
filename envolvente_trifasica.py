@@ -44,6 +44,10 @@ class Termo:
         self.fa = _fa; self.e = _e
         self.eos = eos
         self.metodo = 'hv' if metodo == 'hv' else 'simple'
+        # _params_14 depende del método activo (con 'hv' y EOS de PVTsim usa las
+        # propiedades del agua de PVTsim); se fija ANTES de pedir los parámetros.
+        _fa._METODO = self.metodo
+        _fa._EOS_CTX = eos
         self.Tc, self.Pc, self.om, self.PM, self.kij = _fa._params_14(eos)
         self.es_srk = _e.es_srk(eos)
         self._Tcache = None; self._aa = None; self._bi = None

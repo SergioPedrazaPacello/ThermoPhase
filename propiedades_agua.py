@@ -267,6 +267,98 @@ def _S_fase14(comp, T_R, P, Z, eos, TC, PC, om, kij):
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# Método de PVTsim para H, S y μ con agua (14 componentes, regla Huron-Vidal)
+# ════════════════════════════════════════════════════════════════════════════
+# Validado contra las corridas PRUEBA de PVTsim (PR y SRK, 500 psia,
+# 300-750 °R) evaluando en sus composiciones y Z: H a ≤0.008 BTU/lbmol,
+# S a ≤1e-5 BTU/lbmol·°R en las TRES fases; μ-LBC de vapor y líquido HC a
+# ≤4e-7 relativo.  PVTsim calcula H_res = −RT²·Σx ∂lnφ/∂T con la MISMA regla de
+# mezcla del flash (HV para agua-N₂..nC6, clásica para el resto), sobre las 14
+# componentes de cada fase (el agua disuelta en vapor/líquido HC SÍ cuenta).
+CP_PVT_R_AGUA = (3.8776448, 0.00022935554, 1.2693854e-06, -4.3252765e-10)  # Cp⁰/R base PVTsim
+
+
+def _cp_agua(eos):
+    import eos as _e
+    import entalpia_entropia_gen as _hs
+    if _e.es_pvtsim(eos):
+        return tuple(_hs.R_J_PVT*v for v in CP_PVT_R_AGUA)
+    return CP_REID_AGUA
+
+
+def _am_bm_14(comp, T_R, eos):
+    """(a_m, b_m) de 14 componentes con la regla de mezcla del flash con agua."""
+    import flash_agua as _fa
+    import huron_vidal as _hv
+    _fa._METODO = 'hv'; _fa._EOS_CTX = eos; _fa._T_CTX = T_R
+    Tc, Pc, om, PM, kij = _fa._params_14(eos)
+    aa, bi = _fa._ai_bi(eos, Tc, Pc, om, T_R)
+    return _fa._am_bm(np.asarray(comp, dtype=float), aa, bi, kij)
+
+
+def HS_fase14(comp, T_R, P, Z, eos):
+    """(H [BTU/lbmol], S [BTU/lbmol·°R]) de una fase de 14 componentes por el
+    método de PVTsim: gas ideal (Cp⁰ de la base, ref. 273.15 K / 1 atm) +
+    residual de la EOS con la regla de mezcla HV del flash (da_m/dT numérico)."""
+    import eos as _e
+    import entalpia_entropia_gen as _hs
+    comp = np.asarray(comp, dtype=float)
+    h = 1e-3*T_R
+    am, bm = _am_bm_14(comp, T_R, eos)
+    a_p, _ = _am_bm_14(comp, T_R + h, eos)
+    a_m, _ = _am_bm_14(comp, T_R - h, eos)
+    _am_bm_14(comp, T_R, eos)                      # deja el contexto en T
+    da = (a_p - a_m)/(2.0*h)
+    d1, d2 = (1.0, 0.0) if _e.es_srk(eos) else (1.0+SQRT2, 1.0-SQRT2)
+    B = bm*P/(R_GAS*T_R)
+    lt = math.log((Z + d1*B)/(Z + d2*B))
+    R = _hs.R_BTU
+    Hres = R*T_R*((Z - 1.0) + (T_R*da - am)/((d1-d2)*bm*R_GAS*T_R)*lt)
+    Sres = R*(math.log(Z - B) + da/((d1-d2)*bm*R_GAS)*lt)
+    T_K = T_R/1.8; t0 = _hs.TREF_K
+    c = _cp_agua(eos)
+    FH = lambda T: c[0]*T + c[1]*T**2/2 + c[2]*T**3/3 + c[3]*T**4/4
+    FS = lambda T: c[0]*math.log(T) + c[1]*T + c[2]*T**2/2 + c[3]*T**3/3
+    lnPP = math.log(P/_hs.PREF)
+    Hid = 0.0; Sid = 0.0; Smix = 0.0
+    for i in range(len(comp)):
+        xi = comp[i]
+        if xi <= 0:
+            continue
+        if i < NC:
+            Hid += xi*_hs.H_ideal_i(i, T_R, eos)
+            Sid += xi*_hs.S_ideal_i(i, T_R, P, eos)
+        else:
+            Hid += xi*(FH(T_K) - FH(t0))*_hs.J_TO_BTUlbmol
+            Sid += xi*((FS(T_K) - FS(t0))*_hs.J_TO_BTUlbmolR - R*lnPP)
+        if xi > 1e-300:
+            Smix -= R*xi*math.log(xi)
+    return Hid + Hres, Sid + Smix + Sres
+
+
+def _lbc_params14(eos):
+    """(Tc[K], Pc[atm], PM, Vc/R) de 14 componentes para LBC."""
+    import eos as _e
+    import flash_agua as _fa
+    Tc, Pc, om, PM, kij = _fa._params_14(eos)
+    if _e.es_pvtsim(eos):
+        return (Tc/1.8, Pc/_e.PSIA_ATM_STD, PM,
+                np.array(list(_e._VC_BASE) + [0.68242735]))
+    Vc = np.array(list(_e.VC) + [AGUA_VC])/(_e._R_LATM_PVT*1000.0)
+    return (Tc/1.8, Pc/14.696, PM, Vc)
+
+
+def visc_LBC14(comp, T_R, P, rho_masa, PM_fase, eos):
+    """μ-LBC (cP) de una fase de 14 componentes, formulación de PVTsim."""
+    import eos as _e
+    if rho_masa is None or rho_masa <= 0 or not PM_fase:
+        return None
+    Tc, Pc, M, Vc = _lbc_params14(eos)
+    Z = P*PM_fase/(rho_masa*R_GAS*T_R)
+    return _e.lbc_mezcla(comp, T_R, P, Z, Tc, Pc, M, Vc)
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # API principal
 # ════════════════════════════════════════════════════════════════════════════
 def _norm13(comp14):
@@ -302,10 +394,9 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
         PMv = float(np.dot(y, PM14))
         rho_v = _rho_eos(y, PMv, ZV, T, P)
         sg_v = PMv/28.9625
-        mu_v = _visc_LBC14(list(y), T, rho_v, PMv, Tc14, Pc14, PM14, VC14)
+        mu_v = visc_LBC14(list(y), T, P, rho_v, PMv, eos)
         try:
-            Hv = _hs.H_fase(list(y13), T, P, ZV, eos, kij)
-            Sv = _hs.S_fase(list(y13), T, P, ZV, eos, kij)
+            Hv, Sv = HS_fase14(y, T, P, ZV, eos)
         except Exception:
             Hv = Sv = None
         out['V'] = {'PM': PMv, 'Z': ZV, 'rho': rho_v, 'sg': sg_v,
@@ -336,10 +427,9 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
             except Exception:
                 rho_l = rho_l_eos
         sg_l = rho_l/62.4 if rho_l else None
-        mu_l = _visc_LBC14(list(x), T, rho_l, PMl, Tc14, Pc14, PM14, VC14)
+        mu_l = visc_LBC14(list(x), T, P, rho_l, PMl, eos)
         try:
-            Hl = _hs.H_fase(list(x13), T, P, ZL, eos, kij)
-            Sl = _hs.S_fase(list(x13), T, P, ZL, eos, kij)
+            Hl, Sl = HS_fase14(x, T, P, ZL, eos)
         except Exception:
             Hl = Sl = None
         out['L'] = {'PM': PMl, 'Z': ZL, 'rho': rho_l, 'sg': sg_l,
@@ -368,10 +458,9 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
         except Exception:
             mu_w = None
         if mu_w is None or mu_w <= 0:
-            mu_w = _visc_LBC14(list(w), T, rho_w, PMw, Tc14, Pc14, PM14, VC14)
+            mu_w = visc_LBC14(list(w), T, P, rho_w, PMw, eos)
         try:
-            Hw = _H_fase14(list(w), T, P, ZW, eos, Tc14, Pc14, om14, kij14)
-            Sw = _S_fase14(list(w), T, P, ZW, eos, Tc14, Pc14, om14, kij14)
+            Hw, Sw = HS_fase14(w, T, P, ZW, eos)
         except Exception:
             Hw = Sw = None
         out['W'] = {'PM': PMw, 'Z': ZW, 'rho': rho_w, 'sg': sg_w,

@@ -1672,11 +1672,11 @@ class TabParametros(QWidget):
 
     def _llenar_kij_agua(self):
         """Rellena la fila y columna del agua (idx tabla NC+1) en la matriz kij
-        con el kij CLASICO agua-HC (flash_agua.KIJ_AGUA_PR/SRK segun la EOS),
+        con el kij CLASICO agua-HC (flash_agua.kij_agua_fila segun la EOS),
         como celdas informativas de solo lectura. El par agua-gas usa realmente
         Huron-Vidal, por eso estos valores no son editables."""
         import flash_agua as _fa
-        fila = _fa.KIJ_AGUA_SRK if _eng.es_srk(self._eos_ctx()) else _fa.KIJ_AGUA_PR
+        fila = _fa.kij_agua_fila(self._eos_ctx())
         ra = NC + 1
         self.tbl_k.blockSignals(True)
         for i in range(NC):

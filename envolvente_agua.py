@@ -110,8 +110,11 @@ def linea_aparicion_agua(z14, eos, metodo, T_min, T_max,
         m0 = _margen_agua(z14, T, Pgrid[0], ctx)
         cruce = None
         if m0 > 0:
-            # Agua libre ya presente a P_min → frontera por debajo del rango.
-            cruce = P_min
+            # Agua libre ya presente a P_min → la frontera está por debajo del
+            # rango de presión.  Antes se registraba como un punto a P_min, lo
+            # que llenaba la gráfica de puntos a presión ~0 que no aportan nada;
+            # ahora simplemente no se registra punto a esta temperatura.
+            cruce = None
         else:
             Pprev, mprev = Pgrid[0], m0
             for P in Pgrid[1:]:

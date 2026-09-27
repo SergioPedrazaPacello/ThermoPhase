@@ -46,43 +46,33 @@ AGUA_PM   = 18.015100479126
 AGUA_OMEGA_SRK = 0.34400001168251
 
 
-# ── Matriz kij del agua (fila/columna 14) para HYSYS ────────────────────────
-# Orden: N₂, CO₂, C1, C2, C3, iC4, nC4, iC5, nC5, C6, C7, C8, C9  (agua-agua=0)
-# Estos kij clásicos del agua se toman de la hoja PARAMETROS de PVTsim (matriz
-# de interacción binaria clásica, fila del agua). PVTsim usa la regla clásica
-# con estos kij SOLO para los pares agua-{nC6,nC7,nC8,nC9}; los pares agua con
-# los 9 primeros HC (N₂..nC5) usan Huron-Vidal (matrices G0/GT/α). Ver la matriz
-# de modo de PARAMETROS: HV para agua-N₂..agua-nC5, Classic para agua-nC6..nC9.
-KIJ_AGUA_PR = [
-    -0.48,    # N₂
-     0.0952,  # CO₂
-     0.45,    # C1
-     0.45,    # C2
-     0.53,    # C3
-     0.52,    # iC4
-     0.52,    # nC4
-     0.5,     # iC5
-     0.5,     # nC5
-     0.5,     # nC6
-     0.5,     # nC7
-     0.5,     # nC8
-     0.5,     # nC9
-]
-KIJ_AGUA_SRK = [
-    -0.48,    # N₂
-     0.1,     # CO₂
-     0.45,    # C1
-     0.45,    # C2
-     0.53,    # C3
-     0.52,    # iC4
-     0.52,    # nC4
-     0.5,     # iC5
-     0.5,     # nC5
-     0.5,     # nC6
-     0.5,     # nC7
-     0.5,     # nC8
-     0.5,     # nC9
-]
+# ── Fila kij del agua (fila/columna 14) ──────────────────────────────────────
+# Orden: N₂, CO₂, C1, C2, C3, iC4, nC4, iC5, nC5, nC6, nC7, nC8, nC9 (agua-agua=0).
+# Con el agua activa las 4 EOS usan el MISMO procedimiento (el de PVTsim): regla
+# de mezcla Huron-Vidal para agua con N₂..nC6 (energías G0/GT/α de PVTsim, de la
+# EOS correspondiente) y regla CLÁSICA con este kij para agua con nC7..nC9.
+# Cada familia de EOS conserva sus propios kij:
+#   • PVTsim  → fila del agua de la matriz clásica de PVTsim (hoja PARAMETROS).
+#   • HYSYS   → fila del agua del paquete de fluidos de HYSYS (reporte HYSYS).
+KIJ_AGUA_PVT_PR = [
+    -0.48, 0.0952, 0.45, 0.45, 0.53, 0.52, 0.52, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+KIJ_AGUA_PVT_SRK = [
+    -0.48, 0.10,   0.45, 0.45, 0.53, 0.52, 0.52, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+KIJ_AGUA_HYSYS_PR = [
+    -0.3156, 0.0445, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.48, 0.5, 0.5, 0.5, 0.5]
+KIJ_AGUA_HYSYS_SRK = [
+    -0.4907, 0.0392, 0.5, 0.5, 0.4819, 0.518, 0.518, 0.5, 0.5, 0.5109, 0.5, 0.5, 0.5]
+# Alias retro-compatibles (PVTsim).
+KIJ_AGUA_PR = KIJ_AGUA_PVT_PR
+KIJ_AGUA_SRK = KIJ_AGUA_PVT_SRK
+
+
+def kij_agua_fila(eos):
+    """Fila kij agua-HC (13 valores) de la EOS indicada (HYSYS o PVTsim)."""
+    import eos as _e
+    if _e.es_pvtsim(eos):
+        return KIJ_AGUA_PVT_SRK if _e.es_srk(eos) else KIJ_AGUA_PVT_PR
+    return KIJ_AGUA_HYSYS_SRK if _e.es_srk(eos) else KIJ_AGUA_HYSYS_PR
 
 # Coeficientes Mathias-Copeman (c1,c2,c3) de PVTsim para alpha(T).
 # Coeficientes Mathias-Copeman (C1,C2,C3) EXACTOS de la base de datos de PVTsim
@@ -197,7 +187,11 @@ def _params_14(eos):
     #    de modo que "el método PVTsim corre también con las EOS de HYSYS" —
     #    resultado coherente con la EOS elegida, distinto de PVTsim puro pero
     #    físicamente fundamentado.
-    if _METODO == 'hv' and es_pvt:
+    # Con una EOS de PVTsim se usan SIEMPRE las propiedades de PVTsim (incluida
+    # el agua), sin depender del estado global _METODO: antes, si _METODO aún no
+    # era 'hv' al pedir los parámetros, el agua tomaba Tc/Pc de HYSYS (Pc 3208.23
+    # vs 3203.72 psia) y desplazaba ~0.07 °R las líneas con fase acuosa.
+    if es_pvt:
         Tc = np.array(TC_PVT_14, dtype=float)
         Pc = np.array(PC_PVT_14, dtype=float)
         om = np.array(OMEGA_PVT_14, dtype=float)
@@ -225,7 +219,7 @@ def _params_14(eos):
     kij13 = np.array(_e.kij_base(eos), dtype=float)
     kij = np.zeros((14, 14))
     kij[:13, :13] = kij13
-    fila = KIJ_AGUA_SRK if es_srk else KIJ_AGUA_PR
+    fila = kij_agua_fila(eos)
     for j in range(13):
         kij[13, j] = fila[j]
         kij[j, 13] = fila[j]
@@ -263,14 +257,19 @@ def _ai_bi(eos, Tc, Pc, omega, T):
         # PRUEBA: V = Z·R·T/P con R = 0.08206 L·atm/(mol·K) y P = psia/14.696
         # reproduce el volumen reportado a 8e-8.
         Pc = Pc*(PSIA_ATM_PVT/PSIA_ATM_STD)
+    # Constantes Ωa/Ωb por EOS (verificadas contra las corridas PRUEBA de
+    # PVTsim a 500 psia, 300-750 °R, y coherentes con el motor sin agua de HYSYS):
+    #   PR  PVTsim : Ωa EXACTO 0.4572355289, Ωb 0.07780 (redondeado).  Con
+    #                Ωa=0.45724 el error máx. en fracción molar era 1.6e-5; así,
+    #                1.7e-7 (Ωb exacto lo empeora a 5e-5).
+    #   SRK PVTsim : Ωa y Ωb EXACTOS (0.42748023354 / 0.08664034996).  Con los
+    #                truncados 0.42748/0.08664 el error era 2.8e-6; así, 1.8e-7.
+    #   PR  HYSYS  : 0.45724 / 0.07780 (como eos.ai_pr / eos.bi_pr).
+    #   SRK HYSYS  : exactos (como eos.OMEGA_A_SRK / OMEGA_B_SRK).
     if es_srk:
-        ai = 0.42748*R_GAS**2*Tc**2/Pc
-        b0 = 0.08664
+        ai = _e.OMEGA_A_SRK*R_GAS**2*Tc**2/Pc
+        b0 = _e.OMEGA_B_SRK
     elif es_pvt:
-        # PR de PVTsim: Ωa EXACTO (0.4572355289) y Ωb redondeado (0.07780).
-        # El manual imprime 0.45724/0.07780, pero el ajuste contra PRUEBA es
-        # inequívoco: con Ωa=0.45724 el error máx. en fracción molar es 1.6e-5;
-        # con Ωa exacto y Ωb=0.07780, 1.7e-7 (Ωb exacto lo empeora a 5e-5).
         ai = OMEGA_A_PR_EXACTO*R_GAS**2*Tc**2/Pc
         b0 = 0.07780
     else:
@@ -320,9 +319,38 @@ def _Z_roots(am, bm, T, P, es_srk):
         c = [1.0, -1.0, A - B - B*B, -A*B]
     else:
         c = [1.0, -(1.0 - B), A - 3*B*B - 2*B, -(A*B - B*B - B**3)]
-    r = np.roots(c)
-    Zs = sorted([x.real for x in r if abs(x.imag) < 1e-8 and x.real > B])
+    Zs = sorted(z_ for z_ in _raices_cubica(c[1], c[2], c[3]) if z_ > B)
     return Zs, A, B
+
+
+def _raices_cubica(a2, a1, a0):
+    """Raíces reales de Z³ + a2 Z² + a1 Z + a0 = 0 (analítico + 2 pasos de
+    Newton para pulir; equivalente a np.roots pero ~20× más rápido)."""
+    import math
+    q = (3.0*a1 - a2*a2)/9.0
+    r = (9.0*a2*a1 - 27.0*a0 - 2.0*a2**3)/54.0
+    D = q**3 + r*r
+    if D > 0:
+        sD = math.sqrt(D)
+        s1 = math.copysign(abs(r + sD)**(1.0/3.0), r + sD)
+        s2 = math.copysign(abs(r - sD)**(1.0/3.0), r - sD)
+        roots = [s1 + s2 - a2/3.0]
+    else:
+        th = math.acos(max(-1.0, min(1.0, r/math.sqrt(-q**3)))) if q < 0 else 0.0
+        sq = 2.0*math.sqrt(-q) if q < 0 else 0.0
+        roots = [sq*math.cos(th/3.0) - a2/3.0,
+                 sq*math.cos((th + 2.0*math.pi)/3.0) - a2/3.0,
+                 sq*math.cos((th + 4.0*math.pi)/3.0) - a2/3.0]
+    out = []
+    for z_ in roots:
+        for _ in range(2):
+            f = ((z_ + a2)*z_ + a1)*z_ + a0
+            d = (3.0*z_ + 2.0*a2)*z_ + a1
+            if d == 0:
+                break
+            z_ -= f/d
+        out.append(z_)
+    return out
 
 
 def _sum_aij_deriv(z, aa, bi, kij, am):
@@ -636,9 +664,20 @@ def _distribucion_fases(N, phi, beta0):
     F = len(beta)
     for it in range(100):
         Q, g, H, E = _Q_dist(beta, N, phi)
-        # solo fases activas (beta>0 o gradiente negativo) participan en Newton
+        # Conjunto activo (condiciones KKT de min Q con β ≥ 0): una fase con
+        # β = 0 y ∂Q/∂β ≥ 0 queda fija en cero y NO entra al paso de Newton.
+        # (Incluirla daba direcciones malas cerca de fases que aparecen o
+        # desaparecen: la búsqueda lineal recortaba el paso ~27 veces por
+        # iteración y un flash llegaba a tardar 40 s.)
+        act = (beta > 0.0) | (g < 0.0)
+        if not np.any(act):
+            break
+        if np.max(np.abs(g[act])) < 1e-13:
+            break
+        ia = np.where(act)[0]
+        d = np.zeros(F)
         try:
-            d = np.linalg.solve(H + 1e-12*np.eye(F), g)
+            d[ia] = np.linalg.solve(H[np.ix_(ia, ia)] + 1e-12*np.eye(len(ia)), g[ia])
         except Exception:
             break
         t = 1.0; mejor = False

@@ -139,8 +139,30 @@ class EnvWorker(QThread):
                     pass
         except Exception:
             pass
+    def _envolvente_con_agua(self):
+        """Envolvente Lindeloff-Michelsen (PVTsim) sobre la composición TOTAL
+        con agua: líneas 2-HC, 2-Aq, 3-Aq, 3-HC y punto crítico.  Para los
+        consumidores existentes (puntos especiales, hidratos, mapa, CSV) se
+        mapea 3-HC → 'burbuja' y 2-HC → 'rocio'."""
+        import eos as _e
+        import envolvente_lm as _lm
+        eos_code = self.eos_code or _e.get_eos()
+        r = _lm.envolvente_agua(self.z_full, eos_code, 'hv')
+        crit = r['critico'][0] if r.get('critico') else None
+        res = {'lm': {k: r.get(k, []) for k in ('2-HC', '2-Aq', '3-Aq', '3-HC')},
+               'burbuja': list(r.get('3-HC', [])),
+               'rocio': list(r.get('2-HC', [])),
+               'critico': crit,
+               'critico_burbuja': crit is not None,
+               'critico_rocio': crit is not None,
+               'agua_activa': True}
+        return res
+
     def run(self):
         try:
+            if self.agua_on and self.z_full is not None:
+                self.done.emit(self._envolvente_con_agua())
+                return
             from envolvente import curva_envolvente, es_puro, curva_pura
             # Componente puro: no hay envolvente bifásica (área) sino una única
             # curva de saturación (presión de vapor) que termina en el punto
@@ -766,6 +788,15 @@ class TabEnvolvente(QWidget):
         actual antes de trazar las líneas — la composición pudo cambiar
         desde el último cálculo de envolvente, así que no se reutiliza una
         envolvente guardada."""
+        zz = list(self.get_z())
+        if len(zz) > 13 and zz[13] > 1e-12:
+            # Con agua activa PVTsim traza solo las fronteras de fase (método
+            # Lindeloff-Michelsen) y no líneas de isocalidad.
+            dialogos.advertencia(self,
+                "Con el agua activada no se trazan líneas de isocalidad "
+                "(igual que PVTsim): la envolvente muestra solo las fronteras "
+                "de fase.")
+            return
         if abs(sum(self.get_z())-1.0)>1e-3:
             dialogos.advertencia(self,
                 "La suma de fracciones debe ser 1.0")
@@ -1174,7 +1205,38 @@ class TabEnvolvente(QWidget):
         Tb=[_u.t_desde_R(t) for _,t in burb]; Pb=[_u.p_desde_psia(p) for p,_ in burb]
         Td=[_u.t_desde_R(t) for _,t in rocio]; Pd=[_u.p_desde_psia(p) for p,_ in rocio]
 
-        if es_puro_res:
+        lm = res.get('lm')
+        if lm is not None:
+            # ── Envolvente con agua (Lindeloff-Michelsen, estilo PVTsim) ──
+            # Cuatro fronteras sobre la composición total + punto crítico.
+            estilos = [
+                ('2-HC', '#1a4fa8', 'Rocío HC (2-HC)'),
+                ('3-HC', '#c0392b', 'Límite 3 fases HC (3-HC)'),
+                ('3-Aq', '#8e2fb0', 'Aparición de agua (3-Aq)'),
+                ('2-Aq', '#e67e22', 'Rocío de agua (2-Aq)'),
+            ]
+            for key, col, etq in estilos:
+                pts = lm.get(key) or []
+                if not pts:
+                    continue
+                Tl = [_u.t_desde_R(t) for _, t in pts]
+                Pl = [_u.p_desde_psia(p) for p, _ in pts]
+                if self._regiones is not None:
+                    ax.plot(Tl, Pl, linestyle='-', color=col, linewidth=0.9,
+                            label=_i18n.t(etq), zorder=5)
+                else:
+                    ax.plot(Tl, Pl, linestyle='-', linewidth=0.7, color=col,
+                            zorder=2)
+                    ax.plot(Tl, Pl, linestyle='none', marker='^', color=col,
+                            markersize=3, label=_i18n.t(etq), zorder=3)
+            crit = res.get('critico')
+            if crit is not None:
+                ax.plot([_u.t_desde_R(crit[1])], [_u.p_desde_psia(crit[0])],
+                        linestyle='none', marker='o', markersize=5,
+                        color='#c0392b', markeredgecolor='#6e1f17',
+                        markeredgewidth=0.5, label=_i18n.t('Punto crítico'),
+                        zorder=6)
+        elif es_puro_res:
             # ── Componente puro: curva de saturación + punto crítico ──
             curva = res.get('curva') or res.get('burbuja') or []
             Ts=[_u.t_desde_R(t) for _,t in curva]
@@ -1250,14 +1312,7 @@ class TabEnvolvente(QWidget):
                     ax.plot(Ta, Pa, linestyle='none', marker='^',
                             color=AGUA_COL, markersize=3,
                             label=_i18n.t('Curva de agua'))
-            p3f = res.get('puntos_3f', [])
-            if p3f:
-                T3=[_u.t_desde_R(t) for _,t in p3f]
-                P3=[_u.p_desde_psia(p) for p,_ in p3f]
-                ax.plot(T3, P3, linestyle='none', marker='o', markersize=5,
-                        color=AGUA_COL, markeredgecolor='#4a1560',
-                        markeredgewidth=0.6,
-                        label=_i18n.t('Punto trifásico'), zorder=6)
+            # (El punto trifásico ya no se resalta ni figura en la leyenda.)
 
         # Curva de formación de hidratos (verde, marcador triangular — mismo
         # estilo que rocío/burbuja).  Solo si está activada y calculada.
@@ -1479,6 +1534,13 @@ class TabEnvolvente(QWidget):
                     for p,t in (self.result.get('curva')
                                 or self.result.get('burbuja',[])):
                         f.write(f"Saturacion,{p:.4f},{t:.4f},{t-459.67:.4f}\n")
+                elif self.result.get('lm') is not None:
+                    for key, pts in self.result['lm'].items():
+                        for p,t in pts:
+                            f.write(f"{key},{p:.4f},{t:.4f},{t-459.67:.4f}\n")
+                    crit = self.result.get('critico')
+                    if crit is not None:
+                        f.write(f"Critico,{crit[0]:.4f},{crit[1]:.4f},{crit[1]-459.67:.4f}\n")
                 else:
                     for p,t in self.result.get('burbuja',[]):
                         f.write(f"Burbuja,{p:.4f},{t:.4f},{t-459.67:.4f}\n")

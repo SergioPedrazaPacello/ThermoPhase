@@ -749,11 +749,23 @@ _OM_PVT_A = np.array(OMEGA_PVT)
 def _mi_pr_arr(om):  return 0.37464 + 1.54226*om - 0.26992*om**2
 def _mi_srk_arr(om): return 0.480   + 1.574 *om - 0.176 *om**2
 
-_AI_PR_PVT  = _OA_PR *R_GAS**2*_TC_PVT_A**2/_PC_PVT_A
-_BI_PR_PVT  = _OB_PR *R_GAS*_TC_PVT_A/_PC_PVT_A
+# Constantes internas de PVTsim (validadas contra las corridas PRUEBA de PVTsim,
+# 500 psia, 300-750 °R, con y sin agua; error en fracción molar ~2e-7):
+#   • PVTsim trabaja en atm y convierte la presión del usuario con
+#     1 atm = 14.696 psia, mientras que sus Pc están en atm.  Nuestras Pc en psia
+#     se obtuvieron con 14.69594878, por lo que se re-escalan a Pc_atm·14.696.
+#   • PR : Ωa EXACTO (0.4572355289) y Ωb = 0.07780.
+#   • SRK: Ωa y Ωb EXACTOS (OMEGA_A_SRK / OMEGA_B_SRK).
+# Sin estas constantes el error del flash PR_PVT era 1.9e-5 (SRK_PVT 2.2e-6).
+PSIA_ATM_PVT = 14.696
+PSIA_ATM_STD = 14.69594878
+OMEGA_A_PR_EXACTO = 0.4572355289
+_PC_PVT_EF = _PC_PVT_A*(PSIA_ATM_PVT/PSIA_ATM_STD)   # Pc efectiva (psia) de PVTsim
+_AI_PR_PVT  = OMEGA_A_PR_EXACTO*R_GAS**2*_TC_PVT_A**2/_PC_PVT_EF
+_BI_PR_PVT  = _OB_PR *R_GAS*_TC_PVT_A/_PC_PVT_EF
 _MI_PR_PVT  = _mi_pr_arr(_OM_PVT_A)
-_AI_SRK_PVT = _OA_SRK*R_GAS**2*_TC_PVT_A**2/_PC_PVT_A
-_BI_SRK_PVT = _OB_SRK*R_GAS*_TC_PVT_A/_PC_PVT_A
+_AI_SRK_PVT = _OA_SRK*R_GAS**2*_TC_PVT_A**2/_PC_PVT_EF
+_BI_SRK_PVT = _OB_SRK*R_GAS*_TC_PVT_A/_PC_PVT_EF
 _MI_SRK_PVT = _mi_srk_arr(_OM_PVT_A)
 
 # Tablas por codigo de EOS: (AI, BI, MI, TC)
@@ -1386,9 +1398,10 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
                 x=list(z); y=[0.0]*NC; V=0.0; L=1.0; modo="liquido_unico"
 
     # ── Propiedades finales ─────────────────────────────────
-    PM_v = sum(y[i]*PM[i] for i in range(NC)) if V>0 else 0.0
-    PM_l = sum(x[i]*PM[i] for i in range(NC)) if L>0 else 0.0
-    PM_z = sum(z[i]*PM[i] for i in range(NC))
+    _PMe = crit_props(_EOS_ACTIVA)[3]      # PM de la base de la EOS activa
+    PM_v = sum(y[i]*_PMe[i] for i in range(NC)) if V>0 else 0.0
+    PM_l = sum(x[i]*_PMe[i] for i in range(NC)) if L>0 else 0.0
+    PM_z = sum(z[i]*_PMe[i] for i in range(NC))
     
     # Si el flash bifásico devolvió fases invertidas (vapor con PM mayor que líquido),
     # intercambiar etiquetas para mantener convención: vapor=fase liviana
@@ -1483,8 +1496,8 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
 
     # Viscosidad de cada fase por Lohrenz-Bray-Clark (cP).  Se evalúa con la
     # densidad másica de la fase en unidades internas (lb/ft³) y su PM.
-    mu_v = viscosidad_LBC(y, T, rho_v, PM_v) if (V > 0 and rho_v) else None
-    mu_l = viscosidad_LBC(x, T, rho_l, PM_l) if (L > 0 and rho_l) else None
+    mu_v = viscosidad_LBC(y, T, rho_v, PM_v, P) if (V > 0 and rho_v) else None
+    mu_l = viscosidad_LBC(x, T, rho_l, PM_l, P) if (L > 0 and rho_l) else None
 
     return {
         "V":V,"L":L,"Vm":Vm,"Lm":Lm,
@@ -1540,54 +1553,78 @@ def fase_pvtsim(z, T, P, Z, kij):
 
 _LBC_A = (0.10230, 0.023364, 0.058533, -0.040758, 0.0093324)
 _CM3MOL_A_FT3LBMOL = 0.0160185   # 1 cm³/mol = 0.0160185 ft³/lbmol
+# Stiel-Thodos, rama Tr ≤ 1.5.  La literatura da 34·10⁻⁵, pero PVTsim usa
+# 35·10⁻⁵: ajustando un factor por rama contra las corridas PRUEBA (PR y SRK,
+# 18 fases) sale exactamente 1.0294118 = 35/34 en la rama baja y 1.0000000 en la
+# alta; con 35·10⁻⁵ la viscosidad calza a 6e-8 (vapor) y 4e-7 (líquido).
+_ST_C_BAJA = 35.0e-5
+_R_LATM_PVT = 0.08206            # L·atm/(mol·K), constante de gases de PVTsim
 
-def _visc_gas_diluido_i(i, T_R):
-    """Viscosidad de gas diluido del componente i (cP) por Stiel-Thodos.
-    T_R en °R.  Tc en K y Pc en atm dentro de la correlación."""
-    Tc_K   = TC[i]/1.8
-    Pc_atm = PC[i]/14.696
-    xi_i   = (Tc_K**(1.0/6.0)) / (PM[i]**0.5 * Pc_atm**(2.0/3.0))
-    Tr_i   = (T_R/1.8) / Tc_K
-    if Tr_i <= 1.5:
-        return 34.0e-5 * (Tr_i**0.94) / xi_i
-    return 17.78e-5 * (4.58*Tr_i - 1.67)**(5.0/8.0) / xi_i
 
-def viscosidad_LBC(comp, T_R, rho_masa_lbft3, PM_fase):
-    """Viscosidad de una fase (cP) por Lohrenz-Bray-Clark.
+def _lbc_params(eos=None):
+    """(Tc[K], Pc[atm], PM, Vc/R [K/atm]) para LBC según la EOS.
+    PVTsim: su base (Tc, Pc en atm, PM, Vc reducido Vc/R).  HYSYS: Tc, Pc, PM
+    de HYSYS y Vc de literatura (Reid 1977) reducido con la misma R."""
+    e = eos if eos is not None else _EOS_ACTIVA
+    if es_pvtsim(e):
+        return (np.array(TC_PVT)/1.8, np.array(PC_PVT)/PSIA_ATM_STD,
+                np.array(PM_PVT), np.array(_VC_BASE))
+    return (np.array(TC)/1.8, np.array(PC)/14.696, np.array(PM),
+            np.array(VC)/(_R_LATM_PVT*1000.0))
 
-    comp            fracciones molares de la fase
-    T_R             temperatura en °R
-    rho_masa_lbft3  densidad másica de la fase en lb/ft³
-    PM_fase         peso molecular de la fase
-    """
-    if rho_masa_lbft3 is None or rho_masa_lbft3 <= 0 or PM_fase is None:
-        return None
-    z = comp
-    # Viscosidad de gas diluido por componente
-    eta_i = [(_visc_gas_diluido_i(i, T_R) if z[i] != 0 else 0.0)
-             for i in range(NC)]
-    # Mezcla de gas diluido (Herning-Zippener)
-    num = sum(z[i]*eta_i[i]*PM[i]**0.5 for i in range(NC) if z[i] != 0)
-    den = sum(z[i]*PM[i]**0.5          for i in range(NC) if z[i] != 0)
-    if den <= 0:
-        return None
-    eta_star = num/den
-    # Parámetro reductor de viscosidad ξ (Tc en K, Pc en atm)
-    s_zTc = sum(z[i]*(TC[i]/1.8)     for i in range(NC) if z[i] != 0)
-    s_zM  = sum(z[i]*PM[i]           for i in range(NC) if z[i] != 0)
-    s_zPc = sum(z[i]*(PC[i]/14.696)  for i in range(NC) if z[i] != 0)
-    xi = (s_zTc**(1.0/6.0)) / (s_zM**0.5 * s_zPc**(2.0/3.0))
-    # Densidad reducida ρ_r = ρ_molar · Vc_mezcla
-    Vc_m = sum(z[i]*VC[i]*_CM3MOL_A_FT3LBMOL for i in range(NC) if z[i] != 0)
-    rho_molar = rho_masa_lbft3/PM_fase       # lbmol/ft³
-    rho_r = rho_molar*Vc_m
-    # Polinomio LBC
+
+def lbc_mezcla(z, T_R, P, Z, Tc_K, Pc_atm, M, Vc_red):
+    """Viscosidad LBC (cP), formulación de PVTsim (Method Documentation,
+    Transport Properties).  La densidad reducida se evalúa en las unidades
+    internas de PVTsim:  ρr = ρ·Vc = (P/14.696)·Σz_i(Vc/R)_i / (Z·T[K]),
+    de modo que la constante de gases se cancela exactamente."""
+    z = np.asarray(z, dtype=float)
+    m = z != 0
+    z = z[m]; Tc_K = Tc_K[m]; Pc_atm = Pc_atm[m]; M = M[m]; Vc_red = Vc_red[m]
+    T_K = T_R/1.8
+    xi_i = Tc_K**(1.0/6.0)/(np.sqrt(M)*Pc_atm**(2.0/3.0))
+    Tr = T_K/Tc_K
+    eta = np.where(Tr <= 1.5, _ST_C_BAJA*Tr**0.94,
+                   17.78e-5*np.abs(4.58*Tr - 1.67)**0.625)/xi_i
+    sM = np.sqrt(M)
+    eta_star = float(np.sum(z*eta*sM)/np.sum(z*sM))          # Herning-Zippener
+    xi = float(np.sum(z*Tc_K)**(1.0/6.0)/(np.sum(z*M)**0.5*np.sum(z*Pc_atm)**(2.0/3.0)))
+    rho_r = (P/PSIA_ATM_PVT)*float(np.sum(z*Vc_red))/(Z*T_K)
     a1, a2, a3, a4, a5 = _LBC_A
     poly = a1 + a2*rho_r + a3*rho_r**2 + a4*rho_r**3 + a5*rho_r**4
     val = poly**4 - 1.0e-4
     if val < 0:
         val = 0.0
-    return val/xi + eta_star   # cP
+    return val/xi + eta_star
+
+
+def _visc_gas_diluido_i(i, T_R):
+    """Viscosidad de gas diluido del componente i (cP), Stiel-Thodos (PVTsim)."""
+    Tc_K, Pc_atm, M, _ = _lbc_params()
+    xi_i = (Tc_K[i]**(1.0/6.0)) / (M[i]**0.5 * Pc_atm[i]**(2.0/3.0))
+    Tr_i = (T_R/1.8) / Tc_K[i]
+    if Tr_i <= 1.5:
+        return _ST_C_BAJA * (Tr_i**0.94) / xi_i
+    return 17.78e-5 * (4.58*Tr_i - 1.67)**(5.0/8.0) / xi_i
+
+
+def viscosidad_LBC(comp, T_R, rho_masa_lbft3, PM_fase, P=None, eos=None):
+    """Viscosidad de una fase (cP) por Lohrenz-Bray-Clark (método de PVTsim).
+
+    comp            fracciones molares de la fase
+    T_R             temperatura en °R
+    rho_masa_lbft3  densidad másica de la fase en lb/ft³ (la del método de
+                    densidad elegido; PVTsim usa la de la EOS)
+    PM_fase         peso molecular de la fase
+    P               presión (psia); solo cambia la forma de evaluar ρr
+                    (si falta, se usa el Z implícito con P ficticia).
+    """
+    if rho_masa_lbft3 is None or rho_masa_lbft3 <= 0 or PM_fase is None:
+        return None
+    Tc_K, Pc_atm, M, Vc_red = _lbc_params(eos)
+    Pp = P if P is not None else 14.696
+    Z = Pp*PM_fase/(rho_masa_lbft3*R_GAS*T_R)     # Z equivalente a la densidad
+    return lbc_mezcla(comp, T_R, Pp, Z, Tc_K, Pc_atm, M, Vc_red)
 
 
 def calcular(z,T,P,kij=None,metodo_densidad='EOS'):
