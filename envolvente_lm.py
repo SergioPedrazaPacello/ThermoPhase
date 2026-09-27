@@ -275,7 +275,7 @@ def _sens(fun_spec, X, n_eq, spec_row):
 
 def _continuar(res_fun, X, spec, idx_T, idx_P, parar, dS0=0.03, dSmax=0.12,
                direccion=None, max_pts=5000, forzar_spec=None, idx_crit=None,
-               umbral_crit=0.12):
+               umbral_crit=0.04):
     """Continuación genérica de Michelsen.  res_fun(X, spec, Sv) → residuo;
     parar(X, pts) → True para terminar.  Devuelve lista de X convergidos.
 
@@ -480,6 +480,30 @@ def _buscar_interna(S, eos, dew_pts_PT, P0, T_min):
             T_prev, r_prev, nf_prev = T, r, nf
     return None
 
+
+def _aterrizar(S, pts, jb):
+    """Si la línea trifásica terminó con β fuera de [0, 1] (salió de la
+    región), reemplaza el último punto por la solución EXACTA con β en el
+    límite, partiendo del penúltimo punto válido."""
+    reales = [q for q in pts if not np.isnan(q[0])]
+    if len(reales) < 3:
+        return pts
+    b = reales[-1][jb]
+    if -1e-9 <= b <= 1.0 + 1e-9:
+        return pts
+    lim = 0.0 if b < 0 else 1.0
+    Xa = reales[-2]
+    t = reales[-1] - Xa
+    if t[jb] != 0:
+        Xp = Xa + t*(lim - Xa[jb])/t[jb]
+    else:
+        Xp = Xa
+    Xs, _ = _newton(lambda XX: _res_3l(S, XX, jb, lim), Xp, maxit=40)
+    out = pts[:-1]
+    if Xs is not None:
+        out.append(Xs)
+    return out
+
 # ════════════════════════════════════════════════════════════════════════════
 # API principal
 # ════════════════════════════════════════════════════════════════════════════
@@ -582,9 +606,13 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
     # ── líneas trifásicas desde cada punto trifásico ─────────────────────────
     j2T, j2P, jb = 2*n, 2*n+1, 2*n+2
     lin3 = []
-    for X3s, tw, tx in trif:
+    llegadas = set()          # (índice de punto trifásico, tipo) ya alcanzados
+    TP3 = [(X3s[2*n], X3s[2*n+1]) for X3s, _, _ in trif]
+    for itp, (X3s, tw, tx) in enumerate(trif):
         lKw = X3s[:n]; lKx = X3s[n:2*n]
         for incip in ('aq', 'hc'):
+            if (itp, incip) in llegadas:
+                continue      # esa línea ya se trazó llegando desde otro punto
             # w = incipiente (del tipo incip); y = z (β=1); x = la otra incipiente
             if incip == tw:
                 lw, lx_ = lKw, lKx
@@ -601,6 +629,14 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
             pts = _continuar(lambda XX, sp, Sv: _res_3l(S, XX, sp, Sv), X, jb,
                              j2T, j2P, parar3, forzar_spec=(jb, -1.0),
                              idx_crit=np.arange(n) if incip == 'hc' else None)
+            pts = _aterrizar(S, pts, jb)
+            # ¿terminó en OTRO punto trifásico?  (paper: "the tracing of the
+            # three-phase line is terminated if computations return to a
+            # three-phase point")  → no volver a trazarla desde ese punto.
+            ult = pts[-1]
+            for jtp, (lT, lP) in enumerate(TP3):
+                if jtp != itp and abs(ult[j2T]-lT) < 5e-3 and abs(ult[j2P]-lP) < 2e-2:
+                    llegadas.add((jtp, incip))
             lin3.append((incip, pts))
             out.setdefault('_raw', []).append((incip, pts))
 
@@ -642,9 +678,10 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
     # ── salida en (P, T) + punto crítico en 3-HC (cambio de signo de lnKy) ──
     out['_S'] = S
     out['_raw_dew'] = lineas_dew
+    seg = {'2-HC': [], '2-Aq': [], '3-Aq': [], '3-HC': []}
     for tipo, pts in lineas_dew:
         key = '2-HC' if tipo == 'hc' else '2-Aq'
-        out[key] += [(float(np.exp(p[iP])), float(np.exp(p[iT]))) for p in pts]
+        seg[key].append([(float(np.exp(p[iP])), float(np.exp(p[iT]))) for p in pts])
     for X3s, tw, tx in trif:
         out['trifasicos'].append((float(np.exp(X3s[2*n+1])), float(np.exp(X3s[2*n]))))
     for incip, pts in lin3:
@@ -657,7 +694,8 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
             if P < Pmin or T < T_min:
                 continue
             good.append((P, T, p))
-        out[key] += [(P, T) for P, T, _ in good]
+        if len(good) >= 2:
+            seg[key].append([(P, T) for P, T, _ in good])
         if incip == 'hc' and crit_at is not None and 0 < crit_at < len(good):
             # crítico: lnK_dominante = 0; P y T por ajuste cúbico en ese lnK con
             # los dos puntos a cada lado del cruce.
@@ -669,21 +707,26 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
             Pc = float(np.exp(np.polyval(np.polyfit(sv, [np.log(q[0]) for q in sel], deg), 0.0)))
             Tc = float(np.exp(np.polyval(np.polyfit(sv, [np.log(q[1]) for q in sel], deg), 0.0)))
             out['critico'].append((Pc, Tc))
-    # límite superior de presión (≈ PVTsim): 1.05 × máxima presión de las
-    # líneas trifásicas/rocío HC; recorta 2-Aq por encima.
-    Ps = [p for k in ('2-HC', '3-Aq', '3-HC') for p, _ in out[k]]
+    # límite superior de presión de la 2-Aq (presentación): 1.05 × la mayor
+    # presión de las líneas HC/trifásicas.  PVTsim la corta tras su primer
+    # paso que supera la cricondenbárica.
+    Ps = [p for k in ('2-HC', '3-Aq', '3-HC') for sg in seg[k] for p, _ in sg]
     if P_max is None and Ps:
         P_max = 1.05*max(Ps)
     if P_max is not None:
-        L2 = out['2-Aq']
-        cort = [(P, T) for P, T in L2 if P <= P_max]
-        # último tramo: interpolar exactamente en P_max
-        for a in range(1, len(L2)):
-            if L2[a-1][0] <= P_max < L2[a][0]:
-                f = (P_max - L2[a-1][0])/(L2[a][0] - L2[a-1][0])
-                cort.append((P_max, L2[a-1][1] + f*(L2[a][1] - L2[a-1][1])))
-                break
-        out['2-Aq'] = cort
-    for k in ('2-HC', '2-Aq', '3-Aq', '3-HC'):
-        out[k] = _adelgazar(out[k])
+        nuevos = []
+        for L2 in seg['2-Aq']:
+            cort = [(P, T) for P, T in L2 if P <= P_max]
+            for a in range(1, len(L2)):
+                if L2[a-1][0] <= P_max < L2[a][0]:
+                    f = (P_max - L2[a-1][0])/(L2[a][0] - L2[a-1][0])
+                    cort.append((P_max, L2[a-1][1] + f*(L2[a][1] - L2[a-1][1])))
+                    break
+            if len(cort) >= 2:
+                nuevos.append(cort)
+        seg['2-Aq'] = nuevos
+    for k in seg:
+        seg[k] = [_adelgazar(sg) for sg in seg[k]]
+        out[k] = [pt for sg in seg[k] for pt in sg]       # lista plana (compat.)
+    out['segmentos'] = seg
     return out

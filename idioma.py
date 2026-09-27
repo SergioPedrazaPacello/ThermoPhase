@@ -330,6 +330,14 @@ TRAD = {
     "Punto crítico": "Critical point", "Punto critico": "Critical point",
     "Curva de saturación": "Saturation curve",
     "Curva de saturacion": "Saturation curve",
+    "Curvas de Isocalidad no disponibles para mezclas con agua.":
+        "Quality lines are not available for mixtures with water.",
+    "Mapa de densidad no disponible para mezclas con agua.":
+        "Density map is not available for mixtures with water.",
+    "Rocío HC (2-HC)": "HC dew (2-HC)",
+    "Límite 3 fases HC (3-HC)": "HC 3-phase boundary (3-HC)",
+    "Aparición de agua (3-Aq)": "Water appearance (3-Aq)",
+    "Rocío de agua (2-Aq)": "Water dew (2-Aq)",
     "Las curvas de isocalidad no están disponibles en "
     "componentes puros.":
         "Quality lines are not available for pure components.",

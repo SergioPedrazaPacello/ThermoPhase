@@ -149,7 +149,9 @@ class EnvWorker(QThread):
         eos_code = self.eos_code or _e.get_eos()
         r = _lm.envolvente_agua(self.z_full, eos_code, 'hv')
         crit = r['critico'][0] if r.get('critico') else None
-        res = {'lm': {k: r.get(k, []) for k in ('2-HC', '2-Aq', '3-Aq', '3-HC')},
+        segs = r.get('segmentos') or {k: [r.get(k, [])] for k in ('2-HC', '2-Aq', '3-Aq', '3-HC')}
+        res = {'lm': {k: [sg for sg in segs.get(k, []) if sg]
+                      for k in ('2-HC', '2-Aq', '3-Aq', '3-HC')},
                'burbuja': list(r.get('3-HC', [])),
                'rocio': list(r.get('2-HC', [])),
                'critico': crit,
@@ -793,9 +795,7 @@ class TabEnvolvente(QWidget):
             # Con agua activa PVTsim traza solo las fronteras de fase (método
             # Lindeloff-Michelsen) y no líneas de isocalidad.
             dialogos.advertencia(self,
-                "Con el agua activada no se trazan líneas de isocalidad "
-                "(igual que PVTsim): la envolvente muestra solo las fronteras "
-                "de fase.")
+                "Curvas de Isocalidad no disponibles para mezclas con agua.")
             return
         if abs(sum(self.get_z())-1.0)>1e-3:
             dialogos.advertencia(self,
@@ -880,6 +880,15 @@ class TabEnvolvente(QWidget):
             self._regiones = None
             if self.result is not None:
                 self._plot(self.result)
+            return
+        # Con agua activa el mapa de densidad no está habilitado.
+        zz = list(self.get_z())
+        if len(zz) > 13 and zz[13] > 1e-12:
+            dialogos.advertencia(self,
+                "Mapa de densidad no disponible para mezclas con agua.")
+            self.chk_reg.blockSignals(True)
+            self.chk_reg.setChecked(False)
+            self.chk_reg.blockSignals(False)
             return
         # Lanzar cálculo (envelope + mapa) con la composición actual
         if abs(sum(self.get_z())-1.0) > 1e-3:
@@ -1216,25 +1225,32 @@ class TabEnvolvente(QWidget):
                 ('2-Aq', '#e67e22', 'Rocío de agua (2-Aq)'),
             ]
             for key, col, etq in estilos:
-                pts = lm.get(key) or []
-                if not pts:
-                    continue
-                Tl = [_u.t_desde_R(t) for _, t in pts]
-                Pl = [_u.p_desde_psia(p) for p, _ in pts]
-                if self._regiones is not None:
-                    ax.plot(Tl, Pl, linestyle='-', color=col, linewidth=0.9,
-                            label=_i18n.t(etq), zorder=5)
-                else:
-                    ax.plot(Tl, Pl, linestyle='-', linewidth=0.7, color=col,
-                            zorder=2)
-                    ax.plot(Tl, Pl, linestyle='none', marker='^', color=col,
-                            markersize=3, label=_i18n.t(etq), zorder=3)
+                # cada línea puede tener VARIOS tramos (p. ej. dos puntos
+                # trifásicos): se dibujan por separado para no unirlos con una
+                # recta; la leyenda se pone una sola vez por tipo.
+                primero = True
+                for pts in (lm.get(key) or []):
+                    if not pts:
+                        continue
+                    Tl = [_u.t_desde_R(t) for _, t in pts]
+                    Pl = [_u.p_desde_psia(p) for p, _ in pts]
+                    lab = _i18n.t(etq) if primero else None
+                    primero = False
+                    if self._regiones is not None:
+                        ax.plot(Tl, Pl, linestyle='-', color=col, linewidth=0.9,
+                                label=lab, zorder=5)
+                    else:
+                        ax.plot(Tl, Pl, linestyle='-', linewidth=0.7, color=col,
+                                zorder=2)
+                        ax.plot(Tl, Pl, linestyle='none', marker='^', color=col,
+                                markersize=3, label=lab, zorder=3)
             crit = res.get('critico')
             if crit is not None:
+                # mismo marcador (triángulo, mismo tamaño) que las curvas; color
+                # propio, distinto de rocío/burbuja/agua/hidratos
                 ax.plot([_u.t_desde_R(crit[1])], [_u.p_desde_psia(crit[0])],
-                        linestyle='none', marker='o', markersize=5,
-                        color='#c0392b', markeredgecolor='#6e1f17',
-                        markeredgewidth=0.5, label=_i18n.t('Punto crítico'),
+                        linestyle='none', marker='^', markersize=3,
+                        color='#000000', label=_i18n.t('Punto crítico'),
                         zorder=6)
         elif es_puro_res:
             # ── Componente puro: curva de saturación + punto crítico ──
@@ -1535,9 +1551,11 @@ class TabEnvolvente(QWidget):
                                 or self.result.get('burbuja',[])):
                         f.write(f"Saturacion,{p:.4f},{t:.4f},{t-459.67:.4f}\n")
                 elif self.result.get('lm') is not None:
-                    for key, pts in self.result['lm'].items():
-                        for p,t in pts:
-                            f.write(f"{key},{p:.4f},{t:.4f},{t-459.67:.4f}\n")
+                    for key, segs in self.result['lm'].items():
+                        for isg, pts in enumerate(segs, 1):
+                            etq = key if len(segs) == 1 else f"{key} ({isg})"
+                            for p,t in pts:
+                                f.write(f"{etq},{p:.4f},{t:.4f},{t-459.67:.4f}\n")
                     crit = self.result.get('critico')
                     if crit is not None:
                         f.write(f"Critico,{crit[0]:.4f},{crit[1]:.4f},{crit[1]-459.67:.4f}\n")
