@@ -35,6 +35,61 @@ from pestana_saturacion import (
 )
 
 
+def _py(o):
+    """numpy → tipos nativos (para emitir por señal y guardar la simulación)."""
+    import numpy as _np
+    if isinstance(o, dict):
+        return {k: _py(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_py(v) for v in o]
+    if isinstance(o, _np.ndarray):
+        return [_py(v) for v in o.tolist()]
+    if isinstance(o, _np.generic):
+        return o.item()
+    return o
+
+
+def _resultado_agua(pt, z_full, eos_nombre):
+    """Flash trifásico (HV) y propiedades por fase en el punto de hidrato."""
+    import numpy as _np
+    import eos as _e
+    import flash_agua as _fa
+    import propiedades_agua as _pa
+    eos_nombre = eos_nombre or _e.get_eos()
+    T, P = pt['T_R'], pt['P_psia']
+    z = _np.asarray(z_full, dtype=float); z = z/z.sum()
+    rt = _fa.flash_trifasico(z, T, P, eos=eos_nombre, metodo='hv')
+    pr = _pa.propiedades_fases(rt, T, P, eos_nombre, metodo_densidad='COSTALD')
+    pV, pL, pW = pr.get('V', {}) or {}, pr.get('L', {}) or {}, pr.get('W', {}) or {}
+    bV = rt.get('beta_V', 0.0) or 0.0; bL = rt.get('beta_L', 0.0) or 0.0
+    bW = rt.get('beta_W', 0.0) or 0.0
+    zero = [0.0]*14
+    y = list(rt['y']) if (bV > 1e-12 and rt.get('y') is not None) else zero
+    x = list(rt['x']) if (bL > 1e-12 and rt.get('x') is not None) else zero
+    w = list(rt['w']) if (bW > 1e-12 and rt.get('w') is not None) else None
+    # densidad de mezcla: 1/Σ(fracción másica/densidad) sobre las fases presentes
+    PMz = sum(b*(q.get('PM') or 0.0) for b, q in ((bV, pV), (bL, pL), (bW, pW)))
+    inv = 0.0
+    for b, q in ((bV, pV), (bL, pL), (bW, pW)):
+        if b > 1e-12 and q.get('rho') and q.get('PM'):
+            inv += b*q['PM']/PMz/q['rho']
+    props = {'PM_v': pV.get('PM'), 'PM_l': pL.get('PM'),
+             'ZV': pV.get('Z'), 'ZL': pL.get('Z'),
+             'rho_v': pV.get('rho'), 'rho_l': pL.get('rho'),
+             'sg_v': pV.get('sg'), 'sg_l': pL.get('sg'),
+             'H_v': pV.get('H'), 'H_l': pL.get('H'),
+             'S_v': pV.get('S'), 'S_l': pL.get('S'),
+             'mu_v': pV.get('mu'), 'mu_l': pL.get('mu'),
+             'PM_z': PMz, 'rho_z': (1.0/inv) if inv > 0 else None}
+    pt = dict(pt)
+    pt['flash'] = {'x': x, 'y': y, 'z': list(z), 'bV': bV, 'bL': bL, 'bW': bW}
+    pt['props'] = props
+    pt['agua'] = True
+    pt['w'] = w
+    pt['props_w'] = pW
+    return _py(pt)
+
+
 class HidratoWorker(QThread):
     """Calcula un punto de la curva de hidratos + el flash en ese punto."""
     done  = pyqtSignal(dict)
@@ -57,6 +112,11 @@ class HidratoWorker(QThread):
                                     z_full=self.z_full)
             if pt is None:
                 self.done.emit({})
+                return
+            if self.z_full is not None:
+                # Con agua: flash multifásico (HV) sobre la composición total en
+                # el punto de hidrato — vapor, líquido HC y fase acuosa.
+                self.done.emit(_resultado_agua(pt, self.z_full, self.eos_nombre))
                 return
             # Flash en el punto de hidrato: composición de fases HC.
             flash = _eng2.calcular(self.z, pt['T_R'], pt['P_psia'], self.kij)
@@ -460,7 +520,11 @@ class TabHidratos(QWidget):
                 "No se encontró punto de formación de hidrato en el rango."))
             return
         self.last_result = res
-        self._render(res)
+        try:
+            self._render(res)
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            dialogos.error(self, str(e))
 
     # ══════════════════════════════════════════════════════════
     def aplicar_unidades(self, old):
@@ -505,11 +569,20 @@ class TabHidratos(QWidget):
 
         # ── Composición: Mezcla (col1) | Vapor (col2) | Líquido (col3) ──
         flash = res.get('flash', {}) or {}
+        agua_res = bool(res.get('agua'))
         x = flash.get('x', [0]*NC); y = flash.get('y', [0]*NC)
-        z = flash.get('z') or self.get_z()
-        V = flash.get('V', None)
-        hay_vap = (V is None) or (V > 1e-9)
-        hay_liq = (V is None) or (V < 1.0 - 1e-9)
+        z = flash.get('z')
+        if not z:
+            zz = self.get_z(); s13 = sum(zz[:NC]) or 1.0
+            z = [v/s13 for v in zz[:NC]]
+        if agua_res:
+            hay_vap = (flash.get('bV') or 0.0) > 1e-12
+            hay_liq = (flash.get('bL') or 0.0) > 1e-12
+        else:
+            V = flash.get('V', None)
+            hay_vap = (V is None) or (V > 1e-9)
+            hay_liq = (V is None) or (V < 1.0 - 1e-9)
+        nfil = NC + 1 if (agua_res and len(z) > NC) else NC
         sx = sum(x); sy = sum(y); sz = sum(z)
         VAC = QColor(GRAY_RES)   # celda sombreada (fase ausente / sin valor)
         BLN = QColor(WHITE)
@@ -521,7 +594,11 @@ class TabHidratos(QWidget):
             else:
                 cell.setText(""); cell.setBackground(QBrush(VAC))
 
-        for i in range(NC):
+        if nfil == NC:
+            for c in (1, 2, 3):
+                it = self.tbl.item(NC, c)
+                if it is not None: it.setText("")
+        for i in range(nfil):
             _set(self.tbl.item(i,1), f"{z[i]:.4f}", sz > 0)
             _set(self.tbl.item(i,2), f"{y[i]:.4f}", hay_vap)
             _set(self.tbl.item(i,3), f"{x[i]:.4f}", hay_liq)
@@ -535,17 +612,28 @@ class TabHidratos(QWidget):
         import eos as _eng
         p = res.get('props', {}) or {}
         import poder_calorifico as _pc
-        _pc_v = _pc.poder_calorifico_fase(y, p.get('PM_v')) if hay_vap else {}
-        _pc_l = _pc.poder_calorifico_fase(x, p.get('PM_l')) if hay_liq else {}
-        _pc_z = _pc.poder_calorifico_fase(z, None) if sz > 0 else {}
-        _gpm_v = _pc.gpm_c3(y) if hay_vap else None
-        _gpm_z = _pc.gpm_c3(z) if sz > 0 else None
-        _pm_z = sum(z[i]*_eng.PM[i] for i in range(NC)) if sz > 0 else None
+        # Poder calorífico y GPM sobre la base HC (13 comp. renormalizados).
+        def _hc(c):
+            c13 = list(c[:NC]); s_ = sum(c13)
+            return [v/s_ for v in c13] if s_ > 0 else c13
+        def _pm13(c): return sum(c[i]*_eng.PM[i] for i in range(NC))
+        y13 = _hc(y); x13 = _hc(x); z13 = _hc(z)
+        _pc_v = (_pc.poder_calorifico_fase(y13, _pm13(y13) if agua_res else p.get('PM_v'))
+                 if hay_vap else {})
+        _pc_l = (_pc.poder_calorifico_fase(x13, _pm13(x13) if agua_res else p.get('PM_l'))
+                 if hay_liq else {})
+        _pc_z = _pc.poder_calorifico_fase(z13, None) if sz > 0 else {}
+        _gpm_v = _pc.gpm_c3(y13) if hay_vap else None
+        _gpm_z = _pc.gpm_c3(z13) if (sz > 0 and not agua_res) else None
+        _pm_z = (p.get('PM_z') if agua_res else
+                 (sum(z[i]*_eng.PM[i] for i in range(NC)) if sz > 0 else None))
         # Densidad de mezcla por regla de volúmenes de las fases presentes.
         _rho_z = None
         rho_v = p.get('rho_v'); rho_l = p.get('rho_l')
         Vm = flash.get('Vm'); Lm = flash.get('Lm')
-        if hay_vap and hay_liq and rho_v and rho_l and Vm is not None and Lm is not None:
+        if agua_res:
+            _rho_z = p.get('rho_z')
+        elif hay_vap and hay_liq and rho_v and rho_l and Vm is not None and Lm is not None:
             inv = (Vm/rho_v if rho_v>0 else 0)+(Lm/rho_l if rho_l>0 else 0)
             if inv>0: _rho_z = 1.0/inv
         elif hay_liq and rho_l:
@@ -598,8 +686,57 @@ class TabHidratos(QWidget):
                     cell.setText("")
                     cell.setBackground(QBrush(VAC))
 
-        # ── Fase Acuosa (col 4): flash trifásico en el punto (T,P) ──
-        self._render_acuosa(T, P)
+        # ── Fase Acuosa (col 4) ──
+        if agua_res:
+            self._render_acuosa_res(res)
+        else:
+            self._render_acuosa(T, P)
+
+    def _render_acuosa_res(self, res):
+        """Columna de Fase Acuosa desde el propio resultado (flash con agua)."""
+        if self.tbl.isColumnHidden(4):
+            return
+        w = res.get('w'); pW = res.get('props_w') or {}
+        if not w:
+            self._limpiar_acuosa(); return
+        WHT = QColor(WHITE); GR = QColor(GRAY_RES)
+        sw = 0.0
+        for i in range(NC + 1):
+            it = self.tbl.item(i, 4)
+            if it is None:
+                continue
+            val = float(w[i]) if i < len(w) else None
+            if val is not None:
+                it.setText(f"{val:.4f}")
+                it.setBackground(QBrush(WHT)); it.setForeground(QBrush(QColor(TEXT_RES)))
+                sw += val
+            else:
+                it.setText(""); it.setBackground(QBrush(GR))
+        it_s = self.tbl.item(NC + 1, 4)
+        if it_s is not None:
+            it_s.setText(f"{sw:.4f}"); it_s.setBackground(QBrush(WHT)); it_s.setForeground(QBrush(QColor(TEXT_RES)))
+            it_s.setForeground(QBrush(QColor(TEXT_RES)))
+        _mapa = {
+            'pm':        pW.get('PM'),
+            'z':         pW.get('Z'),
+            'densidad':  _u.dens_desde(pW.get('rho')) if pW.get('rho') is not None else None,
+            'sg':        pW.get('sg'),
+            'entalpia':  _u.H_desde(pW.get('H')) if pW.get('H') is not None else None,
+            'entropia':  _u.S_desde(pW.get('S')) if pW.get('S') is not None else None,
+            'viscosidad':pW.get('mu'),
+        }
+        sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
+        for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
+            cell = self.tbl_prop.item(r, 4)
+            if cell is None:
+                continue
+            vw = _mapa.get(key)
+            if vw is not None:
+                cell.setText(f"{{:.{dec}f}}".format(vw))
+                cell.setForeground(QBrush(QColor(TEXT_RES)))
+                cell.setBackground(QBrush(WHT))
+            else:
+                cell.setText(""); cell.setBackground(QBrush(GR))
 
     # ══════════════════════════════════════════════════════════
     def _limpiar_acuosa(self):
@@ -656,7 +793,7 @@ class TabHidratos(QWidget):
                 it.setText(""); it.setBackground(QBrush(GR))
         it_s = self.tbl.item(NC + 1, 4)
         if it_s is not None:
-            it_s.setText(f"{sw:.4f}"); it_s.setBackground(QBrush(WHT))
+            it_s.setText(f"{sw:.4f}"); it_s.setBackground(QBrush(WHT)); it_s.setForeground(QBrush(QColor(TEXT_RES)))
 
         _mapa = {
             'pm':        pW.get('PM'),

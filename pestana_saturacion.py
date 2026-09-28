@@ -836,6 +836,7 @@ class TabSaturacion(QWidget):
         self.tbl.item(NC+1,3).setText(f"{sx:.4f}")
         for c in (1,2,3):
             self.tbl.item(NC+1,c).setBackground(QBrush(WHT))
+            self.tbl.item(NC+1,c).setForeground(QBrush(QColor(TEXT_RES)))
 
         # ── Fase Acuosa (col 4): flash trifásico en el punto (T,P) ──
         # Solo cuando el agua está activa. Si el flash falla o beta_W≈0, se
@@ -937,7 +938,7 @@ class TabSaturacion(QWidget):
                 it.setText(""); it.setBackground(QBrush(GR))
         it_s = self.tbl.item(NC + 1, 4)
         if it_s is not None:
-            it_s.setText(f"{sw:.4f}"); it_s.setBackground(QBrush(WHT))
+            it_s.setText(f"{sw:.4f}"); it_s.setBackground(QBrush(WHT)); it_s.setForeground(QBrush(QColor(TEXT_RES)))
         _mapa = {
             'pm':        pW.get('PM'),
             'z':         pW.get('Z'),
@@ -1017,7 +1018,7 @@ class TabSaturacion(QWidget):
         # Sumatoria (fila NC+1)
         it_s = self.tbl.item(NC + 1, 4)
         if it_s is not None:
-            it_s.setText(f"{sw:.4f}"); it_s.setBackground(QBrush(WHT))
+            it_s.setText(f"{sw:.4f}"); it_s.setBackground(QBrush(WHT)); it_s.setForeground(QBrush(QColor(TEXT_RES)))
 
         # ── Propiedades de la fase acuosa (col 4 de tbl_prop) ──
         # Mapa clave del catálogo -> valor de la fase acuosa (con conversión de
