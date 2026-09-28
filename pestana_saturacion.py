@@ -174,11 +174,31 @@ class SatWorker(QThread):
             import eos as _eng
             if self.eos:
                 _eng.set_eos(self.eos)      # los puntos de saturacion obedecen la EOS elegida
-            from envolvente import punto_saturacion
-            res = punto_saturacion(self.tipo, self.valor, self.z, self.kij)
-            self.done.emit(res if res else {})
+            import saturacion as _sat
+            res = _sat.punto_saturacion(self.tipo, self.valor, self.z,
+                                        self.kij, eos=self.eos)
+            self.done.emit(_py(res) if res else {})
         except Exception as e:
             self.error.emit(str(e))
+
+
+def _py(o):
+    """Convierte el resultado a tipos nativos de Python (numpy → float/list),
+    para emitirlo por la señal y guardarlo en la simulación sin errores."""
+    try:
+        import numpy as _np
+    except Exception:
+        _np = None
+    if isinstance(o, dict):
+        return {k: _py(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_py(v) for v in o]
+    if _np is not None:
+        if isinstance(o, _np.ndarray):
+            return [_py(v) for v in o.tolist()]
+        if isinstance(o, _np.generic):
+            return o.item()
+    return o
 
 
 class TabSaturacion(QWidget):
@@ -693,11 +713,20 @@ class TabSaturacion(QWidget):
                 "La suma de fracciones debe ser 1.0")
             return
         # Los puntos de saturación (rocío/burbuja) se refieren SIEMPRE a la
-        # envolvente HIDROCARBURO: se usa la mezcla de 13 comp. renormalizada
-        # sin agua (la curva del agua no entra en el punto de saturación).
-        z13 = list(zf[:13]); s13 = sum(z13)
-        if s13 > 0: z13 = [v/s13 for v in z13]
-        z = z13
+        # región bifásica HIDROCARBURO.  Sin agua: mezcla de 13 comp.  Con
+        # agua activa (> 0): composición TOTAL de 14 comp.; el punto es el de
+        # aparición/desaparición de la fase HC (no el rocío del agua).
+        z13 = list(zf[:NC]); s13 = sum(z13)
+        if s13 <= 0:
+            dialogos.advertencia(self,
+                "La mezcla no contiene hidrocarburos.")
+            return
+        agua = (len(zf) > NC and not self.tbl.isRowHidden(NC)
+                and zf[NC] > 1e-12)
+        if agua:
+            st = sum(zf[:NC+1]); z = [v/st for v in zf[:NC+1]]
+        else:
+            z = [v/s13 for v in z13]
         kij=self.get_kij()
         tipo, unidad, etiqueta, res_unit = self.TIPOS[self._tipo_es()]
         valor=self.sp_cond.value()
@@ -757,7 +786,11 @@ class TabSaturacion(QWidget):
             dialogos.advertencia(self, _i18n.t("No se encontro punto de saturacion"))
             return
         self.last_result = res
-        self._render(res)
+        try:
+            self._render(res)
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            dialogos.error(self, str(e))
 
     def _render(self, res):
         """Muestra el resultado en pantalla. Se llama tanto desde el worker
@@ -778,10 +811,19 @@ class TabSaturacion(QWidget):
 
         # ── Composición: Mezcla (col1) | Vapor (col2) | Líquido (col3) ──
         x=res.get('x',[0]*NC); y=res.get('y',[0]*NC)
-        z=res.get('z') or self.get_z()
+        z=res.get('z')
+        if not z:
+            zz=self.get_z(); s13=sum(zz[:NC]) or 1.0
+            z=[v/s13 for v in zz[:NC]]
+        agua_res = bool(res.get('agua')) and len(z) > NC
+        nfil = NC+1 if agua_res else NC
         sx=sum(x); sy=sum(y); sz=sum(z)
         WHT=QColor(WHITE)
-        for i in range(NC):
+        if not agua_res:
+            for c in (1,2,3):
+                it=self.tbl.item(NC,c)
+                if it is not None: it.setText("")
+        for i in range(nfil):
             self.tbl.item(i,1).setText(f"{z[i]:.4f}")
             self.tbl.item(i,2).setText(f"{y[i]:.4f}")
             self.tbl.item(i,3).setText(f"{x[i]:.4f}")
@@ -798,27 +840,42 @@ class TabSaturacion(QWidget):
         # ── Fase Acuosa (col 4): flash trifásico en el punto (T,P) ──
         # Solo cuando el agua está activa. Si el flash falla o beta_W≈0, se
         # deja la columna vacía. NO altera las columnas Mezcla/Vapor/Líquido.
-        self._render_acuosa(T, P)
+        if agua_res:
+            self._render_acuosa_res(res)
+        else:
+            self._render_acuosa(T, P)
 
         # ── Propiedades: Mezcla | Vapor | Líquido ──
-        p=res.get('props',{})
+        p=res.get('props',{}) or {}
         import poder_calorifico as _pc
         import eos as _eng
-        _pc_v = _pc.poder_calorifico_fase(y, p.get('PM_v'))
-        _pc_l = _pc.poder_calorifico_fase(x, p.get('PM_l'))
-        _pc_z = _pc.poder_calorifico_fase(z, None) if sz > 0 else {}
-        _gpm_v = _pc.gpm_c3(y)
-        _gpm_z = _pc.gpm_c3(z) if sz > 0 else None
+        # Poder calorífico y GPM sobre la base HC (13 comp. renormalizados):
+        # el agua es inerte a la combustión (igual que el flash trifásico).
+        def _hc(c):
+            c13=list(c[:NC]); s_=sum(c13)
+            return [v/s_ for v in c13] if s_ > 0 else c13
+        y13=_hc(y); x13=_hc(x); z13=_hc(z)
+        def _pm13(c): return sum(c[i]*_eng.PM[i] for i in range(NC))
+        _pc_v = _pc.poder_calorifico_fase(y13, _pm13(y13) if agua_res else p.get('PM_v'))
+        _pc_l = _pc.poder_calorifico_fase(x13, _pm13(x13) if agua_res else p.get('PM_l'))
+        _pc_z = _pc.poder_calorifico_fase(z13, None) if sz > 0 else {}
+        _gpm_v = _pc.gpm_c3(y13)
+        _gpm_z = _pc.gpm_c3(z13) if sz > 0 else None
         # Peso molecular de la mezcla desde la composición global.
-        _pm_z = sum(z[i]*_eng.PM[i] for i in range(NC)) if sz > 0 else None
+        _pm_z = (p.get('PM_z') if agua_res else
+                 (sum(z[i]*_eng.PM[i] for i in range(NC)) if sz > 0 else None))
         # En un punto de saturación una fase es incipiente (fracción → 0), así
         # que la mezcla coincide con la fase saturada. Densidad/SG/Z de mezcla =
-        # los de esa fase (rocío → vapor; burbuja → líquido).
+        # los de esa fase (rocío → vapor; burbuja → líquido).  Con agua la
+        # mezcla incluye la fase acuosa: densidad por fracciones másicas; SG,
+        # Z y GPM de mezcla quedan en blanco (como en el flash trifásico).
         tipo = self._tipo_es()
         es_rocio = 'rocio' in tipo.lower() or 'rocío' in tipo.lower()
         _rho_z = p.get('rho_v') if es_rocio else p.get('rho_l')
         _sg_z  = p.get('sg_v')  if es_rocio else p.get('sg_l')
         _z_z   = p.get('ZV')    if es_rocio else p.get('ZL')
+        if agua_res:
+            _rho_z = p.get('rho_z'); _sg_z = None; _z_z = None; _gpm_z = None
 
         def _valor_prop(kf, phase_pc, gpm_val):
             if isinstance(kf, str) and kf.startswith('PCAL:'):
@@ -856,6 +913,52 @@ class TabSaturacion(QWidget):
                 else:
                     cell.setText("")
                     cell.setBackground(QBrush(QColor(GRAY_RES)))
+
+    def _render_acuosa_res(self, res):
+        """Columna de Fase Acuosa desde el propio resultado del punto de
+        saturación (composición y propiedades de la fase acuosa en el punto)."""
+        if self.tbl.isColumnHidden(4):
+            return
+        w = res.get('w'); pW = res.get('props_w') or {}
+        if not w or not res.get('beta_W'):
+            self._limpiar_acuosa(); return
+        WHT = QColor(WHITE); GR = QColor(GRAY_RES)
+        sw = 0.0
+        for i in range(NC + 1):
+            it = self.tbl.item(i, 4)
+            if it is None:
+                continue
+            val = float(w[i]) if i < len(w) else None
+            if val is not None:
+                it.setText(f"{val:.4f}")
+                it.setBackground(QBrush(WHT)); it.setForeground(QBrush(QColor(TEXT_RES)))
+                sw += val
+            else:
+                it.setText(""); it.setBackground(QBrush(GR))
+        it_s = self.tbl.item(NC + 1, 4)
+        if it_s is not None:
+            it_s.setText(f"{sw:.4f}"); it_s.setBackground(QBrush(WHT))
+        _mapa = {
+            'pm':        pW.get('PM'),
+            'z':         pW.get('Z'),
+            'densidad':  _u.dens_desde(pW.get('rho')) if pW.get('rho') is not None else None,
+            'sg':        pW.get('sg'),
+            'entalpia':  _u.H_desde(pW.get('H')) if pW.get('H') is not None else None,
+            'entropia':  _u.S_desde(pW.get('S')) if pW.get('S') is not None else None,
+            'viscosidad':pW.get('mu'),
+        }
+        sel = [d for d in _PROP_SAT if d[0] in self._props_sel]
+        for r, (key, base, mag, dec, kv, kl, conv) in enumerate(sel):
+            cell = self.tbl_prop.item(r, 4)
+            if cell is None:
+                continue
+            vw = _mapa.get(key)
+            if vw is not None:
+                cell.setText(f"{{:.{dec}f}}".format(vw))
+                cell.setForeground(QBrush(QColor(TEXT_RES)))
+                cell.setBackground(QBrush(WHT))
+            else:
+                cell.setText(""); cell.setBackground(QBrush(GR))
 
     def _limpiar_acuosa(self):
         """Vacía la columna de Fase Acuosa (col 4) en ambas tablas."""

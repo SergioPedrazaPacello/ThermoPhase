@@ -330,6 +330,8 @@ TRAD = {
     "Punto crítico": "Critical point", "Punto critico": "Critical point",
     "Curva de saturación": "Saturation curve",
     "Curva de saturacion": "Saturation curve",
+    "La mezcla no contiene hidrocarburos.":
+        "The mixture contains no hydrocarbons.",
     "Curvas de Isocalidad no disponibles para mezclas con agua.":
         "Quality lines are not available for mixtures with water.",
     "Mapa de densidad no disponible para mezclas con agua.":

@@ -1250,7 +1250,7 @@ class TabEnvolvente(QWidget):
                 # propio, distinto de rocío/burbuja/agua/hidratos
                 ax.plot([_u.t_desde_R(crit[1])], [_u.p_desde_psia(crit[0])],
                         linestyle='none', marker='^', markersize=3,
-                        color='#000000', label=_i18n.t('Punto crítico'),
+                        color='#d4a017', label=_i18n.t('Punto crítico'),
                         zorder=6)
         elif es_puro_res:
             # ── Componente puro: curva de saturación + punto crítico ──
