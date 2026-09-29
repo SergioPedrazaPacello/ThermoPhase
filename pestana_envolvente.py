@@ -477,7 +477,7 @@ class TabEnvolvente(QWidget):
         met_lbl.setFixedHeight(16)
         vr.addWidget(met_lbl)
         self.cmb_metodo=QComboBox()
-        self.cmb_metodo.addItems(["Ziervogel-Poling","Michelsen"])
+        self.cmb_metodo.addItems(["Michelsen","Ziervogel-Poling"])
         self.cmb_metodo.setFixedHeight(24)
         _aplicar_estilo_combo(self.cmb_metodo)
         vr.addWidget(self.cmb_metodo)
@@ -665,7 +665,7 @@ class TabEnvolvente(QWidget):
             return
         z=self._z_hc()
         kij=self.get_kij()
-        metodo = 'michelsen' if self.cmb_metodo.currentIndex()==1 else 'ziervogel'
+        metodo = 'michelsen' if self.cmb_metodo.currentIndex()==0 else 'ziervogel'
         # Una nueva envolvente puede venir de una composición distinta: las
         # líneas de isocalidad calculadas antes ya no corresponden y se
         # descartan (el usuario debe recalcularlas si las sigue necesitando).
@@ -859,9 +859,9 @@ class TabEnvolvente(QWidget):
             self.btn_exp.setEnabled(True)
             # Asegurar que el selector de método refleje Michelsen, ya que
             # las líneas de isocalidad sólo están implementadas con ese motor.
-            if self.cmb_metodo.currentIndex()!=1:
+            if self.cmb_metodo.currentIndex()!=0:
                 self.cmb_metodo.blockSignals(True)
-                self.cmb_metodo.setCurrentIndex(1)
+                self.cmb_metodo.setCurrentIndex(0)
                 self.cmb_metodo.blockSignals(False)
         self._isocalidad = res.get('lineas', {})
         self._plot(self.result if self.result is not None else {'burbuja':[],'rocio':[]})

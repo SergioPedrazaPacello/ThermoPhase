@@ -330,6 +330,29 @@ TRAD = {
     "Punto crítico": "Critical point", "Punto critico": "Critical point",
     "Curva de saturación": "Saturation curve",
     "Curva de saturacion": "Saturation curve",
+    "Factor de compresibilidad (acuosa)": "Compressibility factor (aqueous)",
+    "Densidad másica (acuosa)": "Mass density (aqueous)",
+    "Fracción de líquido (molar)": "Liquid fraction (molar)",
+    "Fracción acuosa (molar)": "Aqueous fraction (molar)",
+    "Gravedad específica (acuosa)": "Specific gravity (aqueous)",
+    "Peso molecular (acuosa)": "Molecular weight (aqueous)",
+    "Viscosidad (acuosa)": "Viscosity (aqueous)",
+    "Agua en el vapor (fracción molar)": "Water in vapor (mole fraction)",
+    "Agua en el líquido (fracción molar)": "Water in liquid (mole fraction)",
+    "La propiedad seleccionada requiere agua en la mezcla.":
+        "The selected property requires water in the mixture.",
+    "Propiedades generales": "General properties",
+    "Formador de hidrato (estructuras)": "Hydrate former (structures)",
+    "Anfitrión (red del hidrato)": "Host (hydrate lattice)",
+    "Parámetros de HYSYS (EOS PR y SRK de HYSYS)": "HYSYS parameters (HYSYS PR and SRK EOS)",
+    "Parámetros de PVTsim (EOS PR y SRK de PVTsim)": "PVTsim parameters (PVTsim PR and SRK EOS)",
+    "Volumen crítico (viscosidad LBC)": "Critical volume (LBC viscosity)",
+    "Traslado de volumen de Peneloux (PR)": "Peneloux volume shift (PR)",
+    "Traslado de volumen de Peneloux (SRK)": "Peneloux volume shift (SRK)",
+    "Cp de gas ideal a 60 °F": "Ideal-gas Cp at 60 °F",
+    "Factor acéntrico": "Acentric factor",
+    "Agua [H₂O]": "Water [H₂O]",
+    "Agua [H₂O]:": "Water [H₂O]:",
     "La mezcla no contiene hidrocarburos.":
         "The mixture contains no hydrocarbons.",
     "Curvas de Isocalidad no disponibles para mezclas con agua.":
@@ -362,11 +385,11 @@ TRAD = {
     # Acerca de ThermoPhase
     "ThermoPhase 1.0\n\n"
     "Software de equilibrio de fases y propiedades termodinamicas "
-    "para mezclas de hidrocarburos (13 componentes).\n"
+    "para mezclas de hidrocarburos.\n"
     "Ecuaciones de estado: Peng-Robinson y Soave-Redlich-Kwong.":
         "ThermoPhase 1.0\n\n"
         "Phase equilibrium and thermodynamic properties software "
-        "for hydrocarbon mixtures (13 components).\n"
+        "for hydrocarbon mixtures.\n"
         "Equations of state: Peng-Robinson and Soave-Redlich-Kwong.",
     # Reportes PDF (mensaje, titulo de dialogo, nombre por defecto)
     "PDF exportado correctamente:": "PDF exported successfully:",

@@ -942,6 +942,10 @@ class TabEquilibrio(QWidget):
                 rt = _fa.flash_trifasico(_np.array(z, dtype=float),
                                          self.get_T(), self.get_P(),
                                          eos=eos_code, metodo=met)
+                # Identificación V/L de las fases HC con el mismo criterio que
+                # el motor sin agua (PVTsim/HYSYS según la EOS).
+                rt = _fa.identificar_fases_hc(rt, self.get_T(), self.get_P(),
+                                              eos_code, kij)
                 self.btn.setEnabled(True)
                 self.btn.setText(_i18n.t("Realizar Calculo"))
                 self._render_trifasico(rt, z, eos_code, kij)
@@ -1399,18 +1403,39 @@ class TabEquilibrio(QWidget):
             sy += yi_s; sx += xi_s
             tv = f"{yi_s:.4f}" if V>0 else ""
             tl = f"{xi_s:.4f}" if L>0 else ""
-            it2 = self.tbl_comp.item(i,2)
-            it3 = self.tbl_comp.item(i,3)
-            it2.setText(tv); it2.setBackground(_brush(WHITE if tv else GRAY_RES))
-            it3.setText(tl); it3.setBackground(_brush(WHITE if tl else GRAY_RES))
-        self.tbl_comp.blockSignals(False)
+            self._paint_comp(i, 2, tv)
+            self._paint_comp(i, 3, tl)
+        # Fila del agua (visible con el agua activada pero en cero): la fase
+        # presente lleva 0.0000 y la ausente queda sombreada, igual que el resto.
+        self._paint_comp(NC, 1, None)
+        self._paint_comp(NC, 2, "0.0000" if V>0 else "")
+        self._paint_comp(NC, 3, "0.0000" if L>0 else "")
+        # Fase acuosa: no existe en el cálculo bifásico → columna vacía y gris.
+        for row in range(self.tbl_comp.rowCount()):
+            if row != self.sum_row and row > NC:
+                continue
+            self._paint_comp(row, 4, "")
 
         ts2 = f"{sy:.4f}" if V>0 else ""
         ts3 = f"{sx:.4f}" if L>0 else ""
-        self.tbl_comp.item(self.sum_row,2).setText(ts2)
-        self.tbl_comp.item(self.sum_row,3).setText(ts3)
-        self.tbl_comp.item(self.sum_row,2).setBackground(_brush(WHITE if ts2 else GRAY_RES))
-        self.tbl_comp.item(self.sum_row,3).setBackground(_brush(WHITE if ts3 else GRAY_RES))
+        self._paint_comp(self.sum_row, 2, ts2)
+        self._paint_comp(self.sum_row, 3, ts3)
+        self.tbl_comp.blockSignals(False)
+
+    def _paint_comp(self, row, col, txt):
+        """Celda de resultado de la tabla de composiciones: texto azul sobre
+        blanco si hay valor; gris sin texto si no.  txt=None → no se toca
+        (celdas de entrada)."""
+        if txt is None:
+            return
+        it = self.tbl_comp.item(row, col)
+        if it is None:
+            it = cell("", bg=GRAY_RES); self.tbl_comp.setItem(row, col, it)
+        it.setText(txt)
+        if txt:
+            it.setBackground(_brush(WHITE)); it.setForeground(_brush(TEXT_RES))
+        else:
+            it.setBackground(_brush(GRAY_RES)); it.setForeground(_brush(TEXT))
 
 
 # ══════════════════════════════════════════════════════════════
@@ -2669,7 +2694,8 @@ class MainWindow(QMainWindow):
                                     get_eos_nombre=lambda: _eng.get_eos())
         self.tab_hid._on_props_resize = self._on_props_change
         self.tab_prop = TabPropiedades(get_z=self._getz_main,
-                                       get_kij=lambda: kij_user)
+                                       get_kij=lambda: kij_user,
+                                       get_metodo_densidad=self._metodo_densidad_main)
         self.tab_par  = TabParametros()
 
         # Definicion de cada calculo: clave -> (widget, titulo, icono)
@@ -3187,6 +3213,13 @@ class MainWindow(QMainWindow):
                 continue
             w.aplicar_componentes(self._comp_activos)
             self._reajustar_ventana_comp(sw, w, n)
+        # 2b) Análisis de sensibilidad: propiedades con agua sólo si está activa.
+        agua_on = _eng.IDX_AGUA in set(self._comp_activos)
+        ws = [getattr(self, 'tab_prop', None)] + [getattr(sw, '_widget', None)
+                                                  for sw in self._subventanas.values()]
+        for w in ws:
+            if w is not None and hasattr(w, 'set_agua_activa'):
+                w.set_agua_activa(agua_on)
         # 3) Recolorear los iconos de componentes del navegador.
         if hasattr(self, 'nav') and hasattr(self.nav, 'set_componentes_activos'):
             self.nav.set_componentes_activos(self._comp_activos)
@@ -3218,8 +3251,11 @@ class MainWindow(QMainWindow):
         `nombre` es el texto mostrado en el árbol (nombre completo sin ':')."""
         import componentes_ui as _cui
         idx = None
-        for i, nom in enumerate(NOMBRES):
-            if nom.rstrip(':') == nombre:
+        # 13 hidrocarburos + agua (índice 13); se compara con el nombre en
+        # ambos idiomas por si el árbol está traducido.
+        for i in range(NC + 1):
+            nom = _eng.componente_etiqueta(i).rstrip(':')
+            if nombre in (nom, _i18n.t(nom), _eng.componente_nombre(i)):
                 idx = i
                 break
         if idx is None:
@@ -3228,7 +3264,7 @@ class MainWindow(QMainWindow):
         sw = self._subventanas.get(clave)
         if sw is None:
             widget = _cui.VentanaPropComponente(idx)
-            titulo = NOMBRES[idx].rstrip(':')
+            titulo = _eng.componente_etiqueta(idx).rstrip(':')
             tam = widget.tam_ideal()
             sw = self._montar_subventana(clave, widget, titulo, tam=tam)
         self._mostrar_subventana(sw)
@@ -3340,7 +3376,10 @@ class MainWindow(QMainWindow):
             w._on_props_resize = self._on_props_change
             return w
         if clave == 'propiedades':
-            return TabPropiedades(get_z=gz, get_kij=gk)
+            w = TabPropiedades(get_z=gz, get_kij=gk,
+                               get_metodo_densidad=self._metodo_densidad_main)
+            w.set_agua_activa(_eng.IDX_AGUA in set(self._comp_activos))
+            return w
         if clave == 'parametros':
             # Parametros (kij / criticos) INDEPENDIENTES del fluido.
             return TabParametros(objetivo=fluido)
@@ -3474,7 +3513,7 @@ class MainWindow(QMainWindow):
         dialogos.info(self,
             "ThermoPhase 1.0\n\n"
             "Software de equilibrio de fases y propiedades termodinamicas "
-            "para mezclas de hidrocarburos (13 componentes).\n"
+            "para mezclas de hidrocarburos.\n"
             "Ecuaciones de estado: Peng-Robinson y Soave-Redlich-Kwong.")
 
 

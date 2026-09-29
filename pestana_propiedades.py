@@ -63,22 +63,32 @@ def _rho_mezcla(r):
 
 
 # Catálogo de propiedades:
-#  (key, etiqueta técnica, magnitud_unidad|None, requiere_HS, extractor(r,h))
+#  (key, etiqueta técnica, magnitud_unidad|None, solo_con_agua, extractor(r))
+#  El extractor lee el dict unificado de _punto() (con o sin agua).
 _PROPS_SENS = [
-    ('ZV',       'Factor de compresibilidad (vapor)',   None,   False, lambda r,h: r.get('ZV')),
-    ('ZL',       'Factor de compresibilidad (líquido)', None,   False, lambda r,h: r.get('ZL')),
-    ('rho_z',    'Densidad másica (mezcla)',            'dens', False, lambda r,h: _rho_mezcla(r)),
-    ('rho_l',    'Densidad másica (líquido)',           'dens', False, lambda r,h: r.get('rho_l')),
-    ('rho_v',    'Densidad másica (vapor)',             'dens', False, lambda r,h: r.get('rho_v')),
-    ('frac_v',   'Fracción de vapor (molar)',           None,   False, lambda r,h: r.get('V')),
-    ('sg_l',     'Gravedad específica (líquido)',       None,   False, lambda r,h: r.get('sg_l')),
-    ('sg_v',     'Gravedad específica (vapor)',         None,   False, lambda r,h: r.get('sg_v')),
-    ('PM_l',     'Peso molecular (líquido)',            None,   False, lambda r,h: r.get('PM_l')),
-    ('PM_v',     'Peso molecular (vapor)',              None,   False, lambda r,h: r.get('PM_v')),
-    ('mu_l',     'Viscosidad (líquido)',                'visc', False, lambda r,h: r.get('mu_l')),
-    ('mu_v',     'Viscosidad (vapor)',                  'visc', False, lambda r,h: r.get('mu_v')),
-    ('H_stream', 'Entalpía molar (mezcla)',             'H',    True,  lambda r,h: (h or {}).get('H_stream')),
-    ('S_stream', 'Entropía molar (mezcla)',             'S',    True,  lambda r,h: (h or {}).get('S_stream')),
+    ('ZV',       'Factor de compresibilidad (vapor)',   None,   False, lambda r: r.get('ZV')),
+    ('ZL',       'Factor de compresibilidad (líquido)', None,   False, lambda r: r.get('ZL')),
+    ('ZW',       'Factor de compresibilidad (acuosa)',  None,   True,  lambda r: r.get('ZW')),
+    ('rho_z',    'Densidad másica (mezcla)',            'dens', False, lambda r: r.get('rho_z')),
+    ('rho_l',    'Densidad másica (líquido)',           'dens', False, lambda r: r.get('rho_l')),
+    ('rho_v',    'Densidad másica (vapor)',             'dens', False, lambda r: r.get('rho_v')),
+    ('rho_w',    'Densidad másica (acuosa)',            'dens', True,  lambda r: r.get('rho_w')),
+    ('frac_v',   'Fracción de vapor (molar)',           None,   False, lambda r: r.get('V')),
+    ('frac_l',   'Fracción de líquido (molar)',         None,   False, lambda r: r.get('L')),
+    ('frac_w',   'Fracción acuosa (molar)',             None,   True,  lambda r: r.get('W')),
+    ('sg_l',     'Gravedad específica (líquido)',       None,   False, lambda r: r.get('sg_l')),
+    ('sg_v',     'Gravedad específica (vapor)',         None,   False, lambda r: r.get('sg_v')),
+    ('sg_w',     'Gravedad específica (acuosa)',        None,   True,  lambda r: r.get('sg_w')),
+    ('PM_l',     'Peso molecular (líquido)',            None,   False, lambda r: r.get('PM_l')),
+    ('PM_v',     'Peso molecular (vapor)',              None,   False, lambda r: r.get('PM_v')),
+    ('PM_w',     'Peso molecular (acuosa)',             None,   True,  lambda r: r.get('PM_w')),
+    ('mu_l',     'Viscosidad (líquido)',                'visc', False, lambda r: r.get('mu_l')),
+    ('mu_v',     'Viscosidad (vapor)',                  'visc', False, lambda r: r.get('mu_v')),
+    ('mu_w',     'Viscosidad (acuosa)',                 'visc', True,  lambda r: r.get('mu_w')),
+    ('H_stream', 'Entalpía molar (mezcla)',             'H',    False, lambda r: r.get('H_stream')),
+    ('S_stream', 'Entropía molar (mezcla)',             'S',    False, lambda r: r.get('S_stream')),
+    ('y_w',      'Agua en el vapor (fracción molar)',   None,   True,  lambda r: r.get('y_w')),
+    ('x_w',      'Agua en el líquido (fracción molar)', None,   True,  lambda r: r.get('x_w')),
 ]
 _PROPS_BY_KEY = {d[0]: d for d in _PROPS_SENS}
 
@@ -93,27 +103,81 @@ def _conv_mag(mag, v):
     return v
 
 
+def _punto(z, T, P, kij, eos, metodo_densidad, agua):
+    """Propiedades en (T, P) con el MISMO motor que la pestaña de Equilibrio:
+    sin agua → flash bifásico + H/S del motor de 13 comp. (validados contra
+    PVTsim); con agua → flash trifásico (Huron-Vidal) + propiedades por fase
+    de propiedades_agua.  Devuelve un dict unificado."""
+    import eos as eng
+    if not agua:
+        z13 = list(z[:NC]); s = sum(z13); z13 = [v/s for v in z13]
+        r = eng.calcular(z13, float(T), float(P), kij=kij,
+                         metodo_densidad=metodo_densidad)
+        out = dict(r)
+        out['rho_z'] = _rho_mezcla(r)
+        try:
+            import entalpia_entropia_gen as hs
+            h = hs.calcular_HS(z13, float(T), float(P), r, eos=eos, kij=kij)
+            out['H_stream'] = h.get('H_stream'); out['S_stream'] = h.get('S_stream')
+        except Exception:
+            pass
+        if not r.get('V'): out['ZV'] = None
+        if not r.get('L'): out['ZL'] = None
+        return out
+    import flash_agua as fa
+    import propiedades_agua as pa
+    z14 = np.asarray(z, dtype=float); z14 = z14/z14.sum()
+    rt = fa.flash_trifasico(z14, float(T), float(P), eos=eos, metodo='hv')
+    rt = fa.identificar_fases_hc(rt, float(T), float(P), eos, kij)
+    md = metodo_densidad if metodo_densidad in ('COSTALD', 'EOS') else 'EOS'
+    pr = pa.propiedades_fases(rt, float(T), float(P), eos, metodo_densidad=md)
+    bV = rt.get('beta_V', 0.0) or 0.0; bL = rt.get('beta_L', 0.0) or 0.0
+    bW = rt.get('beta_W', 0.0) or 0.0
+    out = {'V': bV, 'L': bL, 'W': bW}
+    PMt = 0.0; inv = 0.0; H = 0.0; S = 0.0; hs_ok = True
+    for b, k, suf in ((bV, 'V', 'v'), (bL, 'L', 'l'), (bW, 'W', 'w')):
+        q = pr.get(k, {}) or {}
+        if b <= 1e-12 or not q:
+            continue
+        out['Z' + k] = q.get('Z'); out['rho_' + suf] = q.get('rho')
+        out['sg_' + suf] = q.get('sg'); out['PM_' + suf] = q.get('PM')
+        out['mu_' + suf] = q.get('mu')
+        PMt += b*(q.get('PM') or 0.0)
+        if q.get('rho') and q.get('PM'):
+            inv += b*q['PM']/q['rho']
+        if q.get('H') is None or q.get('S') is None:
+            hs_ok = False
+        else:
+            H += b*q['H']; S += b*q['S']
+    out['rho_z'] = (PMt/inv) if inv > 0 else None
+    if hs_ok:
+        out['H_stream'] = H; out['S_stream'] = S
+    if bV > 1e-12 and rt.get('y') is not None:
+        out['y_w'] = float(np.asarray(rt['y'])[13])
+    if bL > 1e-12 and rt.get('x') is not None:
+        out['x_w'] = float(np.asarray(rt['x'])[13])
+    return out
+
+
 # ── Worker en segundo plano ───────────────────────────────────
 class SensWorker(QThread):
     done  = pyqtSignal(dict)
     error = pyqtSignal(str)
     progreso = pyqtSignal(int, int)
 
-    def __init__(self, z, kij, eos, prop_key, eje_x, T_vals, P_vals):
+    def __init__(self, z, kij, eos, prop_key, eje_x, T_vals, P_vals,
+                 metodo_densidad='EOS', agua=False):
         super().__init__()
         self.z=z; self.kij=kij; self.eos=eos
         self.prop_key=prop_key; self.eje_x=eje_x
         self.T_vals=T_vals; self.P_vals=P_vals   # °R y psia internos
+        self.metodo_densidad=metodo_densidad; self.agua=agua
 
     def run(self):
         try:
             import eos as eng
             eng.set_eos(self.eos)
-            necesita_hs = _PROPS_BY_KEY[self.prop_key][3]
-            extractor   = _PROPS_BY_KEY[self.prop_key][4]
-            if necesita_hs:
-                import entalpia_entropia_gen as hs
-
+            extractor = _PROPS_BY_KEY[self.prop_key][4]
             # Si el eje X es T, cada curva es una isóbara (P fijo, barrido en
             # T); si es P, cada curva es una isoterma.
             if self.eje_x == 'T':
@@ -129,15 +193,13 @@ class SensWorker(QThread):
                     T = vx if x_es_T else vf
                     P = vf if x_es_T else vx
                     try:
-                        rf = eng.calcular(self.z, float(T), float(P),
-                                          kij=self.kij, metodo_densidad='COSTALD')
-                        rh = hs.calcular_HS(self.z, float(T), float(P), rf,
-                                            eos=self.eos, kij=self.kij) if necesita_hs else None
-                        val = extractor(rf, rh)
+                        r = _punto(self.z, T, P, self.kij, self.eos,
+                                   self.metodo_densidad, self.agua)
+                        val = extractor(r)
                     except Exception:
                         val = None
                     xs.append(float(vx))
-                    ys.append(val if val is not None else np.nan)
+                    ys.append(float(val) if val is not None else np.nan)
                     hecho += 1
                     if hecho % 5 == 0 or hecho == total:
                         self.progreso.emit(hecho, total)
@@ -150,9 +212,11 @@ class SensWorker(QThread):
 
 
 class TabSensibilidad(QWidget):
-    def __init__(self, get_z, get_kij):
+    def __init__(self, get_z, get_kij, get_metodo_densidad=None):
         super().__init__()
         self.get_z=get_z; self.get_kij=get_kij
+        self.get_metodo_densidad=get_metodo_densidad
+        self._agua_on=False
         self.worker=None
         self._last=None
         self._build()
@@ -209,8 +273,7 @@ class TabSensibilidad(QWidget):
 
         vr.addWidget(sub("Propiedad:"))
         self.cmb_prop=QComboBox(); self.cmb_prop.setFixedHeight(24)
-        for key, lbl, *_ in _PROPS_SENS:
-            self.cmb_prop.addItem(_i18n.t(lbl), key)
+        self._llenar_props()
         _aplicar_estilo_combo(self.cmb_prop)
         vr.addWidget(self.cmb_prop)
 
@@ -252,6 +315,27 @@ class TabSensibilidad(QWidget):
         root.addLayout(content)
         self._retitular_rangos()
 
+    def _llenar_props(self, sel=None):
+        """Llena el desplegable: las propiedades de la fase acuosa / contenido
+        de agua sólo aparecen con el agua activada."""
+        if sel is None and self.cmb_prop.count():
+            sel = self.cmb_prop.currentData()
+        self.cmb_prop.blockSignals(True); self.cmb_prop.clear()
+        for key, lbl, mag, solo_agua, _ in _PROPS_SENS:
+            if solo_agua and not self._agua_on:
+                continue
+            self.cmb_prop.addItem(_i18n.t(lbl), key)
+        idx = self.cmb_prop.findData(sel) if sel is not None else 0
+        self.cmb_prop.setCurrentIndex(max(0, idx))
+        self.cmb_prop.blockSignals(False)
+
+    def set_agua_activa(self, on):
+        """Llamado por la ventana principal al activar/desactivar el agua."""
+        on = bool(on)
+        if on != self._agua_on:
+            self._agua_on = on
+            self._llenar_props()
+
     def _fila_rango(self, parent_lay):
         """Fila con Desde / Hasta / N° puntos (celdas vacías por defecto)."""
         g=QGridLayout(); g.setContentsMargins(0,2,0,0)
@@ -289,6 +373,20 @@ class TabSensibilidad(QWidget):
                 "pestaña de Equilibrio de fases."))
             return
         z=[zi/s for zi in z]
+        # Con agua activa y > 0: flash trifásico; si no, motor sin agua.
+        agua = self._agua_on and len(z) > NC and z[NC] > 1e-12
+        if not agua and len(z) > NC:
+            s13 = sum(z[:NC])
+            if s13 <= 0:
+                dialogos.advertencia(self, _i18n.t(
+                    "La mezcla no contiene hidrocarburos."))
+                return
+            z = [v/s13 for v in z[:NC]]
+        prop_d = _PROPS_BY_KEY.get(self.cmb_prop.currentData())
+        if prop_d is not None and prop_d[3] and not agua:
+            dialogos.advertencia(self, _i18n.t(
+                "La propiedad seleccionada requiere agua en la mezcla."))
+            return
 
         Ti=self._num(self.ed_T_ini); Tf=self._num(self.ed_T_fin); nT=self._num(self.ed_T_n)
         Pi=self._num(self.ed_P_ini); Pf=self._num(self.ed_P_fin); nP=self._num(self.ed_P_n)
@@ -320,7 +418,12 @@ class TabSensibilidad(QWidget):
         import eos as eng
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.prog.setRange(0,100); self.prog.setValue(0); self.prog.setVisible(True)
-        self.worker=SensWorker(z, self.get_kij(), eng.get_eos(), prop, eje, T_vals, P_vals)
+        md = 'EOS'
+        if callable(self.get_metodo_densidad):
+            try: md = self.get_metodo_densidad() or 'EOS'
+            except Exception: md = 'EOS'
+        self.worker=SensWorker(z, self.get_kij(), eng.get_eos(), prop, eje,
+                               T_vals, P_vals, metodo_densidad=md, agua=agua)
         self.worker.progreso.connect(self._on_prog)
         self.worker.done.connect(self._on_done)
         self.worker.error.connect(self._on_error)
@@ -475,11 +578,7 @@ class TabSensibilidad(QWidget):
         self._retitular_rangos()
         self.btn.setText(_i18n.t("Calcular"))
         prop_sel=self.cmb_prop.currentData(); eje_sel=self.cmb_eje.currentData()
-        self.cmb_prop.blockSignals(True); self.cmb_prop.clear()
-        for key,lbl,*_ in _PROPS_SENS:
-            self.cmb_prop.addItem(_i18n.t(lbl), key)
-        idx=self.cmb_prop.findData(prop_sel); self.cmb_prop.setCurrentIndex(max(0,idx))
-        self.cmb_prop.blockSignals(False)
+        self._llenar_props(prop_sel)
         self.cmb_eje.blockSignals(True); self.cmb_eje.clear()
         self.cmb_eje.addItem(_i18n.t("Temperatura"), 'T')
         self.cmb_eje.addItem(_i18n.t("Presion"), 'P')

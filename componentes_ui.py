@@ -48,100 +48,178 @@ FS       = 10
 
 import unidades as _u
 
+# ── Valores por componente (unidades internas de campo) ─────────────────
+# Cada propiedad se obtiene con una función getter(i) → valor (o None si no
+# aplica).  Así el agua (índice 13), cuyos datos viven fuera de los arreglos de
+# 13 componentes, se trata igual que el resto.
+
+_J_A_BTU = 0.2388459              # J/(mol·K) → BTU/(lbmol·°F)
+_T60_K = (60.0 + 459.67)/1.8      # 60 °F en K
+
+
+def _es_agua(i):
+    return i == getattr(_eng, 'IDX_AGUA', 13)
+
+
+def _hysys_agua():
+    import flash_agua as _fa
+    return _fa
+
+
+def _g_nbp(i):
+    return _eng.AGUA_NBP if _es_agua(i) else _eng.NBP[i]
+
+
+def _g_formador(i):
+    """Estructuras de hidrato en las que el componente entra como huésped
+    (constantes de Langmuir de la base de datos de PVTsim)."""
+    if _es_agua(i):
+        return "Anfitrión (red del hidrato)"
+    import hidratos as _h
+    nombre = [k for k, v in _h._IDX.items() if v == i]
+    if not nombre:
+        return "No"
+    nom = nombre[0]
+    est = []
+    par = _h._AB_DB_PR.get(nom)
+    if par is not None:
+        if any(p is not None for p in par[0:2]):
+            est.append('sI')
+        if any(p is not None for p in par[2:4]):
+            est.append('sII')
+    if any(nom in _h._AB_H_PR[c] for c in ('small', 'large')):
+        est.append('sH')
+    return ", ".join(est) if est else "No"
+
+
+# HYSYS
+def _g_tc_h(i):  return _hysys_agua().AGUA_TC if _es_agua(i) else _eng.TC[i]
+def _g_pc_h(i):  return _hysys_agua().AGUA_PC if _es_agua(i) else _eng.PC[i]
+def _g_w_pr(i):  return _hysys_agua().AGUA_OMEGA if _es_agua(i) else _eng.OMEGA[i]
+def _g_w_srk(i): return _hysys_agua().AGUA_OMEGA_SRK if _es_agua(i) else _eng.OMEGA_SRK[i]
+def _g_pm_h(i):  return _hysys_agua().AGUA_PM if _es_agua(i) else _eng.PM[i]
+def _g_vc_h(i):  return 55.9 if _es_agua(i) else _eng.VC[i]
+
+
+def _g_vstar(i):
+    if _es_agua(i):
+        import propiedades_agua as _pa
+        return _pa.AGUA_VSTAR
+    return _eng.VSTAR_COSTALD[i]
+
+
+def _g_pen(i, srk):
+    """Traslado de volumen de Peneloux [ft³/lbmol] (misma fórmula del motor)."""
+    tc, pc, w = _g_tc_h(i), _g_pc_h(i), _g_w_pr(i)
+    z_ra = 0.29056 - 0.08775*w
+    rtp = _eng.R_GAS*tc/pc
+    return 0.40768*rtp*(0.29441 - z_ra) if srk else 0.50033*rtp*(0.25969 - z_ra)
+
+
+def _cp60(coefs):
+    if coefs is None:
+        return None
+    c1, c2, c3, c4 = coefs[:4]
+    T = _T60_K
+    return (c1 + c2*T + c3*T**2 + c4*T**3)*_J_A_BTU
+
+
+def _g_cp_h(i):
+    if _es_agua(i):
+        import propiedades_agua as _pa
+        return _cp60(_pa.CP_REID_AGUA)
+    import entalpia_entropia_gen as _hs
+    return _cp60(_hs._cp_coefs(i, 'PR'))
+
+
+# PVTsim
+def _g_tc_p(i):  return _eng.AGUA_TC if _es_agua(i) else _eng.TC_PVT[i]
+def _g_pc_p(i):  return _eng.AGUA_PC if _es_agua(i) else _eng.PC_PVT[i]
+def _g_w_p(i):   return _eng.AGUA_OMEGA if _es_agua(i) else _eng.OMEGA_PVT[i]
+def _g_pm_p(i):  return _eng.AGUA_PM if _es_agua(i) else _eng.PM_PVT[i]
+def _g_vc_p(i):  return _eng.AGUA_VC_PVT if _es_agua(i) else _eng.VC_PVT[i]
+
+
+def _g_cp_p(i):
+    if _es_agua(i):
+        import propiedades_agua as _pa
+        return _cp60(_pa._cp_agua('PR_PVT'))
+    import entalpia_entropia_gen as _hs
+    return _cp60(_hs._cp_coefs(i, 'PR_PVT'))
+
+
+# Cada entrada: (etiqueta, getter | 'nombre' | 'simbolo', magnitud, decimales)
+#   magnitud: None, 'T_abs', 'P', 'PM', 'Vc' (cm³/mol), 'Vstar' (ft³/lbmol),
+#             'Vpen' (ft³/lbmol), 'Cp' (unidad de entropía), 'texto'
 _GRUPOS_PROP = [
-    # Propiedades genéricas, comunes a ambos modelos
-    ("Propiedades en conjunto", [
-        ("Nombre",                  None,           None,   None),
-        ("Símbolo",                 None,           None,   None),
-        ("Peso molecular",          "PM",           "PM",   4),
-        ("Punto de ebullición normal", "NBP",       "T_abs", 2),
-        ("Volumen crítico",         "VC",           "Vc",   2),
+    ("Propiedades generales", [
+        ("Nombre",                          'nombre',   None,    None),
+        ("Símbolo",                         'simbolo',  None,    None),
+        ("Punto de ebullición normal",      _g_nbp,     "T_abs", 2),
+        ("Formador de hidrato (estructuras)", _g_formador, "texto", None),
     ]),
-    # Todo lo recopilado de HYSYS (incluye COSTALD, que es el método de
-    # densidad de líquido del paquete HYSYS)
-    ("Propiedades recopiladas de HYSYS", [
-        ("Temperatura crítica",     "TC",           "T_abs", 4),
-        ("Presión crítica",         "PC",           "P",    4),
-        ("Factor acéntrico (PR)",   "OMEGA",        None,   6),
-        ("Factor acéntrico (SRK)",  "OMEGA_SRK",    None,   6),
-        ("Volumen característico V* (COSTALD)", "VSTAR_COSTALD", "Vstar", 6),
+    ("Parámetros de HYSYS (EOS PR y SRK de HYSYS)", [
+        ("Temperatura crítica",             _g_tc_h,    "T_abs", 4),
+        ("Presión crítica",                 _g_pc_h,    "P",     4),
+        ("Factor acéntrico (PR)",           _g_w_pr,    None,    6),
+        ("Factor acéntrico (SRK)",          _g_w_srk,   None,    6),
+        ("Peso molecular",                  _g_pm_h,    "PM",    4),
+        ("Volumen crítico (viscosidad LBC)", _g_vc_h,   "Vc",    2),
+        ("Volumen característico V* (COSTALD)", _g_vstar, "Vstar", 6),
+        ("Traslado de volumen de Peneloux (PR)",  lambda i: _g_pen(i, False), "Vpen", 6),
+        ("Traslado de volumen de Peneloux (SRK)", lambda i: _g_pen(i, True),  "Vpen", 6),
+        ("Cp de gas ideal a 60 °F",         _g_cp_h,    "Cp",    4),
     ]),
-    # Todo lo recopilado de PVTsim
-    ("Propiedades recopiladas de PVTsim", [
-        ("Temperatura crítica",     "TC_PVT",       "T_abs", 4),
-        ("Presión crítica",         "PC_PVT",       "P",    4),
-        ("Factor acéntrico",        "OMEGA_PVT",    None,   6),
-        ("Peso molecular",          "PM_PVT",       "PM",   4),
+    ("Parámetros de PVTsim (EOS PR y SRK de PVTsim)", [
+        ("Temperatura crítica",             _g_tc_p,    "T_abs", 4),
+        ("Presión crítica",                 _g_pc_p,    "P",     4),
+        ("Factor acéntrico",                _g_w_p,     None,    6),
+        ("Peso molecular",                  _g_pm_p,    "PM",    4),
+        ("Volumen crítico (viscosidad LBC)", _g_vc_p,   "Vc",    2),
+        ("Cp de gas ideal a 60 °F",         _g_cp_p,    "Cp",    4),
     ]),
 ]
 
 
 def _unidad_prop(magnitud):
     """Etiqueta de unidad de una propiedad según el sistema activo."""
-    if magnitud is None:
+    if magnitud in (None, 'texto'):
         return ""
     if magnitud == 'T_abs':
         return _u.u_abs()                 # °R o K
     if magnitud == 'P':
         return _u.u('P')                  # psia, kPa o bar
     if magnitud == 'PM':
-        return _u.u('dens') and 'lb/lbmol' if _u.sistema() == 'FIELD' else 'kg/kgmol'
+        return 'lb/lbmol' if _u.sistema() == 'FIELD' else 'kg/kgmol'
     if magnitud == 'Vc':
         return 'cm³/mol'                  # volumen crítico se mantiene
-    if magnitud == 'Vstar':
-        return 'ft³/lbmol' if _u.sistema() == 'FIELD' else 'm³/kgmol'
+    if magnitud in ('Vstar', 'Vpen'):
+        return _u.u('V')
+    if magnitud == 'Cp':
+        return _u.u('S')
     return ""
 
 
-def _valor_convertido(idx, nombre_array, magnitud, decimales):
+def _valor_convertido(idx, getter, magnitud, decimales):
     """Valor de una propiedad convertido al sistema activo, formateado."""
-    if nombre_array is None:
+    if getter is None:
         return ""
-    # Agua (índice 13): sus propiedades viven en constantes AGUA_* de eos.py.
-    # Se aplican tanto a la columna HYSYS como a la de PVTsim (mismos valores).
-    if idx == getattr(_eng, 'IDX_AGUA', 13):
-        mapa = {
-            'PM': _eng.AGUA_PM, 'PM_PVT': _eng.AGUA_PM,
-            'TC': _eng.AGUA_TC, 'TC_PVT': _eng.AGUA_TC,
-            'PC': _eng.AGUA_PC, 'PC_PVT': _eng.AGUA_PC,
-            'OMEGA': _eng.AGUA_OMEGA, 'OMEGA_SRK': _eng.AGUA_OMEGA,
-            'OMEGA_PVT': _eng.AGUA_OMEGA, 'NBP': _eng.AGUA_NBP,
-        }
-        if nombre_array not in mapa:
-            return ""             # propiedad sin dato para el agua (p.ej. VC)
-        val = mapa[nombre_array]
-        if magnitud == 'T_abs':
-            val = _u.abs_desde_R(val)
-        elif magnitud == 'P':
-            val = _u.p_desde_psia(val)
-        return str(val) if decimales is None else f"{val:.{decimales}f}"
-    arr = getattr(_eng, nombre_array, None)
-    if arr is None or idx >= len(arr):
+    try:
+        val = getter(idx)
+    except Exception:
+        val = None
+    if val is None:
         return ""
-    val = arr[idx]
-    # Conversión según magnitud
+    if magnitud == 'texto':
+        return _i18n.t(str(val))
     if magnitud == 'T_abs':
         val = _u.abs_desde_R(val)
     elif magnitud == 'P':
         val = _u.p_desde_psia(val)
-    elif magnitud == 'PM':
-        val = val if _u.sistema() == 'FIELD' else val   # lb/lbmol = kg/kgmol num.
-    elif magnitud == 'Vstar':
-        val = val if _u.sistema() == 'FIELD' else _u.V_desde(val)
-    # 'Vc' y None no se convierten
-    if decimales is None:
-        return str(val)
-    return f"{val:.{decimales}f}"
-
-
-def _valor_prop(idx, nombre_array, decimales):
-    """Compatibilidad: valor sin conversión (solo para casos None)."""
-    if nombre_array is None:
-        return ""
-    arr = getattr(_eng, nombre_array, None)
-    if arr is None or idx >= len(arr):
-        return ""
-    val = arr[idx]
+    elif magnitud in ('Vstar', 'Vpen'):
+        val = _u.V_desde(val)
+    elif magnitud == 'Cp':
+        val = _u.S_desde(val)
     if decimales is None:
         return str(val)
     return f"{val:.{decimales}f}"
@@ -181,9 +259,9 @@ class VentanaPropComponente(QWidget):
                 et_full = _i18n.t(etiqueta)
                 if unidad:
                     et_full = f"{et_full} [{unidad}]"
-                if etiqueta == "Nombre":
+                if arr == 'nombre':
                     valor = _eng.componente_etiqueta(self.idx).rstrip(":")
-                elif etiqueta == "Símbolo":
+                elif arr == 'simbolo':
                     valor = _eng.componente_nombre(self.idx)
                 else:
                     valor = _valor_convertido(self.idx, arr, magnitud, dec)

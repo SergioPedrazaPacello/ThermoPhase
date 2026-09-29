@@ -1515,6 +1515,9 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
     }
 
 # ══ Punto de entrada ═════════════════════════════════════════
+_CRIT_CACHE = {}
+
+
 def fase_pvtsim(z, T, P, Z, kij):
     """Identificacion de fase de una sola raiz real segun el criterio de
     PVTsim (Method Documentation, "Phase Identification"):
@@ -1527,13 +1530,28 @@ def fase_pvtsim(z, T, P, Z, kij):
     C1/10% C2 a 3000 psia cambia a -82 °F, no a -96 °F). Si el punto critico
     no converge, cae al pseudocritico de Kay como respaldo."""
     Tcm = Pcm = None
+    # El punto crítico depende sólo de (EOS, z, kij): se guarda en caché
+    # (composición redondeada a 1e-6) para no recalcularlo en cada flash de
+    # un barrido (sensibilidad, flash con agua).
     try:
-        import critico
-        c = critico.punto_critico(z, kij)
-        if c is not None:
-            Pcm, Tcm = c[0], c[1]
+        clave = (_EOS_ACTIVA, tuple(np.round(np.asarray(z, dtype=float), 6)),
+                 tuple(np.round(np.asarray(kij, dtype=float).ravel(), 8)))
     except Exception:
-        Tcm = Pcm = None
+        clave = None
+    if clave is not None and clave in _CRIT_CACHE:
+        Pcm, Tcm = _CRIT_CACHE[clave]
+    else:
+        try:
+            import critico
+            c = critico.punto_critico(z, kij)
+            if c is not None:
+                Pcm, Tcm = c[0], c[1]
+        except Exception:
+            Tcm = Pcm = None
+        if clave is not None:
+            if len(_CRIT_CACHE) > 256:
+                _CRIT_CACHE.clear()
+            _CRIT_CACHE[clave] = (Pcm, Tcm)
     if Tcm is None:                     # respaldo: pseudocritico de Kay
         TCa, PCa, _om, _pm = crit_props(_EOS_ACTIVA)
         Tcm = sum(z[i] * TCa[i] for i in range(NC))

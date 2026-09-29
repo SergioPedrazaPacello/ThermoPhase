@@ -49,7 +49,7 @@ _SELECTORES = [
                                            "Peng-Robinson (PVTsim)", "SRK (PVTsim)"]),
     ("densidad",   "Densidad:",           ["COSTALD", "EOS"]),
     ("volumen",    "Corrección de volumen:", ["Ninguna", "Peneloux"]),
-    ("envolvente", "Método envolvente:",  ["Ziervogel-Poling", "Michelsen"]),
+    ("envolvente", "Método envolvente:",  ["Michelsen", "Ziervogel-Poling"]),
     ("unidades",   "Sistema de unidades:", ["Field", "SI"]),
 ]
 

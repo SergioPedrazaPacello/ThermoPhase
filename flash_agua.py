@@ -489,6 +489,41 @@ def flash_trifasico(z, T, P, eos='PR', metodo='simple', max_iter=400, tol=1e-11)
         return _pack(bV,1-bV,0.0,y,x,np.zeros(14),ZV,ZL,None,PM,1)
 
     beta, comps, Zs = res
+    # Si la tercera fase NO resultó acuosa (mínimo local: a T muy baja el HC
+    # puede separarse en dos líquidos y "atrapar" la semilla de agua), se
+    # reintenta con cuatro fases (V, L, L2, acuosa) y se reagrupan las fases
+    # HC para no perder el agua del balance de materia.
+    if comps[2][IDX_AGUA] < 0.5:
+        x0b = np.clip(z*np.sqrt(Kw), 1e-300, None); x0b[IDX_AGUA] = 1e-8
+        x0b /= x0b.sum()
+        res4 = _flash_multifase(z, aa,bi,kij,T,P,es_srk,Tc,Pc,om,PM,
+                                ['V', 'L', 'L', 'L'], [y0, x0, x0b, w0],
+                                max_iter, tol)
+        if res4 is not None:
+            b4, c4, Z4 = res4
+            iaq = [j for j in range(4) if b4[j] > 1e-10 and c4[j][IDX_AGUA] > 0.5]
+            ihc = [j for j in range(4) if b4[j] > 1e-10 and j not in iaq]
+            if iaq:
+                bW_ = sum(b4[j] for j in iaq)
+                w_ = sum(b4[j]*c4[j] for j in iaq)/bW_
+                # fases HC ordenadas por densidad molar (menos densa = V)
+                def _dens(j):
+                    lp_, Zj = _ln_phi(c4[j], aa,bi,kij,T,P,es_srk, ['V','L','L','L'][j])
+                    return (P/(Zj*T)) if Zj else 0.0
+                ihc.sort(key=_dens)
+                if len(ihc) == 0:
+                    beta = np.array([0.0, 0.0, bW_]); comps = [np.zeros(14), np.zeros(14), w_]
+                    Zs = [None, None, Z4[iaq[0]]]
+                elif len(ihc) == 1:
+                    j = ihc[0]
+                    beta = np.array([b4[j], 0.0, bW_]); comps = [c4[j], np.zeros(14), w_]
+                    Zs = [Z4[j], None, Z4[iaq[0]]]
+                else:
+                    jv = ihc[0]; jl = ihc[1:]
+                    bLl = sum(b4[j] for j in jl)
+                    xl = sum(b4[j]*c4[j] for j in jl)/bLl
+                    beta = np.array([b4[jv], bLl, bW_]); comps = [c4[jv], xl, w_]
+                    Zs = [Z4[jv], Z4[jl[-1]], Z4[iaq[0]]]
     bV, bL, bW = beta[0], beta[1], beta[2]
     y, x, w = comps[0], comps[1], comps[2]
     ZV, ZL, ZW = Zs[0], Zs[1], Zs[2]
@@ -538,7 +573,15 @@ def flash_trifasico(z, T, P, eos='PR', metodo='simple', max_iter=400, tol=1e-11)
 
     # Descartar fases despreciables (beta ~ 0) — Michelsen ec. 11.
     # ¿la "acuosa" es realmente acuosa?
-    if w[IDX_AGUA] < 0.5 or bW < UMB:
+    if w[IDX_AGUA] < 0.5 and bW >= UMB:
+        # la "acuosa" no es rica en agua: es otra fase HC → se une al líquido
+        # HC (nunca se descarta masa del balance)
+        if bL > 0:
+            x = (bL*x + bW*w)/(bL + bW); x = x/x.sum(); bL = bL + bW
+        else:
+            x = w; bL = bW; ZL = ZW
+        bW = 0.0
+    elif bW < UMB:
         bW = 0.0
     if bV < UMB: bV = 0.0
     if bL < UMB: bL = 0.0
@@ -826,3 +869,91 @@ def _gibbs_fase(comp, aa, bi, kij, T, P, es_srk, fase):
     return float(np.sum(comp[mask]*(np.log(comp[mask]) + lnp[mask])))
 
 
+
+
+def identificar_fases_hc(rt, T, P, eos, kij13=None):
+    """Identificación de las fases HC del flash con agua con el MISMO criterio
+    del motor sin agua (PVTsim para sus EOS, HYSYS para las suyas):
+
+    • Dos fases HC: la de menor densidad es el vapor (PVTsim).
+    • Una sola fase HC: se clasifica como vapor o líquido con el flash del
+      motor de 13 componentes sobre la composición HC de esa fase (sin agua),
+      de modo que la etiqueta coincide con la que se obtiene sin agua.
+
+    Modifica y devuelve `rt` (β, composiciones y Z de las fases V/L)."""
+    import eos as _e
+    bV = rt.get('beta_V', 0.0) or 0.0
+    bL = rt.get('beta_L', 0.0) or 0.0
+    if bV <= 0 and bL <= 0:
+        return rt
+    _METODO_prev = _METODO
+    try:
+        Tc, Pc, om, PM, kij = _params_14(eos)
+        aa, bi = _ai_bi(eos, Tc, Pc, om, T)
+        es_srk = _e.es_srk(eos)
+
+        def Z_de(c, rol):
+            _, Z = _ln_phi(np.asarray(c, dtype=float), aa, bi, kij, T, P, es_srk, rol)
+            return Z
+
+        if bV > 0 and bL > 0:
+            y = np.asarray(rt['y'], dtype=float); x = np.asarray(rt['x'], dtype=float)
+            # Dos fases HC "líquidas" (v/b < 2.5 en ambas) que el motor sin agua
+            # ve como un único líquido estable: división espuria (T criogénica)
+            # → se reúnen en una sola fase líquida (balance de materia intacto).
+            def _vb(c, Z):
+                am_, bm_ = _am_bm(c, aa, bi, kij)
+                return (Z*R_GAS*T/P)/bm_ if (Z and bm_ > 0) else 99.0
+            if _vb(y, rt['Z_V']) < 2.5 and _vb(x, rt['Z_L']) < 2.5:
+                hc = (bV*y + bL*x)/(bV + bL)
+                h13 = hc[:13]/hc[:13].sum()
+                eos_prev = _e.get_eos()
+                try:
+                    _e.set_eos(eos)
+                    k13 = kij13 if kij13 is not None else _e.kij_base(eos)
+                    r = _e.calcular(list(h13), T, P, k13)
+                finally:
+                    _e.set_eos(eos_prev)
+                if r['L'] >= 1.0 - 1e-9:
+                    rt['x'], rt['y'] = hc, np.zeros(14)
+                    rt['beta_L'], rt['beta_V'] = bV + bL, 0.0
+                    rt['Z_L'], rt['Z_V'] = Z_de(hc, 'L'), None
+                    return rt
+            dv = float(np.dot(y, PM))/(rt['Z_V'] or 1.0)
+            dl = float(np.dot(x, PM))/(rt['Z_L'] or 1.0)
+            if dv > dl:                      # el "vapor" es el más denso → intercambiar
+                rt['y'], rt['x'] = x, y
+                rt['beta_V'], rt['beta_L'] = bL, bV
+                rt['Z_V'], rt['Z_L'] = rt['Z_L'], rt['Z_V']
+            return rt
+
+        hc = np.asarray(rt['y'] if bV > 0 else rt['x'], dtype=float)
+        b = bV if bV > 0 else bL
+        h13 = hc[:13].copy(); s13 = h13.sum()
+        if s13 <= 0:
+            return rt
+        h13 = h13/s13
+        eos_prev = _e.get_eos()
+        try:
+            _e.set_eos(eos)
+            k13 = kij13 if kij13 is not None else _e.kij_base(eos)
+            r = _e.calcular(list(h13), T, P, k13)
+        finally:
+            _e.set_eos(eos_prev)
+        if r['V'] >= 1.0 - 1e-9:
+            es_v = True
+        elif r['L'] >= 1.0 - 1e-9:
+            es_v = False
+        else:
+            return rt                          # caso límite: se deja como está
+        if es_v and bV <= 0:
+            rt['y'], rt['x'] = hc, np.zeros(14)
+            rt['beta_V'], rt['beta_L'] = b, 0.0
+            rt['Z_V'], rt['Z_L'] = Z_de(hc, 'V'), None
+        elif (not es_v) and bL <= 0:
+            rt['x'], rt['y'] = hc, np.zeros(14)
+            rt['beta_L'], rt['beta_V'] = b, 0.0
+            rt['Z_L'], rt['Z_V'] = Z_de(hc, 'L'), None
+        return rt
+    except Exception:
+        return rt

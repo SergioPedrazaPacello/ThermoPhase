@@ -59,6 +59,7 @@ def _resultado_agua(pt, z_full, eos_nombre):
     T, P = pt['T_R'], pt['P_psia']
     z = _np.asarray(z_full, dtype=float); z = z/z.sum()
     rt = _fa.flash_trifasico(z, T, P, eos=eos_nombre, metodo='hv')
+    rt = _fa.identificar_fases_hc(rt, T, P, eos_nombre)
     pr = _pa.propiedades_fases(rt, T, P, eos_nombre, metodo_densidad='COSTALD')
     pV, pL, pW = pr.get('V', {}) or {}, pr.get('L', {}) or {}, pr.get('W', {}) or {}
     bV = rt.get('beta_V', 0.0) or 0.0; bL = rt.get('beta_L', 0.0) or 0.0
