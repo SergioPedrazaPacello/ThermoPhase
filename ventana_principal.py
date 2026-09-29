@@ -1544,9 +1544,12 @@ class TabParametros(QWidget):
         WK = self._WK
         # El tamaño solo crece cuando están TODOS los componentes activos + agua
         # (14). Con menos, el tamaño original es el correcto.
+        # El ANCHO solo crece (columna del agua) con todos los HC + agua; el
+        # ALTO siempre incluye la fila del agua cuando está activa (si no, con
+        # menos HC la fila del agua no entra y aparecen barras de desplazamiento).
         crece = self._requiere_ancho_extra()
-        extra_c = 1 if crece else 0   # columna del agua (kij)
-        extra_f = 1 if crece else 0   # fila del agua (ambas tablas)
+        extra_c = 1 if crece else 0          # columna del agua (kij)
+        extra_f = 1 if self._agua_on else 0  # fila del agua (ambas tablas)
         ancho_tabla = (NC + 1 + extra_c) * WK + 2  # columnas kij + borde (1 px por lado)
         margen_lat = 13                    # margen lateral izquierdo/derecho
         ancho = ancho_tabla + 2*margen_lat
@@ -1949,13 +1952,17 @@ class TabFluidos(QWidget):
         # Derecha: composicion del fluido seleccionado
         der = QVBoxLayout(); der.setSpacing(4)
         der.addWidget(section_label("Composicion del fluido (fraccion molar)", left=True))
-        self.tbl = make_table(NC + 1, 2)
+        # 13 HC + agua (fila NC, visible solo con el agua activada) + fila de
+        # Sumatorias (NC+1).
+        self._sum_row = NC + 1
+        self.tbl = make_table(NC + 2, 2)
         self.tbl.setColumnWidth(0, W_COMP); self.tbl.setColumnWidth(1, W_VAL)
-        for i in range(NC):
-            self.tbl.setItem(i, 0, cell(NOMBRES[i], bg=GRAY_LBL))
+        for i in range(NC + 1):
+            self.tbl.setItem(i, 0, cell(_eng.componente_etiqueta(i), bg=GRAY_LBL))
             self.tbl.setItem(i, 1, cell("", bg=WHITE, editable=True))
-        self.tbl.setItem(NC, 0, cell("Sumatorias:", bg=GRAY_LBL))
-        self.tbl.setItem(NC, 1, cell("", bg=WHITE))
+        self.tbl.setItem(self._sum_row, 0, cell("Sumatorias:", bg=GRAY_LBL))
+        self.tbl.setItem(self._sum_row, 1, cell("", bg=WHITE))
+        self.tbl.setRowHidden(NC, True)
         fix_table_size(self.tbl)
         self.tbl.itemChanged.connect(self._on_edit)
         der.addWidget(self.tbl, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -2000,7 +2007,7 @@ class TabFluidos(QWidget):
             r = min(max(self._idx, 0), len(self.fluidos) - 1)
             self.lista.setCurrentRow(r); self._on_sel(r)
         else:
-            self._idx = -1; self._mostrar_z([0.0] * NC)
+            self._idx = -1; self._mostrar_z([0.0] * (NC + 1))
         if self._on_change:
             self._on_change()
 
@@ -2011,27 +2018,27 @@ class TabFluidos(QWidget):
 
     def _mostrar_z(self, z):
         self.tbl.blockSignals(True)
-        for i in range(NC):
+        for i in range(NC + 1):
             self.tbl.item(i, 1).setText(f"{z[i] if i < len(z) else 0.0:.4f}")
         self.tbl.blockSignals(False)
         self._upd_suma()
 
     def _leer_z(self):
         z = []
-        for i in range(NC):
+        for i in range(NC + 1):
             try: z.append(float(self.tbl.item(i, 1).text()))
             except: z.append(0.0)
         return z
 
     def _upd_suma(self):
         s = 0.0
-        for i in range(NC):
+        for i in range(NC + 1):
             if self.tbl.isRowHidden(i):
                 continue
             try: s += float(self.tbl.item(i, 1).text())
             except: pass
         self.tbl.blockSignals(True)
-        self.tbl.item(NC, 1).setText(f"{s:.4f}")
+        self.tbl.item(self._sum_row, 1).setText(f"{s:.4f}")
         self.tbl.blockSignals(False)
 
     def aplicar_componentes(self, activos):
@@ -2041,7 +2048,7 @@ class TabFluidos(QWidget):
         no entran en la suma ni, via el enmascarado de get_z, en los calculos.
         Cambio puramente estetico."""
         act = set(activos)
-        for i in range(NC):
+        for i in range(NC + 1):
             self.tbl.setRowHidden(i, i not in act)
         fix_table_size(self.tbl)
         self._upd_suma()
@@ -2059,7 +2066,7 @@ class TabFluidos(QWidget):
         return max(0, tabla_full - tabla_piso)
 
     def _on_edit(self, item):
-        if item.column() != 1 or item.row() >= NC:
+        if item.column() != 1 or item.row() >= self._sum_row:
             return
         self._upd_suma()
         if 0 <= self._idx < len(self.fluidos):
@@ -2077,7 +2084,7 @@ class TabFluidos(QWidget):
         return f"{base} {i}"
 
     def _nuevo(self):
-        self.fluidos.append({'nombre': self._nombre_nuevo(), 'z': [0.0] * NC,
+        self.fluidos.append({'nombre': self._nombre_nuevo(), 'z': [0.0] * (NC + 1),
                              'eos': 'PR', 'kij': copy.deepcopy(KIJ_DEFAULT),
                              'kij_fuente': 'PR'})
         self._idx = len(self.fluidos) - 1
@@ -3143,7 +3150,7 @@ class MainWindow(QMainWindow):
             h = widget.sizeHint()
             sw = self._montar_subventana('fluidos', widget, "Fluidos",
                                          tam=(h.width() + 24, h.height() + 16))
-            if len(self._comp_activos) < NC:
+            if sorted(self._comp_activos) != list(range(NC)):
                 widget.aplicar_componentes(self._comp_activos)
                 self._reajustar_ventana_comp(sw, widget, len(self._comp_activos))
         self._mostrar_subventana(sw)
@@ -3340,7 +3347,8 @@ class MainWindow(QMainWindow):
         _set_eos(fluido.get('eos', 'PR'))
         z = fluido['z']
         act = set(getattr(self, '_comp_activos', range(NC)))
-        return [(z[i] if (i in act and i < len(z)) else 0.0) for i in range(NC)]
+        # 13 HC + agua (índice NC) cuando está activada.
+        return [(z[i] if (i in act and i < len(z)) else 0.0) for i in range(NC + 1)]
 
     def _crear_widget_fluido(self, clave, fluido):
         """Construye el widget de calculo ligado a la composicion y kij del

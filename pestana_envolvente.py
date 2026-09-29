@@ -157,7 +157,8 @@ class EnvWorker(QThread):
                'critico': crit,
                'critico_burbuja': crit is not None,
                'critico_rocio': crit is not None,
-               'agua_activa': True}
+               'agua_activa': True,
+               'binaria': bool(r.get('binaria'))}
         return res
 
     def run(self):
@@ -1220,7 +1221,8 @@ class TabEnvolvente(QWidget):
             # Cuatro fronteras sobre la composición total + punto crítico.
             estilos = [
                 ('2-HC', '#1a4fa8', 'Rocío HC (2-HC)'),
-                ('3-HC', '#c0392b', 'Límite 3 fases HC (3-HC)'),
+                ('3-HC', '#c0392b', 'Línea trifásica V-L-Aq' if res.get('binaria')
+                                    else 'Límite 3 fases HC (3-HC)'),
                 ('3-Aq', '#8e2fb0', 'Aparición de agua (3-Aq)'),
                 ('2-Aq', '#e67e22', 'Rocío de agua (2-Aq)'),
             ]

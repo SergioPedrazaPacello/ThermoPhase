@@ -521,6 +521,108 @@ def _adelgazar(pts, dmin=0.004):
     return out
 
 
+_DEBUG_BIN = False
+
+
+def _linea_trifasica_binaria(S, Pmin, Pmax, T_min):
+    """Línea trifásica V-L_HC-Aq de una mezcla binaria HC + agua.
+
+    A T fija las tres fases coexisten a una sola presión.  Incógnitas
+    X = [ln(x/y) (2), ln(w/y) (2), y_HC, ln P] con igualdad de fugacidades
+    (4 ec.) y Σx = Σw = 1.  Se recorre en T desde una presión intermedia hacia
+    abajo (hasta Pmin) y hacia arriba hasta que L_HC y V se igualan (UCEP).
+    Devuelve ([(P, T), …] ordenada por T, (P_ucep, T_ucep) | None)."""
+    ih = 0 if S.iw == 1 else 1
+    iw = S.iw
+    tm = S.tm
+
+    def res(X, T):
+        lKx = X[0:2]; lKw = X[2:4]; yh = X[4]; P = np.exp(X[5])
+        if not (0.0 < yh < 1.0) or not (1e-6 < P < 1e5):
+            return None
+        y = np.zeros(2); y[ih] = yh; y[iw] = 1.0 - yh
+        x = np.exp(np.clip(lKx, -80, 80))*y
+        w = np.exp(np.clip(lKw, -80, 80))*y
+        ly = S.lnphi(y, T, P, 'V'); lx = S.lnphi(x/x.sum(), T, P, 'L')
+        lw = S.lnphi(w/w.sum(), T, P, 'L')
+        if ly is None or lx is None or lw is None:
+            return None
+        g = np.empty(6)
+        g[0:2] = lKx + lx - ly
+        g[2:4] = lKw + lw - ly
+        g[4] = x.sum() - 1.0
+        g[5] = w.sum() - 1.0
+        return g
+
+    # estimación inicial (Wilson): P ≈ Psat_HC + Psat_agua
+    try:
+        TcA, PcA, omA = (np.asarray(v, dtype=float)[S.act] for v in (tm.Tc, tm.Pc, tm.om))
+    except Exception:
+        return [], None
+    def psat(k, T):
+        return PcA[k]*np.exp(5.373*(1.0 + omA[k])*(1.0 - TcA[k]/T))
+    def X_ini(T):
+        Ph, Pw = psat(ih, T), psat(iw, T)
+        P = Ph + Pw
+        y = np.zeros(2); y[ih] = Ph/P; y[iw] = Pw/P
+        x = np.zeros(2); x[ih] = 1.0 - 1e-4; x[iw] = 1e-4
+        w = np.zeros(2); w[ih] = 1e-5; w[iw] = 1.0 - 1e-5
+        return np.array([np.log(x[0]/y[0]), np.log(x[1]/y[1]),
+                         np.log(w[0]/y[0]), np.log(w[1]/y[1]), y[ih], np.log(P)])
+    # T de arranque: Psat_HC ≈ 50 psia (sin exceder 0.95·Tc del HC)
+    T0 = None
+    for T in np.linspace(0.3*TcA[ih], 0.95*TcA[ih], 400):
+        if psat(ih, T) >= 50.0:
+            T0 = T; break
+    cand = ([T0] if T0 is not None else []) + [f*TcA[ih] for f in (0.8, 0.7, 0.9, 0.95, 0.6)]
+    X0 = None
+    for T0 in cand:
+        X0, _ = _newton(lambda XX: res(XX, T0), X_ini(T0), tol=1e-11, maxit=80, maxstep=1.0)
+        if X0 is not None and np.max(np.abs(X0[0:2])) > 1e-3:
+            break
+        X0 = None
+    if X0 is None:
+        return [], None
+
+    def recorrer(direc):
+        pts = []; X = X0.copy(); T = T0; dT = 2.0
+        while dT > 1e-3:
+            Tn = T + direc*dT
+            Xn, _ = _newton(lambda XX: res(XX, Tn), X, tol=1e-11, maxit=40, maxstep=0.5)
+            if Xn is None or np.max(np.abs(Xn[0:2])) < 1e-4:
+                dT *= 0.5; continue
+            P = float(np.exp(Xn[5]))
+            if P < Pmin or P > Pmax or Tn < T_min:
+                break
+            X, T = Xn, Tn
+            pts.append((T, X.copy()))
+            dT = min(dT*1.3, 10.0)
+            if direc > 0 and np.max(np.abs(X[0:2])) < 0.02:
+                dT = min(dT, 0.2)
+        return pts
+
+    abajo = recorrer(-1.0); arriba = recorrer(+1.0)
+    todos = abajo[::-1] + [(T0, X0)] + arriba
+    lin = [(float(np.exp(X[5])), float(T)) for T, X in todos]
+    ucep = None
+    if len(arriba) >= 3:
+        # UCEP: ln(x_HC/y_HC) → 0, extrapolado con los últimos puntos
+        sel = arriba[-4:]
+        # variable de cruce: el ln(x/y) de mayor magnitud al inicio (para C1 +
+        # agua el del HC es ~0 en toda la línea; el del agua no)
+        kc = int(np.argmax(np.abs(X0[0:2])))
+        s_ = np.array([X[kc] for _, X in sel])
+        deg = min(2, len(sel) - 1)
+        Tu = float(np.polyval(np.polyfit(s_, [T for T, _ in sel], deg), 0.0))
+        Pu = float(np.exp(np.polyval(np.polyfit(s_, [X[5] for _, X in sel], deg), 0.0)))
+        if _DEBUG_BIN:
+            print('UCEP dbg', [(round(T,4), float(X[ih])) for T, X in sel], Tu, Pu)
+        if np.isfinite(Tu) and np.isfinite(Pu) and Tu >= sel[-1][0] - 0.05:
+            ucep = (Pu, Tu)
+            lin.append(ucep)
+    return lin, ucep
+
+
 def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
                     T_min=250.0, P_max=None, progress_cb=None):
     """Traza las líneas 2-HC, 2-Aq, 3-Aq, 3-HC y el punto crítico.
@@ -530,6 +632,12 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
     (P en psia, T en °R)."""
     S = Sistema(z14, eos, metodo)
     n = S.n
+    # Mezcla BINARIA (un solo hidrocarburo + agua): la región trifásica
+    # degenera en una LÍNEA univariante V-L_HC-Aq (análoga a la curva de
+    # presión de vapor del HC puro) que termina en el punto crítico final
+    # superior (UCEP).  Se traza aparte; las líneas trifásicas del caso general
+    # (Ec. 17-20 con β como especificación) no aplican.
+    binaria = (n == 2 and S.iw is not None)
     out = {'2-HC': [], '2-Aq': [], '3-Aq': [], '3-HC': [], 'critico': [],
            'trifasicos': []}
     ini = _dew_inicial(S, P0)
@@ -608,7 +716,7 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
     lin3 = []
     llegadas = set()          # (índice de punto trifásico, tipo) ya alcanzados
     TP3 = [(X3s[2*n], X3s[2*n+1]) for X3s, _, _ in trif]
-    for itp, (X3s, tw, tx) in enumerate(trif):
+    for itp, (X3s, tw, tx) in enumerate([] if binaria else trif):
         lKw = X3s[:n]; lKx = X3s[n:2*n]
         for incip in ('aq', 'hc'):
             if (itp, incip) in llegadas:
@@ -641,7 +749,7 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
             out.setdefault('_raw', []).append((incip, pts))
 
     # ── región trifásica aislada (ningún punto trifásico en el rocío) ───────
-    if not trif:
+    if not trif and not binaria:
         dew_PT = [(float(np.exp(p[iP])), float(np.exp(p[iT])))
                   for _, pts in lineas_dew for p in pts]
         ini3 = _buscar_interna(S, eos, dew_PT, P0, T_min)
@@ -677,12 +785,19 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
 
     # ── salida en (P, T) + punto crítico en 3-HC (cambio de signo de lnKy) ──
     out['_S'] = S
+    out['binaria'] = binaria
     out['_raw_dew'] = lineas_dew
     seg = {'2-HC': [], '2-Aq': [], '3-Aq': [], '3-HC': []}
     for tipo, pts in lineas_dew:
         key = '2-HC' if tipo == 'hc' else '2-Aq'
         seg[key].append([(float(np.exp(p[iP])), float(np.exp(p[iT]))) for p in pts])
-    for X3s, tw, tx in trif:
+    if binaria:
+        lin_b, ucep = _linea_trifasica_binaria(S, Pmin, PMAX_ABS, T_min)
+        if len(lin_b) >= 2:
+            seg['3-HC'].append(lin_b)
+        if ucep is not None:
+            out['critico'].append(ucep)
+    for X3s, tw, tx in ([] if binaria else trif):
         out['trifasicos'].append((float(np.exp(X3s[2*n+1])), float(np.exp(X3s[2*n]))))
     for incip, pts in lin3:
         key = '3-Aq' if incip == 'aq' else '3-HC'

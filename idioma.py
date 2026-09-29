@@ -361,6 +361,7 @@ TRAD = {
         "Density map is not available for mixtures with water.",
     "Rocío HC (2-HC)": "HC dew (2-HC)",
     "Límite 3 fases HC (3-HC)": "HC 3-phase boundary (3-HC)",
+    "Línea trifásica V-L-Aq": "V-L-Aq three-phase line",
     "Aparición de agua (3-Aq)": "Water appearance (3-Aq)",
     "Rocío de agua (2-Aq)": "Water dew (2-Aq)",
     "Las curvas de isocalidad no están disponibles en "
