@@ -249,41 +249,56 @@ def _sub_markup(txt):
 # tablas con el formato gris del reporte, replicando los cálculos de las
 # pestañas (poder calorífico, peso molecular de mezcla, densidad de mezcla).
 
-def _tabla_composicion(z, y, x, hay_vap, hay_liq, W):
-    """Construye la tabla de composición de fases con formato del reporte."""
-    from eos import NOMBRES, NC
+def _anchos(W, acuosa):
+    return ([W*0.28, W*0.18, W*0.18, W*0.18, W*0.18] if acuosa
+            else [W*0.34, W*0.22, W*0.22, W*0.22])
+
+
+def _tabla_composicion(z, y, x, hay_vap, hay_liq, W, w=None, hay_aq=False,
+                       agua=False):
+    """Tabla de composición de fases.  Con agua: fila del agua y, si hay fase
+    acuosa, columna de Fase Acuosa."""
+    import eos as _eng
+    NC = _eng.NC
     E = _estilos()
     def hdr(s): return Paragraph(s, E['hdr'])
     def lab(s): return Paragraph(s, E['lbl'])
     def val(v): return Paragraph(_f(v, 4), E['val'])
     def vac():  return Paragraph("", E['val'])
     sz = sum(z) if z else 0.0
-
-    comp = [
-        [lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
-         hdr(_i18n.t("Fase Liquida"))],
-        [lab(""), hdr(_i18n.t("Fraccion Molar")), hdr(_i18n.t("Fraccion Molar")),
-         hdr(_i18n.t("Fraccion Molar"))],
-    ]
-    for i in range(NC):
+    acuosa = w is not None
+    h1 = [lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
+          hdr(_i18n.t("Fase Liquida"))]
+    h2 = [lab(""), hdr(_i18n.t("Fraccion Molar")), hdr(_i18n.t("Fraccion Molar")),
+          hdr(_i18n.t("Fraccion Molar"))]
+    if acuosa:
+        h1.append(hdr(_i18n.t("Fase Acuosa"))); h2.append(hdr(_i18n.t("Fraccion Molar")))
+    comp = [h1, h2]
+    n = NC + 1 if (agua or acuosa) else NC
+    for i in range(n):
         zi = z[i] if i < len(z) else 0.0
         yi = y[i] if i < len(y) else 0.0
         xi = x[i] if i < len(x) else 0.0
-        comp.append([
-            lab(_sub_markup(_i18n.t(NOMBRES[i]))),
+        fila = [
+            lab(_sub_markup(_i18n.t(_eng.componente_etiqueta(i)))),
             val(zi) if sz > 0 else vac(),
             val(yi) if hay_vap else vac(),
             val(xi) if hay_liq else vac(),
-        ])
-    t = Table(comp, colWidths=[W*0.34, W*0.22, W*0.22, W*0.22], hAlign='CENTER')
+        ]
+        if acuosa:
+            wi = w[i] if (w is not None and i < len(w)) else 0.0
+            fila.append(val(wi) if hay_aq else vac())
+        comp.append(fila)
+    t = Table(comp, colWidths=_anchos(W, acuosa), hAlign='CENTER')
     est = _estilo_tabla_datos(len(comp), n_hdr=2)
     est.add('LEFTPADDING', (0, 2), (0, -1), 8)
     t.setStyle(est)
     return t
 
 
-def _tabla_propiedades_fase(props, z, y, x, hay_vap, hay_liq, W):
-    """Construye la tabla de propiedades por fase (Mezcla|Vapor|Líquido),
+def _tabla_propiedades_fase(props, z, y, x, hay_vap, hay_liq, W, pW=None,
+                            hay_aq=False, agua=False, sel=None, fase_mezcla=None):
+    """Tabla de propiedades por fase (Mezcla|Vapor|Líquido[|Acuosa]),
     replicando los cálculos de las pestañas de saturación/hidratos."""
     import math as _math
     import unidades as _u
@@ -291,26 +306,38 @@ def _tabla_propiedades_fase(props, z, y, x, hay_vap, hay_liq, W):
     import eos as _eng
     from pestana_saturacion import _PROP_SAT, _conv_prop
     E = _estilos()
+    NC = _eng.NC
     def hdr(s):   return Paragraph(s, E['hdr'])
     def lab(s):   return Paragraph(s, E['lbl'])
     def val(txt): return Paragraph(txt, E['val'])
 
     sz = sum(z) if z else 0.0
     p = props or {}
-    _pc_v = _pc.poder_calorifico_fase(y, p.get('PM_v')) if hay_vap else {}
-    _pc_l = _pc.poder_calorifico_fase(x, p.get('PM_l')) if hay_liq else {}
-    _pc_z = _pc.poder_calorifico_fase(z, None) if sz > 0 else {}
-    _gpm_v = _pc.gpm_c3(y) if hay_vap else None
-    _gpm_z = _pc.gpm_c3(z) if sz > 0 else None
-    _pm_z = sum(z[i]*_eng.PM[i] for i in range(len(z))) if sz > 0 else None
-    _rho_z = None
-    rho_v = p.get('rho_v'); rho_l = p.get('rho_l')
-    Vm = p.get('Vm'); Lm = p.get('Lm')
-    if hay_vap and hay_liq and rho_v and rho_l and Vm is not None and Lm is not None:
-        inv = (Vm/rho_v if rho_v>0 else 0)+(Lm/rho_l if rho_l>0 else 0)
-        if inv>0: _rho_z = 1.0/inv
-    elif hay_liq and rho_l: _rho_z = rho_l
-    elif hay_vap and rho_v: _rho_z = rho_v
+    # poder calorífico y GPM sobre la base HC (13 comp. renormalizados)
+    def _hc(c):
+        c13 = list(c[:NC]); s_ = sum(c13)
+        return [v/s_ for v in c13] if s_ > 0 else c13
+    y13, x13, z13 = _hc(y), _hc(x), _hc(z)
+    def _pm13(c): return sum(c[i]*_eng.PM[i] for i in range(NC))
+    _pc_v = _pc.poder_calorifico_fase(y13, _pm13(y13) if agua else p.get('PM_v')) if hay_vap else {}
+    _pc_l = _pc.poder_calorifico_fase(x13, _pm13(x13) if agua else p.get('PM_l')) if hay_liq else {}
+    _pc_z = _pc.poder_calorifico_fase(z13, None) if sz > 0 else {}
+    _gpm_v = _pc.gpm_c3(y13) if hay_vap else None
+    _gpm_z = _pc.gpm_c3(z13) if (sz > 0 and not agua) else None
+    if agua:
+        _pm_z = p.get('PM_z'); _rho_z = p.get('rho_z')
+    else:
+        _pm_z = sum(z[i]*_eng.PM[i] for i in range(min(len(z), NC))) if sz > 0 else None
+        _rho_z = None
+        rho_v = p.get('rho_v'); rho_l = p.get('rho_l')
+        Vm = p.get('Vm'); Lm = p.get('Lm')
+        if hay_vap and hay_liq and rho_v and rho_l and Vm is not None and Lm is not None:
+            inv = (Vm/rho_v if rho_v>0 else 0)+(Lm/rho_l if rho_l>0 else 0)
+            if inv>0: _rho_z = 1.0/inv
+        elif fase_mezcla == 'V' and rho_v: _rho_z = rho_v   # punto de rocío
+        elif fase_mezcla == 'L' and rho_l: _rho_z = rho_l   # punto de burbuja
+        elif hay_liq and rho_l: _rho_z = rho_l
+        elif hay_vap and rho_v: _rho_z = rho_v
 
     def _ok(v):
         return v is not None and not (isinstance(v, float) and
@@ -329,28 +356,41 @@ def _tabla_propiedades_fase(props, z, y, x, hay_vap, hay_liq, W):
 
     def _val_mezcla(key, conv):
         if sz <= 0: return None
-        if key == 'pm':       return _conv_prop(conv, _pm_z)
+        if key == 'pm':       return _conv_prop(conv, _pm_z) if _pm_z else None
         if key == 'densidad': return _conv_prop(conv, _rho_z) if _rho_z else None
         if key in ('hhv_mas','lhv_mas','hhv_vol','lhv_vol'):
             v = _pc_z.get(key); return v if _ok(v) else None
         if key == 'gpm':      return _gpm_z if _ok(_gpm_z) else None
         return None
 
-    filas = [[lab(""), hdr(_i18n.t("Composicion General")),
-              hdr(_i18n.t("Fase Vapor")), hdr(_i18n.t("Fase Liquida"))]]
+    _mapa_w = {'pm': 'PM', 'z': 'Z', 'densidad': 'rho', 'sg': 'sg',
+               'entalpia': 'H', 'entropia': 'S', 'viscosidad': 'mu'}
+    acuosa = pW is not None
+    h = [lab(""), hdr(_i18n.t("Composicion General")),
+         hdr(_i18n.t("Fase Vapor")), hdr(_i18n.t("Fase Liquida"))]
+    if acuosa:
+        h.append(hdr(_i18n.t("Fase Acuosa")))
+    filas = [h]
     for (key, base, mag, dec, kv, kl, conv) in _PROP_SAT:
+        if sel is not None and key not in sel:
+            continue            # sólo las propiedades activas en la pestaña
         unidad = f" [{_u.u(mag)}]" if mag else ""
         vz = _val_mezcla(key, conv)
         vv = _val_fase(kv, _pc_v, conv, _gpm_v, hay_vap)
         vl = _val_fase(kl, _pc_l, conv, None, hay_liq)
         fmt = f"{{:.{dec}f}}"
-        filas.append([
+        fila = [
             lab(f"{_i18n.t(base)}{unidad}:"),
             val(fmt.format(vz)) if vz is not None else val(""),
             val(fmt.format(vv)) if vv is not None else val(""),
             val(fmt.format(vl)) if vl is not None else val(""),
-        ])
-    t = Table(filas, colWidths=[W*0.34, W*0.22, W*0.22, W*0.22], hAlign='CENTER')
+        ]
+        if acuosa:
+            kw = _mapa_w.get(key)
+            vw = _conv_prop(conv, (pW or {}).get(kw)) if (kw and hay_aq) else None
+            fila.append(val(fmt.format(vw)) if _ok(vw) else val(""))
+        filas.append(fila)
+    t = Table(filas, colWidths=_anchos(W, acuosa), hAlign='CENTER')
     est = _estilo_tabla_datos(len(filas), n_hdr=1)
     est.add('LEFTPADDING', (0, 1), (0, -1), 8)
     t.setStyle(est)
@@ -438,6 +478,100 @@ def _grafica_envolvente(resultado):
     return tmp.name
 
 
+def _filas_resumen_equilibrio(sel, mezcla, fases, hay, comp, pm_fases, E):
+    """Filas del resumen de Equilibrio según las propiedades ACTIVAS en la
+    pestaña (en su orden).  mezcla/fases: dict clave → valor (internas);
+    comp = (z, y, x[, w]) para el poder calorífico/GPM (base HC)."""
+    import unidades as _u
+    import eos as _eng
+    import poder_calorifico as _pc
+    from ventana_principal import PROP_RESUMEN
+    NC = _eng.NC
+    def lab(s):  return Paragraph(s, E['lbl'])
+    def val(v, d=4): return Paragraph(_f(v, d), E['val'])
+    def vac():   return Paragraph("", E['val'])
+    def _hc(c):
+        c13 = list(c[:NC]) if c else []; s_ = sum(c13)
+        return [v/s_ for v in c13] if s_ > 0 else None
+    comp13 = [_hc(c) for c in comp]
+    pcs = [(_pc.poder_calorifico_fase(c, None) if c else {}) for c in comp13]
+    conv = {'densidad': _u.dens_desde, 'entalpia': _u.H_desde, 'entropia': _u.S_desde}
+    filas = []
+    for key, base, mag, dec, tiene_mix in PROP_RESUMEN:
+        if sel is not None and key not in sel:
+            continue
+        unidad = f" [{_u.u(mag)}]" if mag else ""
+        if key in ('hhv_mas', 'lhv_mas', 'hhv_vol', 'lhv_vol'):
+            vm = pcs[0].get(key) if pcs[0] else None
+            vf = [(pcs[k+1].get(key) if (k+1 < len(pcs) and pcs[k+1] and k < 2) else None)
+                  for k in range(len(fases))]
+        elif key == 'gpm':
+            vm = None
+            vf = [(_pc.gpm_c3(comp13[1]) if (comp13[1] and k == 0) else None)
+                  for k in range(len(fases))]
+        else:
+            c = conv.get(key)
+            vm = mezcla.get(key) if tiene_mix else None
+            vf = [f.get(key) for f in fases]
+            if c:
+                vm = c(vm) if vm is not None else None
+                vf = [c(v) if v is not None else None for v in vf]
+        d = 6 if (key == 'frac_molar' and len(fases) == 3) else dec
+        filas.append([lab(f"{_i18n.t(base)}{unidad}:"),
+                      val(vm, d) if vm is not None else vac()] +
+                     [val(v, d) if (h and v is not None) else vac()
+                      for v, h in zip(vf, hay)])
+    return filas
+
+
+def _hoja_equilibrio_agua(story, res3, ent, W, E, sel=None):
+    """Resumen y composición del flash con agua (V, L, Acuosa)."""
+    import unidades as _u
+    import eos as _eng
+    NC = _eng.NC
+    rt = res3.get('rt', {}) or {}
+    pr = res3.get('props', {}) or {}
+    b = [rt.get('beta_V') or 0.0, rt.get('beta_L') or 0.0, rt.get('beta_W') or 0.0]
+    hay = [v > 1e-9 for v in b]
+    q = [pr.get('V') or {}, pr.get('L') or {}, pr.get('W') or {}]
+    fm = res3.get('frac_masica') or [None]*3
+    fv = res3.get('frac_vol') or [None]*3
+    def hdr(s):  return Paragraph(s, E['hdr'])
+    def lab(s):  return Paragraph(s, E['lbl'])
+    def val(v, d=4): return Paragraph(_f(v, d), E['val'])
+    def vac():   return Paragraph("", E['val'])
+    def fila(etq, mezcla, vals, d=4, conv=None):
+        c = (lambda v: conv(v) if (v is not None and conv) else v)
+        return ([lab(etq), val(c(mezcla), d) if mezcla is not None else vac()] +
+                [val(c(v), d) if (h and v is not None) else vac()
+                 for v, h in zip(vals, hay)])
+    claves = {'PM': 'pm', 'Z': 'z', 'rho': 'densidad', 'sg': 'sg', 'H': 'entalpia',
+              'S': 'entropia', 'mu': 'viscosidad'}
+    fases = []
+    for k in range(3):
+        f = {claves[c]: v for c, v in q[k].items() if c in claves}
+        f['frac_molar'] = b[k]; f['frac_masica'] = fm[k]; f['frac_vol'] = fv[k]
+        fases.append(f)
+    mezcla = {'densidad': res3.get('rho_z'), 'pm': res3.get('PM_z'),
+              'entalpia': res3.get('H_z'), 'entropia': res3.get('S_z')}
+    z_ = list(ent.get('composicion') or [])
+    resumen = [[lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
+                hdr(_i18n.t("Fase Liquida")), hdr(_i18n.t("Fase Acuosa"))]]
+    resumen += _filas_resumen_equilibrio(sel, mezcla, fases, hay,
+                                         (z_, rt.get('y'), rt.get('x'), rt.get('w')),
+                                         None, E)
+    t = Table(resumen, colWidths=_anchos(W, True), hAlign='CENTER')
+    t.setStyle(_estilo_tabla_datos(len(resumen), n_hdr=1))
+    story.append(t)
+    story.append(Spacer(1, 8))
+    story.append(_titulo_seccion(_i18n.t("Composicion de las fases:"), W))
+    story.append(Spacer(1, 6))
+    z = list(ent.get('composicion') or [0.0]*(NC + 1))
+    story.append(_tabla_composicion(z, rt.get('y') or [], rt.get('x') or [],
+                                    hay[0], hay[1], W, w=rt.get('w') or [],
+                                    hay_aq=hay[2], agua=True))
+
+
 def generar_pdf(estado, path):
     """
     Genera el reporte PDF del calculo flash (Equilibrio de fases).
@@ -457,6 +591,7 @@ def generar_pdf(estado, path):
         tabs = estado.get('tabs', {})
         t_eq  = tabs.get('equilibrio', {}) or {}
         res   = t_eq.get('resultado') or {}
+        res3  = t_eq.get('resultado_trifasico') or {}
         ent   = t_eq.get('entrada', {}) or {}
         t_sat = tabs.get('saturacion', {}) or {}
         t_hid = tabs.get('hidratos', {}) or {}
@@ -467,7 +602,7 @@ def generar_pdf(estado, path):
                   if t_env.get('resultado') else None
 
         # Se exporta lo que esté calculado. Si NADA lo está, se avisa.
-        if not (res or res_sat or res_hid or res_env):
+        if not (res or res3 or res_sat or res_hid or res_env):
             return False, (
                 "No hay resultados para exportar.\n"
                 "Ejecute al menos un cálculo (Equilibrio de fases, Saturación, "
@@ -505,7 +640,7 @@ def generar_pdf(estado, path):
         # ══════════════════════════════════════════════════════════
         # HOJA 1 — Equilibrio de fases (solo si está calculado)
         # ══════════════════════════════════════════════════════════
-        if res:
+        if res or res3:
             _primera = False
             story.append(_fecha_par())
             story.append(Spacer(1, 7))
@@ -551,93 +686,105 @@ def generar_pdf(estado, path):
             # ═══ Resumen de los calculos ═════════════════════════════
             story.append(_titulo_seccion(_i18n.t("Resumen de los calculos:"), W))
             story.append(Spacer(1, 6))
+            if res3:
+                _hoja_equilibrio_agua(story, res3, ent, W, E, sel=t_eq.get('props'))
 
-            V  = res.get('V')  or 0.0
-            L  = res.get('L')  or 0.0
-            Vm = res.get('Vm')
-            Lm = res.get('Lm')
-            ZV = res.get('ZV')
-            ZL = res.get('ZL')
-            PM_v  = res.get('PM_v');  PM_l  = res.get('PM_l');  PM_z = res.get('PM_z')
-            rho_v = res.get('rho_v'); rho_l = res.get('rho_l')
-            sg_v  = res.get('sg_v');  sg_l  = res.get('sg_l')
+            if not res3:
+                V  = res.get('V')  or 0.0
+                L  = res.get('L')  or 0.0
+                Vm = res.get('Vm')
+                Lm = res.get('Lm')
+                ZV = res.get('ZV')
+                ZL = res.get('ZL')
+                PM_v  = res.get('PM_v');  PM_l  = res.get('PM_l');  PM_z = res.get('PM_z')
+                rho_v = res.get('rho_v'); rho_l = res.get('rho_l')
+                sg_v  = res.get('sg_v');  sg_l  = res.get('sg_l')
 
-            # Densidad de la mezcla (volumenes aditivos), si no viene calculada
-            rho_z = res.get('rho_z')
-            if rho_z is None:
-                if rho_v and rho_l:
-                    inv = ((Vm or 0)/rho_v if rho_v > 0 else 0) + \
-                          ((Lm or 0)/rho_l if rho_l > 0 else 0)
-                    rho_z = 1.0/inv if inv > 0 else None
-                elif rho_l:
-                    rho_z = rho_l
-                elif rho_v:
-                    rho_z = rho_v
+                # Densidad de la mezcla (volumenes aditivos), si no viene calculada
+                rho_z = res.get('rho_z')
+                if rho_z is None:
+                    if rho_v and rho_l:
+                        inv = ((Vm or 0)/rho_v if rho_v > 0 else 0) + \
+                              ((Lm or 0)/rho_l if rho_l > 0 else 0)
+                        rho_z = 1.0/inv if inv > 0 else None
+                    elif rho_l:
+                        rho_z = rho_l
+                    elif rho_v:
+                        rho_z = rho_v
 
-            # Densidad al sistema de unidades activo (MW y Z no cambian)
-            rho_z = _u.dens_desde(rho_z) if rho_z is not None else None
-            rho_v = _u.dens_desde(rho_v) if rho_v is not None else None
-            rho_l = _u.dens_desde(rho_l) if rho_l is not None else None
+                # Fracción volumétrica de fase: β·PM/ρ normalizado (PVTsim)
+                _vv = V*PM_v/rho_v if (V > 0 and PM_v and rho_v) else 0.0
+                _vl = L*PM_l/rho_l if (L > 0 and PM_l and rho_l) else 0.0
+                fv_v = _vv/(_vv+_vl) if (_vv+_vl) > 0 and V > 0 else None
+                fv_l = _vl/(_vv+_vl) if (_vv+_vl) > 0 and L > 0 else None
+                rho_z_int = rho_z
+                # Densidad al sistema de unidades activo (MW y Z no cambian)
+                rho_z = _u.dens_desde(rho_z) if rho_z is not None else None
+                rho_v = _u.dens_desde(rho_v) if rho_v is not None else None
+                rho_l = _u.dens_desde(rho_l) if rho_l is not None else None
 
-            def hdr(s):        return Paragraph(s, E['hdr'])
-            def lab(s):        return Paragraph(s, E['lbl'])
-            def val(v, d=4):   return Paragraph(_f(v, d), E['val'])
-            def vac():         return Paragraph("", E['val'])
+                def hdr(s):        return Paragraph(s, E['hdr'])
+                def lab(s):        return Paragraph(s, E['lbl'])
+                def val(v, d=4):   return Paragraph(_f(v, d), E['val'])
+                def vac():         return Paragraph("", E['val'])
 
-            resumen = [
-                [lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
-                 hdr(_i18n.t("Fase Liquida"))],
-                [lab(_i18n.t("Fase fraccion [molar]:")),      vac(),
-                 val(V),  val(L)],
-                [lab(_i18n.t("Fase fraccion [masica]:")),     vac(),
-                 val(Vm), val(Lm)],
-                [lab(_i18n.t("Gravedad especifica:")),        vac(),
-                 val(sg_v), val(sg_l)],
-                [lab(f"{_i18n.t('Densidad masica')} [{_u.u('dens')}]:"),   val(rho_z),
-                 val(rho_v), val(rho_l)],
-                [lab(_i18n.t("Factor de compresibilidad:")),  vac(),
-                 val(ZV), val(ZL)],
-                [lab(_i18n.t("Peso molecular:")),             val(PM_z),
-                 val(PM_v), val(PM_l)],
-            ]
-            t = Table(resumen, colWidths=[W*0.34, W*0.22, W*0.22, W*0.22],
-                      hAlign='CENTER')
-            t.setStyle(_estilo_tabla_datos(len(resumen), n_hdr=1))
-            story.append(t)
-            story.append(Spacer(1, 8))
+                hayV2 = V > 0; hayL2 = L > 0
+                fases2 = [
+                    {'frac_molar': V, 'frac_masica': Vm, 'frac_vol': fv_v, 'sg': sg_v,
+                     'densidad': res.get('rho_v'), 'z': ZV, 'pm': PM_v,
+                     'entalpia': res.get('H_vapor'), 'entropia': res.get('S_vapor'),
+                     'viscosidad': res.get('mu_v')},
+                    {'frac_molar': L, 'frac_masica': Lm, 'frac_vol': fv_l, 'sg': sg_l,
+                     'densidad': res.get('rho_l'), 'z': ZL, 'pm': PM_l,
+                     'entalpia': res.get('H_liquido'), 'entropia': res.get('S_liquido'),
+                     'viscosidad': res.get('mu_l')},
+                ]
+                mezcla2 = {'densidad': rho_z_int, 'pm': PM_z,
+                           'entalpia': res.get('H_stream'), 'entropia': res.get('S_stream')}
+                resumen = [[lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
+                            hdr(_i18n.t("Fase Liquida"))]]
+                resumen += _filas_resumen_equilibrio(
+                    t_eq.get('props'), mezcla2, fases2, [hayV2, hayL2],
+                    (list(ent.get('composicion') or []), res.get('y'), res.get('x')),
+                    None, E)
+                t = Table(resumen, colWidths=[W*0.34, W*0.22, W*0.22, W*0.22],
+                          hAlign='CENTER')
+                t.setStyle(_estilo_tabla_datos(len(resumen), n_hdr=1))
+                story.append(t)
+                story.append(Spacer(1, 8))
 
-            # ═══ Composicion de las fases ════════════════════════════
-            story.append(_titulo_seccion(_i18n.t("Composicion de las fases:"), W))
-            story.append(Spacer(1, 6))
+                # ═══ Composicion de las fases ════════════════════════════
+                story.append(_titulo_seccion(_i18n.t("Composicion de las fases:"), W))
+                story.append(Spacer(1, 6))
 
-            z = list(ent.get('composicion') or [0.0]*NC)
-            x = list(res.get('x') or [0.0]*NC)
-            y = list(res.get('y') or [0.0]*NC)
+                z = list(ent.get('composicion') or [0.0]*NC)
+                x = list(res.get('x') or [0.0]*NC)
+                y = list(res.get('y') or [0.0]*NC)
 
-            comp = [
-                [lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
-                 hdr(_i18n.t("Fase Liquida"))],
-                [lab(""), hdr(_i18n.t("Fraccion Molar")), hdr(_i18n.t("Fraccion Molar")),
-                 hdr(_i18n.t("Fraccion Molar"))],
-            ]
-            for i in range(NC):
-                zi = z[i] if i < len(z) else 0.0
-                yi = y[i] if i < len(y) else 0.0
-                xi = x[i] if i < len(x) else 0.0
-                comp.append([
-                    lab(_sub_markup(_i18n.t(NOMBRES[i]))),  # <sub> para el subindice (N2, CO2)
-                    val(zi),
-                    val(yi) if V > 0 else vac(),
-                    val(xi) if L > 0 else vac(),
-                ])
-            t = Table(comp, colWidths=[W*0.34, W*0.22, W*0.22, W*0.22],
-                      hAlign='CENTER')
-            est = _estilo_tabla_datos(len(comp), n_hdr=2)
-            # Nombres de componentes alineados a la derecha (como el original),
-            # con un poco más de aire a la izquierda.
-            est.add('LEFTPADDING', (0, 2), (0, -1), 8)
-            t.setStyle(est)
-            story.append(t)
+                comp = [
+                    [lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
+                     hdr(_i18n.t("Fase Liquida"))],
+                    [lab(""), hdr(_i18n.t("Fraccion Molar")), hdr(_i18n.t("Fraccion Molar")),
+                     hdr(_i18n.t("Fraccion Molar"))],
+                ]
+                for i in range(NC):
+                    zi = z[i] if i < len(z) else 0.0
+                    yi = y[i] if i < len(y) else 0.0
+                    xi = x[i] if i < len(x) else 0.0
+                    comp.append([
+                        lab(_sub_markup(_i18n.t(NOMBRES[i]))),  # <sub> para el subindice (N2, CO2)
+                        val(zi),
+                        val(yi) if V > 0 else vac(),
+                        val(xi) if L > 0 else vac(),
+                    ])
+                t = Table(comp, colWidths=[W*0.34, W*0.22, W*0.22, W*0.22],
+                          hAlign='CENTER')
+                est = _estilo_tabla_datos(len(comp), n_hdr=2)
+                # Nombres de componentes alineados a la derecha (como el original),
+                # con un poco más de aire a la izquierda.
+                est.add('LEFTPADDING', (0, 2), (0, -1), 8)
+                t.setStyle(est)
+                story.append(t)
 
         # ══════════════════════════════════════════════════════════
         # Helpers de página adicional (salto + fecha en cada hoja)
@@ -689,13 +836,25 @@ def generar_pdf(estado, path):
 
             story.append(_titulo_seccion(_i18n.t("Composicion de las fases:"), W))
             story.append(Spacer(1, 6))
-            story.append(_tabla_composicion(z_s, y_s, x_s, True, True, W))
+            agua_s = bool(res_sat.get('agua'))
+            w_s = res_sat.get('w') if agua_s else None
+            hay_aq_s = bool(agua_s and w_s and (res_sat.get('beta_W') or 0) > 0)
+            if agua_s and not e_sat.get('z'):
+                z_s = list(res_sat.get('z') or z_s)
+            story.append(_tabla_composicion(z_s, y_s, x_s, True, True, W,
+                                            w=(w_s if hay_aq_s else None),
+                                            hay_aq=hay_aq_s, agua=agua_s))
             story.append(Spacer(1, 7))
 
             story.append(_titulo_seccion(_i18n.t("Propiedades del punto:"), W))
             story.append(Spacer(1, 6))
             story.append(_tabla_propiedades_fase(props_s, z_s, y_s, x_s,
-                                                 True, True, W))
+                                                 True, True, W,
+                                                 pW=(res_sat.get('props_w') if hay_aq_s else None),
+                                                 hay_aq=hay_aq_s, agua=agua_s,
+                                                 sel=t_sat.get('props'),
+                                                 fase_mezcla=('V' if 'roc' in tipo_s.lower()
+                                                              else 'L')))
 
         # ══════════════════════════════════════════════════════════
         # HOJA — Formación de hidratos
@@ -704,9 +863,16 @@ def generar_pdf(estado, path):
             _abrir_hoja(_i18n.t("Formación de hidratos"))
             flash_h = res_hid.get('flash', {}) or {}
             T_h = res_hid.get('T_R'); P_h = res_hid.get('P_psia')
-            Vh = flash_h.get('V')
-            hay_vap_h = (Vh is None) or (Vh > 1e-9)
-            hay_liq_h = (Vh is None) or (Vh < 1.0 - 1e-9)
+            agua_h = bool(res_hid.get('agua'))
+            if agua_h:
+                hay_vap_h = (flash_h.get('bV') or 0.0) > 1e-12
+                hay_liq_h = (flash_h.get('bL') or 0.0) > 1e-12
+            else:
+                Vh = flash_h.get('V')
+                hay_vap_h = (Vh is None) or (Vh > 1e-9)
+                hay_liq_h = (Vh is None) or (Vh < 1.0 - 1e-9)
+            w_h = res_hid.get('w') if agua_h else None
+            hay_aq_h = bool(agua_h and w_h and (flash_h.get('bW') or 0) > 0)
             x_h = list(flash_h.get('x') or [0.0]*NC)
             y_h = list(flash_h.get('y') or [0.0]*NC)
             z_h = list(flash_h.get('z') or res_hid.get('z') or [0.0]*NC)
@@ -724,13 +890,18 @@ def generar_pdf(estado, path):
 
             story.append(_titulo_seccion(_i18n.t("Composicion de las fases:"), W))
             story.append(Spacer(1, 6))
-            story.append(_tabla_composicion(z_h, y_h, x_h, hay_vap_h, hay_liq_h, W))
+            story.append(_tabla_composicion(z_h, y_h, x_h, hay_vap_h, hay_liq_h, W,
+                                            w=(w_h if hay_aq_h else None),
+                                            hay_aq=hay_aq_h, agua=agua_h))
             story.append(Spacer(1, 7))
 
             story.append(_titulo_seccion(_i18n.t("Propiedades del punto:"), W))
             story.append(Spacer(1, 6))
             story.append(_tabla_propiedades_fase(props_h, z_h, y_h, x_h,
-                                                 hay_vap_h, hay_liq_h, W))
+                                                 hay_vap_h, hay_liq_h, W,
+                                                 pW=(res_hid.get('props_w') if hay_aq_h else None),
+                                                 hay_aq=hay_aq_h, agua=agua_h,
+                                                 sel=(t_hid.get('entrada', {}) or {}).get('props')))
 
         # ══════════════════════════════════════════════════════════
         # HOJA — Envolvente de fases (gráfica en grises)

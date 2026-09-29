@@ -245,6 +245,7 @@ W_VAL_A  = 120     # 230 + 4·120 = 710 (igual ancho total)
 PROP_RESUMEN = [
     ('frac_molar',  'Fase fraccion [molar]',      None,   4, False),
     ('frac_masica', 'Fase fraccion [masica]',     None,   4, False),
+    ('frac_vol',    'Fase fraccion [volumetrica]', None,  4, False),
     ('sg',          'Gravedad especifica',         None,   4, False),
     ('densidad',    'Densidad masica',             'dens', 4, True),
     ('z',           'Factor de compresibilidad',   None,   4, False),
@@ -739,6 +740,9 @@ class TabEquilibrio(QWidget):
             },
             'props': list(self._props_sel),
             'resultado': self.last_result,   # dict o None
+            # flash con agua (trifásico): resultado numérico para PDF/archivo
+            'resultado_trifasico': (getattr(self, '_res_trifasico', None)
+                                    if getattr(self, '_ultimo_trifasico', None) else None),
         }
 
     def set_estado(self, datos):
@@ -788,7 +792,19 @@ class TabEquilibrio(QWidget):
                     self._on_props_resize(self, len(self._props_sel))
         # Resultado
         r = datos.get('resultado')
-        if r:
+        rt3 = datos.get('resultado_trifasico')
+        if rt3 and rt3.get('rt'):
+            try:
+                import numpy as _np
+                rt = dict(rt3['rt'])
+                for k in ('y', 'x', 'w', 'PM'):
+                    if rt.get(k) is not None:
+                        rt[k] = _np.array(rt[k], dtype=float)
+                kij = self._kij_get() if self._kij_get is not None else kij_user
+                self._render_trifasico(rt, self.get_z(), rt3.get('eos', eos_code), kij)
+            except Exception:
+                pass
+        elif r:
             self.last_result = r
             self._render(r)
 
@@ -1030,6 +1046,14 @@ class TabEquilibrio(QWidget):
         fmV = mV/mT if mT>0 else 0.0; fmL = mL/mT if mT>0 else 0.0
         fmW = mW/mT if mT>0 else 0.0
 
+        # Fracción volumétrica de fase (como PVTsim "Volume%"): volumen de cada
+        # fase β·PM/ρ sobre el volumen total (suma de las fases presentes).
+        def _vf(b, q):
+            return b*q['PM']/q['rho'] if (b > 0 and q.get('PM') and q.get('rho')) else 0.0
+        vV, vL, vW = _vf(bV, pV), _vf(bL, pL), _vf(bW, pW)
+        vT = vV + vL + vW
+        fvV = vV/vT if vT > 0 else 0.0; fvL = vL/vT if vT > 0 else 0.0
+        fvW = vW/vT if vT > 0 else 0.0
         # Densidad de mezcla = 1 / Σ(fracción másica / densidad)  (unid. internas)
         def _inv(fm, rho): return (fm/rho) if (rho and rho>0) else 0.0
         inv = _inv(fmV,pV.get('rho'))+_inv(fmL,pL.get('rho'))+_inv(fmW,pW.get('rho'))
@@ -1079,6 +1103,7 @@ class TabEquilibrio(QWidget):
         valores = {
             'frac_molar':  ("",             cf(bV,hayV,6), cf(bL,hayL,6), cf(bW,hayW,6)),
             'frac_masica': ("",             cf(fmV,hayV),  cf(fmL,hayL),  cf(fmW,hayW)),
+            'frac_vol':    ("",             cf(fvV,hayV),  cf(fvL,hayL),  cf(fvW,hayW)),
             'sg':          ("",             cf(pV.get('sg'),hayV), cf(pL.get('sg'),hayL), cf(pW.get('sg'),hayW)),
             'densidad':    (ff(dz(rho_mix)),cf(dz(pV.get('rho')),hayV), cf(dz(pL.get('rho')),hayL), cf(dz(pW.get('rho')),hayW)),
             'z':           ("",             cf(pV.get('Z'),hayV), cf(pL.get('Z'),hayL), cf(pW.get('Z'),hayW)),
@@ -1091,6 +1116,22 @@ class TabEquilibrio(QWidget):
             'hhv_vol':     (pcf(pcz,'hhv_vol'), pcf(pcv,'hhv_vol',hayV), pcf(pcl,'hhv_vol',hayL), ""),
             'lhv_vol':     (pcf(pcz,'lhv_vol'), pcf(pcv,'lhv_vol',hayV), pcf(pcl,'lhv_vol',hayL), ""),
             'gpm':         ("",             pcf({'g':gpm_v},'g',hayV,4) if gpm_v is not None else "", "", ""),
+        }
+        # Resultado numérico (unidades internas) para el reporte PDF y para
+        # guardar/restaurar la simulación.
+        def _lst(c):
+            return [float(v) for v in c] if c is not None else None
+        def _q(q):
+            return {k: (float(v) if v is not None else None) for k, v in (q or {}).items()}
+        self._res_trifasico = {
+            'rt': {'beta_V': float(bV), 'beta_L': float(bL), 'beta_W': float(bW),
+                   'y': _lst(y), 'x': _lst(x), 'w': _lst(w),
+                   'Z_V': rt.get('Z_V'), 'Z_L': rt.get('Z_L'), 'Z_W': rt.get('Z_W'),
+                   'PM': _lst(rt.get('PM'))},
+            'eos': eos_code,
+            'props': {'V': _q(pV), 'L': _q(pL), 'W': _q(pW)},
+            'frac_masica': [fmV, fmL, fmW], 'frac_vol': [fvV, fvL, fvW],
+            'rho_z': rho_mix, 'PM_z': PM_mix, 'H_z': H_mix, 'S_z': S_mix,
         }
         # Reconstruir las FILAS del resumen según la selección actual (evita los
         # huecos al agregar/quitar propiedades tras el cálculo) y luego pintar
@@ -1122,6 +1163,7 @@ class TabEquilibrio(QWidget):
             pass
         self.last_result = r
         self._ultimo_trifasico = None
+        self._res_trifasico = None
         self._render(r)
 
     def _paint_res(self, row, col, txt, empty_bg=GRAY_RES):
@@ -1371,9 +1413,16 @@ class TabEquilibrio(QWidget):
         def gpmf(v, ok, dg=4):
             return f(v, dg) if (v is not None and ok) else ""
 
+        # Fracción volumétrica de fase (PVTsim "Volume%"): β·PM/ρ normalizado.
+        _r_v = r.get('rho_v'); _r_l = r.get('rho_l')
+        _vv = V*PM_v/_r_v if (vap_ok and PM_v and _r_v) else 0.0
+        _vl = L*PM_l/_r_l if (liq_ok and PM_l and _r_l) else 0.0
+        fvv = _vv/(_vv+_vl) if (_vv+_vl) > 0 else None
+        fvl = _vl/(_vv+_vl) if (_vv+_vl) > 0 else None
         valores = {
             'frac_molar':  ("",          cv(V, vap_ok),  cv(L, liq_ok)),
             'frac_masica': ("",          cv(Vm, vap_ok), cv(Lm, liq_ok)),
+            'frac_vol':    ("",          cv(fvv, vap_ok), cv(fvl, liq_ok)),
             'sg':          ("",          cv(sg_v, vap_ok),cv(sg_l, liq_ok)),
             'densidad':    (f(rho_z),    cv(rho_v, vap_ok),cv(rho_l, liq_ok)),
             'z':           ("",          cv(ZV, vap_ok), cv(ZL, liq_ok)),
@@ -2442,9 +2491,8 @@ class MainWindow(QMainWindow):
         """Genera un PDF con los resultados del calculo flash (Equilibrio
         de fases). Si no se ha ejecutado el flash, no exporta."""
         estado = self._recopilar_estado()
-        res_eq = (estado.get('tabs', {})
-                        .get('equilibrio', {})
-                        .get('resultado'))
+        t_eq = estado.get('tabs', {}).get('equilibrio', {}) or {}
+        res_eq = t_eq.get('resultado') or t_eq.get('resultado_trifasico')
         if not res_eq:
             dialogos.advertencia(self,
                 "No hay resultados del calculo flash para exportar.\n"
