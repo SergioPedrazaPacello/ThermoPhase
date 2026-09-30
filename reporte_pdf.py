@@ -413,7 +413,11 @@ def _grafica_envolvente(resultado):
     rocio = env.get('rocio', []) or []
     crit = env.get('critico')
     iso = (resultado or {}).get('isocalidad') or {}
-    if not (burb or rocio):
+    lm = env.get('lm')                      # envolvente con agua (4 líneas)
+    puro = bool(env.get('puro'))
+    if puro and not burb:
+        burb = env.get('curva') or []
+    if not (burb or rocio or (lm and any(lm.values()))):
         return None
 
     import unidades as _u
@@ -437,6 +441,37 @@ def _grafica_envolvente(resultado):
         ax.plot(Ti, Pi, linestyle='-', linewidth=0.6, color='#b0b0b0',
                 zorder=2)
 
+    if lm is not None:
+        # ── Envolvente con agua (Lindeloff-Michelsen, estilo PVTsim): las
+        # cuatro fronteras con la misma leyenda de la pestaña, distinguidas en
+        # gris por tipo de línea y marcador.  Cada línea puede tener varios
+        # tramos: se trazan por separado y la leyenda va una sola vez.
+        estilos = [
+            ('2-HC', '#2b2b2b', '-',  '^', 'Rocío HC (2-HC)'),
+            ('3-HC', '#555555', '--', 'v', 'Línea trifásica V-L-Aq' if env.get('binaria')
+                                           else 'Límite 3 fases HC (3-HC)'),
+            ('3-Aq', '#777777', '-.', 's', 'Aparición de agua (3-Aq)'),
+            ('2-Aq', '#999999', ':',  'o', 'Rocío de agua (2-Aq)'),
+        ]
+        for key, col, ls, mk, etq in estilos:
+            primero = True
+            for pts in (lm.get(key) or []):
+                if not pts:
+                    continue
+                Tl = [_u.t_desde_R(t) for _, t in pts]
+                Pl = [_u.p_desde_psia(p) for p, _ in pts]
+                ax.plot(Tl, Pl, linestyle=ls, linewidth=0.9, color=col, zorder=3)
+                ax.plot(Tl, Pl, linestyle='none', marker=mk, markersize=2.6,
+                        color=col, zorder=4,
+                        label=_i18n.t(etq) if primero else None)
+                primero = False
+        Tb = Pb = Td = Pd = []
+    elif puro:
+        if Tb and Pb:
+            ax.plot(Tb, Pb, linestyle='-', linewidth=0.8, color='#3a3a3a', zorder=3)
+            ax.plot(Tb, Pb, linestyle='none', marker='^', markersize=3.2,
+                    color='#3a3a3a', zorder=4, label=_i18n.t('Curva de saturación'))
+        Tb = Pb = Td = Pd = []
     # Burbuja: gris oscuro, línea continua + triángulos
     if Tb and Pb:
         ax.plot(Tb, Pb, linestyle='-', linewidth=0.8, color='#3a3a3a', zorder=3)
@@ -551,6 +586,8 @@ def _hoja_equilibrio_agua(story, res3, ent, W, E, sel=None):
     for k in range(3):
         f = {claves[c]: v for c, v in q[k].items() if c in claves}
         f['frac_molar'] = b[k]; f['frac_masica'] = fm[k]; f['frac_vol'] = fv[k]
+        if k == 0:
+            f['agua_cont'] = res3.get('agua_cont'); f['agua_cap'] = res3.get('agua_cap')
         fases.append(f)
     mezcla = {'densidad': res3.get('rho_z'), 'pm': res3.get('PM_z'),
               'entalpia': res3.get('H_z'), 'entropia': res3.get('S_z')}
@@ -733,7 +770,8 @@ def generar_pdf(estado, path):
                     {'frac_molar': V, 'frac_masica': Vm, 'frac_vol': fv_v, 'sg': sg_v,
                      'densidad': res.get('rho_v'), 'z': ZV, 'pm': PM_v,
                      'entalpia': res.get('H_vapor'), 'entropia': res.get('S_vapor'),
-                     'viscosidad': res.get('mu_v')},
+                     'viscosidad': res.get('mu_v'),
+                     'agua_cont': 0.0, 'agua_cap': res.get('agua_cap')},
                     {'frac_molar': L, 'frac_masica': Lm, 'frac_vol': fv_l, 'sg': sg_l,
                      'densidad': res.get('rho_l'), 'z': ZL, 'pm': PM_l,
                      'entalpia': res.get('H_liquido'), 'entropia': res.get('S_liquido'),

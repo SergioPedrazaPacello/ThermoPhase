@@ -72,11 +72,12 @@ def _vc14(eos=None):
 # ════════════════════════════════════════════════════════════════════════════
 # Densidad
 # ════════════════════════════════════════════════════════════════════════════
-def _rho_eos(comp, PM_fase, Z, T, P):
+def _rho_eos(comp, PM_fase, Z, T, P, eos=None):
     """Densidad másica por la EOS (lb/ft³):  ρ = P·PM/(Z·R·T)."""
     if Z is None or Z <= 0 or PM_fase is None or PM_fase <= 0:
         return None
-    return P*PM_fase/(Z*R_GAS*T)
+    import eos as _e
+    return P*PM_fase/(Z*R_GAS*T)*_e.factor_rho(eos)
 
 
 def _vstar_om14():
@@ -354,7 +355,7 @@ def visc_LBC14(comp, T_R, P, rho_masa, PM_fase, eos):
     if rho_masa is None or rho_masa <= 0 or not PM_fase:
         return None
     Tc, Pc, M, Vc = _lbc_params14(eos)
-    Z = P*PM_fase/(rho_masa*R_GAS*T_R)
+    Z = P*PM_fase*_e.factor_rho(eos)/(rho_masa*R_GAS*T_R)
     return _e.lbc_mezcla(comp, T_R, P, Z, Tc, Pc, M, Vc)
 
 
@@ -366,6 +367,17 @@ def _norm13(comp14):
     c = np.asarray(comp14, dtype=float)[:NC]
     s = c.sum()
     return (c/s) if s > 0 else c, s
+
+def _peneloux(comp, Z, PM_fase, T, P, eos):
+    """(Z, ρ [lb/ft³], ΔH [BTU/lbmol]) con el traslado de Peneloux de PVTsim
+    sobre la composición completa de la fase (14 comp.)."""
+    import eos as _e
+    c = _e.c_peneloux_mezcla(list(comp), eos)
+    Zp = Z - P*c/(R_GAS*T)
+    if Zp <= 0:
+        Zp = Z; c = 0.0
+    return Zp, P*PM_fase/(Zp*R_GAS*T)*_e.factor_rho(eos), -P*c*144.0/778.169262
+
 
 def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
     """Propiedades por fase (vapor, líquido, acuosa) del flash trifásico `rt`.
@@ -392,24 +404,32 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
     if bV > 1e-9 and y is not None:
         y13, _ = _norm13(y)
         PMv = float(np.dot(y, PM14))
-        rho_v = _rho_eos(y, PMv, ZV, T, P)
+        rho_v = _rho_eos(y, PMv, ZV, T, P, eos)
+        ZVr = ZV; dHv = 0.0
+        if metodo_densidad == 'Peneloux':
+            ZVr, rho_v, dHv = _peneloux(y, ZV, PMv, T, P, eos)
         sg_v = PMv/28.9625
         mu_v = visc_LBC14(list(y), T, P, rho_v, PMv, eos)
         try:
             Hv, Sv = HS_fase14(y, T, P, ZV, eos)
         except Exception:
             Hv = Sv = None
-        out['V'] = {'PM': PMv, 'Z': ZV, 'rho': rho_v, 'sg': sg_v,
+        if Hv is not None:
+            Hv += dHv
+        out['V'] = {'PM': PMv, 'Z': ZVr, 'rho': rho_v, 'sg': sg_v,
                     'mu': mu_v, 'H': Hv, 'S': Sv}
 
     # ── Líquido HC ──
     if bL > 1e-9 and x is not None:
         x13, _ = _norm13(x)
         PMl = float(np.dot(x, PM14))
-        rho_l_eos = _rho_eos(x, PMl, ZL, T, P)
+        rho_l_eos = _rho_eos(x, PMl, ZL, T, P, eos)
         rho_l = rho_l_eos
+        ZLr = ZL; dHl = 0.0
         # Densidad de líquido con el método pedido (COSTALD sobre los 13 HC).
-        if metodo_densidad == 'COSTALD':
+        if metodo_densidad == 'Peneloux':
+            ZLr, rho_l, dHl = _peneloux(x, ZL, PMl, T, P, eos)
+        elif metodo_densidad == 'COSTALD':
             try:
                 mix = _e._costald_mix_params(list(x13))
                 if mix is not None:
@@ -432,14 +452,19 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
             Hl, Sl = HS_fase14(x, T, P, ZL, eos)
         except Exception:
             Hl = Sl = None
-        out['L'] = {'PM': PMl, 'Z': ZL, 'rho': rho_l, 'sg': sg_l,
+        if Hl is not None:
+            Hl += dHl
+        out['L'] = {'PM': PMl, 'Z': ZLr, 'rho': rho_l, 'sg': sg_l,
                     'mu': mu_l, 'H': Hl, 'S': Sl}
 
     # ── Fase acuosa (14 comp., parámetros del agua) ──
     if bW > 1e-9 and w is not None:
         PMw = float(np.dot(w, PM14))
-        rho_w_eos = _rho_eos(w, PMw, ZW, T, P)
+        rho_w_eos = _rho_eos(w, PMw, ZW, T, P, eos)
         rho_w = rho_w_eos
+        ZWr = ZW; dHw = 0.0
+        if metodo_densidad == 'Peneloux':
+            ZWr, rho_w, dHw = _peneloux(w, ZW, PMw, T, P, eos)
         # Con COSTALD activo, la fase acuosa usa COSTALD-14 sobre la
         # composición COMPLETA (agua + HC/CO₂ disueltos), igual que la fase
         # líquida HC. Fuera del rango de COSTALD cae a la densidad de la EOS.
@@ -463,7 +488,9 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
             Hw, Sw = HS_fase14(w, T, P, ZW, eos)
         except Exception:
             Hw = Sw = None
-        out['W'] = {'PM': PMw, 'Z': ZW, 'rho': rho_w, 'sg': sg_w,
+        if Hw is not None:
+            Hw += dHw
+        out['W'] = {'PM': PMw, 'Z': ZWr, 'rho': rho_w, 'sg': sg_w,
                     'mu': mu_w, 'H': Hw, 'S': Sw}
 
     return out

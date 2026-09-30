@@ -258,6 +258,8 @@ PROP_RESUMEN = [
     ('hhv_vol',     'HHV volumetrico [BTU/pie3]',  None,   1, True),
     ('lhv_vol',     'LHV volumetrico [BTU/pie3]',  None,   1, True),
     ('gpm',         'GPM C3+ [gal/1000pie3]',      None,   4, False),
+    ('agua_cont',   'Contenido de agua [lb/MMscf]', None,  3, False),
+    ('agua_cap',    'Capacidad de agua [lb/MMscf]', None,  3, False),
 ]
 PROP_DEFAULT = ['frac_molar', 'frac_masica', 'sg', 'densidad', 'z', 'pm']
 _PROP_DEF = {d[0]: d for d in PROP_RESUMEN}
@@ -711,10 +713,14 @@ class TabEquilibrio(QWidget):
             self.sp_F.setValue(_u.t_desde_R(T_int_R))
         self._sync_lock = False
         # 4) Reconstruir el resumen con las unidades nuevas (etiquetas + valores)
-        if getattr(self, 'last_result', None) is not None:
+        #    El resultado con agua (trifásico) se guarda aparte de last_result.
+        if getattr(self, '_ultimo_trifasico', None) is not None:
+            self._render_trifasico(*self._ultimo_trifasico)
+        elif getattr(self, 'last_result', None) is not None:
             self._render(self.last_result)
         else:
             self._rebuild_resumen()
+        self._on_chk(rerender=False)
 
     # ── Handlers ─────────────────────────────────────────────
     def _on_eos_changed(self, idx):
@@ -808,19 +814,29 @@ class TabEquilibrio(QWidget):
             self.last_result = r
             self._render(r)
 
-    def _on_chk(self):
+    def _on_chk(self, *_a, rerender=True):
         masa = self.btn_frac.isChecked()
-        # El botón muestra el modo OPUESTO (la acción que realizará al hacer clic)
-        self.btn_frac.setText("Fraccion molar" if masa else "Fraccion masica")
-        # Col 1 (Composicion General) SIEMPRE "Fraccion Molar"
-        self.hdr_comp_vap.setText(
-            "Fraccion masica" if masa else "Fraccion molar")
-        self.hdr_comp_liq.setText(
-            "Fraccion masica" if masa else "Fraccion molar")
-        if getattr(self, '_ultimo_trifasico', None) is not None:
-            self._render_trifasico(*self._ultimo_trifasico)
-        elif self.last_result:
-            self._render(self.last_result)
+        # El botón muestra el modo OPUESTO (la acción que realizará al hacer
+        # clic).  Los textos se ponen traducidos y se guarda su original en
+        # español, para que un cambio de idioma posterior no los revierta.
+        es_btn = "Fraccion molar" if masa else "Fraccion masica"
+        self.btn_frac.setProperty("_i18n_es", es_btn)
+        self.btn_frac.setText(_i18n.t(es_btn))
+        # Col 1 (Composicion General) SIEMPRE "Fraccion Molar"; las columnas
+        # de fase (vapor, líquido y acuosa) siguen el modo elegido.
+        es_hdr = "Fraccion masica" if masa else "Fraccion molar"
+        for it in (self.hdr_comp_vap, self.hdr_comp_liq, self.hdr_comp_aq):
+            it.setData(Qt.ItemDataRole.UserRole + 99, es_hdr)
+            it.setText(_i18n.t(es_hdr))
+        if not rerender:
+            return
+        try:
+            if getattr(self, '_ultimo_trifasico', None) is not None:
+                self._render_trifasico(*self._ultimo_trifasico)
+            elif self.last_result:
+                self._render(self.last_result)
+        except Exception as ex:
+            dialogos.error(self, f"{ex}")
 
     def _on_item_changed(self, item):
         if item.column() != 1: return
@@ -1100,6 +1116,22 @@ class TabEquilibrio(QWidget):
             v = dd.get(k) if dd else None
             return (f"{v:.{dg}f}") if (v is not None and hay) else ""
 
+        # Contenido y capacidad de agua del gas [lb/MMscf].  Con agua libre
+        # el vapor está saturado (capacidad = contenido); si no, la capacidad
+        # sale de un flash del mismo gas saturado con agua (sólo si se pide).
+        agua_cont = agua_cap = None
+        if hayV and y is not None:
+            import contenido_agua as _ca
+            clave = (tuple(round(float(v), 12) for v in y), round(self.get_T(), 6),
+                     round(self.get_P(), 6), eos_code)
+            agua_cont = _ca.contenido(y[NC])
+            if hayW:
+                agua_cap = agua_cont
+            elif 'agua_cap' in self._props_sel:
+                if getattr(self, '_cache_cap', (None, None))[0] != clave:
+                    self._cache_cap = (clave, _ca.capacidad(
+                        y, self.get_T(), self.get_P(), eos_code))
+                agua_cap = self._cache_cap[1]
         valores = {
             'frac_molar':  ("",             cf(bV,hayV,6), cf(bL,hayL,6), cf(bW,hayW,6)),
             'frac_masica': ("",             cf(fmV,hayV),  cf(fmL,hayL),  cf(fmW,hayW)),
@@ -1116,6 +1148,8 @@ class TabEquilibrio(QWidget):
             'hhv_vol':     (pcf(pcz,'hhv_vol'), pcf(pcv,'hhv_vol',hayV), pcf(pcl,'hhv_vol',hayL), ""),
             'lhv_vol':     (pcf(pcz,'lhv_vol'), pcf(pcv,'lhv_vol',hayV), pcf(pcl,'lhv_vol',hayL), ""),
             'gpm':         ("",             pcf({'g':gpm_v},'g',hayV,4) if gpm_v is not None else "", "", ""),
+            'agua_cont':   ("",             cf(agua_cont, hayV, 3), "", ""),
+            'agua_cap':    ("",             cf(agua_cap, hayV, 3), "", ""),
         }
         # Resultado numérico (unidades internas) para el reporte PDF y para
         # guardar/restaurar la simulación.
@@ -1132,6 +1166,7 @@ class TabEquilibrio(QWidget):
             'props': {'V': _q(pV), 'L': _q(pL), 'W': _q(pW)},
             'frac_masica': [fmV, fmL, fmW], 'frac_vol': [fvV, fvL, fvW],
             'rho_z': rho_mix, 'PM_z': PM_mix, 'H_z': H_mix, 'S_z': S_mix,
+            'agua_cont': agua_cont, 'agua_cap': agua_cap,
         }
         # Reconstruir las FILAS del resumen según la selección actual (evita los
         # huecos al agregar/quitar propiedades tras el cálculo) y luego pintar
@@ -1351,6 +1386,23 @@ class TabEquilibrio(QWidget):
             if self._on_props_resize is not None:
                 self._on_props_resize(self, len(self._props_sel))
 
+    def _capacidad_seca(self, r):
+        """Capacidad de agua [lb/MMscf] del vapor de un flash SIN agua: se
+        calcula sólo si la propiedad está seleccionada y se guarda en r."""
+        if 'agua_cap' not in self._props_sel or not (r.get('V') or 0) > 1e-9:
+            return r.get('agua_cap')
+        if r.get('agua_cap') is None:
+            try:
+                import contenido_agua as _ca
+                ctx = getattr(self, '_hs_ctx', None)
+                T = ctx[1] if ctx else self.get_T()
+                P = ctx[2] if ctx else self.get_P()
+                eos_c = ctx[4] if ctx else _eos_code(self.cmb_eos.currentIndex())
+                r['agua_cap'] = _ca.capacidad(r['y'], T, P, eos_c)
+            except Exception:
+                r['agua_cap'] = None
+        return r.get('agua_cap')
+
     def _render(self, r):
         masa = self.btn_frac.isChecked()
         V=r["V"]; L=r["L"]
@@ -1435,6 +1487,8 @@ class TabEquilibrio(QWidget):
             'hhv_vol':     (pcf(pcz,'hhv_vol'), pcf(pcv,'hhv_vol',vap_ok), pcf(pcl,'hhv_vol',liq_ok)),
             'lhv_vol':     (pcf(pcz,'lhv_vol'), pcf(pcv,'lhv_vol',vap_ok), pcf(pcl,'lhv_vol',liq_ok)),
             'gpm':         ("",                 gpmf(gpm_v, vap_ok),        ""),
+            'agua_cont':   ("",          cv(0.0, vap_ok, 3), ""),
+            'agua_cap':    ("",          cv(self._capacidad_seca(r), vap_ok, 3), ""),
         }
         self._rebuild_resumen(valores)
 

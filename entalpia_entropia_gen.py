@@ -293,8 +293,13 @@ def calcular_HS(z, T_R, P, res_flash, eos=None, kij=None):
         eos = eng.get_eos()
     V  = res_flash.get('V', 0.0)
     L  = 1.0 - V
-    ZV = res_flash.get('ZV', None)
-    ZL = res_flash.get('ZL', None)
+    # H y S se evalúan con la raíz de la EOS: el Z reportado puede venir
+    # modificado por COSTALD o por el traslado de Peneloux.
+    ZV = res_flash.get('ZV_eos') or res_flash.get('ZV', None)
+    ZL = res_flash.get('ZL_eos') or res_flash.get('ZL', None)
+    pen = bool(res_flash.get('peneloux'))
+    def _dH(comp):
+        return eng.dH_peneloux(comp, P, eos) if pen else 0.0
     y  = res_flash.get('y', None)
     x  = res_flash.get('x', None)
 
@@ -305,18 +310,18 @@ def calcular_HS(z, T_R, P, res_flash, eos=None, kij=None):
 
     if V >= 1.0 - 1e-10:
         Z = ZV if ZV is not None else _pick_Z(z, T_R, P, 'V', eos, kij)
-        H = H_fase(z, T_R, P, Z, eos, kij); S = S_fase(z, T_R, P, Z, eos, kij)
+        H = H_fase(z, T_R, P, Z, eos, kij) + _dH(z); S = S_fase(z, T_R, P, Z, eos, kij)
         out.update(H_vapor=H, S_vapor=S, H_stream=H, S_stream=S)
         return out
     if V <= 1e-10:
         Z = ZL if ZL is not None else _pick_Z(z, T_R, P, 'L', eos, kij)
-        H = H_fase(z, T_R, P, Z, eos, kij); S = S_fase(z, T_R, P, Z, eos, kij)
+        H = H_fase(z, T_R, P, Z, eos, kij) + _dH(z); S = S_fase(z, T_R, P, Z, eos, kij)
         out.update(H_liquido=H, S_liquido=S, H_stream=H, S_stream=S)
         return out
     if y is None or x is None:
         return out
-    Hv = H_fase(y, T_R, P, ZV, eos, kij); Sv = S_fase(y, T_R, P, ZV, eos, kij)
-    Hl = H_fase(x, T_R, P, ZL, eos, kij); Sl = S_fase(x, T_R, P, ZL, eos, kij)
+    Hv = H_fase(y, T_R, P, ZV, eos, kij) + _dH(y); Sv = S_fase(y, T_R, P, ZV, eos, kij)
+    Hl = H_fase(x, T_R, P, ZL, eos, kij) + _dH(x); Sl = S_fase(x, T_R, P, ZL, eos, kij)
     out.update(H_vapor=Hv, S_vapor=Sv, H_liquido=Hl, S_liquido=Sl,
                H_stream=V * Hv + L * Hl, S_stream=V * Sv + L * Sl)
     return out

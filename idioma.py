@@ -249,6 +249,14 @@ TRAD = {
     "n-Pentano [nC5]": "n-Pentane [nC5]", "Hexano [C6]": "Hexane [C6]",
     "Heptano [C7]": "Heptane [C7]", "Octano [C8]": "Octane [C8]",
     "Nonano [C9]": "Nonane [C9]",
+    "Contenido de agua [lb/MMscf]": "Water content [lb/MMscf]",
+    "Capacidad de agua [lb/MMscf]": "Water capacity [lb/MMscf]",
+    "Contenido de agua del gas [lb/MMscf]": "Gas water content [lb/MMscf]",
+    "Capacidad de agua del gas [lb/MMscf]": "Gas water capacity [lb/MMscf]",
+    "n-Hexano [nC6]:": "n-Hexane [nC6]:", "n-Hexano [nC6]": "n-Hexane [nC6]",
+    "n-Heptano [nC7]:": "n-Heptane [nC7]:", "n-Heptano [nC7]": "n-Heptane [nC7]",
+    "n-Octano [nC8]:": "n-Octane [nC8]:", "n-Octano [nC8]": "n-Octane [nC8]",
+    "n-Nonano [nC9]:": "n-Nonane [nC9]:", "n-Nonano [nC9]": "n-Nonane [nC9]",
 
     # ── Ampliacion: cadenas que faltaban al traducir ────────────────────
     "Presion (psi):": "Pressure (psi):",

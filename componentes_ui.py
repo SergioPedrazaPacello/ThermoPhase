@@ -109,11 +109,9 @@ def _g_vstar(i):
 
 
 def _g_pen(i, srk):
-    """Traslado de volumen de Peneloux [ft³/lbmol] (misma fórmula del motor)."""
-    tc, pc, w = _g_tc_h(i), _g_pc_h(i), _g_w_pr(i)
-    z_ra = 0.29056 - 0.08775*w
-    rtp = _eng.R_GAS*tc/pc
-    return 0.40768*rtp*(0.29441 - z_ra) if srk else 0.50033*rtp*(0.25969 - z_ra)
+    """Traslado de volumen de Peneloux c' [ft³/lbmol] de PVTsim (base de datos
+    CPenPR/CPenSRK; correlación de PVTsim si el componente no lo tiene)."""
+    return _eng.c_peneloux_i(i, 'SRK_PVT' if srk else 'PR_PVT')
 
 
 def _cp60(coefs):
@@ -166,8 +164,6 @@ _GRUPOS_PROP = [
         ("Peso molecular",                  _g_pm_h,    "PM",    4),
         ("Volumen crítico (viscosidad LBC)", _g_vc_h,   "Vc",    2),
         ("Volumen característico V* (COSTALD)", _g_vstar, "Vstar", 6),
-        ("Traslado de volumen de Peneloux (PR)",  lambda i: _g_pen(i, False), "Vpen", 6),
-        ("Traslado de volumen de Peneloux (SRK)", lambda i: _g_pen(i, True),  "Vpen", 6),
         ("Cp de gas ideal a 60 °F",         _g_cp_h,    "Cp",    4),
     ]),
     ("Parámetros de PVTsim (EOS PR y SRK de PVTsim)", [
@@ -176,6 +172,8 @@ _GRUPOS_PROP = [
         ("Factor acéntrico",                _g_w_p,     None,    6),
         ("Peso molecular",                  _g_pm_p,    "PM",    4),
         ("Volumen crítico (viscosidad LBC)", _g_vc_p,   "Vc",    2),
+        ("Traslado de volumen de Peneloux (PR)",  lambda i: _g_pen(i, False), "Vpen", 6),
+        ("Traslado de volumen de Peneloux (SRK)", lambda i: _g_pen(i, True),  "Vpen", 6),
         ("Cp de gas ideal a 60 °F",         _g_cp_p,    "Cp",    4),
     ]),
 ]

@@ -89,6 +89,8 @@ _PROPS_SENS = [
     ('S_stream', 'Entropía molar (mezcla)',             'S',    False, lambda r: r.get('S_stream')),
     ('y_w',      'Agua en el vapor (fracción molar)',   None,   True,  lambda r: r.get('y_w')),
     ('x_w',      'Agua en el líquido (fracción molar)', None,   True,  lambda r: r.get('x_w')),
+    ('agua_cont','Contenido de agua del gas [lb/MMscf]', None,  True,  lambda r: r.get('agua_cont')),
+    ('agua_cap', 'Capacidad de agua del gas [lb/MMscf]', None,  False, lambda r: r.get('agua_cap')),
 ]
 _PROPS_BY_KEY = {d[0]: d for d in _PROPS_SENS}
 
@@ -103,7 +105,7 @@ def _conv_mag(mag, v):
     return v
 
 
-def _punto(z, T, P, kij, eos, metodo_densidad, agua):
+def _punto(z, T, P, kij, eos, metodo_densidad, agua, capacidad=False):
     """Propiedades en (T, P) con el MISMO motor que la pestaña de Equilibrio:
     sin agua → flash bifásico + H/S del motor de 13 comp. (validados contra
     PVTsim); con agua → flash trifásico (Huron-Vidal) + propiedades por fase
@@ -123,13 +125,18 @@ def _punto(z, T, P, kij, eos, metodo_densidad, agua):
             pass
         if not r.get('V'): out['ZV'] = None
         if not r.get('L'): out['ZL'] = None
+        if (r.get('V') or 0) > 1e-9:
+            import contenido_agua as _ca
+            out['agua_cont'] = 0.0
+            if capacidad:
+                out['agua_cap'] = _ca.capacidad(r['y'], float(T), float(P), eos)
         return out
     import flash_agua as fa
     import propiedades_agua as pa
     z14 = np.asarray(z, dtype=float); z14 = z14/z14.sum()
     rt = fa.flash_trifasico(z14, float(T), float(P), eos=eos, metodo='hv')
     rt = fa.identificar_fases_hc(rt, float(T), float(P), eos, kij)
-    md = metodo_densidad if metodo_densidad in ('COSTALD', 'EOS') else 'EOS'
+    md = metodo_densidad if metodo_densidad in ('COSTALD', 'EOS', 'Peneloux') else 'EOS'
     pr = pa.propiedades_fases(rt, float(T), float(P), eos, metodo_densidad=md)
     bV = rt.get('beta_V', 0.0) or 0.0; bL = rt.get('beta_L', 0.0) or 0.0
     bW = rt.get('beta_W', 0.0) or 0.0
@@ -154,6 +161,12 @@ def _punto(z, T, P, kij, eos, metodo_densidad, agua):
         out['H_stream'] = H; out['S_stream'] = S
     if bV > 1e-12 and rt.get('y') is not None:
         out['y_w'] = float(np.asarray(rt['y'])[13])
+        import contenido_agua as _ca
+        out['agua_cont'] = _ca.contenido(out['y_w'])
+        if bW > 1e-12:
+            out['agua_cap'] = out['agua_cont']          # vapor saturado
+        elif capacidad:
+            out['agua_cap'] = _ca.capacidad(rt['y'], float(T), float(P), eos)
     if bL > 1e-12 and rt.get('x') is not None:
         out['x_w'] = float(np.asarray(rt['x'])[13])
     return out
@@ -194,7 +207,8 @@ class SensWorker(QThread):
                     P = vf if x_es_T else vx
                     try:
                         r = _punto(self.z, T, P, self.kij, self.eos,
-                                   self.metodo_densidad, self.agua)
+                                   self.metodo_densidad, self.agua,
+                                   capacidad=(self.prop_key == 'agua_cap'))
                         val = extractor(r)
                     except Exception:
                         val = None

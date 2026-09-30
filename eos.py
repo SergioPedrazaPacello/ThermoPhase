@@ -664,50 +664,92 @@ def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
 
 
 # ── Corrección de volumen de Peneloux ──────────────────────────
-# Traslado de volumen (volume shift) que mejora la densidad de líquido
-# predicha por la ecuación de estado sin alterar el equilibrio de fases.
-# Formulación de PVTsim (Pedersen y Christensen):
+# Traslado de volumen (volume shift) de Peneloux, formulación de PVTsim
+# (Method Documentation, "SRK/PR with Volume Correction"):
 #
-#   V_corregido = V_EOS − c_m        c_m = Σ xᵢ·cᵢ
+#   V = Ṽ − c          c_m = Σ xᵢ·cᵢ
 #
-# El parámetro de traslado de cada componente se estima a partir de las
-# propiedades críticas y del factor de compresibilidad de Rackett:
+# donde Ṽ es el volumen de la EOS.  PVTsim guarda en su base de datos el
+# término independiente de T, c', en unidades reducidas c'/R [K/atm]
+# (columnas CPenPR y CPenSRK), distinto para PR y para SRK.  Con la opción
+# "PR/SRK Peneloux" (sin (T)) PVTsim usa sólo c' (el término c'' se ignora);
+# validado contra PVTsim: Z de las tres fases al 1e-7.
 #
-#   Z_RA,i = 0.29056 − 0.08775·ωᵢ
+# Para los componentes sin valor en la base (n-heptano a n-nonano) se usa la
+# correlación que PVTsim documenta para orgánicos definidos:
+#   Z_RA = 0.29056 − 0.08775·ω
+#   SRK: c' = 0.40768·(R·Tc/Pc)·(0.29441 − Z_RA)
+#   PR : c' = 0.50033·(R·Tc/Pc)·(0.25969 − Z_RA)
 #
-#   SRK:  cᵢ = 0.40768·(R·Tcᵢ/Pcᵢ)·(0.29441 − Z_RA,i)
-#   PR :  cᵢ = 0.50033·(R·Tcᵢ/Pcᵢ)·(0.25969 − Z_RA,i)
-#
-# El traslado de volumen es algebraicamente neutro en el cálculo del
-# equilibrio (el término c se cancela en la relación de fugacidades),
-# por lo que solo se aplica a la densidad reportada.
+# El traslado no altera el equilibrio (el término −c·P/RT se cancela en las
+# fugacidades); cambia volumen, densidad, Z y entalpía:  H = H_EOS − P·c
+# (con c independiente de T la entropía no cambia).  Se aplica a TODAS las
+# fases (vapor, líquido y acuosa), igual que PVTsim.
+_CPEN_PR_DB = [-0.051547647, -0.020000001, -0.063368268, -0.070558131,
+               -0.077382393, -0.087496951, -0.079088472, -0.075554475,
+               -0.062393371, 0.016938826, None, None, None]
+_CPEN_SRK_DB = [0.01121131, 0.036899831, 0.0076773106, 0.032049719,
+                0.061662193, 0.088837437, 0.095783576, 0.13319522,
+                0.14842798, 0.21910797, None, None, None]
+AGUA_CPEN_PR = 0.037110969
+AGUA_CPEN_SRK = 0.068562075
 
-def c_peneloux_i(i, eos=None):
-    """Parámetro de traslado de volumen de Peneloux del componente i
-    [ft³/lbmol], según la EOS indicada (SRK o PR)."""
+
+def c_peneloux_red(i, eos=None):
+    """c'/R de Peneloux [K/atm] del componente i (i == NC → agua)."""
     if eos is None:
         eos = _EOS_ACTIVA
-    Z_RA = 0.29056 - 0.08775*OMEGA[i]
-    RTc_Pc = R_GAS*TC[i]/PC[i]
-    if es_srk(eos):
-        return 0.40768*RTc_Pc*(0.29441 - Z_RA)
-    return 0.50033*RTc_Pc*(0.25969 - Z_RA)
+    srk = es_srk(eos)
+    if i >= NC:
+        return AGUA_CPEN_SRK if srk else AGUA_CPEN_PR
+    v = (_CPEN_SRK_DB if srk else _CPEN_PR_DB)[i]
+    if v is not None:
+        return v
+    Tc = TC_PVT[i]/1.8; Pc = PC_PVT[i]/PSIA_ATM_STD
+    Z_RA = 0.29056 - 0.08775*OMEGA_PVT[i]
+    if srk:
+        return 0.40768*Tc/Pc*(0.29441 - Z_RA)
+    return 0.50033*Tc/Pc*(0.25969 - Z_RA)
+
+
+def c_peneloux_i(i, eos=None):
+    """Parámetro de traslado de Peneloux del componente i [ft³/lbmol]
+    (i == NC → agua).  Conversión con R en atm (14.696 psia/atm de PVTsim),
+    de modo que P·c/(R·T) coincide exactamente con el de PVTsim."""
+    return c_peneloux_red(i, eos)*R_GAS*1.8/PSIA_ATM_PVT
 
 
 def c_peneloux_mezcla(comp, eos=None):
-    """Parámetro de traslado de volumen de la mezcla [ft³/lbmol]:
-    c_m = Σ xᵢ·cᵢ (regla de mezclado clásica)."""
+    """c_m = Σ xᵢ·cᵢ [ft³/lbmol].  Acepta 13 componentes o 14 (con agua)."""
     if eos is None:
         eos = _EOS_ACTIVA
-    return sum(comp[i]*c_peneloux_i(i, eos) for i in range(NC) if comp[i] != 0)
+    return sum(float(comp[i])*c_peneloux_i(i, eos)
+               for i in range(len(comp)) if comp[i] != 0)
 
 
 def V_liq_peneloux(comp, V_eos, eos=None):
-    """Volumen molar de líquido corregido por Peneloux [ft³/lbmol]:
-    V = V_EOS − c_m.  V_eos es el volumen molar de la ecuación de estado."""
+    """Volumen molar corregido por Peneloux [ft³/lbmol]: V = V_EOS − c_m."""
     c_m = c_peneloux_mezcla(comp, eos)
     V = V_eos - c_m
     return V if V > 0 else V_eos
+
+
+def factor_rho(eos=None):
+    """Factor de la densidad de la EOS para reproducir la de PVTsim.  PVTsim
+    obtiene el volumen como V = Z·R·T/P con R = 82.06 cm³·atm/(mol·K) y la
+    presión convertida con 14.696 psia/atm, y ρ = M/V; frente a ρ = P·M/(Z·R·T)
+    en unidades de campo eso equivale a un factor 1 − 3.35e-5 (validado contra
+    PVTsim en las tres fases).  Para las EOS de HYSYS vale 1."""
+    if eos is None:
+        eos = _EOS_ACTIVA
+    if es_pvtsim(eos):
+        return (R_GAS*1.8*62.42796)/(82.06*PSIA_ATM_PVT)
+    return 1.0
+
+
+def dH_peneloux(comp, P, eos=None):
+    """Corrección de entalpía de Peneloux [BTU/lbmol]: ΔH = −P·c_m."""
+    return -P*c_peneloux_mezcla(comp, eos)*144.0/778.169262
 # ── m, alpha, ai·alpha para cada EOS ───────────────────────────
 # PR: m = 0.37464 + 1.54226 ω − 0.26992 ω²
 # SRK: m = 0.480 + 1.574 ω − 0.176 ω²  (Soave 1972 original)
@@ -1416,13 +1458,15 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
     Lm = L*PM_l/den_m if L>0 else 0.0
 
     ZV_fin = None; ZL_fin = None
+    ZV_eos = None; ZL_eos = None      # raíces de la EOS (sin COSTALD/Peneloux)
     rho_v = None; rho_l = None
     sg_v = None; sg_l = None
 
     if V>0 and PM_v>0:
         am_v=am(y,T,kij); bm_v=bm(y)
         ZV_fin,_=solve_Z(*AB(am_v,bm_v,T,P))
-        rho_v=P*PM_v/(ZV_fin*R_GAS*T)
+        ZV_eos=ZV_fin
+        rho_v=P*PM_v/(ZV_fin*R_GAS*T)*factor_rho()
         sg_v=PM_v/28.9625
         # Corrección de volumen de Peneloux en la fase vapor.  El traslado
         # V = V_EOS − c desplaza el volumen molar y por tanto el factor de
@@ -1432,16 +1476,17 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
             V_eos_v = ZV_fin*R_GAS*T/P
             V_pen_v = V_liq_peneloux(y, V_eos_v)
             if V_pen_v > 0:
-                rho_v  = PM_v/V_pen_v
+                rho_v  = PM_v/V_pen_v*factor_rho()
                 ZV_fin = P*V_pen_v/(R_GAS*T)
     if L>0 and PM_l>0:
         am_l=am(x,T,kij); bm_l=bm(x)
         ZVL_l, ZLL_l = solve_Z(*AB(am_l,bm_l,T,P))
         ZL_fin = ZLL_l
+        ZL_eos = ZL_fin
         # ρ por EOS de Peng-Robinson (siempre calculable).  Es el default
         # cuando el usuario pide método='EOS' y también el fallback cuando
         # la correlación COSTALD no es aplicable en el estado (T,P) actual.
-        rho_l_EOS = P*PM_l/(ZL_fin*R_GAS*T)
+        rho_l_EOS = P*PM_l/(ZL_fin*R_GAS*T)*factor_rho()
 
         # Ruta de cálculo de la densidad de líquido según el método pedido:
         #   'EOS'      → densidad de la ecuación de estado
@@ -1456,7 +1501,7 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         # supercrítico.  Para Tr ≥ 1.0 se usa la densidad de la EOS.
         if metodo_densidad == 'Peneloux':
             V_pen = V_liq_peneloux(x, ZL_fin*R_GAS*T/P)
-            rho_l = PM_l/V_pen if V_pen > 0 else rho_l_EOS
+            rho_l = PM_l/V_pen*factor_rho() if V_pen > 0 else rho_l_EOS
             ZL_fin = P*V_pen/(R_GAS*T)
         elif metodo_densidad == 'COSTALD':
             mix = _costald_mix_params(x)
@@ -1503,6 +1548,8 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         "V":V,"L":L,"Vm":Vm,"Lm":Lm,
         "x":x,"y":y,"z":list(z),"K":K,
         "ZV":ZV_fin,"ZL":ZL_fin,
+        "ZV_eos":ZV_eos,"ZL_eos":ZL_eos,
+        "peneloux":(metodo_densidad == 'Peneloux'),
         "PM_v":PM_v if V>0 else None,
         "PM_l":PM_l if L>0 else None,
         "PM_z":PM_z,
@@ -1641,7 +1688,8 @@ def viscosidad_LBC(comp, T_R, rho_masa_lbft3, PM_fase, P=None, eos=None):
         return None
     Tc_K, Pc_atm, M, Vc_red = _lbc_params(eos)
     Pp = P if P is not None else 14.696
-    Z = Pp*PM_fase/(rho_masa_lbft3*R_GAS*T_R)     # Z equivalente a la densidad
+    # Z equivalente a la densidad (sin el factor de unidades de PVTsim)
+    Z = Pp*PM_fase*factor_rho(eos)/(rho_masa_lbft3*R_GAS*T_R)
     return lbc_mezcla(comp, T_R, Pp, Z, Tc_K, Pc_atm, M, Vc_red)
 
 

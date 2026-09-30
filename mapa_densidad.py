@@ -124,6 +124,8 @@ def _rho_kgm3_en_punto(z, T, P, kij, PM, metodo='COSTALD'):
             if V_pen > 0:
                 rho_lbft3 = PM/V_pen
 
+    if metodo in ('EOS', 'Peneloux'):
+        rho_lbft3 *= e.factor_rho()          # convención de unidades de PVTsim
     return rho_lbft3   # unidades del programa (lb/ft³)
 
 
