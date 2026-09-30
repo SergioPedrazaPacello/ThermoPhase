@@ -622,12 +622,16 @@ def flash_trifasico(z, T, P, eos='PR', metodo='simple', max_iter=400, tol=1e-11)
                 y, x, ZV, ZL = yh, xh, ZVh, ZLh
 
     # Si solo queda una fase HC, identificar V o L por Z (respaldo).
+    # Al cambiar la etiqueta se toma la raíz de Z que corresponde a la nueva
+    # fase (menor para líquido, mayor para vapor).
     if bV > UMB and bL <= UMB:
         if not _es_vapor(y, aa,bi,kij,T,P,es_srk, Tc):
-            bL, x, ZL = bV, y, ZV; bV = 0.0; y = np.zeros(14)
+            bL, x = bV, y; bV = 0.0; y = np.zeros(14)
+            ZL = _ln_phi(x, aa,bi,kij,T,P,es_srk,'L')[1]
     elif bL > UMB and bV <= UMB:
         if _es_vapor(x, aa,bi,kij,T,P,es_srk, Tc):
-            bV, y, ZV = bL, x, ZL; bL = 0.0; x = np.zeros(14)
+            bV, y = bL, x; bL = 0.0; x = np.zeros(14)
+            ZV = _ln_phi(y, aa,bi,kij,T,P,es_srk,'V')[1]
 
     s = bV+bL+bW
     if s>0: bV/=s; bL/=s; bW/=s
@@ -954,6 +958,10 @@ def identificar_fases_hc(rt, T, P, eos, kij13=None):
             rt['x'], rt['y'] = hc, np.zeros(14)
             rt['beta_L'], rt['beta_V'] = b, 0.0
             rt['Z_L'], rt['Z_V'] = Z_de(hc, 'L'), None
+        elif es_v:
+            rt['Z_V'] = Z_de(hc, 'V')          # raíz coherente con la etiqueta
+        else:
+            rt['Z_L'] = Z_de(hc, 'L')
         return rt
     except Exception:
         return rt

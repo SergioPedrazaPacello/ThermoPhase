@@ -285,14 +285,11 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'Critical volume stored in reduced form V<sub>c</sub>/R (K/atm) '
                                    'and converted to cm³/mol with R = 82.05736 cm³·atm/(mol·K).'),
                                   ("Traslado de volumen de Peneloux c', distinto para PR y para "
-                                   "SRK, almacenado como c'/R (K/atm); para nC7, nC8 y nC9, sin "
-                                   'valor en la base de datos, se obtiene de la correlación de '
-                                   'PVTsim para componentes orgánicos definidos (véase «Corrección '
-                                   'de volumen de Peneloux»).',
+                                   "SRK, almacenado como c'/R (K/atm), para los catorce "
+                                   'componentes (véase «Corrección de volumen de Peneloux»).',
                                    "Peneloux volume shift c', different for PR and SRK, stored as "
-                                   "c'/R (K/atm); for nC7, nC8, and nC9, which have no database "
-                                   'value, it is obtained from the PVTsim correlation for defined '
-                                   'organic components (see “Peneloux volume correction”).'),
+                                   "c'/R (K/atm), for all fourteen components (see “Peneloux "
+                                   'volume correction”).'),
                                   ('Coeficientes de C<sub>p</sub><sup>ig</sup> de gas ideal de la '
                                    'base de PVTsim, almacenados divididos por R y multiplicados '
                                    'por R = 8.3147295 J/(mol·K) al usarse.',
@@ -6825,17 +6822,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'temperatura no interviene. La columna PR o SRK se elige según la '
                                  'ecuación de estado activa, tanto con los parámetros de HYSYS '
                                  'como con los de PVTsim. La base incluye los valores de N₂, CO₂, '
-                                 'metano a n-hexano y agua. Para n-heptano, n-octano y n-nonano se '
-                                 'aplica la correlación que PVTsim documenta para componentes '
+                                 'metano a n-nonano y agua. Para un componente sin valor en la base '
+                                 'se aplicaría la correlación que PVTsim documenta para componentes '
                                  'orgánicos definidos:',
                                  "The temperature-independent term c' from the PVTsim database is "
                                  "used, stored in reduced form c'/R (K/atm) and different for PR "
                                  'and SRK; the temperature-dependent term is not used. The PR or '
                                  'SRK column is selected according to the active equation of '
                                  'state, with both the HYSYS and the PVTsim parameter sets. The '
-                                 'database contains values for N₂, CO₂, methane through n-hexane '
-                                 'and water. For n-heptane, n-octane and n-nonane the correlation '
-                                 'documented by PVTsim for defined organic components is applied:'),
+                                 'database contains values for N₂, CO₂, methane through n-nonane '
+                                 'and water. For a component without a database value the correlation '
+                                 'documented by PVTsim for defined organic components would be applied:'),
                                 ('eq', 'Z_{RA,i} = 0.29056 - 0.08775\\,\\omega_i'),
                                 ('eq',
                                  '\\mathrm{SRK:}\\quad c_i = '
@@ -7171,12 +7168,10 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'coefficients for the thirteen components.'),
                                   ('Juegos de PVTsim (PR y SRK): coeficientes '
                                    'C<sub>p</sub><sup>ig</sup>/R de la base de datos de PVTsim, '
-                                   'multiplicados por R = 8.3147295 J/(mol·K); para n-heptano se '
-                                   'usan los coeficientes de Reid, Prausnitz y Sherwood.',
+                                   'multiplicados por R = 8.3147295 J/(mol·K).',
                                    'PVTsim sets (PR and SRK): C<sub>p</sub><sup>ig</sup>/R '
                                    'coefficients from the PVTsim database, multiplied by R = '
-                                   '8.3147295 J/(mol·K); for n-heptane the Reid, Prausnitz and '
-                                   'Sherwood coefficients are used.'),
+                                   '8.3147295 J/(mol·K).'),
                                   ('Agua: con los juegos de HYSYS, polinomio de Reid, Prausnitz y '
                                    'Sherwood (C<sub>1</sub> = 32.24, C<sub>2</sub> = '
                                    '1.924·10<sup>−3</sup>, C<sub>3</sub> = 1.055·10<sup>−5</sup>, '

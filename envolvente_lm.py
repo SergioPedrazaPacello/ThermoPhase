@@ -344,7 +344,22 @@ def _continuar(res_fun, X, spec, idx_T, idx_P, parar, dS0=0.03, dSmax=0.12,
         if Xn is None:
             dS *= 0.5
             if dS < 1e-5:
-                break
+                # Rescate: la especificación elegida (a menudo el lnK de un
+                # componente traza, de sensibilidad enorme) no admite más
+                # pasos.  Se continúa especificando ln T con pasos finitos en
+                # la dirección de avance; si ninguno converge, la línea termina.
+                sgn = 1.0 if t[idx_T] >= 0 else -1.0
+                Xr = None
+                for paso in (0.005, 0.01, 0.02, 0.0025):
+                    Xq = X.copy(); Xq[idx_T] += sgn*paso
+                    Xr, _nit = _newton(lambda XX: res_fun(XX, idx_T, Xq[idx_T]), Xq)
+                    if Xr is not None:
+                        break
+                if Xr is None:
+                    break
+                X = Xr; pts.append(X.copy()); dS = dS0
+                if parar(X, pts):
+                    break
             continue
         X = Xn
         pts.append(X.copy())
@@ -623,7 +638,7 @@ def _linea_trifasica_binaria(S, Pmin, Pmax, T_min):
     return lin, ucep
 
 
-def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
+def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.37*P_ATM,
                     T_min=250.0, P_max=None, progress_cb=None):
     """Traza las líneas 2-HC, 2-Aq, 3-Aq, 3-HC y el punto crítico.
 
@@ -822,12 +837,12 @@ def envolvente_agua(z14, eos, metodo='hv', P0=0.5*P_ATM, Pmin=0.4*P_ATM,
             Pc = float(np.exp(np.polyval(np.polyfit(sv, [np.log(q[0]) for q in sel], deg), 0.0)))
             Tc = float(np.exp(np.polyval(np.polyfit(sv, [np.log(q[1]) for q in sel], deg), 0.0)))
             out['critico'].append((Pc, Tc))
-    # límite superior de presión de la 2-Aq (presentación): 1.05 × la mayor
+    # límite superior de presión de la 2-Aq (presentación): 1.20 × la mayor
     # presión de las líneas HC/trifásicas.  PVTsim la corta tras su primer
     # paso que supera la cricondenbárica.
     Ps = [p for k in ('2-HC', '3-Aq', '3-HC') for sg in seg[k] for p, _ in sg]
     if P_max is None and Ps:
-        P_max = 1.05*max(Ps)
+        P_max = 1.20*max(Ps)
     if P_max is not None:
         nuevos = []
         for L2 in seg['2-Aq']:

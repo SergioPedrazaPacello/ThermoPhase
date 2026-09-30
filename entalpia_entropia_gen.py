@@ -77,14 +77,7 @@ CP_REID = [
 # Coeficientes Cp⁰/R EXACTOS de la base de datos de PVTsim (ComponentParams,
 # CpCoefficient1-4; T en K).  Son los de Reid et al. (1977) divididos por R, con
 # toda la precisión almacenada.  PVTsim evalúa Cp⁰ = R·(C1+C2T+C3T²+C4T³).
-# nC7: Reid (reproduce PVTsim).
-# nC8 y nC9: identificados con las 4 corridas PRUEBA de PVTsim (PR y SRK, con y
-#      sin agua; 72 fases HC, 300-750 °R).  El Cp⁰ del nC9 de PVTsim NO es el
-#      de Reid para el n-nonano: es ~11 % más bajo (prácticamente la curva del
-#      nC8).  El del nC8 difiere de Reid solo ~0.1 % (precisión de la base).  Con
-#      estos coeficientes H calza a 0.006 BTU/lbmol y S a 1e-5 BTU/lbmol·°R en
-#      todas las fases; con Reid el error llegaba a 433 BTU/lbmol en el líquido
-#      pesado.  Reemplazar por los del registro de PVTsim cuando se tengan.
+# nC7, nC8 y nC9: valores de la base de PVTsim (registro del fluido exportado).
 CP_PVT_R = [
     (3.7462244, -0.0016314193, 3.2225582e-06, -1.4048339e-09),   # N2
     (2.3806651, 0.0088318232, -6.7371611e-06, 2.0629407e-09),    # CO2
@@ -96,9 +89,9 @@ CP_PVT_R = [
     (-1.1455189, 0.060926471, -3.2824766e-05, 6.8831811e-09),    # iC5
     (-0.43605244, 0.058610283, -3.1032232e-05, 6.3796581e-09),   # nC5
     (-0.53071505, 0.06998992, -3.7507551e-05, 7.8096685e-09),    # nC6
-    None,                                                        # nC7 (Reid)
-    (-0.74717143, 0.092914095, -5.1131273e-05, 1.1536517e-08),   # nC8 (PVTsim)
-    (0.431201, 0.080935648, -2.1417071e-05, -5.5203767e-09),     # nC9 (PVTsim)
+    (-0.6188319, 0.08131924, -4.390736e-05, 9.209467e-09),       # nC7 (PVTsim)
+    (-0.7331319, 0.09274925, -5.045317e-05, 1.064955e-08),       # nC8 (PVTsim)
+    (0.3781469, 0.0814703, -2.319235e-05, -3.585599e-09),        # nC9 (PVTsim)
 ]
 
 

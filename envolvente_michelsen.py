@@ -1560,7 +1560,33 @@ def construir_envolvente(z, kij=None, progress_cb=None,
         except Exception:
             pass
 
+    envolvente, crit = _refinar_critico(z, kij, envolvente, crit)
     return {'envolvente': envolvente, 'critico': crit}
+
+
+def _refinar_critico(z, kij, envolvente, crit):
+    """Sustituye el crítico estimado por la traza (extremo de Σ(lnK)²) por el
+    crítico exacto del método directo de Heidemann-Khalil cuando ambos
+    concuerdan (misma región del diagrama).  El punto de la envolvente más
+    cercano se reemplaza por el crítico exacto, de modo que la división en
+    burbuja/rocío sigue funcionando por índice."""
+    if crit is None or not envolvente:
+        return envolvente, crit
+    try:
+        import critico as _cr
+        cd = _cr.punto_critico_directo(list(z), kij)
+    except Exception:
+        cd = None
+    if not cd:
+        return envolvente, crit
+    Pc, Tc = float(cd[0]), float(cd[1])
+    if abs(Tc - crit[1]) > 5.0 or abs(Pc - crit[0]) > 0.03*crit[0]:
+        return envolvente, crit
+    i = min(range(len(envolvente)),
+            key=lambda k: abs(envolvente[k][1] - Tc) + abs(envolvente[k][0] - Pc)/10.0)
+    env = list(envolvente)
+    env[i] = (Pc, Tc)
+    return env, (Pc, Tc)
 
 
 def _envolvente_respaldo(z, act, kij, P_ini, max_pts, paso_max, progress_cb,

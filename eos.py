@@ -675,8 +675,9 @@ def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
 # "PR/SRK Peneloux" (sin (T)) PVTsim usa sólo c' (el término c'' se ignora);
 # validado contra PVTsim: Z de las tres fases al 1e-7.
 #
-# Para los componentes sin valor en la base (n-heptano a n-nonano) se usa la
-# correlación que PVTsim documenta para orgánicos definidos:
+# Todos los componentes tienen su valor en la base de PVTsim (n-heptano a
+# n-nonano incluidos).  Si faltara alguno se usaría la correlación que PVTsim
+# documenta para orgánicos definidos:
 #   Z_RA = 0.29056 − 0.08775·ω
 #   SRK: c' = 0.40768·(R·Tc/Pc)·(0.29441 − Z_RA)
 #   PR : c' = 0.50033·(R·Tc/Pc)·(0.25969 − Z_RA)
@@ -687,10 +688,10 @@ def V_liq_costald_smooth(comp, T, P, kij=None, Ps=None):
 # fases (vapor, líquido y acuosa), igual que PVTsim.
 _CPEN_PR_DB = [-0.051547647, -0.020000001, -0.063368268, -0.070558131,
                -0.077382393, -0.087496951, -0.079088472, -0.075554475,
-               -0.062393371, 0.016938826, None, None, None]
+               -0.062393371, 0.016938826, 0.0308311, 0.0870095, 0.1099196]
 _CPEN_SRK_DB = [0.01121131, 0.036899831, 0.0076773106, 0.032049719,
                 0.061662193, 0.088837437, 0.095783576, 0.13319522,
-                0.14842798, 0.21910797, None, None, None]
+                0.14842798, 0.21910797, 0.2602974, 0.3458445, 0.39398]
 AGUA_CPEN_PR = 0.037110969
 AGUA_CPEN_SRK = 0.068562075
 
