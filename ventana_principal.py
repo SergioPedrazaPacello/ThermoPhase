@@ -3,6 +3,7 @@ Peng-Robinson EOS — Equilibrio de Fases
 v12: Estructura multi-widget. Títulos como QLabel, datos como QTableWidget pequeños.
      Esto elimina el conflicto de QSS y permite colorear celda por celda.
 """
+from numeros import SpinNum as _SpinNum, a_float as _a_float, composicion_a_fracciones as _comp_frac
 import sys, os, copy
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -335,7 +336,7 @@ class TabEquilibrio(QWidget):
 
         self.lbl_P_in = inp_lbl("Presion (psi):")
         gl.addWidget(self.lbl_P_in, 0, 0)
-        self.sp_P = QDoubleSpinBox()
+        self.sp_P = _SpinNum()
         self.sp_P.setRange(0,15000); self.sp_P.setDecimals(2)
         self.sp_P.setSpecialValueText(" "); self.sp_P.setValue(0)
         self.sp_P.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
@@ -347,7 +348,7 @@ class TabEquilibrio(QWidget):
 
         self.lbl_Tabs_in = inp_lbl("Temperatura (°R):")
         gl.addWidget(self.lbl_Tabs_in, 1, 0)
-        self.sp_T = QDoubleSpinBox()
+        self.sp_T = _SpinNum()
         self.sp_T.setRange(0.0, 9999.99)
         self.sp_T.setDecimals(2)
         self.sp_T.setSpecialValueText(" "); self.sp_T.setValue(0)
@@ -357,7 +358,7 @@ class TabEquilibrio(QWidget):
 
         self.lbl_Trel_in = inp_lbl("Temperatura (°F):")
         gl.addWidget(self.lbl_Trel_in, 2, 0)
-        self.sp_F = QDoubleSpinBox()
+        self.sp_F = _SpinNum()
         self.sp_F.setRange(-459.67, 9540.32)
         self.sp_F.setDecimals(2)
         self.sp_F.setSpecialValueText(" "); self.sp_F.setValue(-459.67)
@@ -611,7 +612,7 @@ class TabEquilibrio(QWidget):
             align=Qt.AlignmentFlag.AlignCenter))
 
         hdr_comp.setItem(1,0, cell("", bg=GRAY_LBL))
-        self.hdr_comp_gen  = cell("Fraccion Molar", bg=GRAY_LBL,
+        self.hdr_comp_gen  = cell("Fraccion / % molar", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter)
         self.hdr_comp_vap  = cell("Fraccion molar", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter)
@@ -682,7 +683,9 @@ class TabEquilibrio(QWidget):
         """Presión en psia (interno), convertida desde la unidad mostrada."""
         import unidades as _u
         try:
-            val = float(self.sp_P.text().replace(',', '.'))
+            val = _a_float(self.sp_P.text())
+            if val is None:
+                raise ValueError
         except ValueError:
             val = 200.0
         if val <= 0:
@@ -695,7 +698,7 @@ class TabEquilibrio(QWidget):
         import unidades as _u
         # 1) Valores internos actuales (con el sistema anterior)
         try:
-            P_int = _u.p_a_psia(float(self.sp_P.text().replace(',', '.')), old)
+            P_int = _u.p_a_psia(_a_float(self.sp_P.text(), 0.0), old)
         except Exception:
             P_int = None
         Tabs_old = self.sp_T.value()
@@ -843,9 +846,10 @@ class TabEquilibrio(QWidget):
         if item.row() == self.sum_row: return  # no procesar fila sumatorias
         self._upd_suma()
 
-    def get_z(self):
-        """Composición de 14 componentes (índice 13 = agua). Un componente
-        oculto (no activo) cuenta como fracción 0."""
+    def z_ingresada(self):
+        """Valores de composición tal como los escribió el usuario (fracción o
+        porcentaje molar; punto o coma decimal).  Un componente oculto (no
+        activo) cuenta como 0."""
         z = []
         for i in range(NC+1):
             # Un componente oculto (quitado en el gestor) no entra en la
@@ -853,9 +857,15 @@ class TabEquilibrio(QWidget):
             # celda ni el motor de calculo.
             if self.tbl_comp.isRowHidden(i):
                 z.append(0.0); continue
-            try: z.append(float(self.tbl_comp.item(i,1).text()))
-            except: z.append(0.0)
+            it = self.tbl_comp.item(i, 1)
+            z.append(_a_float(it.text(), 0.0) if it is not None else 0.0)
         return z
+
+    def get_z(self):
+        """Composición en FRACCIÓN molar de 14 componentes (índice 13 = agua).
+        Si el usuario la ingresó en porcentaje molar (suma ≈ 100) se divide
+        por 100."""
+        return _comp_frac(self.z_ingresada())[0]
 
     def agua_activa(self):
         """True si la fila del agua está visible (agua activada)."""
@@ -900,17 +910,22 @@ class TabEquilibrio(QWidget):
         self._upd_suma()
 
     def _upd_suma(self):
-        s = sum(self.get_z())
+        s = sum(self.z_ingresada())       # en la base ingresada (1 o 100)
         self.tbl_comp.blockSignals(True)
         self.tbl_comp.item(self.sum_row,1).setText(f"{s:.4f}")
         self.tbl_comp.blockSignals(False)
 
     def normalizar(self):
-        z = self.get_z(); s = sum(z)
+        """Normaliza a suma 1 (fracción) o 100 (porcentaje), según la base en
+        que se ingresó la composición."""
+        z = self.z_ingresada(); s = sum(z)
         if s <= 0: return
+        base = 100.0 if _comp_frac(z)[1] else 1.0
         self.tbl_comp.blockSignals(True)
         for i in range(NC+1):
-            self.tbl_comp.item(i,1).setText(f"{z[i]/s:.4f}")
+            if self.tbl_comp.isRowHidden(i):
+                continue
+            self.tbl_comp.item(i,1).setText(f"{z[i]/s*base:.4f}")
         self.tbl_comp.blockSignals(False)
         self._upd_suma()  # actualiza fila sumatorias
 
@@ -941,7 +956,7 @@ class TabEquilibrio(QWidget):
             return
         if abs(sum(z)-1.0) > 1e-3:
             dialogos.advertencia(self,
-                "La suma de fracciones debe ser 1.0")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
             return
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         # Cada ventana de Equilibrio usa la EOS de su propio combo.
@@ -1824,7 +1839,9 @@ class TabParametros(QWidget):
         i = r-1; j = c-1
         if i == j: return
         try:
-            v = float(item.text())
+            v = _a_float(item.text())
+            if v is None:
+                raise ValueError
             m = self._kij()
             m[i][j] = v
             m[j][i] = v
@@ -2054,7 +2071,7 @@ class TabFluidos(QWidget):
 
         # Derecha: composicion del fluido seleccionado
         der = QVBoxLayout(); der.setSpacing(4)
-        der.addWidget(section_label("Composicion del fluido (fraccion molar)", left=True))
+        der.addWidget(section_label("Composicion del fluido (fraccion o % molar)", left=True))
         # 13 HC + agua (fila NC, visible solo con el agua activada) + fila de
         # Sumatorias (NC+1).
         self._sum_row = NC + 1
@@ -2119,27 +2136,33 @@ class TabFluidos(QWidget):
         if 0 <= row < len(self.fluidos):
             self._mostrar_z(self.fluidos[row]['z'])
 
-    def _mostrar_z(self, z):
+    def _mostrar_z(self, z, pct=None):
+        """Muestra la composición (fracciones) en la base del fluido: en
+        porcentaje molar si el fluido se ingresó así."""
+        if pct is None:
+            pct = (0 <= self._idx < len(self.fluidos)
+                   and bool(self.fluidos[self._idx].get('pct')))
+        f = 100.0 if pct else 1.0
         self.tbl.blockSignals(True)
         for i in range(NC + 1):
-            self.tbl.item(i, 1).setText(f"{z[i] if i < len(z) else 0.0:.4f}")
+            self.tbl.item(i, 1).setText(f"{(z[i] if i < len(z) else 0.0)*f:.4f}")
         self.tbl.blockSignals(False)
         self._upd_suma()
 
+    def _leer_crudo(self):
+        """Valores tal como se escribieron (fracción o %; punto o coma)."""
+        return [_a_float(self.tbl.item(i, 1).text(), 0.0) for i in range(NC + 1)]
+
     def _leer_z(self):
-        z = []
-        for i in range(NC + 1):
-            try: z.append(float(self.tbl.item(i, 1).text()))
-            except: z.append(0.0)
-        return z
+        """Composición en fracción molar (convierte si se ingresó en %)."""
+        return _comp_frac(self._leer_crudo())[0]
 
     def _upd_suma(self):
         s = 0.0
         for i in range(NC + 1):
             if self.tbl.isRowHidden(i):
                 continue
-            try: s += float(self.tbl.item(i, 1).text())
-            except: pass
+            s += _a_float(self.tbl.item(i, 1).text(), 0.0)
         self.tbl.blockSignals(True)
         self.tbl.item(self._sum_row, 1).setText(f"{s:.4f}")
         self.tbl.blockSignals(False)
@@ -2173,7 +2196,9 @@ class TabFluidos(QWidget):
             return
         self._upd_suma()
         if 0 <= self._idx < len(self.fluidos):
-            self.fluidos[self._idx]['z'] = self._leer_z()
+            crudo = self._leer_crudo()
+            self.fluidos[self._idx]['z'], self.fluidos[self._idx]['pct'] = \
+                _comp_frac(crudo)
             if self._on_comp_change:
                 self._on_comp_change(self.fluidos[self._idx])
 
@@ -2219,12 +2244,15 @@ class TabFluidos(QWidget):
         self._refrescar_lista()
 
     def _normalizar(self):
-        z = self._leer_z(); s = sum(z)
+        z, pct = _comp_frac(self._leer_crudo())
+        s = sum(z)
         if s <= 0:
             return
-        self._mostrar_z([v / s for v in z])
+        z = [v / s for v in z]
+        self._mostrar_z(z, pct)
         if 0 <= self._idx < len(self.fluidos):
-            self.fluidos[self._idx]['z'] = self._leer_z()
+            self.fluidos[self._idx]['z'] = z
+            self.fluidos[self._idx]['pct'] = pct
 
     def _cargar(self):
         if 0 <= self._idx < len(self.fluidos):

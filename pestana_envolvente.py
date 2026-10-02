@@ -9,6 +9,14 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
+def _a_float_req(txt):
+    """float del texto (punto o coma decimal); ValueError si no es número."""
+    from numeros import a_float
+    v = a_float(txt)
+    if v is None:
+        raise ValueError(txt)
+    return v
+
 import numpy as np
 import idioma as _i18n
 import matplotlib
@@ -662,7 +670,7 @@ class TabEnvolvente(QWidget):
         zf_all=list(self.get_z())
         if sum(zf_all)<=0 or abs(sum(zf_all)-1.0)>1e-3:
             dialogos.advertencia(self,
-                "La suma de fracciones debe ser 1.0")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
             return
         z=self._z_hc()
         kij=self.get_kij()
@@ -739,7 +747,7 @@ class TabEnvolvente(QWidget):
     def _lanzar_curva_hidratos(self):
         """Lanza el cálculo en segundo plano de la curva de hidratos."""
         if abs(sum(self.get_z()) - 1.0) > 1e-3:
-            dialogos.advertencia(self, "La suma de fracciones debe ser 1.0")
+            dialogos.advertencia(self, "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
             return
         z = self._z_hc()
         zf = list(self.get_z())
@@ -800,7 +808,7 @@ class TabEnvolvente(QWidget):
             return
         if abs(sum(self.get_z())-1.0)>1e-3:
             dialogos.advertencia(self,
-                "La suma de fracciones debe ser 1.0")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
             return
         z=self._z_hc()
 
@@ -818,7 +826,7 @@ class TabEnvolvente(QWidget):
             txt=ed.text().strip()
             if not txt: continue
             try:
-                val=float(txt.replace(',', '.'))
+                val=_a_float_req(txt)
             except ValueError:
                 dialogos.advertencia(self, _i18n.t("Valor inválido en Línea de isocalidad N°%d.") % (i+1))
                 return
@@ -894,7 +902,7 @@ class TabEnvolvente(QWidget):
         # Lanzar cálculo (envelope + mapa) con la composición actual
         if abs(sum(self.get_z())-1.0) > 1e-3:
             dialogos.advertencia(self,
-                "La suma de fracciones debe ser 1.0")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
             self.chk_reg.blockSignals(True)
             self.chk_reg.setChecked(False)
             self.chk_reg.blockSignals(False)
@@ -1061,10 +1069,10 @@ class TabEnvolvente(QWidget):
         if old is not None:
             try:
                 if self.ed_pP.text().strip():
-                    v = float(self.ed_pP.text().replace(',', '.'))
+                    v = _a_float_req(self.ed_pP.text())
                     self.ed_pP.setText(f"{_u.p_desde_psia(_u.p_a_psia(v, old)):.2f}")
                 if self.ed_pT.text().strip():
-                    v = float(self.ed_pT.text().replace(',', '.'))
+                    v = _a_float_req(self.ed_pT.text())
                     self.ed_pT.setText(f"{_u.t_desde_F(_u.t_a_F(v, old)):.2f}")
             except Exception:
                 pass
@@ -1384,8 +1392,8 @@ class TabEnvolvente(QWidget):
     def _colocar_punto(self):
         """Lee P y T de los campos (en unidades activas) y marca el punto."""
         try:
-            Pp = _u.p_a_psia(float(self.ed_pP.text().replace(',', '.')))
-            Tp = _u.t_a_F(float(self.ed_pT.text().replace(',', '.')))
+            Pp = _u.p_a_psia(_a_float_req(self.ed_pP.text()))
+            Tp = _u.t_a_F(_a_float_req(self.ed_pT.text()))
         except ValueError:
             dialogos.advertencia(self,
                 "Ingrese valores numéricos válidos de presión y temperatura.")

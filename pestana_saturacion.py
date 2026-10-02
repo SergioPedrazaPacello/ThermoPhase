@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush, QPen
 
 from eos import NOMBRES, NC
+from numeros import SpinNum as _SpinNum
 import dialogos as dialogos
 import idioma as _i18n
 import eos as _eng
@@ -265,7 +266,7 @@ class TabSaturacion(QWidget):
         self.lbl_cond=lbl("Presion (psi):")
         self.lbl_cond.setFixedWidth(130)
         gl.addWidget(self.lbl_cond, 1, 0)
-        self.sp_cond=QDoubleSpinBox()
+        self.sp_cond= _SpinNum()
         self.sp_cond.setRange(0.0, 15000.0); self.sp_cond.setDecimals(2)
         self.sp_cond.setSpecialValueText(" ")   # muestra vacío en el mínimo
         self.sp_cond.setValue(0.0)              # inicia vacío
@@ -710,7 +711,7 @@ class TabSaturacion(QWidget):
         zf=self.get_z()
         if abs(sum(zf)-1.0)>1e-3:
             dialogos.advertencia(self,
-                "La suma de fracciones debe ser 1.0")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
             return
         # Los puntos de saturación (rocío/burbuja) se refieren SIEMPRE a la
         # región bifásica HIDROCARBURO.  Sin agua: mezcla de 13 comp.  Con

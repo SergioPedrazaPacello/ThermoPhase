@@ -19,6 +19,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush
 
 from eos import NOMBRES, NC
+from numeros import SpinNum as _SpinNum
 import dialogos as dialogos
 import idioma as _i18n
 import eos as _eng
@@ -200,7 +201,7 @@ class TabHidratos(QWidget):
         self.lbl_cond = lbl("Presion (psi):")
         self.lbl_cond.setFixedWidth(130)
         gl.addWidget(self.lbl_cond, 1, 0)
-        self.sp_cond = QDoubleSpinBox()
+        self.sp_cond = _SpinNum()
         self.sp_cond.setRange(0.0, 15000.0); self.sp_cond.setDecimals(2)
         self.sp_cond.setSpecialValueText(" "); self.sp_cond.setValue(0.0)
         self.sp_cond.setFixedHeight(24)
@@ -471,7 +472,7 @@ class TabHidratos(QWidget):
     def calcular(self):
         z = self.get_z()
         if abs(sum(z)-1.0) > 1e-3:
-            dialogos.advertencia(self, "La suma de fracciones debe ser 1.0")
+            dialogos.advertencia(self, "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
             return
         tipo_es = self._tipo_es()
         modo, u_in, lbl_in, u_res = self.TIPOS[tipo_es]

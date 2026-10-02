@@ -373,10 +373,8 @@ class TabSensibilidad(QWidget):
     # ── Cálculo ────────────────────────────────────────────────
     @staticmethod
     def _num(edit):
-        t=edit.text().strip().replace(',', '.')
-        if not t: return None
-        try: return float(t)
-        except ValueError: return None
+        from numeros import a_float
+        return a_float(edit.text())
 
     def calcular(self):
         import dialogos
