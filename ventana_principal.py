@@ -612,8 +612,10 @@ class TabEquilibrio(QWidget):
             align=Qt.AlignmentFlag.AlignCenter))
 
         hdr_comp.setItem(1,0, cell("", bg=GRAY_LBL))
-        self.hdr_comp_gen  = cell("Fraccion / % molar", bg=GRAY_LBL,
+        self.hdr_comp_gen  = cell("Fraccion o porcentaje", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter)
+        self.hdr_comp_gen.setToolTip(_i18n.t(
+            "Composicion en fraccion molar (suma 1) o en porcentaje molar (suma 100)"))
         self.hdr_comp_vap  = cell("Fraccion molar", bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignCenter)
         self.hdr_comp_liq  = cell("Fraccion molar", bg=GRAY_LBL,
@@ -956,7 +958,7 @@ class TabEquilibrio(QWidget):
             return
         if abs(sum(z)-1.0) > 1e-3:
             dialogos.advertencia(self,
-                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)")
             return
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         # Cada ventana de Equilibrio usa la EOS de su propio combo.
@@ -2071,7 +2073,7 @@ class TabFluidos(QWidget):
 
         # Derecha: composicion del fluido seleccionado
         der = QVBoxLayout(); der.setSpacing(4)
-        der.addWidget(section_label("Composicion del fluido (fraccion o % molar)", left=True))
+        der.addWidget(section_label("Composicion del fluido (fraccion o porcentaje molar)", left=True))
         # 13 HC + agua (fila NC, visible solo con el agua activada) + fila de
         # Sumatorias (NC+1).
         self._sum_row = NC + 1

@@ -317,6 +317,20 @@ class TabSensibilidad(QWidget):
         self.btn.clicked.connect(self.calcular)
         vr.addWidget(self.btn)
 
+        # Escala de los ejes del gráfico (se aplica al gráfico actual sin
+        # recalcular).  Semilog con eje Y logarítmico es la forma de la carta
+        # de McKetta-Wehe para la capacidad de agua.
+        vr.addWidget(sub("Escala del gráfico:"))
+        self.cmb_escala=QComboBox(); self.cmb_escala.setFixedHeight(24)
+        for txt, clave in (("Lineal", 'lin'),
+                           ("Semilog (eje Y logarítmico)", 'semilogy'),
+                           ("Semilog (eje X logarítmico)", 'semilogx'),
+                           ("Logarítmica (ambos ejes)", 'loglog')):
+            self.cmb_escala.addItem(_i18n.t(txt), clave)
+        _aplicar_estilo_combo(self.cmb_escala)
+        self.cmb_escala.currentIndexChanged.connect(self._on_escala)
+        vr.addWidget(self.cmb_escala)
+
         self.prog=QProgressBar(); self.prog.setVisible(False)
         self.prog.setFixedHeight(16); self.prog.setTextVisible(False)
         self.prog.setStyleSheet(
@@ -455,6 +469,30 @@ class TabSensibilidad(QWidget):
         self.prog.setVisible(False)
         dialogos.advertencia(self, _i18n.t("Error en el cálculo:")+f"\n{msg}")
 
+    def _on_escala(self, *_a):
+        if getattr(self, '_last', None):
+            self._plot(self._last)
+
+    def _aplicar_escala(self, ax):
+        """Ejes logarítmicos según el selector.  Un eje logarítmico solo admite
+        valores positivos: los no positivos se ocultan; si el eje no tiene
+        ninguno positivo se mantiene lineal."""
+        clave = self.cmb_escala.currentData() if hasattr(self, 'cmb_escala') else 'lin'
+        logx = clave in ('semilogx', 'loglog')
+        logy = clave in ('semilogy', 'loglog')
+        def _hay_pos(eje):
+            for ln in ax.get_lines():
+                d = np.asarray(ln.get_xdata() if eje == 'x' else ln.get_ydata(), dtype=float)
+                if np.any(np.isfinite(d) & (d > 0)):
+                    return True
+            return False
+        if logx and _hay_pos('x'):
+            ax.set_xscale('log', nonpositive='mask')
+        if logy and _hay_pos('y'):
+            ax.set_yscale('log', nonpositive='mask')
+        if logx or logy:
+            ax.grid(True, which='minor', linestyle=':', linewidth=0.6, color=GRAY_LBL)
+
     # ── Gráfico ────────────────────────────────────────────────
     def _plot(self, res):
         key=res['prop_key']; eje=res['eje_x']; curvas=res['curvas']
@@ -497,6 +535,7 @@ class TabSensibilidad(QWidget):
         for sp in ax.spines.values():
             sp.set_edgecolor('#000000'); sp.set_linewidth(1.4)
         ax.grid(True, linestyle='-', linewidth=0.8, alpha=1.0, color=GRAY_LBL)
+        self._aplicar_escala(ax)
         if hay:
             leg=ax.legend(fontsize=8, framealpha=1.0, fancybox=False,
                           edgecolor='#000000', facecolor=GRAY_PLOT_BG,
@@ -607,6 +646,7 @@ class TabSensibilidad(QWidget):
                 'eje':  self.cmb_eje.currentData(),
                 'T': [self.ed_T_ini.text(), self.ed_T_fin.text(), self.ed_T_n.text()],
                 'P': [self.ed_P_ini.text(), self.ed_P_fin.text(), self.ed_P_n.text()],
+                'escala': self.cmb_escala.currentData(),
             },
             'resultado': None,
         }
@@ -618,6 +658,8 @@ class TabSensibilidad(QWidget):
             if idx>=0: self.cmb_prop.setCurrentIndex(idx)
             idx=self.cmb_eje.findData(e.get('eje'))
             if idx>=0: self.cmb_eje.setCurrentIndex(idx)
+            idx=self.cmb_escala.findData(e.get('escala', 'lin'))
+            if idx>=0: self.cmb_escala.setCurrentIndex(idx)
             if 'T' in e:
                 self.ed_T_ini.setText(str(e['T'][0])); self.ed_T_fin.setText(str(e['T'][1]))
                 self.ed_T_n.setText(str(e['T'][2]))

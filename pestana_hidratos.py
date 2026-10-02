@@ -472,7 +472,7 @@ class TabHidratos(QWidget):
     def calcular(self):
         z = self.get_z()
         if abs(sum(z)-1.0) > 1e-3:
-            dialogos.advertencia(self, "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
+            dialogos.advertencia(self, "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)")
             return
         tipo_es = self._tipo_es()
         modo, u_in, lbl_in, u_res = self.TIPOS[tipo_es]

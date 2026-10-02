@@ -10,7 +10,7 @@ estilo retro).
 Uso:
     from dialogos import info, advertencia, error
     info(self, "Operacion completada.", titulo="Guardado")
-    advertencia(self, "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
+    advertencia(self, "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)")
     error(self, "No se pudo abrir el archivo:\n" + str(ex))
 """
 from PyQt6.QtWidgets import (QMessageBox, QStyleFactory, QPushButton)

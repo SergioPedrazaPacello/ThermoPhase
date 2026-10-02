@@ -711,7 +711,7 @@ class TabSaturacion(QWidget):
         zf=self.get_z()
         if abs(sum(zf)-1.0)>1e-3:
             dialogos.advertencia(self,
-                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)")
             return
         # Los puntos de saturación (rocío/burbuja) se refieren SIEMPRE a la
         # región bifásica HIDROCARBURO.  Sin agua: mezcla de 13 comp.  Con

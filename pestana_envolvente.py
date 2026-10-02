@@ -670,7 +670,7 @@ class TabEnvolvente(QWidget):
         zf_all=list(self.get_z())
         if sum(zf_all)<=0 or abs(sum(zf_all)-1.0)>1e-3:
             dialogos.advertencia(self,
-                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)")
             return
         z=self._z_hc()
         kij=self.get_kij()
@@ -747,7 +747,7 @@ class TabEnvolvente(QWidget):
     def _lanzar_curva_hidratos(self):
         """Lanza el cálculo en segundo plano de la curva de hidratos."""
         if abs(sum(self.get_z()) - 1.0) > 1e-3:
-            dialogos.advertencia(self, "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
+            dialogos.advertencia(self, "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)")
             return
         z = self._z_hc()
         zf = list(self.get_z())
@@ -808,7 +808,7 @@ class TabEnvolvente(QWidget):
             return
         if abs(sum(self.get_z())-1.0)>1e-3:
             dialogos.advertencia(self,
-                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)")
             return
         z=self._z_hc()
 
@@ -902,7 +902,7 @@ class TabEnvolvente(QWidget):
         # Lanzar cálculo (envelope + mapa) con la composición actual
         if abs(sum(self.get_z())-1.0) > 1e-3:
             dialogos.advertencia(self,
-                "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)")
+                "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)")
             self.chk_reg.blockSignals(True)
             self.chk_reg.setChecked(False)
             self.chk_reg.blockSignals(False)

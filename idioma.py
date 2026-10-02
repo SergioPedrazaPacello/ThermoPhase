@@ -40,6 +40,10 @@ TRAD = {
     "&Imprimir / Exportar a PDF...": "&Print / Export to PDF...",
     "&Salir": "&Exit", "&Deshacer": "&Undo", "&Rehacer": "&Redo",
     "&Copiar": "&Copy", "&Pegar": "&Paste", "Cortar": "Cut", "Borrar": "Delete",
+    "Escala del gráfico:": "Chart scale:", "Lineal": "Linear",
+    "Semilog (eje Y logarítmico)": "Semi-log (log Y axis)",
+    "Semilog (eje X logarítmico)": "Semi-log (log X axis)",
+    "Logarítmica (ambos ejes)": "Log-log (both axes)",
     "Copiar": "Copy", "Pegar": "Paste", "Deshacer": "Undo", "Rehacer": "Redo", "&Navegador": "&Navigator",
     "Barra de &herramientas": "&Toolbar",
     "&Asociar archivos .tpsim con este programa":
@@ -198,7 +202,7 @@ TRAD = {
     # Fluidos
     "Fluidos guardados": "Saved fluids",
     "Composicion del fluido (fraccion molar)": "Fluid composition (mole fraction)",
-    "Composicion del fluido (fraccion o % molar)": "Fluid composition (mole fraction or %)",
+    "Composicion del fluido (fraccion o porcentaje molar)": "Fluid composition (mole fraction or percent)",
     "Capturar actual": "Capture current",
     "Cargar en composicion principal": "Load into main composition",
     "Renombrar": "Rename", "Eliminar": "Delete", "Renombrar fluido": "Rename fluid",
@@ -299,7 +303,8 @@ TRAD = {
     "Abrir cálculo del fluido seleccionado (ventana independiente):":
         "Open calculation for the selected fluid (separate window):",
     "Parámetros EOS": "EOS Parameters", "Parametros EOS": "EOS Parameters",
-    "Fraccion Molar": "Mole Fraction", "Fraccion / % molar": "Mole fraction / %", "Fracción Molar": "Mole Fraction",
+    "Fraccion Molar": "Mole Fraction", "Fraccion o porcentaje": "Fraction or percent",
+    "Composicion en fraccion molar (suma 1) o en porcentaje molar (suma 100)": "Composition as mole fraction (sum 1) or mole percent (sum 100)", "Fracción Molar": "Mole Fraction",
     "Fraccion Masica": "Mass Fraction", "Fracción Másica": "Mass Fraction",
     "Densidad masica [lb/ft3]": "Mass density [lb/ft3]",
     "Densidad masica [lb/ft3]:": "Mass density [lb/ft3]:",
@@ -390,7 +395,7 @@ TRAD = {
     "ThermoPhase — Error": "ThermoPhase — Error",
     "Advertencia": "Warning", "Error": "Error",
     "La suma de fracciones debe ser 1.0": "The sum of fractions must be 1.0",
-    "La composicion debe sumar 1 (fraccion molar) o 100 (% molar)": "The composition must add up to 1 (mole fraction) or 100 (mole %)",
+    "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)": "The composition must add up to 1 (mole fraction) or 100 (mole percent)",
     "La suma de las fracciones debe ser 1.0": "The sum of fractions must be 1.0",
     "No se pudo abrir el archivo:": "Could not open the file:",
     "No se pudo guardar el archivo:": "Could not save the file:",
