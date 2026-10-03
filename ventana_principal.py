@@ -261,6 +261,10 @@ PROP_RESUMEN = [
     ('gpm',         'GPM C3+ [gal/1000pie3]',      None,   4, False),
     ('agua_cont',   'Contenido de agua [lb/MMscf]', None,  3, False),
     ('agua_cap',    'Capacidad de agua [lb/MMscf]', None,  3, False),
+    ('bg',          'Factor volumetrico Bg [ft3/scf]', None, 6, False),
+    ('bo',          'Factor volumetrico Bo [bbl/STB]', None, 4, False),
+    ('bw',          'Factor volumetrico Bw [bbl/STB]', None, 4, False),
+    ('rs',          'Gas en solucion Rs [scf/STB]',    None, 2, False),
 ]
 PROP_DEFAULT = ['frac_molar', 'frac_masica', 'sg', 'densidad', 'z', 'pm']
 _PROP_DEF = {d[0]: d for d in PROP_RESUMEN}
@@ -1149,6 +1153,23 @@ class TabEquilibrio(QWidget):
                     self._cache_cap = (clave, _ca.capacidad(
                         y, self.get_T(), self.get_P(), eos_code))
                 agua_cap = self._cache_cap[1]
+        # Factores volumétricos (Bg, Bo, Bw) y gas en solución (Rs, Rsw):
+        # Bo/Rs y Bw/Rsw por flash a condiciones estándar (sólo si se piden).
+        fvol = {'bg': None, 'bo': None, 'bw': None, 'rs': None, 'rsw': None}
+        try:
+            import factores_volumetricos as _fv
+            if hayV:
+                fvol['bg'] = _fv.bg(pV.get('Z'), self.get_T(), self.get_P())
+            metodo_fv = getattr(self, '_metodo_densidad_actual', 'EOS')
+            if hayL and ({'bo', 'rs'} & set(self._props_sel)):
+                fvol['bo'], fvol['rs'] = _fv.bo_rs(x, pL.get('PM'), pL.get('rho'),
+                                                   eos_code, None, metodo_fv)
+            if hayW and ({'bw', 'rs'} & set(self._props_sel)):
+                fvol['bw'], fvol['rsw'] = _fv.bw_rsw(w, pW.get('PM'), pW.get('rho'),
+                                                     eos_code, metodo_fv,
+                                                     self.get_T(), self.get_P())
+        except Exception:
+            pass
         valores = {
             'frac_molar':  ("",             cf(bV,hayV,6), cf(bL,hayL,6), cf(bW,hayW,6)),
             'frac_masica': ("",             cf(fmV,hayV),  cf(fmL,hayL),  cf(fmW,hayW)),
@@ -1167,6 +1188,10 @@ class TabEquilibrio(QWidget):
             'gpm':         ("",             pcf({'g':gpm_v},'g',hayV,4) if gpm_v is not None else "", "", ""),
             'agua_cont':   ("",             cf(agua_cont, hayV, 3), "", ""),
             'agua_cap':    ("",             cf(agua_cap, hayV, 3), "", ""),
+            'bg':          ("",             cf(fvol['bg'], hayV, 6), "", ""),
+            'bo':          ("",             "", cf(fvol['bo'], hayL, 4), ""),
+            'bw':          ("",             "", "", cf(fvol['bw'], hayW, 4)),
+            'rs':          ("",             "", cf(fvol['rs'], hayL, 2), cf(fvol['rsw'], hayW, 2)),
         }
         # Resultado numérico (unidades internas) para el reporte PDF y para
         # guardar/restaurar la simulación.
@@ -1184,6 +1209,7 @@ class TabEquilibrio(QWidget):
             'frac_masica': [fmV, fmL, fmW], 'frac_vol': [fvV, fvL, fvW],
             'rho_z': rho_mix, 'PM_z': PM_mix, 'H_z': H_mix, 'S_z': S_mix,
             'agua_cont': agua_cont, 'agua_cap': agua_cap,
+            'fvol': fvol,
         }
         # Reconstruir las FILAS del resumen según la selección actual (evita los
         # huecos al agregar/quitar propiedades tras el cálculo) y luego pintar
@@ -1420,6 +1446,30 @@ class TabEquilibrio(QWidget):
                 r['agua_cap'] = None
         return r.get('agua_cap')
 
+    def _factores_secos(self, r):
+        """Bg, Bo y Rs de un flash sin agua (Bo/Rs sólo si se piden; se
+        guardan en r para no repetir el flash a condiciones estándar)."""
+        import factores_volumetricos as _fv
+        ctx = getattr(self, '_hs_ctx', None)
+        T = ctx[1] if ctx else self.get_T()
+        P = ctx[2] if ctx else self.get_P()
+        kij = ctx[3] if ctx else None
+        eos_c = ctx[4] if ctx else _eos_code(self.cmb_eos.currentIndex())
+        out = {'bg': None, 'bo': r.get('fv_bo'), 'rs': r.get('fv_rs')}
+        if (r.get('V') or 0) > 1e-9:
+            out['bg'] = _fv.bg(r.get('ZV'), T, P)
+        if ((r.get('L') or 0) > 1e-9 and out['bo'] is None
+                and ({'bo', 'rs'} & set(self._props_sel))):
+            try:
+                metodo = getattr(self, '_metodo_densidad_actual', 'EOS')
+                out['bo'], out['rs'] = _fv.bo_rs(r['x'], r.get('PM_l'), r.get('rho_l'),
+                                                 eos_c, kij, metodo)
+                r['fv_bo'], r['fv_rs'] = out['bo'], out['rs']
+            except Exception:
+                pass
+        r['fv_bg'] = out['bg']
+        return out
+
     def _render(self, r):
         masa = self.btn_frac.isChecked()
         V=r["V"]; L=r["L"]
@@ -1488,6 +1538,7 @@ class TabEquilibrio(QWidget):
         _vl = L*PM_l/_r_l if (liq_ok and PM_l and _r_l) else 0.0
         fvv = _vv/(_vv+_vl) if (_vv+_vl) > 0 else None
         fvl = _vl/(_vv+_vl) if (_vv+_vl) > 0 else None
+        fv = self._factores_secos(r)
         valores = {
             'frac_molar':  ("",          cv(V, vap_ok),  cv(L, liq_ok)),
             'frac_masica': ("",          cv(Vm, vap_ok), cv(Lm, liq_ok)),
@@ -1506,6 +1557,10 @@ class TabEquilibrio(QWidget):
             'gpm':         ("",                 gpmf(gpm_v, vap_ok),        ""),
             'agua_cont':   ("",          cv(0.0, vap_ok, 3), ""),
             'agua_cap':    ("",          cv(self._capacidad_seca(r), vap_ok, 3), ""),
+            'bg':          ("",          cv(fv['bg'], vap_ok, 6), ""),
+            'bo':          ("",          "", cv(fv['bo'], liq_ok, 4)),
+            'bw':          ("",          "", ""),
+            'rs':          ("",          "", cv(fv['rs'], liq_ok, 2)),
         }
         self._rebuild_resumen(valores)
 

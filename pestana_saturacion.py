@@ -402,7 +402,7 @@ class TabSaturacion(QWidget):
                 cell.setBackground(QBrush(GRIS_RES))
                 self.tbl.setItem(i,c,cell)
         # Fila del agua (indice NC): visible solo con agua activa.
-        wit=QTableWidgetItem(_eng.componente_nombre(_eng.IDX_AGUA))
+        wit=QTableWidgetItem(_eng.componente_etiqueta(_eng.IDX_AGUA).rstrip(':'))
         wit.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         wit.setBackground(QBrush(GRIS_NOMBRE))
         self.tbl.setItem(NC,0,wit)
@@ -821,9 +821,16 @@ class TabSaturacion(QWidget):
         sx=sum(x); sy=sum(y); sz=sum(z)
         WHT=QColor(WHITE)
         if not agua_res:
+            # Agua activa pero con fracción cero: 0 en la fila del agua.
+            agua_vis = not self.tbl.isRowHidden(NC)
             for c in (1,2,3):
                 it=self.tbl.item(NC,c)
-                if it is not None: it.setText("")
+                if it is None: continue
+                if agua_vis:
+                    it.setText("0.0000"); it.setBackground(QBrush(WHT))
+                    it.setForeground(QBrush(QColor(TEXT_RES)))
+                else:
+                    it.setText("")
         for i in range(nfil):
             self.tbl.item(i,1).setText(f"{z[i]:.4f}")
             self.tbl.item(i,2).setText(f"{y[i]:.4f}")

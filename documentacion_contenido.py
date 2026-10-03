@@ -7062,7 +7062,126 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
                                  'Data Book</em>, 10.ª ed. GPSA.',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
-                                 'Data Book</em>, 10th ed. GPSA.')]}]},
+                                 'Data Book</em>, 10th ed. GPSA.')]},
+                   {'titulo': ('Factores volumétricos y gas en solución',
+                               'Formation volume factors and solution gas'),
+                    'bloques': [('p',
+                                 'El resumen de resultados del equilibrio de fases incluye los '
+                                 'factores volumétricos de formación del gas (B<sub>g</sub>), del '
+                                 'petróleo (B<sub>o</sub>) y del agua (B<sub>w</sub>), y la '
+                                 'relación gas en solución del petróleo (R<sub>s</sub>) y del agua '
+                                 '(R<sub>sw</sub>). Cada factor se reporta en la columna de su '
+                                 'fase y solo cuando esa fase existe. Las condiciones estándar '
+                                 'son 60 °F (519.67 °R) y 14.696 psia.',
+                                 'The phase-equilibrium results summary includes the formation '
+                                 'volume factors of gas (B<sub>g</sub>), oil (B<sub>o</sub>) and '
+                                 'water (B<sub>w</sub>), and the solution gas-oil ratio '
+                                 '(R<sub>s</sub>) and solution gas-water ratio (R<sub>sw</sub>). '
+                                 'Each factor is reported in the column of its phase and only when '
+                                 'that phase exists. Standard conditions are 60 °F (519.67 °R) and '
+                                 '14.696 psia.'),
+                                ('h3', 'Factor volumétrico del gas', 'Gas formation volume factor'),
+                                ('eq',
+                                 'B_g = \\frac{Z_V\\,T}{P}\\,\\frac{P_{sc}}{T_{sc}} '
+                                 '\\qquad [\\mathrm{ft^3/scf}]'),
+                                ('p',
+                                 'donde Z<sub>V</sub> es el factor de compresibilidad de la fase '
+                                 'vapor reportado (con el traslado de Peneloux si está activo), T '
+                                 'y P las condiciones del flash y T<sub>sc</sub>, P<sub>sc</sub> '
+                                 'las condiciones estándar. El volumen estándar del gas es el de '
+                                 'gas ideal, 379.48 scf/lbmol.',
+                                 'where Z<sub>V</sub> is the reported vapor compressibility '
+                                 'factor (with the Peneloux shift when active), T and P the flash '
+                                 'conditions and T<sub>sc</sub>, P<sub>sc</sub> the standard '
+                                 'conditions. The standard gas volume is the ideal-gas volume, '
+                                 '379.48 scf/lbmol.'),
+                                ('h3', 'Factor volumétrico del petróleo y R<sub>s</sub>',
+                                 'Oil formation volume factor and R<sub>s</sub>'),
+                                ('p',
+                                 'La fase líquida de hidrocarburos a (P, T) se lleva a condiciones '
+                                 'estándar con un flash de una etapa (sin el agua disuelta). Por '
+                                 'mol de líquido a (P, T):',
+                                 'The hydrocarbon liquid phase at (P, T) is taken to standard '
+                                 'conditions with a single-stage flash (dissolved water '
+                                 'excluded). Per mole of liquid at (P, T):'),
+                                ('eq',
+                                 'V_o = \\frac{M_L}{\\rho_L} \\qquad V_{STO} = f_{HC}\\,'
+                                 '\\beta_{L,sc}\\,\\frac{M_{L,sc}}{\\rho_{L,sc}}'),
+                                ('eq',
+                                 'B_o = \\frac{V_o}{V_{STO}} \\qquad R_s = '
+                                 '\\frac{f_{HC}\\,\\beta_{V,sc}\\,379.48}{V_{STO}/5.614583}'),
+                                ('p',
+                                 'donde M<sub>L</sub> y ρ<sub>L</sub> son el peso molecular y la '
+                                 'densidad del líquido a (P, T) con el método de densidad '
+                                 'seleccionado, f<sub>HC</sub> la fracción molar de hidrocarburos '
+                                 'del líquido, β<sub>L,sc</sub> y β<sub>V,sc</sub> las fracciones '
+                                 'de líquido y vapor del flash a condiciones estándar y '
+                                 'V<sub>STO</sub> el volumen del petróleo de tanque (ft³). '
+                                 'B<sub>o</sub> resulta en bbl/STB y R<sub>s</sub> en scf/STB. '
+                                 'Por encima del punto de burbuja el líquido es toda la mezcla: '
+                                 'R<sub>s</sub> es constante y B<sub>o</sub> crece al bajar la '
+                                 'presión por expansión del líquido. B<sub>o</sub> es máximo en el '
+                                 'punto de burbuja y disminuye por debajo de él, a medida que se '
+                                 'libera gas.',
+                                 'where M<sub>L</sub> and ρ<sub>L</sub> are the molecular weight '
+                                 'and density of the liquid at (P, T) with the selected density '
+                                 'method, f<sub>HC</sub> the hydrocarbon mole fraction of the '
+                                 'liquid, β<sub>L,sc</sub> and β<sub>V,sc</sub> the liquid and '
+                                 'vapor fractions of the flash at standard conditions and '
+                                 'V<sub>STO</sub> the stock-tank oil volume (ft³). B<sub>o</sub> '
+                                 'is in bbl/STB and R<sub>s</sub> in scf/STB. Above the bubble '
+                                 'point the liquid is the whole mixture: R<sub>s</sub> is constant '
+                                 'and B<sub>o</sub> increases as pressure falls because the liquid '
+                                 'expands. B<sub>o</sub> is maximum at the bubble point and '
+                                 'decreases below it as gas is liberated.'),
+                                ('h3', 'Factor volumétrico del agua y R<sub>sw</sub>',
+                                 'Water formation volume factor and R<sub>sw</sub>'),
+                                ('p',
+                                 'La fase acuosa a (P, T) se lleva a condiciones estándar con un '
+                                 'flash trifásico de su composición (Huron-Vidal). R<sub>sw</sub> '
+                                 'es el gas liberado por barril de agua a condiciones estándar. '
+                                 'Los volúmenes de agua se calculan con la densidad del agua pura '
+                                 'de IAPWS-IF97 (región 1), porque las ecuaciones cúbicas y COSTALD '
+                                 'sobrestiman la expansión térmica del agua. El volumen del gas '
+                                 'disuelto no se incluye, como en las correlaciones de McCain:',
+                                 'The aqueous phase at (P, T) is taken to standard conditions with '
+                                 'a three-phase flash of its composition (Huron-Vidal). '
+                                 'R<sub>sw</sub> is the gas liberated per barrel of water at '
+                                 'standard conditions. Water volumes are computed with the '
+                                 'IAPWS-IF97 (region 1) pure-water density, because cubic '
+                                 'equations and COSTALD overestimate the thermal expansion of '
+                                 'water. The dissolved-gas volume is not included, as in the '
+                                 'McCain correlations:'),
+                                ('eq',
+                                 'B_w = \\frac{w_{H_2O}\\,/\\,\\rho_w(P,T)}{\\beta_{W,sc}'
+                                 '\\,w_{H_2O,sc}\\,/\\,\\rho_w(P_{sc},T_{sc})} \\qquad '
+                                 'R_{sw} = \\frac{\\beta_{V,sc}\\,379.48}{V_{w,sc}/5.614583}'),
+                                ('p',
+                                 'donde w<sub>H₂O</sub> es la fracción molar de agua de la fase '
+                                 'acuosa, β<sub>W,sc</sub> y β<sub>V,sc</sub> las fracciones de '
+                                 'fase acuosa y de vapor a condiciones estándar, ρ<sub>w</sub> la '
+                                 'densidad IAPWS-IF97 y V<sub>w,sc</sub> el volumen del agua a '
+                                 'condiciones estándar (ft³). Por encima de 662 °F, fuera del '
+                                 'rango de IF97, se usa la densidad del método seleccionado.',
+                                 'where w<sub>H₂O</sub> is the water mole fraction of the aqueous '
+                                 'phase, β<sub>W,sc</sub> and β<sub>V,sc</sub> the aqueous and '
+                                 'vapor fractions at standard conditions, ρ<sub>w</sub> the '
+                                 'IAPWS-IF97 density and V<sub>w,sc</sub> the water volume at '
+                                 'standard conditions (ft³). Above 662 °F, outside the IF97 '
+                                 'range, the density of the selected method is used.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'McCain, W. D. (1990). <em>The Properties of Petroleum '
+                                 'Fluids</em>, 2.ª ed. PennWell.',
+                                 'McCain, W. D. (1990). <em>The Properties of Petroleum '
+                                 'Fluids</em>, 2nd ed. PennWell.'),
+                                ('p',
+                                 'Wagner, W. et al. (2000). The IAPWS Industrial Formulation 1997 '
+                                 'for the Thermodynamic Properties of Water and Steam. <em>J. Eng. '
+                                 'Gas Turbines Power</em>, 122, 150–182.',
+                                 'Wagner, W. et al. (2000). The IAPWS Industrial Formulation 1997 '
+                                 'for the Thermodynamic Properties of Water and Steam. <em>J. Eng. '
+                                 'Gas Turbines Power</em>, 122, 150–182.')]}]},
  {'titulo': ('Entalpía y entropía', 'Enthalpy and entropy'),
   'subsecciones': [{'titulo': ('Esquema de cálculo', 'Calculation scheme'),
                     'bloques': [('p',
@@ -9283,7 +9402,13 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'también sin agua en la mezcla.',
                                    'Gas water capacity, in lb/MMscf, calculated by the second '
                                    'flash with the water-saturated gas; it is also available '
-                                   'without water in the mixture.')]),
+                                   'without water in the mixture.'),
+                                  ('Factores volumétricos B<sub>g</sub> y B<sub>o</sub> y gas en '
+                                   'solución R<sub>s</sub> (véase «Factores volumétricos y gas en '
+                                   'solución»).',
+                                   'Formation volume factors B<sub>g</sub> and B<sub>o</sub> and '
+                                   'solution gas R<sub>s</sub> (see “Formation volume factors and '
+                                   'solution gas”).')]),
                                 ('p',
                                  'Las siguientes propiedades solo aplican cuando el agua está '
                                  'activa, y únicamente entonces aparecen en el desplegable:',
@@ -9301,7 +9426,11 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'Water mole fraction in the vapor and in the hydrocarbon '
                                    'liquid.'),
                                   ('Contenido de agua del gas, en lb/MMscf.',
-                                   'Gas water content, in lb/MMscf.')]),
+                                   'Gas water content, in lb/MMscf.'),
+                                  ('Factor volumétrico B<sub>w</sub> y gas en solución '
+                                   'R<sub>sw</sub> de la fase acuosa.',
+                                   'Formation volume factor B<sub>w</sub> and solution gas '
+                                   'R<sub>sw</sub> of the aqueous phase.')]),
                                 ('p',
                                  'El contenido y la capacidad de agua siguen las definiciones de '
                                  '«Contenido y capacidad de agua del gas»: con fase acuosa '

@@ -588,6 +588,13 @@ def _hoja_equilibrio_agua(story, res3, ent, W, E, sel=None):
         f['frac_molar'] = b[k]; f['frac_masica'] = fm[k]; f['frac_vol'] = fv[k]
         if k == 0:
             f['agua_cont'] = res3.get('agua_cont'); f['agua_cap'] = res3.get('agua_cap')
+        fvl = res3.get('fvol') or {}
+        if k == 0:
+            f['bg'] = fvl.get('bg')
+        elif k == 1:
+            f['bo'] = fvl.get('bo'); f['rs'] = fvl.get('rs')
+        else:
+            f['bw'] = fvl.get('bw'); f['rs'] = fvl.get('rsw')
         fases.append(f)
     mezcla = {'densidad': res3.get('rho_z'), 'pm': res3.get('PM_z'),
               'entalpia': res3.get('H_z'), 'entropia': res3.get('S_z')}
@@ -771,11 +778,13 @@ def generar_pdf(estado, path):
                      'densidad': res.get('rho_v'), 'z': ZV, 'pm': PM_v,
                      'entalpia': res.get('H_vapor'), 'entropia': res.get('S_vapor'),
                      'viscosidad': res.get('mu_v'),
-                     'agua_cont': 0.0, 'agua_cap': res.get('agua_cap')},
+                     'agua_cont': 0.0, 'agua_cap': res.get('agua_cap'),
+                     'bg': res.get('fv_bg')},
                     {'frac_molar': L, 'frac_masica': Lm, 'frac_vol': fv_l, 'sg': sg_l,
                      'densidad': res.get('rho_l'), 'z': ZL, 'pm': PM_l,
                      'entalpia': res.get('H_liquido'), 'entropia': res.get('S_liquido'),
-                     'viscosidad': res.get('mu_l')},
+                     'viscosidad': res.get('mu_l'),
+                     'bo': res.get('fv_bo'), 'rs': res.get('fv_rs')},
                 ]
                 mezcla2 = {'densidad': rho_z_int, 'pm': PM_z,
                            'entalpia': res.get('H_stream'), 'entropia': res.get('S_stream')}

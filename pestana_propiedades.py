@@ -91,6 +91,11 @@ _PROPS_SENS = [
     ('x_w',      'Agua en el líquido (fracción molar)', None,   True,  lambda r: r.get('x_w')),
     ('agua_cont','Contenido de agua del gas [lb/MMscf]', None,  True,  lambda r: r.get('agua_cont')),
     ('agua_cap', 'Capacidad de agua del gas [lb/MMscf]', None,  False, lambda r: r.get('agua_cap')),
+    ('fv_bg',    'Factor volumétrico del gas Bg [ft3/scf]', None, False, lambda r: r.get('fv_bg')),
+    ('fv_bo',    'Factor volumétrico del petróleo Bo [bbl/STB]', None, False, lambda r: r.get('fv_bo')),
+    ('fv_rs',    'Gas en solución en el petróleo Rs [scf/STB]', None, False, lambda r: r.get('fv_rs')),
+    ('fv_bw',    'Factor volumétrico del agua Bw [bbl/STB]', None, True, lambda r: r.get('fv_bw')),
+    ('fv_rsw',   'Gas en solución en el agua Rsw [scf/STB]', None, True, lambda r: r.get('fv_rsw')),
 ]
 _PROPS_BY_KEY = {d[0]: d for d in _PROPS_SENS}
 
@@ -105,7 +110,7 @@ def _conv_mag(mag, v):
     return v
 
 
-def _punto(z, T, P, kij, eos, metodo_densidad, agua, capacidad=False):
+def _punto(z, T, P, kij, eos, metodo_densidad, agua, capacidad=False, fvol=False):
     """Propiedades en (T, P) con el MISMO motor que la pestaña de Equilibrio:
     sin agua → flash bifásico + H/S del motor de 13 comp. (validados contra
     PVTsim); con agua → flash trifásico (Huron-Vidal) + propiedades por fase
@@ -130,6 +135,12 @@ def _punto(z, T, P, kij, eos, metodo_densidad, agua, capacidad=False):
             out['agua_cont'] = 0.0
             if capacidad:
                 out['agua_cap'] = _ca.capacidad(r['y'], float(T), float(P), eos)
+        import factores_volumetricos as _fv
+        if (r.get('V') or 0) > 1e-9:
+            out['fv_bg'] = _fv.bg(r.get('ZV'), float(T), float(P))
+        if fvol and (r.get('L') or 0) > 1e-9:
+            out['fv_bo'], out['fv_rs'] = _fv.bo_rs(r['x'], r.get('PM_l'), r.get('rho_l'),
+                                                   eos, kij, metodo_densidad)
         return out
     import flash_agua as fa
     import propiedades_agua as pa
@@ -169,6 +180,14 @@ def _punto(z, T, P, kij, eos, metodo_densidad, agua, capacidad=False):
             out['agua_cap'] = _ca.capacidad(rt['y'], float(T), float(P), eos)
     if bL > 1e-12 and rt.get('x') is not None:
         out['x_w'] = float(np.asarray(rt['x'])[13])
+    import factores_volumetricos as _fv
+    qV = pr.get('V') or {}; qL = pr.get('L') or {}; qW = pr.get('W') or {}
+    if bV > 1e-12:
+        out['fv_bg'] = _fv.bg(qV.get('Z'), float(T), float(P))
+    if fvol and bL > 1e-12:
+        out['fv_bo'], out['fv_rs'] = _fv.bo_rs(rt['x'], qL.get('PM'), qL.get('rho'), eos, None, md)
+    if fvol and bW > 1e-12:
+        out['fv_bw'], out['fv_rsw'] = _fv.bw_rsw(rt['w'], qW.get('PM'), qW.get('rho'), eos, md, float(T), float(P))
     return out
 
 
@@ -208,7 +227,8 @@ class SensWorker(QThread):
                     try:
                         r = _punto(self.z, T, P, self.kij, self.eos,
                                    self.metodo_densidad, self.agua,
-                                   capacidad=(self.prop_key == 'agua_cap'))
+                                   capacidad=(self.prop_key == 'agua_cap'),
+                                   fvol=(self.prop_key in ('fv_bo', 'fv_rs', 'fv_bw', 'fv_rsw')))
                         val = extractor(r)
                     except Exception:
                         val = None

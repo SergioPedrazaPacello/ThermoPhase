@@ -324,7 +324,7 @@ class TabHidratos(QWidget):
                 cell.setBackground(QBrush(GRIS_RES))
                 self.tbl.setItem(i,c,cell)
         # Fila del agua (indice NC): visible solo con agua activa.
-        wit = QTableWidgetItem(_eng.componente_nombre(_eng.IDX_AGUA))
+        wit = QTableWidgetItem(_eng.componente_etiqueta(_eng.IDX_AGUA).rstrip(':'))
         wit.setTextAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         wit.setBackground(QBrush(GRIS_NOMBRE))
         self.tbl.setItem(NC,0,wit)
@@ -597,9 +597,16 @@ class TabHidratos(QWidget):
                 cell.setText(""); cell.setBackground(QBrush(VAC))
 
         if nfil == NC:
-            for c in (1, 2, 3):
-                it = self.tbl.item(NC, c)
-                if it is not None: it.setText("")
+            # Agua activa pero con fracción cero: la fila del agua muestra 0 en
+            # las fases presentes (como en Equilibrio de fases).
+            if not self.tbl.isRowHidden(NC):
+                _set(self.tbl.item(NC,1), "0.0000", sz > 0)
+                _set(self.tbl.item(NC,2), "0.0000", hay_vap)
+                _set(self.tbl.item(NC,3), "0.0000", hay_liq)
+            else:
+                for c in (1, 2, 3):
+                    it = self.tbl.item(NC, c)
+                    if it is not None: it.setText("")
         for i in range(nfil):
             _set(self.tbl.item(i,1), f"{z[i]:.4f}", sz > 0)
             _set(self.tbl.item(i,2), f"{y[i]:.4f}", hay_vap)
