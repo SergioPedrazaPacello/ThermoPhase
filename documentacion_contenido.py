@@ -7161,14 +7161,18 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'acuosa, β<sub>W,sc</sub> y β<sub>V,sc</sub> las fracciones de '
                                  'fase acuosa y de vapor a condiciones estándar, ρ<sub>w</sub> la '
                                  'densidad IAPWS-IF97 y V<sub>w,sc</sub> el volumen del agua a '
-                                 'condiciones estándar (ft³). Por encima de 662 °F, fuera del '
-                                 'rango de IF97, se usa la densidad del método seleccionado.',
+                                 'condiciones estándar (ft³). Por debajo de 32 °F la región 1 se '
+                                 'extrapola al agua líquida subenfriada, que reproduce IAPWS-95 '
+                                 'hasta −22 °F. Fuera de −22 °F a 662 °F se usa la densidad del '
+                                 'método seleccionado.',
                                  'where w<sub>H₂O</sub> is the water mole fraction of the aqueous '
                                  'phase, β<sub>W,sc</sub> and β<sub>V,sc</sub> the aqueous and '
                                  'vapor fractions at standard conditions, ρ<sub>w</sub> the '
                                  'IAPWS-IF97 density and V<sub>w,sc</sub> the water volume at '
-                                 'standard conditions (ft³). Above 662 °F, outside the IF97 '
-                                 'range, the density of the selected method is used.'),
+                                 'standard conditions (ft³). Below 32 °F region 1 is '
+                                 'extrapolated to subcooled liquid water, reproducing IAPWS-95 '
+                                 'down to −22 °F. Outside −22 °F to 662 °F the density of the '
+                                 'selected method is used.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'McCain, W. D. (1990). <em>The Properties of Petroleum '

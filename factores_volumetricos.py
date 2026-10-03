@@ -36,8 +36,8 @@ Bw y Rsw — agua (fase acuosa)
         V_w(P,T) = x_H2O · 18.015 / ρ_IF97(P,T)
         V_w,sc   = β_W,sc · x_H2O,sc · 18.015 / ρ_IF97(sc)
         Bw = V_w(P,T) / V_w,sc                             [bbl/STB]
-    Fuera del rango de IF97 (T > 662 °F) se usa la densidad del método
-    elegido.
+    Fuera del rango de IF97 (T < −22 °F o T > 662 °F) se usa la densidad
+    del método elegido.
 
 Las densidades del petróleo a condiciones estándar se calculan con el mismo
 método de densidad del cálculo principal (EOS, COSTALD o Peneloux).
@@ -73,10 +73,12 @@ LBFT3_KGM3 = 0.0624279606
 
 def rho_agua_if97(T, P):
     """Densidad del agua líquida pura [lb/ft³] a (T °R, P psia) por IAPWS-IF97
-    región 1.  None fuera de 273.15–623.15 K o 0–100 MPa."""
+    región 1.  None fuera de 243.15–623.15 K o 0–100 MPa.  Por debajo de
+    0 °C la región 1 se extrapola al agua líquida subenfriada (metaestable);
+    hasta −30 °C reproduce IAPWS-95 dentro de 0.05 %."""
     T_K = T/1.8
     p = P*0.00689475729                       # MPa
-    if not (273.15 <= T_K <= 623.15) or not (0 < p <= 100.0):
+    if not (243.15 <= T_K <= 623.15) or not (0 < p <= 100.0):
         return None
     pi = p/16.53
     tau = 1386.0/T_K
