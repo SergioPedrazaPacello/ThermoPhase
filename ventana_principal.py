@@ -1987,15 +1987,16 @@ class SplashScreen(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self._img = None
         ancho, alto = 340, 269
-        # Cargar imagen splash (logotipo sin fondo, generado a 2x)
+        # Cargar imagen splash (alta resolución, se muestra a 640 px de ancho)
         _sp = ruta_recurso('splash.png')
         if os.path.exists(_sp):
             from PyQt6.QtGui import QPixmap
             self._img = QPixmap(_sp)
             if not self._img.isNull():
-                self._img.setDevicePixelRatio(2.0)
-                ancho = int(self._img.width()/2.0)
-                alto = int(self._img.height()/2.0)
+                dpr = max(self._img.width()/640.0, 1.0)
+                self._img.setDevicePixelRatio(dpr)
+                ancho = int(round(self._img.width()/dpr))
+                alto = int(round(self._img.height()/dpr))
             else:
                 self._img = None
         self.setFixedSize(ancho, alto)
@@ -2010,6 +2011,11 @@ class SplashScreen(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         if self._img:
+            from PyQt6.QtGui import QPainterPath
+            from PyQt6.QtCore import QRectF
+            camino = QPainterPath()
+            camino.addRoundedRect(QRectF(self.rect()), 14, 14)
+            p.setClipPath(camino)
             p.drawPixmap(0, 0, self._img)
         else:
             # Fallback: rectángulo oscuro con texto
