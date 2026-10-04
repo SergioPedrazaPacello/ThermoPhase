@@ -1985,17 +1985,24 @@ class SplashScreen(QWidget):
             Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(340, 269)
         self._img = None
-        # Cargar imagen splash
+        ancho, alto = 340, 269
+        # Cargar imagen splash (logotipo sin fondo, generado a 2x)
         _sp = ruta_recurso('splash.png')
         if os.path.exists(_sp):
             from PyQt6.QtGui import QPixmap
             self._img = QPixmap(_sp)
+            if not self._img.isNull():
+                self._img.setDevicePixelRatio(2.0)
+                ancho = int(self._img.width()/2.0)
+                alto = int(self._img.height()/2.0)
+            else:
+                self._img = None
+        self.setFixedSize(ancho, alto)
         # Centrar en pantalla
         from PyQt6.QtWidgets import QApplication
         sg = QApplication.primaryScreen().geometry()
-        self.move((sg.width()-340)//2, (sg.height()-269)//2)
+        self.move((sg.width()-ancho)//2, (sg.height()-alto)//2)
 
     def paintEvent(self, event):
         from PyQt6.QtGui import QPainter, QColor, QPen, QFont
