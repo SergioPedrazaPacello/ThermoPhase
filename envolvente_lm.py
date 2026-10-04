@@ -170,6 +170,12 @@ def estabilidad(S, comp, T, P, tipo, W0=None):
             W = Wn; break
         W = Wn
     y = W/W.sum()
+    # solución trivial (y = comp): no informa estabilidad; su k ≈ 0 con ruido
+    # numérico de signo arbitrario.  Se devuelve estable y sin composición
+    # para no arrastrarla como estimación inicial del siguiente punto.
+    comp = np.asarray(comp, dtype=float); m = comp > 0
+    if np.max(np.abs(np.log(np.clip(y[m], 1e-300, None)/comp[m]))) < 1e-4:
+        return 0.0, None
     return -np.log(W.sum()), y
 
 
@@ -179,7 +185,7 @@ def estabilidad(S, comp, T, P, tipo, W0=None):
 # ════════════════════════════════════════════════════════════════════════════
 def _res_dew(S, X, spec, Sv):
     n = S.n
-    lnK = np.clip(X[:n], -80, 80); T = np.exp(X[n]); P = np.exp(X[n+1])
+    lnK = np.clip(X[:n], -500, 80); T = np.exp(X[n]); P = np.exp(X[n+1])
     if not (120 < T < 3000 and 0.01 < P < 1e5):
         return None
     w = np.exp(lnK)*S.z
@@ -275,7 +281,7 @@ def _sens(fun_spec, X, n_eq, spec_row):
 
 def _continuar(res_fun, X, spec, idx_T, idx_P, parar, dS0=0.03, dSmax=0.12,
                direccion=None, max_pts=5000, forzar_spec=None, idx_crit=None,
-               umbral_crit=0.04):
+               umbral_crit=0.1):
     """Continuación genérica de Michelsen.  res_fun(X, spec, Sv) → residuo;
     parar(X, pts) → True para terminar.  Devuelve lista de X convergidos.
 
@@ -294,22 +300,37 @@ def _continuar(res_fun, X, spec, idx_T, idx_P, parar, dS0=0.03, dSmax=0.12,
         if idx_crit is not None and not cruzado and prev_t is not None:
             lk = X[idx_crit]
             k = int(np.argmax(np.abs(lk)))
-            if abs(lk[k]) < umbral_crit and prev_t[idx_crit[k]]*lk[k] < 0:
+            # cruce cuando ya está cerca o cuando el próximo paso llegaría
+            # al crítico (si no, Newton cae en la solución trivial lnK = 0)
+            paso_k = 1.5*dS*abs(prev_t[idx_crit[k]])
+            if (abs(lk[k]) < max(umbral_crit, paso_k)
+                    and prev_t[idx_crit[k]]*lk[k] < 0):
                 kk = idx_crit[k]
-                objetivo = -lk[k]
                 # Predicción CÚBICA en el lnK dominante con los últimos puntos
                 # (la curva tiene mucha curvatura en el crítico; el predictor
-                # lineal se sale de la envolvente).
+                # lineal se sale de la envolvente).  Si Newton no converge se
+                # prueba un salto más largo y el predictor lineal.
                 hist = [q for q in pts if not np.isnan(q[0])][-4:]
-                if len(hist) >= 3:
-                    s_ = np.array([q[kk] for q in hist])
-                    Hm = np.array(hist)
-                    deg = min(3, len(hist)-1)
-                    Xp = np.array([np.polyval(np.polyfit(s_, Hm[:, c], deg), objetivo)
-                                   for c in range(len(X))])
-                else:
-                    Xp = X + prev_t*(objetivo - X[kk])/prev_t[kk]
-                Xn, nit = _newton(lambda XX: res_fun(XX, kk, objetivo), Xp)
+                Xn = None
+                for fac in (1.0, 2.0, 3.0, 5.0):
+                    objetivo = -np.sign(lk[k])*max(fac*abs(lk[k]), 0.1*fac)
+                    preds = []
+                    if len(hist) >= 3:
+                        s_ = np.array([q[kk] for q in hist])
+                        Hm = np.array(hist)
+                        deg = min(3, len(hist)-1)
+                        preds.append(np.array([np.polyval(np.polyfit(s_, Hm[:, c], deg), objetivo)
+                                               for c in range(len(X))]))
+                    preds.append(X + prev_t*(objetivo - X[kk])/prev_t[kk])
+                    for Xp in preds:
+                        Xn, nit = _newton(lambda XX: res_fun(XX, kk, objetivo), Xp)
+                        if (Xn is not None
+                                and np.max(np.abs(Xn[idx_crit])) > 0.5*abs(objetivo)
+                                and Xn[kk]*objetivo > 0):
+                            break
+                        Xn = None
+                    if Xn is not None:
+                        break
                 if Xn is not None:
                     pts.append(np.full_like(X, np.nan))       # marca de crítico
                     X = Xn; pts.append(X.copy()); cruzado = True
@@ -331,8 +352,17 @@ def _continuar(res_fun, X, spec, idx_T, idx_P, parar, dS0=0.03, dSmax=0.12,
         else:
             if np.dot(t, prev_t) < 0:
                 t = -t
-        # nueva especificación: mayor sensibilidad (T y P en logaritmo, lnK)
-        k = int(np.argmax(np.abs(t)))
+        # nueva especificación: mayor sensibilidad (T y P en logaritmo, lnK).
+        # Se excluyen los lnK de componentes traza en una fase muy diluida
+        # (|lnK| > 30, p. ej. nC9 en la fase acuosa, lnK ≈ −100 a −400): su
+        # sensibilidad es proporcional a su magnitud (lnK ≈ A/T), dominaría
+        # la elección y forzaría pasos diminutos en T y P.
+        cand = np.abs(t)
+        lejos = np.abs(X) > 30.0
+        lejos[[idx_T, idx_P]] = False
+        if np.any(cand[~lejos] > 0):
+            cand = np.where(lejos, 0.0, cand)
+        k = int(np.argmax(cand))
         t = t/abs(t[k])
         prev_t = t.copy()
         spec = k
@@ -341,6 +371,9 @@ def _continuar(res_fun, X, spec, idx_T, idx_P, parar, dS0=0.03, dSmax=0.12,
         if J0 is not None:
             J0 = J0.copy(); J0[-1, :] = 0.0; J0[-1, spec] = 1.0
         Xn, nit = _newton(lambda XX: res_fun(XX, spec, Xp[spec]), Xp, J0=J0)
+        if (Xn is not None and idx_crit is not None
+                and np.max(np.abs(Xn[idx_crit])) < 1e-3):
+            Xn = None          # solución trivial (fase incipiente ≡ presente)
         if Xn is None:
             dS *= 0.5
             if dS < 1e-5:
@@ -353,6 +386,9 @@ def _continuar(res_fun, X, spec, idx_T, idx_P, parar, dS0=0.03, dSmax=0.12,
                 for paso in (0.005, 0.01, 0.02, 0.0025):
                     Xq = X.copy(); Xq[idx_T] += sgn*paso
                     Xr, _nit = _newton(lambda XX: res_fun(XX, idx_T, Xq[idx_T]), Xq)
+                    if (Xr is not None and idx_crit is not None
+                            and np.max(np.abs(Xr[idx_crit])) < 1e-3):
+                        Xr = None
                     if Xr is not None:
                         break
                 if Xr is None:
@@ -378,7 +414,7 @@ def _continuar(res_fun, X, spec, idx_T, idx_P, parar, dS0=0.03, dSmax=0.12,
 # ════════════════════════════════════════════════════════════════════════════
 def _res_3p(S, X):
     n = S.n
-    lKw = np.clip(X[:n], -80, 80); lKx = np.clip(X[n:2*n], -80, 80)
+    lKw = np.clip(X[:n], -500, 80); lKx = np.clip(X[n:2*n], -500, 80)
     T = np.exp(X[2*n]); P = np.exp(X[2*n+1])
     if not (120 < T < 3000 and 0.01 < P < 1e5):
         return None
@@ -395,7 +431,7 @@ def _res_3p(S, X):
 # ════════════════════════════════════════════════════════════════════════════
 def _comp3(S, X):
     n = S.n
-    lKy = np.clip(X[:n], -80, 80); lKx = np.clip(X[n:2*n], -80, 80)
+    lKy = np.clip(X[:n], -500, 80); lKx = np.clip(X[n:2*n], -500, 80)
     b = X[2*n+2]
     Ky = np.exp(lKy); Kx = np.exp(lKx)
     den = b*Ky + (1.0-b)*Kx
@@ -556,8 +592,8 @@ def _linea_trifasica_binaria(S, Pmin, Pmax, T_min):
         if not (0.0 < yh < 1.0) or not (1e-6 < P < 1e5):
             return None
         y = np.zeros(2); y[ih] = yh; y[iw] = 1.0 - yh
-        x = np.exp(np.clip(lKx, -80, 80))*y
-        w = np.exp(np.clip(lKw, -80, 80))*y
+        x = np.exp(np.clip(lKx, -500, 80))*y
+        w = np.exp(np.clip(lKw, -500, 80))*y
         ly = S.lnphi(y, T, P, 'V'); lx = S.lnphi(x/x.sum(), T, P, 'L')
         lw = S.lnphi(w/w.sum(), T, P, 'L')
         if ly is None or lx is None or lw is None:
