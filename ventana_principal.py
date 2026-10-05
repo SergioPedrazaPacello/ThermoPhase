@@ -1993,7 +1993,7 @@ class SplashScreen(QWidget):
             from PyQt6.QtGui import QPixmap
             self._img = QPixmap(_sp)
             if not self._img.isNull():
-                dpr = 1.0                                  # tamaño nativo
+                dpr = max(self._img.width()/763.0, 1.0)    # se muestra a 763 px
                 self._img.setDevicePixelRatio(dpr)
                 ancho = int(round(self._img.width()/dpr))
                 alto = int(round(self._img.height()/dpr))
