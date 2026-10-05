@@ -1993,7 +1993,7 @@ class SplashScreen(QWidget):
             from PyQt6.QtGui import QPixmap
             self._img = QPixmap(_sp)
             if not self._img.isNull():
-                dpr = max(self._img.width()/640.0, 1.0)
+                dpr = max(self._img.width()/640.0, 1.0)   # splash original: 1:1
                 self._img.setDevicePixelRatio(dpr)
                 ancho = int(round(self._img.width()/dpr))
                 alto = int(round(self._img.height()/dpr))
@@ -2011,11 +2011,6 @@ class SplashScreen(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         if self._img:
-            from PyQt6.QtGui import QPainterPath
-            from PyQt6.QtCore import QRectF
-            camino = QPainterPath()
-            camino.addRoundedRect(QRectF(self.rect()), 14, 14)
-            p.setClipPath(camino)
             p.drawPixmap(0, 0, self._img)
         else:
             # Fallback: rectángulo oscuro con texto

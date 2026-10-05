@@ -1604,7 +1604,24 @@ def fase_pvtsim(z, T, P, Z, kij):
         TCa, PCa, _om, _pm = crit_props(_EOS_ACTIVA)
         Tcm = sum(z[i] * TCa[i] for i in range(NC))
         Pcm = sum(z[i] * PCa[i] for i in range(NC))
-    return "liquido" if T < Tcm else "vapor"
+    if T >= Tcm:
+        return "vapor"
+    if P >= Pcm:
+        return "liquido"
+    # P < Pc y T < Tc: fuera de la envolvente el fluido está a la izquierda
+    # de la burbuja (líquido) o a la derecha del rocío (gas).  Se distingue
+    # por el volumen reducido v/b de la raíz frente a su valor crítico
+    # (v/b ≈ 3.95 en PR y 3.85 en SRK): el líquido subcrítico es más denso y
+    # el gas menos denso que el crítico.  Sin esto, p. ej. un gas de C1–C3 a
+    # 60 °F y 14.7 psia (T < Tc de la mezcla) se etiquetaba como líquido.
+    try:
+        B = bm(z)*P/(R_GAS*T)
+        vb = Z/B if B > 0 else None
+    except Exception:
+        vb = None
+    if vb is None:
+        return "liquido"
+    return "liquido" if vb < 3.9 else "vapor"
 
 
 # ── Viscosidad por el método Lohrenz-Bray-Clark (LBC) ──────────

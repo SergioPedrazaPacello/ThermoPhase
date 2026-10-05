@@ -110,6 +110,9 @@ def _flash_sc_seco(x13, eos, kij, metodo):
     finally:
         _e.set_eos(prev)
     bL = r.get('L') or 0.0
+    # salvaguarda: una fase única con Z de gas a 14.7 psia no es líquido
+    if bL >= 1 - 1e-9 and (r.get('ZL') or 0.0) > 0.3:
+        return 1.0, 0.0, None
     if bL <= 1e-9 or not r.get('rho_l') or not r.get('PM_l'):
         return (r.get('V') or 0.0), 0.0, None
     return (r.get('V') or 0.0), bL, r['PM_l']/r['rho_l']
