@@ -5333,7 +5333,54 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Equilibria</em>, 8(1), 7–23.'),
                                 ('p',
                                  'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]}]},
+                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                   {'titulo': ('Comparación de envolventes', 'Envelope comparison'),
+                    'bloques': [('p',
+                                 'La comparación de envolventes traza en un mismo diagrama P-T '
+                                 'las envolventes de la composición principal y de los fluidos '
+                                 'del gestor de fluidos. Se abre desde el menú Gráficos '
+                                 '(«Comparar envolventes») o desde el gestor de fluidos. Una '
+                                 'ventana de dos listas permite elegir los fluidos; debe '
+                                 'seleccionarse al menos uno.',
+                                 'Envelope comparison plots, on the same P-T diagram, the '
+                                 'envelopes of the main composition and of the fluids in the '
+                                 'fluid manager. It is opened from the Graphics menu («Compare '
+                                 'envelopes») or from the fluid manager. A two-list window '
+                                 'is used to choose the fluids; at least one must be selected.'),
+                                ('ul',
+                                 [('Cada fluido se calcula con su propia ecuación de estado y sus '
+                                   'coeficientes de interacción; la composición principal usa los '
+                                   'de la ventana principal.',
+                                   'Each fluid is calculated with its own equation of state and '
+                                   'interaction coefficients; the main composition uses those of '
+                                   'the main window.'),
+                                  ('El método de trazado (Michelsen o Ziervogel-Poling) es el '
+                                   'seleccionado en la barra principal. Con agua activa se usa el '
+                                   'método de Lindeloff-Michelsen, igual que en la envolvente '
+                                   'individual.',
+                                   'The tracing method (Michelsen or Ziervogel-Poling) is the one '
+                                   'selected in the main bar. With water active, the '
+                                   'Lindeloff-Michelsen method is used, as in the individual '
+                                   'envelope.'),
+                                  ('Los fluidos sin composición, o cuya composición no suma 1 '
+                                   '(fracción molar) o 100 (porcentaje molar), se informan y se '
+                                   'excluyen; si ninguno es válido no se grafica.',
+                                   'Fluids without a composition, or whose composition does not '
+                                   'add up to 1 (mole fraction) or 100 (mole percent), are '
+                                   'reported and excluded; if none is valid nothing is plotted.'),
+                                  ('Cada fluido tiene un color; las curvas conservan el estilo de '
+                                   'la envolvente individual (línea fina con marcadores '
+                                   'triangulares) y el punto crítico se marca con un cuadrado.',
+                                   'Each fluid has its own colour; the curves keep the style of '
+                                   'the individual envelope (thin line with triangular markers) '
+                                   'and the critical point is marked with a square.'),
+                                  ('El panel lateral muestra el punto crítico, la '
+                                   'cricondentérmica y la cricondenbárica del fluido elegido, y '
+                                   'permite resaltar un fluido: los demás se vuelven '
+                                   'translúcidos.',
+                                   'The side panel shows the critical point, cricondentherm and '
+                                   'cricondenbar of the selected fluid, and allows one fluid to '
+                                   'be highlighted: the others become translucent.')])]}]},
  {'titulo': ('Puntos de saturación', 'Saturation points'),
   'subsecciones': [{'titulo': ('Definición y tipos de cálculo', 'Definition and calculation types'),
                     'bloques': [('p',

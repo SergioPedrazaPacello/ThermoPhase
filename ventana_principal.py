@@ -63,6 +63,7 @@ BORDER   = "#888888"
 TEXT     = "#000000"
 TEXT_DIM = "#555555"
 TEXT_RES = "#000080"   # azul oscuro para resultados
+SEL_BG   = "#DCDCDC"   # gris tenue para celdas seleccionadas (no el azul del sistema)
 FONT_F   = "Arial Narrow"
 FS       = 10
 
@@ -214,7 +215,8 @@ def make_table(rows, cols, row_h=22):
     t.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     t.setStyleSheet(
         f'QTableWidget {{ border:1px solid {BORDER}; '
-        f'font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER}; }}'
+        f'font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER};'
+        f' selection-background-color:{SEL_BG}; selection-color:{TEXT}; }}'
         f'QTableWidget::item {{ padding:2px 6px; }}'
     )
     for r in range(rows):
@@ -1755,7 +1757,8 @@ class TabParametros(QWidget):
         self.tbl_p.setStyleSheet(
             f'QTableWidget {{ background:{WHITE};'
             f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;'
+            f'selection-background-color:{SEL_BG};selection-color:{TEXT};}}'
             f'QTableWidget::item {{ padding:2px 6px; }}')
         self.tbl_p.setItemDelegate(GridDelegate(BORDER, self.tbl_p))
         for c,w in enumerate(WP): self.tbl_p.setColumnWidth(c,w)
@@ -1789,7 +1792,8 @@ class TabParametros(QWidget):
         self.tbl_k.setStyleSheet(
             f'QTableWidget {{ background:{WHITE};'
             f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;}}'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;'
+            f'selection-background-color:{SEL_BG};selection-color:{TEXT};}}'
             f'QTableWidget::item {{ padding:2px 4px; }}')
         self.tbl_k.setItemDelegate(GridDelegate(BORDER, self.tbl_k))
         self.tbl_k.setColumnWidth(0, WK)
@@ -2043,8 +2047,9 @@ class TabFluidos(QWidget):
     calculos independientes por fluido para compararlos entre si."""
 
     def __init__(self, fluidos, get_z_actual, cargar_en_principal, abrir_calc,
-                 on_change=None, on_comp_change=None):
+                 on_change=None, on_comp_change=None, abrir_comparar=None):
         super().__init__()
+        self._abrir_comparar = abrir_comparar
         self.fluidos = fluidos                 # lista compartida de dicts
         self._get_z_actual = get_z_actual
         self._cargar_principal = cargar_en_principal
@@ -2113,7 +2118,9 @@ class TabFluidos(QWidget):
         der.addWidget(self.tbl, alignment=Qt.AlignmentFlag.AlignLeft)
         g2 = QHBoxLayout(); g2.setSpacing(4)
         for txt, fn in [("Normalizar", self._normalizar),
-                        ("Cargar en composicion principal", self._cargar)]:
+                        ("Cargar en composicion principal", self._cargar),
+                        ("Comparar envolventes",
+                         lambda: self._abrir_comparar and self._abrir_comparar())]:
             b = QPushButton(txt); b.setStyleSheet(BTN); b.clicked.connect(fn)
             g2.addWidget(b)
         g2.addStretch()
@@ -2404,6 +2411,13 @@ class MainWindow(QMainWindow):
         self._act_tb.toggled.connect(
             lambda on: self.ribbon.setVisible(on))
         m_ver.addAction(self._act_tb)
+        # Mostrar / ocultar todos los iconos del programa (barra superior de
+        # selectores + árbol del navegador). DESACTIVADO por defecto.
+        m_ver.addSeparator()
+        self._act_iconos = QAction("Mostrar iconos", self, checkable=True)
+        self._act_iconos.setChecked(False)
+        self._act_iconos.toggled.connect(self._toggle_iconos)
+        m_ver.addAction(self._act_iconos)
         # La X del panel navegador desmarca la opcion de Ver.
         if hasattr(self, 'nav'):
             self.nav.cerrar_pedido.connect(
@@ -2436,14 +2450,12 @@ class MainWindow(QMainWindow):
         self._act_pts_critico.triggered.connect(
             lambda: self._set_modo_puntos_env('critico'))
 
-        # Mostrar / ocultar todos los iconos del programa (barra superior de
-        # selectores + árbol del navegador). DESACTIVADO por defecto.
+        # Comparación de varias envolventes (composición principal y fluidos
+        # del gestor) en un mismo diagrama.
         m_graf.addSeparator()
-        self._act_iconos = QAction("Mostrar iconos", self, checkable=True)
-        self._act_iconos.setChecked(False)
-        self._act_iconos.toggled.connect(self._toggle_iconos)
-        m_graf.addAction(self._act_iconos)
-        # Aplicar el estado inicial (oculto) — ribbon y navegador ya existen.
+        m_graf.addAction(_act("Comparar envolventes", self._abrir_multi_envolvente))
+        # Aplicar el estado inicial de los iconos (ocultos) — ribbon y
+        # navegador ya existen.
         self._toggle_iconos(self._act_iconos.isChecked())
 
         # ── Herramientas ─────────────────────────────────────
@@ -3306,7 +3318,8 @@ class MainWindow(QMainWindow):
                 cargar_en_principal=self._cargar_fluido_principal,
                 abrir_calc=self._abrir_calculo_fluido,
                 on_change=self._sync_nav_fluidos,
-                on_comp_change=lambda f: self._sync_fluido_z(f, 'fluidos'))
+                on_comp_change=lambda f: self._sync_fluido_z(f, 'fluidos'),
+                abrir_comparar=self._abrir_multi_envolvente)
             self._tab_fluidos = widget
             h = widget.sizeHint()
             sw = self._montar_subventana('fluidos', widget, "Fluidos",
@@ -3315,6 +3328,156 @@ class MainWindow(QMainWindow):
                 widget.aplicar_componentes(self._comp_activos)
                 self._reajustar_ventana_comp(sw, widget, len(self._comp_activos))
         self._mostrar_subventana(sw)
+
+    # ── Comparación de envolventes ───────────────────────────
+    _CLAVE_PRINCIPAL = '__principal__'
+
+    def _abrir_multi_envolvente(self):
+        """Selector de fluidos (composición principal + fluidos del gestor)
+        para comparar sus envolventes en un mismo diagrama."""
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
+                                     QListWidget, QListWidgetItem, QPushButton,
+                                     QLabel)
+        PRIN = self._CLAVE_PRINCIPAL
+        nombre_prin = _i18n.t("Composición principal")
+        disponibles = [PRIN] + [f['nombre'] for f in self.fluidos]
+        previos = [k for k in getattr(self, '_multi_sel', [])
+                   if k in disponibles]
+
+        def etiqueta(k):
+            return nombre_prin if k == PRIN else k
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(_i18n.t("Comparar envolventes"))
+        dlg.setStyleSheet('QDialog { background:#e0e0e0; }')
+        root = QVBoxLayout(dlg)
+        root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
+        txt_qss = (f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                   f'color:{TEXT};background:transparent;')
+        info = QLabel(_i18n.t("Seleccione los fluidos cuyas envolventes se compararán:"))
+        info.setStyleSheet(txt_qss); root.addWidget(info)
+        list_qss = (f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
+                    f' font-family:"{FONT_F}"; font-size:{FS}pt; outline:0; }}'
+                    f'QListWidget::item {{ height:22px; padding-left:4px; }}'
+                    f'QListWidget::item:selected {{ background:{SEL_BG};'
+                    f' color:{TEXT}; }}')
+        btn_qss = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
+                   f'font-family:"{FONT_F}";font-size:{FS}pt;')
+        cols = QHBoxLayout(); cols.setSpacing(12)
+        listas = []
+        for titulo in ("Fluidos disponibles", "Fluidos a graficar"):
+            c = QVBoxLayout(); c.setSpacing(3)
+            l = QLabel(_i18n.t(titulo)); l.setStyleSheet(txt_qss); c.addWidget(l)
+            lw = QListWidget(); lw.setStyleSheet(list_qss); lw.setFixedSize(240, 240)
+            c.addWidget(lw); cols.addLayout(c); listas.append(lw)
+        lista_disp, lista_sel = listas
+        root.addLayout(cols)
+
+        def add_item(lista, k):
+            it = QListWidgetItem(etiqueta(k))
+            it.setData(Qt.ItemDataRole.UserRole, k)
+            lista.addItem(it)
+        for k in previos:
+            add_item(lista_sel, k)
+        for k in disponibles:
+            if k not in previos:
+                add_item(lista_disp, k)
+
+        fila = QHBoxLayout(); fila.setSpacing(8)
+        contador = QLabel(); contador.setStyleSheet(txt_qss)
+        fila.addWidget(contador); fila.addStretch()
+        btn_add = QPushButton(_i18n.t("Agregar")); btn_rem = QPushButton(_i18n.t("Quitar"))
+        btn_ok = QPushButton(_i18n.t("Graficar")); btn_cancel = QPushButton(_i18n.t("Cancelar"))
+        for b in (btn_add, btn_rem, btn_ok, btn_cancel):
+            b.setFixedHeight(26); b.setMinimumWidth(84); b.setStyleSheet(btn_qss)
+            b.setCursor(Qt.CursorShape.PointingHandCursor); fila.addWidget(b)
+        root.addLayout(fila)
+
+        def _actualizar():
+            n = lista_sel.count()
+            contador.setText(_i18n.t("Seleccionados: ") + str(n))
+            btn_ok.setEnabled(n >= 1)
+            btn_add.setEnabled(lista_disp.count() > 0)
+            btn_rem.setEnabled(n > 0)
+
+        def _mover(origen, destino):
+            items = origen.selectedItems() or ([origen.currentItem()] if origen.currentItem() else [])
+            for it in items:
+                k = it.data(Qt.ItemDataRole.UserRole)
+                origen.takeItem(origen.row(it)); add_item(destino, k)
+            _actualizar()
+        btn_add.clicked.connect(lambda: _mover(lista_disp, lista_sel))
+        btn_rem.clicked.connect(lambda: _mover(lista_sel, lista_disp))
+        lista_disp.itemDoubleClicked.connect(lambda _: _mover(lista_disp, lista_sel))
+        lista_sel.itemDoubleClicked.connect(lambda _: _mover(lista_sel, lista_disp))
+        btn_ok.clicked.connect(dlg.accept); btn_cancel.clicked.connect(dlg.reject)
+        _actualizar()
+        dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
+        if not dlg.exec():
+            return
+        sel = [lista_sel.item(i).data(Qt.ItemDataRole.UserRole)
+               for i in range(lista_sel.count())]
+        self._multi_sel = sel
+        self._lanzar_multi_envolvente(sel)
+
+    def _lanzar_multi_envolvente(self, claves):
+        """Valida las composiciones y abre/actualiza la ventana de
+        comparación de envolventes."""
+        import pestana_multienvolvente as _pme
+        PRIN = self._CLAVE_PRINCIPAL
+        self._multi_sel = list(claves)
+        act = set(getattr(self, '_comp_activos', range(NC)))
+        trabajos, sin_comp, sin_suma = [], [], []
+        for k in claves:
+            if k == PRIN:
+                nombre = _i18n.t("Composición principal")
+                z = list(self.tab_eq.get_z())
+                eos_c = self._eos_main_code(); kij = kij_user
+            else:
+                f = next((x for x in self.fluidos if x['nombre'] == k), None)
+                if f is None:
+                    continue
+                nombre = k
+                zf = f.get('z') or []
+                z = [(zf[i] if (i in act and i < len(zf)) else 0.0) for i in range(NC + 1)]
+                eos_c = f.get('eos', 'PR'); kij = f.get('kij', KIJ_DEFAULT)
+            s = sum(z)
+            if s <= 1e-12:
+                sin_comp.append(nombre); continue
+            if abs(s - 1.0) > 1e-3:
+                sin_suma.append(nombre); continue
+            trabajos.append({'nombre': nombre, 'z': z, 'kij': kij, 'eos': eos_c})
+        avisos = []
+        if sin_comp:
+            avisos.append(_i18n.t("Sin composición:") + "\n• " + "\n• ".join(sin_comp))
+        if sin_suma:
+            avisos.append(_i18n.t("La composición no suma 1 (fracción molar) ni 100 (porcentaje molar):")
+                          + "\n• " + "\n• ".join(sin_suma))
+        if not trabajos:
+            dialogos.error(self, _i18n.t("Ninguno de los fluidos seleccionados tiene una composición válida; no se puede graficar.")
+                           + ("\n\n" + "\n\n".join(avisos) if avisos else ""))
+            return
+        if avisos:
+            dialogos.advertencia(self, _i18n.t("Los siguientes fluidos no se graficarán:")
+                                 + "\n\n" + "\n\n".join(avisos))
+        clave = 'multienvolvente'
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            metodo = lambda: ('michelsen' if self.tab_env.cmb_metodo.currentIndex() == 0
+                              else 'ziervogel')
+            widget = _pme.TabMultiEnvolvente(
+                get_metodo=metodo,
+                on_reseleccionar=self._abrir_multi_envolvente,
+                on_calcular=lambda: self._lanzar_multi_envolvente(
+                    getattr(self, '_multi_sel', [])))
+            if not hasattr(self, '_tam_sub'):
+                h = self.tab_eq.sizeHint()
+                self._tam_sub = (h.width() + 26, h.height() + 12)
+            sw = self._montar_subventana(clave, widget, "Comparación de envolventes",
+                                         tam=self._tam_sub,
+                                         pie_texto=_i18n.t("Comparación de envolventes"))
+        self._mostrar_subventana(sw)
+        sw._widget.calcular(trabajos, self._eos_main_code())
 
     def _cargar_fluido_principal(self, z):
         """Carga la composicion de un fluido en la pestaña de Equilibrio."""
@@ -3715,6 +3878,14 @@ def main(app=None, splash=None):
     # Fuente global Arial Narrow (todo el cromo retro la hereda).
     _f = QFont("Arial Narrow", 9)
     app.setFont(_f)
+    # Selección en tablas/listas: gris tenue en lugar del azul del sistema
+    # (activa e inactiva), con texto negro.
+    from PyQt6.QtGui import QPalette as _QPal
+    _pal = app.palette()
+    for _grp in (_QPal.ColorGroup.Active, _QPal.ColorGroup.Inactive):
+        _pal.setColor(_grp, _QPal.ColorRole.Highlight, QColor(SEL_BG))
+        _pal.setColor(_grp, _QPal.ColorRole.HighlightedText, QColor(TEXT))
+    app.setPalette(_pal)
     # Icono global de la aplicacion
     _ico2 = ruta_recurso('thermophase.ico')
     if os.path.exists(_ico2):
