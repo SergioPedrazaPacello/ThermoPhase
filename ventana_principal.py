@@ -3730,12 +3730,12 @@ def main(app=None, splash=None):
     _SPLASH_ACTIVO = None
     # Completar la barra (y mantener el splash visible al menos 2 s)
     splash.terminar(minimo=2.0)
-    # Ventana normal (no maximizada): 85 % del área útil de la pantalla,
+    # Ventana normal (no maximizada): 60 % del área útil de la pantalla,
     # centrada.  El usuario puede maximizarla con el botón de la barra.
     try:
         _g = app.primaryScreen().availableGeometry()
-        _w = max(920, min(int(_g.width()*0.85), 1600))
-        _h = max(620, min(int(_g.height()*0.85), 1000))
+        _w = max(920, min(int(_g.width()*0.60), 1600))
+        _h = max(620, min(int(_g.height()*0.60), 1000))
         win.resize(_w, _h)
         win.move(_g.x() + (_g.width() - _w)//2, _g.y() + (_g.height() - _h)//2)
     except Exception:
