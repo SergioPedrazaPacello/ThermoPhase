@@ -1987,18 +1987,28 @@ class SplashScreen(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self._img = None
         ancho, alto = 340, 269
-        # Cargar imagen splash (alta resolución, se muestra a 640 px de ancho)
+        # Cargar imagen splash.  splash.png está a 4× de su tamaño en pantalla
+        # (784 px de ancho); se reescala una sola vez, con filtro suave, a los
+        # píxeles físicos de la pantalla (tamaño lógico × escalado de Windows)
+        # para que se vea nítido con escalado de 100 %, 125 %, 150 %, 200 %...
         _sp = ruta_recurso('splash.png')
         if os.path.exists(_sp):
             from PyQt6.QtGui import QPixmap
-            self._img = QPixmap(_sp)
-            if not self._img.isNull():
-                dpr = max(self._img.width()/763.0, 1.0)    # se muestra a 763 px
+            from PyQt6.QtWidgets import QApplication
+            img = QPixmap(_sp)
+            if not img.isNull():
+                ANCHO_LOGICO = 784
+                ancho = min(ANCHO_LOGICO, img.width())
+                alto = int(round(img.height()*ancho/img.width()))
+                try:
+                    dpr = float(QApplication.primaryScreen().devicePixelRatio())
+                except Exception:
+                    dpr = 1.0
+                dpr = max(dpr, 1.0)
+                self._img = img.scaled(int(round(ancho*dpr)), int(round(alto*dpr)),
+                                       Qt.AspectRatioMode.IgnoreAspectRatio,
+                                       Qt.TransformationMode.SmoothTransformation)
                 self._img.setDevicePixelRatio(dpr)
-                ancho = int(round(self._img.width()/dpr))
-                alto = int(round(self._img.height()/dpr))
-            else:
-                self._img = None
         self.setFixedSize(ancho, alto)
         # Centrar en pantalla
         from PyQt6.QtWidgets import QApplication
