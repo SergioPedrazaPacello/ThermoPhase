@@ -1975,68 +1975,18 @@ class TabParametros(QWidget):
 # ══════════════════════════════════════════════════════════════
 # Pantalla de Carga (Splash Screen)
 # ══════════════════════════════════════════════════════════════
-class SplashScreen(QWidget):
-    """Pantalla de carga mostrada mientras ThermoPhase inicia."""
-    def __init__(self):
-        super().__init__()
-        self.setWindowFlags(
-            Qt.WindowType.SplashScreen |
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint
-        )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self._img = None
-        ancho, alto = 340, 269
-        # Cargar imagen splash.  splash.png está a 4× de su tamaño en pantalla
-        # (784 px de ancho); se reescala una sola vez, con filtro suave, a los
-        # píxeles físicos de la pantalla (tamaño lógico × escalado de Windows)
-        # para que se vea nítido con escalado de 100 %, 125 %, 150 %, 200 %...
-        _sp = ruta_recurso('splash.png')
-        if os.path.exists(_sp):
-            from PyQt6.QtGui import QPixmap
-            from PyQt6.QtWidgets import QApplication
-            img = QPixmap(_sp)
-            if not img.isNull():
-                ANCHO_LOGICO = 784
-                ancho = min(ANCHO_LOGICO, img.width())
-                alto = int(round(img.height()*ancho/img.width()))
-                try:
-                    dpr = float(QApplication.primaryScreen().devicePixelRatio())
-                except Exception:
-                    dpr = 1.0
-                dpr = max(dpr, 1.0)
-                self._img = img.scaled(int(round(ancho*dpr)), int(round(alto*dpr)),
-                                       Qt.AspectRatioMode.IgnoreAspectRatio,
-                                       Qt.TransformationMode.SmoothTransformation)
-                self._img.setDevicePixelRatio(dpr)
-        self.setFixedSize(ancho, alto)
-        # Centrar en pantalla
-        from PyQt6.QtWidgets import QApplication
-        sg = QApplication.primaryScreen().geometry()
-        self.move((sg.width()-ancho)//2, (sg.height()-alto)//2)
+from splash import SplashScreen   # pantalla de carga (splash.py)
 
-    def paintEvent(self, event):
-        from PyQt6.QtGui import QPainter, QColor, QPen, QFont
-        from PyQt6.QtCore import Qt as _Qt
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        if self._img:
-            p.drawPixmap(0, 0, self._img)
-        else:
-            # Fallback: rectángulo oscuro con texto
-            p.setBrush(QColor(20,10,5))
-            p.setPen(_Qt.PenStyle.NoPen)
-            p.drawRoundedRect(0,0,420,260,16,16)
-            p.setPen(QColor(240,144,48))
-            fnt = QFont("Arial Narrow", 28, QFont.Weight.Bold)
-            p.setFont(fnt)
-            p.drawText(50,80,320,60, _Qt.AlignmentFlag.AlignCenter, "ThermoPhase")
-            p.setPen(QColor(200,160,120))
-            fnt2 = QFont("Arial Narrow", 11)
-            p.setFont(fnt2)
-            p.drawText(50,140,320,40, _Qt.AlignmentFlag.AlignCenter,
-                       "Software de Equilibrio de Fases")
-        p.end()
+
+def _avance(frac, texto):
+    """Informa el avance del arranque al splash, si está activo."""
+    sp = globals().get('_SPLASH_ACTIVO')
+    if sp is not None:
+        try:
+            sp.progreso(frac, texto, animar_ms=120)
+        except Exception:
+            pass
+
 
 # ══════════════════════════════════════════════════════════════
 class ScrollableTabBar(QTabBar):
@@ -2892,23 +2842,29 @@ class MainWindow(QMainWindow):
 
     def _build(self):
         # ── Widgets de cada calculo (tamaño / colores identicos) ──
+        _avance(0.66, "Preparando equilibrio de fases…")
         self.tab_eq   = TabEquilibrio()
         self.tab_eq._on_props_resize = self._on_props_change
+        _avance(0.72, "Preparando envolventes de fases…")
         self.tab_env  = TabEnvolvente(get_z=self._getz_main,
                                       get_kij=lambda: kij_user,
                                       get_metodo_densidad=self._metodo_densidad_main)
+        _avance(0.77, "Preparando puntos de saturación…")
         self.tab_sat  = TabSaturacion(get_z=self._getz_main,
                                       get_kij=lambda: kij_user)
         self.tab_sat._on_props_resize = self._on_props_change
+        _avance(0.82, "Preparando formación de hidratos…")
         self.tab_hid  = TabHidratos(get_z=self._getz_main,
                                     get_kij=lambda: kij_user,
                                     get_envolvente=lambda: self.tab_env,
                                     get_eos_nombre=lambda: _eng.get_eos())
         self.tab_hid._on_props_resize = self._on_props_change
+        _avance(0.87, "Preparando análisis de sensibilidad…")
         self.tab_prop = TabPropiedades(get_z=self._getz_main,
                                        get_kij=lambda: kij_user,
                                        get_metodo_densidad=self._metodo_densidad_main)
         self.tab_par  = TabParametros()
+        _avance(0.92, "Construyendo la interfaz…")
 
         # Definicion de cada calculo: clave -> (widget, titulo, icono)
         self._defs_calc = {
@@ -3749,10 +3705,13 @@ class MainWindow(QMainWindow):
         self._lbl_info.setText(f"{_eos_nombre(eos)} EOS")
         self._refrescar_pies()
 
-def main():
-    """Arranca la aplicacion. Llamado desde main.py en la raiz."""
-    import time as _time
-    app = QApplication(sys.argv)
+def main(app=None, splash=None):
+    """Arranca la aplicacion.  main.py crea la aplicacion y el splash ANTES de
+    importar este módulo (que carga numpy, matplotlib y los modelos) y los
+    pasa aquí; si se ejecuta este archivo directamente, se crean aquí."""
+    global _SPLASH_ACTIVO
+    if app is None:
+        app = QApplication.instance() or QApplication(sys.argv)
     # Fuente global Arial Narrow (todo el cromo retro la hereda).
     _f = QFont("Arial Narrow", 9)
     app.setFont(_f)
@@ -3761,17 +3720,16 @@ def main():
     if os.path.exists(_ico2):
         app.setWindowIcon(QIcon(_ico2))
     # Splash screen
-    splash = SplashScreen()
-    splash.show()
-    app.processEvents()
-    _t_ini = _time.time()
+    if splash is None:
+        splash = SplashScreen()
+        splash.show()
+        splash.progreso(0.60, "Cargando interfaz…")
+    _SPLASH_ACTIVO = splash
     # Cargar ventana principal
     win = MainWindow()
-    # Mantener el splash visible al menos 2 segundos en total
-    _espera = 2.0 - (_time.time() - _t_ini)
-    if _espera > 0:
-        _time.sleep(_espera)
-    splash.close()
+    _SPLASH_ACTIVO = None
+    # Completar la barra (y mantener el splash visible al menos 2 s)
+    splash.terminar(minimo=2.0)
     win.showMaximized()
     # Si el programa fue invocado con un .tpsim como argumento (por ejemplo
     # al hacer doble clic sobre el archivo en Windows Explorer), abrirlo

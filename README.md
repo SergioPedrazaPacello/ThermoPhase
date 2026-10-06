@@ -41,7 +41,9 @@ python main.py
 | `asociar_extension.py`     | Asociar `.tpsim` con el programa (Windows Registry)    |
 | `rutas.py`                 | Localiza los recursos (funciona también dentro del .exe)|
 | **Recursos**               |                                                        |
-| `splash.png`               | Pantalla de carga                                      |
+| `splash.png`               | Fondo de la pantalla de carga (envolvente real, 3×)    |
+| `splash.py`                | Pantalla de carga con barra de progreso animada        |
+| `Inter-Regular.ttf`        | Fuente del mensaje de carga (SIL Open Font License)    |
 | `thermophase.ico`          | Ícono de la aplicación                                 |
 
 ## Convenciones internas
