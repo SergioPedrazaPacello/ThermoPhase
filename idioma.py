@@ -547,6 +547,7 @@ TRAD = {
     "Condiciones:": "Conditions:",
     "Composición:": "Composition:",
     "Composición": "Composition",
+    "ThermoPhase — Ingreso de datos": "ThermoPhase — Data input",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

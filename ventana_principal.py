@@ -3703,6 +3703,8 @@ class MainWindow(QMainWindow):
         w = getattr(sub, '_widget', None) if sub is not None else None
         if w is not None and hasattr(w, 'cmb_vol'):
             met = 'Peneloux' if w.cmb_vol.currentText() == 'Peneloux' else w.cmb_dens.currentText()
+        elif f.get('correccion_volumen') == 'Peneloux':
+            met = 'Peneloux'
         else:
             met = f.get('densidad', 'COSTALD')
         return (clave, z, f.get('kij', KIJ_DEFAULT), f.get('eos', 'PR'), met)
@@ -3936,6 +3938,7 @@ class MainWindow(QMainWindow):
         dlg.setWindowTitle(f"{_i18n.t(titulos[clave])} — {nombre}")
         dlg.setStyleSheet('QDialog { background:#e0e0e0; }')
         root = QVBoxLayout(dlg); root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
+        root.addWidget(title_label(_i18n.t("ThermoPhase — Ingreso de datos")))
         txt_qss = (f'font-family:"{FONT_F}";font-size:{FS}pt;'
                    f'color:{TEXT};background:transparent;')
         lbl_qss = (f'background:{GRAY_LBL};border:1px solid {BORDER};'
@@ -3951,7 +3954,7 @@ class MainWindow(QMainWindow):
             return l
 
         def campo():
-            e = QLineEdit(); e.setStyleSheet(ed_qss); e.setFixedSize(110, 22)
+            e = QLineEdit(); e.setStyleSheet(ed_qss); e.setFixedSize(190, 22)
             e.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             return e
 
@@ -3969,16 +3972,67 @@ class MainWindow(QMainWindow):
             gl.addWidget(etiqueta(txt_T), 1, 0); gl.addWidget(ed_T, 1, 1)
         else:
             tipos = (TabSaturacion if clave == 'saturacion' else TabHidratos).TIPOS
-            cmb = QComboBox(); cmb.setFixedHeight(22); _aplicar_estilo_combo(cmb)
+            cmb = QComboBox(); cmb.setFixedSize(190, 22); _aplicar_estilo_combo(cmb)
             for k in tipos:
                 cmb.addItem(_i18n.t(k), k)
             gl.addWidget(etiqueta(_i18n.t("Calcular:")), 0, 0); gl.addWidget(cmb, 0, 1)
-            lbl_c = etiqueta(txt_P); ed_c = campo(); ed_c.setFixedWidth(150)
+            lbl_c = etiqueta(txt_P); ed_c = campo()
             gl.addWidget(lbl_c, 1, 0); gl.addWidget(ed_c, 1, 1)
             def _tipo(_i=None):
                 u_in = tipos[cmb.currentData()][1]
                 lbl_c.setText(txt_P if u_in == 'P' else txt_T)
             cmb.currentIndexChanged.connect(_tipo); _tipo()
+        # ── Modelo: EOS, densidad y corrección de volumen ──────
+        # Composición principal: cada selección se refleja al instante en la
+        # barra superior (que gobierna la composición principal); al cancelar
+        # se restaura la selección previa.  Fluido: se aplica al calcular.
+        def combo(items, idx):
+            c = QComboBox(); c.setFixedSize(190, 22); _aplicar_estilo_combo(c)
+            c.addItems([_i18n.t(x) for x in items]); c.setCurrentIndex(max(0, idx))
+            return c
+        if fluido is None:
+            i_eos0 = self.tab_eq.cmb_eos.currentIndex()
+            dens0 = self.tab_eq.cmb_dens.currentText()
+            vol0 = self.tab_eq.cmb_vol.currentText()
+            dens_prev0 = getattr(self.tab_eq, '_densidad_previa_local', 'COSTALD')
+        else:
+            sub = self._subventanas.get(f"equilibrio@{fluido['nombre']}")
+            we = getattr(sub, '_widget', None) if sub is not None else None
+            i_eos0 = _eos_idx(fluido.get('eos', 'PR'))
+            if we is not None and hasattr(we, 'cmb_vol'):
+                dens0, vol0 = we.cmb_dens.currentText(), we.cmb_vol.currentText()
+            else:
+                dens0 = fluido.get('densidad', self.tab_eq.cmb_dens.currentText())
+                vol0 = fluido.get('correccion_volumen', 'Ninguna')
+            dens_prev0 = 'COSTALD'
+        DENS = ["COSTALD", "EOS"]; VOL = ["Ninguna", "Peneloux"]
+        c_eos = combo(EOS_ITEMS, i_eos0)
+        c_dens = combo(DENS, DENS.index(dens0) if dens0 in DENS else 0)
+        c_vol = combo(VOL, VOL.index(vol0) if vol0 in VOL else 0)
+        c_dens.setEnabled(vol0 != 'Peneloux')
+        gl.addWidget(etiqueta(_i18n.t("Ecuación de estado:")), 4, 0); gl.addWidget(c_eos, 4, 1)
+        gl.addWidget(etiqueta(_i18n.t("Densidad:")), 5, 0); gl.addWidget(c_dens, 5, 1)
+        gl.addWidget(etiqueta(_i18n.t("Corrección de volumen:")), 6, 0); gl.addWidget(c_vol, 6, 1)
+        gl.setRowMinimumHeight(3, 6)
+        estado_dens = {'prev': dens0 if vol0 != 'Peneloux' else dens_prev0}
+
+        def _on_vol(i):
+            # Peneloux corrige la densidad de la EOS: fuerza EOS y bloquea.
+            if i == 1:
+                if c_dens.isEnabled():
+                    estado_dens['prev'] = DENS[c_dens.currentIndex()]
+                c_dens.setCurrentIndex(1); c_dens.setEnabled(False)
+            else:
+                c_dens.setEnabled(True)
+                c_dens.setCurrentIndex(DENS.index(estado_dens['prev']))
+        c_vol.currentIndexChanged.connect(_on_vol)
+        sel = self.selectores
+        if fluido is None:
+            c_eos.currentIndexChanged.connect(lambda i: sel['eos'].setCurrentIndex(i))
+            if sel.get('volumen') is not None:
+                c_vol.currentIndexChanged.connect(lambda i: sel['volumen'].setCurrentIndex(i))
+            c_dens.currentIndexChanged.connect(
+                lambda i: c_dens.isEnabled() and sel['densidad'].setCurrentIndex(i))
         c1.addLayout(gl); c1.addStretch()
         cols.addLayout(c1)
 
@@ -4109,7 +4163,24 @@ class MainWindow(QMainWindow):
         b_ok.clicked.connect(_aceptar)
         dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
         if not dlg.exec():
+            if fluido is None:
+                # Restaurar la selección previa de la barra.
+                sel['eos'].setCurrentIndex(i_eos0)
+                if sel.get('volumen') is not None:
+                    sel['volumen'].setCurrentIndex(VOL.index(vol0) if vol0 in VOL else 0)
+                if vol0 != 'Peneloux':
+                    sel['densidad'].setCurrentIndex(DENS.index(dens0) if dens0 in DENS else 0)
             return
+        if fluido is not None:
+            self._set_eos_fluido(fluido, _eos_code(c_eos.currentIndex()))
+            fluido['densidad'] = DENS[c_dens.currentIndex()]
+            fluido['correccion_volumen'] = VOL[c_vol.currentIndex()]
+            if c_vol.currentIndex() == 1:
+                fluido['densidad'] = estado_dens['prev']
+            sub = self._subventanas.get(f"equilibrio@{fluido['nombre']}")
+            we = getattr(sub, '_widget', None) if sub is not None else None
+            if we is not None and hasattr(we, 'cmb_vol'):
+                self._aplicar_modelo_eq(we, fluido)
 
         # ── Composición al fluido / composición principal ──────
         z, pct = datos['z'], datos['pct']
@@ -4406,6 +4477,8 @@ class MainWindow(QMainWindow):
                 if w.cmb_vol.currentText() == 'Peneloux':
                     return 'Peneloux'
                 return w.cmb_dens.currentText()
+            if f.get('correccion_volumen') == 'Peneloux':
+                return 'Peneloux'
             return f.get('densidad', 'COSTALD')
         if clave == 'envolvente':
             return TabEnvolvente(get_z=gz, get_kij=gk, get_metodo_densidad=gm)
@@ -4443,6 +4516,15 @@ class MainWindow(QMainWindow):
             w.cmb_eos.setCurrentIndex(_eos_idx(fluido.get('eos', 'PR')))
             w.cmb_eos.blockSignals(False)
             w.cmb_dens.setCurrentIndex(self.tab_eq.cmb_dens.currentIndex())
+            if fluido.get('densidad') or fluido.get('correccion_volumen'):
+                self._aplicar_modelo_eq(w, fluido)
+            def _guardar_modelo(*_a, f=fluido, ww=w):
+                f['correccion_volumen'] = ww.cmb_vol.currentText()
+                f['densidad'] = (getattr(ww, '_densidad_previa_local', 'COSTALD')
+                                 if ww.cmb_vol.currentText() == 'Peneloux'
+                                 else ww.cmb_dens.currentText())
+            w.cmb_dens.currentIndexChanged.connect(_guardar_modelo)
+            w.cmb_vol.currentIndexChanged.connect(_guardar_modelo)
             w.eos_changed.connect(
                 lambda *_a, f=fluido, ww=w: self._on_fluido_eos(f, ww))
             w.tbl_comp.itemChanged.connect(
@@ -4478,6 +4560,44 @@ class MainWindow(QMainWindow):
                     tf._mostrar_z(fluido['z'])
         finally:
             self._sync_z_lock = False
+
+    def _set_eos_fluido(self, fluido, code):
+        """Fija la EOS de un fluido (su kij vuelve al de esa EOS, como al
+        cambiarla en su ventana de Equilibrio)."""
+        if fluido.get('eos', 'PR') == code:
+            return
+        sub = self._subventanas.get(f"equilibrio@{fluido['nombre']}")
+        we = getattr(sub, '_widget', None) if sub is not None else None
+        if we is not None and hasattr(we, 'cmb_eos'):
+            we.cmb_eos.setCurrentIndex(_eos_idx(code))   # -> _on_fluido_eos
+            return
+        fluido['eos'] = code
+        fluido['kij_fuente'] = code
+        fluido['kij'] = _eng.kij_base(code)
+        par = self._subventanas.get(f"parametros@{fluido['nombre']}")
+        if par is not None:
+            for tp in par.findChildren(TabParametros):
+                tp._sync_desde_objetivo()
+        self._refrescar_pies()
+
+    @staticmethod
+    def _aplicar_modelo_eq(w, fluido):
+        """Densidad y corrección de volumen guardadas del fluido -> su
+        ventana de Equilibrio (respetando el switch de Peneloux)."""
+        dens = fluido.get('densidad')
+        vol = fluido.get('correccion_volumen', 'Ninguna')
+        if vol != 'Peneloux' and w.cmb_vol.currentText() == 'Peneloux':
+            w.cmb_vol.setCurrentIndex(0)
+        if dens:
+            i = w.cmb_dens.findText(dens)
+            if i >= 0:
+                if w.cmb_dens.isEnabled():
+                    w.cmb_dens.setCurrentIndex(i)
+                else:
+                    w._densidad_previa_local = dens
+        iv = w.cmb_vol.findText(vol)
+        if iv >= 0:
+            w.cmb_vol.setCurrentIndex(iv)
 
     def _on_fluido_eos(self, fluido, w):
         """La EOS del combo de la ventana de Equilibrio del fluido pasa a ser
