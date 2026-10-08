@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QTabBar, QTableWidget, QTableWidgetItem, QLabel, QPushButton,
     QDoubleSpinBox, QGridLayout, QFrame, QHeaderView,
-    QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox,
+    QCheckBox, QMessageBox, QStatusBar, QAbstractItemView, QScrollArea, QComboBox, QSizePolicy,
     QAbstractSpinBox, QMenuBar, QFileDialog, QSplitter,
     QMdiArea, QMdiSubWindow, QListWidget, QInputDialog, QStyledItemDelegate
 )
@@ -251,6 +251,70 @@ def make_table(rows, cols, row_h=22):
     t.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     t.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     return t
+
+class TablaPuntos(QTableWidget):
+    """Tabla de puntos (P, T) con el MISMO aspecto que las tablas de
+    Equilibrio de fases: la fila de títulos y la columna de numeración son
+    celdas grises de la propia tabla (no cabeceras nativas), con la rejilla
+    fina de make_table.  Fila 0 = títulos; filas 1.. = puntos."""
+
+    W_NUM = 34
+
+    def __init__(self, titulos, alto=260, parent=None):
+        super().__init__(1, 1 + len(titulos), parent)
+        self.horizontalHeader().hide(); self.verticalHeader().hide()
+        self.setShowGrid(True)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.setStyleSheet(
+            f'QTableWidget {{ background:{WHITE}; border:1px solid {BORDER};'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER};'
+            f' selection-background-color:{SEL_BG}; selection-color:{TEXT}; }}'
+            f'QTableWidget::item {{ padding:2px 6px; }}')
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.verticalHeader().setDefaultSectionSize(ROW_H)
+        self.setFixedHeight(alto)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setItem(0, 0, cell("", bg=GRAY_LBL))
+        for c, t in enumerate(titulos, 1):
+            self.setItem(0, c, cell(t, bg=GRAY_LBL, align=Qt.AlignmentFlag.AlignCenter))
+        self.setRowHeight(0, ROW_H)
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        n = self.columnCount() - 1
+        disp = self.viewport().width() - self.W_NUM
+        self.setColumnWidth(0, self.W_NUM)
+        for c in range(1, n + 1):
+            self.setColumnWidth(c, max(60, disp // n if c < n else disp - (disp // n)*(n - 1)))
+
+    def agregar(self, valores=None):
+        r = self.rowCount(); self.insertRow(r); self.setRowHeight(r, ROW_H)
+        self.setItem(r, 0, cell(str(r), bg=GRAY_LBL, align=Qt.AlignmentFlag.AlignCenter))
+        for c in range(1, self.columnCount()):
+            v = None if valores is None or c - 1 >= len(valores) else valores[c - 1]
+            self.setItem(r, c, cell("" if v is None else f"{v:.2f}", bg=WHITE, editable=True))
+
+    def quitar(self):
+        r = self.currentRow()
+        if r < 1:
+            r = self.rowCount() - 1
+        if r >= 1:
+            self.removeRow(r)
+        for i in range(1, self.rowCount()):
+            self.item(i, 0).setText(str(i))
+
+    def vaciar(self):
+        self.setRowCount(1)
+
+    def filas(self):
+        """[(texto_col1, texto_col2, ...)] de cada fila de datos."""
+        out = []
+        for r in range(1, self.rowCount()):
+            out.append(tuple((self.item(r, c).text().strip() if self.item(r, c) else "")
+                             for c in range(1, self.columnCount())))
+        return out
+
 
 def fix_table_size(t):
     """Ajusta el tamaño de la tabla a su contenido."""
@@ -2506,12 +2570,27 @@ class MainWindow(QMainWindow):
         m_graf.addSeparator()
         m_graf.addAction(_act("Comparar envolventes", self._abrir_multi_envolvente))
         m_graf.addAction(_act("Recorrido de presión y temperatura", self._abrir_recorrido))
+        # Curva de formación de hidratos sobre la envolvente principal (el
+        # mismo interruptor que el botón de la ventana de Hidratos).
+        self._act_hid = QAction("Mostrar curva de hidratos", self, checkable=True)
+        self._act_hid.setChecked(bool(getattr(self.tab_hid, '_curva_on', False)))
+        self._act_hid.toggled.connect(self._toggle_hidratos_menu)
+        m_graf.addAction(self._act_hid)
+        _orig_btn = self.tab_hid._actualizar_btn_curva
+        def _btn_sync(_o=_orig_btn):
+            _o()
+            self._act_hid.blockSignals(True)
+            self._act_hid.setChecked(bool(self.tab_hid._curva_on))
+            self._act_hid.blockSignals(False)
+        self.tab_hid._actualizar_btn_curva = _btn_sync
         # Aplicar el estado inicial de los iconos (ocultos) — ribbon y
         # navegador ya existen.
         self._toggle_iconos(self._act_iconos.isChecked())
 
         # ── Herramientas ─────────────────────────────────────
         m_herr = menubar.addMenu("&Herramientas")
+        m_herr.addAction(_act("&Flash múltiple", self._abrir_flash_multiple))
+        m_herr.addSeparator()
         m_herr.addAction(_act("&Asociar archivos .tpsim con este programa",
                               self._menu_asociar))
         m_herr.addAction(_act("&Quitar asociacion de archivos .tpsim",
@@ -2546,6 +2625,19 @@ class MainWindow(QMainWindow):
         m_ayuda.addAction(_act("&Documentación técnica", self._abrir_documentacion))
         m_ayuda.addSeparator()
         m_ayuda.addAction(_act("&Acerca de ThermoPhase...", self._menu_acerca))
+
+    def _toggle_hidratos_menu(self, on):
+        """Muestra u oculta la curva de hidratos en la envolvente principal
+        (sincronizado con el botón de la ventana de Hidratos)."""
+        th = self.tab_hid
+        if bool(on) == bool(th._curva_on):
+            return
+        if on:
+            self._abrir_calculo('envolvente')
+        self.tab_env._get_eos_nombre = th._eos_nombre
+        th._curva_on = bool(on)
+        self.tab_env.set_hidratos_activo(th._curva_on)
+        th._actualizar_btn_curva()
 
     def _toggle_nav(self, on):
         if hasattr(self, 'nav'):
@@ -2966,7 +3058,7 @@ class MainWindow(QMainWindow):
 
         # ── Panel Navegador lateral ──────────────────────────
         self.nav = NavigatorPanel()
-        self.nav.calculo_pedido.connect(self._abrir_calculo)
+        self.nav.calculo_pedido.connect(self._on_nav_calculo)
         self.nav.dato_pedido.connect(self._accion_nav)
         self.nav.fluido_calc_pedido.connect(self._abrir_calc_fluido_por_nombre)
         self.nav.componente_pedido.connect(self._abrir_componente)
@@ -3519,29 +3611,8 @@ class MainWindow(QMainWindow):
         info = QLabel(_i18n.t("Puntos del recorrido, en el orden en que se recorren:"))
         info.setStyleSheet(txt_qss); root.addWidget(info)
 
-        tbl = QTableWidget(0, 2)
-        tbl.setHorizontalHeaderLabels([f"{_i18n.t('Presion')} ({_u.u('P')})",
-                                       f"{_i18n.t('Temperatura')} ({_u.u('T')})"])
-        tbl.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        tbl.verticalHeader().setDefaultSectionSize(22)
-        # mismo borde fino de 1 px que las tablas de Equilibrio de fases: cada
-        # cabecera dibuja solo su borde derecho e inferior (sin bordes dobles)
-        tbl.setFixedHeight(260)
-        tbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        tbl.horizontalHeader().setHighlightSections(False)   # sin negrita
-        tbl.verticalHeader().setHighlightSections(False)
-        tbl.setStyleSheet(
-            f'QTableWidget {{ background:{WHITE}; border:1px solid {BORDER};'
-            f' font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER};'
-            f' selection-background-color:{SEL_BG}; selection-color:{TEXT}; }}'
-            f'QHeaderView {{ background:{WHITE}; border:none; }}'
-            f'QHeaderView::section {{ background:{GRAY_LBL}; color:{TEXT};'
-            f' border:none; border-right:1px solid {BORDER};'
-            f' border-bottom:1px solid {BORDER};'
-            f' font-family:"{FONT_F}"; font-size:{FS}pt; font-weight:normal;'
-            f' padding:2px; }}'
-            f'QTableCornerButton::section {{ background:{GRAY_LBL}; border:none;'
-            f' border-right:1px solid {BORDER}; border-bottom:1px solid {BORDER}; }}')
+        tbl = TablaPuntos([f"{_i18n.t('Presion')} ({_u.u('P')})",
+                           f"{_i18n.t('Temperatura')} ({_u.u('T')})"])
         root.addWidget(tbl)
         try:
             self.gestor_edicion.registrar(tbl)
@@ -3549,14 +3620,10 @@ class MainWindow(QMainWindow):
             pass
 
         def _fila(p=None, t=None):
-            r = tbl.rowCount(); tbl.insertRow(r)
-            for c, v in enumerate((p, t)):
-                it = QTableWidgetItem("" if v is None else f"{v:.2f}")
-                it.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                tbl.setItem(r, c, it)
+            tbl.agregar(None if p is None else (p, t))
 
         def _cargar_puntos():
-            tbl.setRowCount(0)
+            tbl.vaciar()
             w = self._env_widget_destino(cmb.currentData())
             pts = list(getattr(w, '_recorrido', []) or []) if w is not None else []
             for P, TF in pts:
@@ -3576,18 +3643,13 @@ class MainWindow(QMainWindow):
         fila.addWidget(b_ok); fila.addWidget(b_can)
         root.addLayout(fila)
         b_add.clicked.connect(lambda: _fila())
-        def _quitar():
-            r = tbl.currentRow()
-            tbl.removeRow(r if r >= 0 else tbl.rowCount() - 1)
-        b_rem.clicked.connect(_quitar)
+        b_rem.clicked.connect(tbl.quitar)
         b_can.clicked.connect(dlg.reject)
 
         resultado = {}
         def _aceptar():
             pts = []
-            for r in range(tbl.rowCount()):
-                tp = (tbl.item(r, 0).text().strip() if tbl.item(r, 0) else "")
-                tt = (tbl.item(r, 1).text().strip() if tbl.item(r, 1) else "")
+            for tp, tt in tbl.filas():
                 if not tp and not tt:
                     continue
                 vp = _a_float(tp); vt = _a_float(tt)
@@ -3618,6 +3680,201 @@ class MainWindow(QMainWindow):
         # La envolvente se recalcula con la composición ACTUAL del fluido
         # (la validación de la composición la hace el propio cálculo).
         w.calcular()
+
+    # ── Flash múltiple ──────────────────────────────────────────
+    def _datos_fluido(self, clave):
+        """(nombre, z, kij, eos, metodo_densidad) de la composición principal
+        o de un fluido del gestor; None si el fluido no existe."""
+        if clave == self._CLAVE_PRINCIPAL:
+            return (_i18n.t("Composición principal"), list(self.tab_eq.get_z()),
+                    kij_user, self._eos_main_code(), self._metodo_densidad_main())
+        f = next((x for x in self.fluidos if x['nombre'] == clave), None)
+        if f is None:
+            return None
+        act = set(getattr(self, '_comp_activos', range(NC)))
+        zf = f.get('z') or []
+        z = [(zf[i] if (i in act and i < len(zf)) else 0.0) for i in range(NC + 1)]
+        sub = self._subventanas.get(f"equilibrio@{clave}")
+        w = getattr(sub, '_widget', None) if sub is not None else None
+        if w is not None and hasattr(w, 'cmb_vol'):
+            met = 'Peneloux' if w.cmb_vol.currentText() == 'Peneloux' else w.cmb_dens.currentText()
+        else:
+            met = f.get('densidad', 'COSTALD')
+        return (clave, z, f.get('kij', KIJ_DEFAULT), f.get('eos', 'PR'), met)
+
+    def _abrir_flash_multiple(self):
+        """Diálogo del flash múltiple: fluido, tabla de puntos (P, T) y
+        propiedades a mostrar.  Al aceptar abre la ventana de resultados."""
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                                     QPushButton, QComboBox, QListWidget,
+                                     QListWidgetItem)
+        import unidades as _u
+        import flash_multiple as _fm
+        PRIN = self._CLAVE_PRINCIPAL
+        claves = [PRIN] + [f['nombre'] for f in self.fluidos]
+        ult = getattr(self, '_fm_ultimo', {})
+        dlg = QDialog(self)
+        dlg.setWindowTitle(_i18n.t("Flash múltiple"))
+        dlg.setStyleSheet('QDialog { background:#e0e0e0; }')
+        root = QVBoxLayout(dlg); root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
+        txt_qss = (f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                   f'color:{TEXT};background:transparent;')
+        btn_qss = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
+                   f'font-family:"{FONT_F}";font-size:{FS}pt;')
+        fila_f = QHBoxLayout()
+        lf = QLabel(_i18n.t("Fluido:")); lf.setStyleSheet(txt_qss)
+        cmb = QComboBox(); cmb.setFixedHeight(24); cmb.setMinimumWidth(240)
+        _aplicar_estilo_combo(cmb)
+        for k in claves:
+            cmb.addItem(_i18n.t("Composición principal") if k == PRIN else k, k)
+        if ult.get('fluido') in claves:
+            cmb.setCurrentIndex(claves.index(ult['fluido']))
+        fila_f.addWidget(lf); fila_f.addWidget(cmb, 1)
+        root.addLayout(fila_f)
+
+        cols = QHBoxLayout(); cols.setSpacing(12)
+        c1 = QVBoxLayout(); c1.setSpacing(3)
+        l1 = QLabel(_i18n.t("Condiciones de cada corrida:")); l1.setStyleSheet(txt_qss)
+        c1.addWidget(l1)
+        tbl = TablaPuntos([f"{_i18n.t('Presion')} ({_u.u('P')})",
+                           f"{_i18n.t('Temperatura')} ({_u.u('T')})"], alto=300)
+        tbl.setMinimumWidth(260)
+        c1.addWidget(tbl)
+        try:
+            self.gestor_edicion.registrar(tbl)
+        except Exception:
+            pass
+        pts_prev = ult.get('puntos') or []
+        for P, T_R in pts_prev:
+            tbl.agregar((_u.p_desde_psia(P), _u.t_desde_R(T_R)))
+        for _ in range(max(0, 4 - len(pts_prev))):
+            tbl.agregar()
+        c2 = QVBoxLayout(); c2.setSpacing(3)
+        l2 = QLabel(_i18n.t("Propiedades a mostrar:")); l2.setStyleSheet(txt_qss)
+        c2.addWidget(l2)
+        lista = QListWidget(); lista.setFixedSize(300, 300)
+        lista.setStyleSheet(
+            f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; outline:0; }}'
+            f'QListWidget::item {{ height:20px; padding-left:2px; }}'
+            f'QListWidget::item:selected {{ background:{SEL_BG}; color:{TEXT}; }}')
+        c2.addWidget(lista)
+        cols.addLayout(c1, 1); cols.addLayout(c2)
+        root.addLayout(cols)
+
+        marcadas = set(ult.get('keys') or _fm.DEFAULT_KEYS)
+        def _cargar_props():
+            # conserva lo marcado al cambiar de fluido
+            if lista.count():
+                marcadas.clear()
+                for i in range(lista.count()):
+                    it = lista.item(i)
+                    if it.checkState() == Qt.CheckState.Checked:
+                        marcadas.add(it.data(Qt.ItemDataRole.UserRole))
+            lista.clear()
+            d = self._datos_fluido(cmb.currentData())
+            agua = bool(d and len(d[1]) > NC and d[1][NC] > 1e-12)
+            for k, txt in _fm.propiedades_disponibles(agua):
+                it = QListWidgetItem(txt)
+                it.setData(Qt.ItemDataRole.UserRole, k)
+                it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                it.setCheckState(Qt.CheckState.Checked if k in marcadas
+                                 else Qt.CheckState.Unchecked)
+                lista.addItem(it)
+        def _toggle(it):
+            it.setCheckState(Qt.CheckState.Unchecked if it.checkState() == Qt.CheckState.Checked
+                             else Qt.CheckState.Checked)
+        lista.itemDoubleClicked.connect(_toggle)
+        cmb.currentIndexChanged.connect(lambda _i: _cargar_props())
+        _cargar_props()
+
+        fila = QHBoxLayout(); fila.setSpacing(8)
+        b_add = QPushButton(_i18n.t("Agregar punto")); b_rem = QPushButton(_i18n.t("Quitar punto"))
+        b_ok = QPushButton(_i18n.t("Calcular")); b_can = QPushButton(_i18n.t("Cancelar"))
+        for b in (b_add, b_rem, b_ok, b_can):
+            b.setFixedHeight(26); b.setMinimumWidth(84); b.setStyleSheet(btn_qss)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+        fila.addWidget(b_add); fila.addWidget(b_rem); fila.addStretch()
+        fila.addWidget(b_ok); fila.addWidget(b_can)
+        root.addLayout(fila)
+        b_add.clicked.connect(lambda: tbl.agregar())
+        b_rem.clicked.connect(tbl.quitar)
+        b_can.clicked.connect(dlg.reject)
+
+        resultado = {}
+        def _aceptar():
+            pts = []
+            for tp, tt in tbl.filas():
+                if not tp and not tt:
+                    continue
+                vp = _a_float(tp); vt = _a_float(tt)
+                if vp is None or vt is None:
+                    dialogos.advertencia(dlg, _i18n.t(
+                        "Cada punto debe tener presión y temperatura numéricas.")
+                        + f" ({_i18n.t('Punto')} {len(pts) + 1})")
+                    return
+                P = _u.p_a_psia(vp); T_R = _u.t_a_F(vt) + 459.67
+                if P <= 0 or T_R <= 0:
+                    dialogos.advertencia(dlg, _i18n.t(
+                        "La presión y la temperatura absoluta deben ser mayores que cero.")
+                        + f" ({_i18n.t('Punto')} {len(pts) + 1})")
+                    return
+                pts.append((P, T_R))
+            if not pts:
+                dialogos.advertencia(dlg, _i18n.t("Ingrese al menos un punto de presión y temperatura."))
+                return
+            keys = [lista.item(i).data(Qt.ItemDataRole.UserRole) for i in range(lista.count())
+                    if lista.item(i).checkState() == Qt.CheckState.Checked]
+            if not keys:
+                dialogos.advertencia(dlg, _i18n.t("Seleccione al menos una propiedad."))
+                return
+            d = self._datos_fluido(cmb.currentData())
+            if d is None:
+                return
+            s = sum(d[1])
+            if s <= 1e-12:
+                dialogos.advertencia(dlg, _i18n.t("El fluido seleccionado no tiene composición."))
+                return
+            if abs(s - 1.0) > 1e-3:
+                dialogos.advertencia(dlg, _i18n.t(
+                    "La composición no suma 1 (fracción molar) ni 100 (porcentaje molar):")
+                    + " " + d[0])
+                return
+            resultado.update(pts=pts, keys=keys, datos=d)
+            dlg.accept()
+        b_ok.clicked.connect(_aceptar)
+        dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
+        if not dlg.exec():
+            return
+        nombre, z, kij, eos_c, met = resultado['datos']
+        agua = len(z) > NC and z[NC] > 1e-12
+        self._fm_ultimo = {'fluido': cmb.currentData(), 'puntos': resultado['pts'],
+                           'keys': resultado['keys']}
+        spec = dict(nombre=nombre, z=z, kij=kij, eos=eos_c,
+                    eos_nombre=self._nombre_eos(eos_c), metodo=met, agua=agua,
+                    puntos=resultado['pts'], keys=resultado['keys'])
+        clave = 'flash_multiple'
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            widget = _fm.TabFlashMultiple(on_nuevo=self._abrir_flash_multiple)
+            try:
+                self.gestor_edicion.registrar(widget.tbl)
+            except Exception:
+                pass
+            if not hasattr(self, '_tam_sub'):
+                h = self.tab_eq.sizeHint()
+                self._tam_sub = (h.width() + 26, h.height() + 12)
+            sw = self._montar_subventana(clave, widget, "Flash múltiple",
+                                         tam=self._tam_sub, redimensionable=True,
+                                         pie_texto=_i18n.t("Flash múltiple"))
+        self._mostrar_subventana(sw)
+        sw._widget.calcular(spec)
+
+    def _on_nav_calculo(self, clave):
+        if clave == 'flash_multiple':
+            self._abrir_flash_multiple()
+        else:
+            self._abrir_calculo(clave)
 
     def _lanzar_multi_envolvente(self, claves):
         """Valida las composiciones y abre/actualiza la ventana de

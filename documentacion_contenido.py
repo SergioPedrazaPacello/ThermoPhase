@@ -5354,6 +5354,32 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'accepting, the envelope of that fluid is opened, recalculated '
                                  'with its current composition, and the numbered points are '
                                  'plotted. Leaving the list empty removes the path.')]},
+                   {'titulo': ('Flash múltiple', 'Multiple flash'),
+                    'bloques': [('p',
+                                 'El flash múltiple repite el cálculo de equilibrio de fases en '
+                                 'una lista de condiciones (P, T) para un mismo fluido. Se abre '
+                                 'desde el menú Herramientas («Flash múltiple») o desde el '
+                                 'Navegador, en Cálculos. En la ventana de entrada se elige la '
+                                 'composición principal o un fluido del gestor, se ingresan las '
+                                 'condiciones de cada corrida en las unidades activas y se marcan '
+                                 'las propiedades a mostrar. Cada punto se resuelve con el mismo '
+                                 'motor que la ventana de Equilibrio de fases (flash bifásico, o '
+                                 'trifásico si el fluido contiene agua), con la EOS, los kij y el '
+                                 'método de densidad del fluido. El resultado es una tabla con el '
+                                 'número de corrida, la presión, la temperatura y las propiedades '
+                                 'elegidas, que puede exportarse a CSV.',
+                                 'The multiple flash repeats the phase equilibrium calculation over '
+                                 'a list of (P, T) conditions for one fluid. It is opened from the '
+                                 'Tools menu («Multiple flash») or from the Navigator, under '
+                                 'Calculations. In the input window the main composition or a '
+                                 'fluid from the manager is chosen, the conditions of each run are '
+                                 'entered in the active units and the properties to display are '
+                                 'checked. Each point is solved with the same engine as the Phase '
+                                 'equilibrium window (two-phase flash, or three-phase flash when '
+                                 'the fluid contains water), with the EOS, kij and density method '
+                                 'of the fluid. The result is a table with the run number, '
+                                 'pressure, temperature and the chosen properties, which can be '
+                                 'exported to CSV.')]},
                    {'titulo': ('Comparación de envolventes', 'Envelope comparison'),
                     'bloques': [('p',
                                  'La comparación de envolventes traza en un mismo diagrama P-T '

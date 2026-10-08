@@ -60,6 +60,7 @@ NAV_CALCULOS = [
     ("saturacion",  "Puntos de saturación"),
     ("hidratos",    "Formación de hidratos"),
     ("propiedades", "Análisis de sensibilidad"),
+    ("flash_multiple", "Flash múltiple"),
     ("parametros",  "Parámetros de la ecuación de estado"),
 ]
 

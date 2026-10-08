@@ -532,6 +532,18 @@ TRAD = {
     "Quitar punto": "Remove point",
     "Cada punto debe tener presión y temperatura numéricas.": "Each point must have numeric pressure and temperature.",
     "La presión y la temperatura absoluta deben ser mayores que cero.": "Pressure and absolute temperature must be greater than zero.",
+    "Mostrar curva de hidratos": "Show hydrate curve",
+    "Flash múltiple": "Multiple flash",
+    "&Flash múltiple": "&Multiple flash",
+    "ThermoPhase — Flash múltiple": "ThermoPhase — Multiple flash",
+    "Nuevo cálculo": "New calculation",
+    "Guardar CSV": "Save CSV",
+    "No convergió el cálculo en las corridas:": "The calculation did not converge in runs:",
+    "Condiciones de cada corrida:": "Conditions of each run:",
+    "Propiedades a mostrar:": "Properties to display:",
+    "Ingrese al menos un punto de presión y temperatura.": "Enter at least one pressure and temperature point.",
+    "Seleccione al menos una propiedad.": "Select at least one property.",
+    "El fluido seleccionado no tiene composición.": "The selected fluid has no composition.",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.
