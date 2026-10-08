@@ -544,6 +544,9 @@ TRAD = {
     "Ingrese al menos un punto de presión y temperatura.": "Enter at least one pressure and temperature point.",
     "Seleccione al menos una propiedad.": "Select at least one property.",
     "El fluido seleccionado no tiene composición.": "The selected fluid has no composition.",
+    "Condiciones:": "Conditions:",
+    "Composición:": "Composition:",
+    "Composición": "Composition",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

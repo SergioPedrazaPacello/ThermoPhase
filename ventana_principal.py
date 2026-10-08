@@ -2527,12 +2527,11 @@ class MainWindow(QMainWindow):
             lambda on: self.ribbon.setVisible(on))
         m_ver.addAction(self._act_tb)
         # Mostrar / ocultar todos los iconos del programa (barra superior de
-        # selectores + árbol del navegador). DESACTIVADO por defecto.
-        m_ver.addSeparator()
+        # selectores + árbol del navegador). Por ahora la opción NO se muestra
+        # en el menú: los iconos quedan ocultos, pero el código se conserva.
         self._act_iconos = QAction("Mostrar iconos", self, checkable=True)
         self._act_iconos.setChecked(False)
         self._act_iconos.toggled.connect(self._toggle_iconos)
-        m_ver.addAction(self._act_iconos)
         # La X del panel navegador desmarca la opcion de Ver.
         if hasattr(self, 'nav'):
             self.nav.cerrar_pedido.connect(
@@ -3460,7 +3459,7 @@ class MainWindow(QMainWindow):
                 fluidos=self.fluidos,
                 get_z_actual=self.tab_eq.get_z,
                 cargar_en_principal=self._cargar_fluido_principal,
-                abrir_calc=self._abrir_calculo_fluido,
+                abrir_calc=self._abrir_calculo_fluido_ui,
                 on_change=self._sync_nav_fluidos,
                 on_comp_change=lambda f: self._sync_fluido_z(f, 'fluidos'),
                 abrir_comparar=self._abrir_multi_envolvente)
@@ -3608,12 +3607,18 @@ class MainWindow(QMainWindow):
             cmb.setCurrentIndex(claves.index(ultimo))
         fila_f.addWidget(lf); fila_f.addWidget(cmb, 1)
         root.addLayout(fila_f)
+        # Misma geometría que el diálogo de Flash múltiple (etiqueta y tabla
+        # en una columna con 3 px de separación y 300 px de alto): con el
+        # escalado fraccionario de Windows (125 %) la posición de la tabla
+        # decide si la rejilla cae en píxeles enteros y se ve fina.
+        col = QVBoxLayout(); col.setSpacing(3)
         info = QLabel(_i18n.t("Puntos del recorrido, en el orden en que se recorren:"))
-        info.setStyleSheet(txt_qss); root.addWidget(info)
+        info.setStyleSheet(txt_qss); col.addWidget(info)
 
         tbl = TablaPuntos([f"{_i18n.t('Presion')} ({_u.u('P')})",
-                           f"{_i18n.t('Temperatura')} ({_u.u('T')})"])
-        root.addWidget(tbl)
+                           f"{_i18n.t('Temperatura')} ({_u.u('T')})"], alto=300)
+        col.addWidget(tbl)
+        root.addLayout(col)
         try:
             self.gestor_edicion.registrar(tbl)
         except Exception:
@@ -3874,7 +3879,263 @@ class MainWindow(QMainWindow):
         if clave == 'flash_multiple':
             self._abrir_flash_multiple()
         else:
+            self._abrir_calculo_ui(clave)
+
+    # ── Ventana de inicio de cálculo (Equilibrio, Saturación, Hidratos) ──
+    _CLAVES_INICIO = ('equilibrio', 'saturacion', 'hidratos')
+
+    @staticmethod
+    def _tiene_calculo(w):
+        if w is None:
+            return False
+        return (getattr(w, 'last_result', None) is not None
+                or bool(getattr(w, '_ultimo_trifasico', None)))
+
+    def _abrir_calculo_ui(self, clave):
+        """Apertura pedida por el usuario: si la ventana aún no tiene cálculo,
+        primero pide los datos en una ventana pequeña y calcula."""
+        if clave in self._CLAVES_INICIO and clave in self._defs_calc:
+            w = self._defs_calc[clave][0]
+            if not self._tiene_calculo(w):
+                self._dialogo_inicio(clave, None)
+                return
+        self._abrir_calculo(clave)
+
+    def _abrir_calculo_fluido_ui(self, clave, fluido):
+        if clave in self._CLAVES_INICIO:
+            sw = self._subventanas.get(f"{clave}@{fluido['nombre']}")
+            if sw is not None:
+                tiene = self._tiene_calculo(getattr(sw, '_widget', None))
+            else:
+                pend = getattr(self, '_fluido_estados_pend', {}).get(
+                    fluido['nombre'], {}).get(clave) or {}
+                tiene = bool(pend.get('resultado') or pend.get('resultado_trifasico'))
+            if not tiene:
+                self._dialogo_inicio(clave, fluido)
+                return
+        self._abrir_calculo_fluido(clave, fluido)
+
+    def _dialogo_inicio(self, clave, fluido=None):
+        """Ventana pequeña con lo necesario para el primer cálculo: las
+        condiciones (P y T en Equilibrio; tipo de cálculo y P o T en
+        Saturación e Hidratos) y la composición.  Al calcular, la composición
+        pasa al fluido (o a la composición principal), se abre la ventana
+        normal del cálculo y se ejecuta."""
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                                     QPushButton, QComboBox, QGridLayout,
+                                     QLineEdit)
+        import unidades as _u
+        from pestana_saturacion import TabSaturacion
+        from pestana_hidratos import TabHidratos
+        titulos = {'equilibrio': "Equilibrio de fases",
+                   'saturacion': "Puntos de saturación",
+                   'hidratos':   "Formación de hidratos"}
+        nombre = (fluido['nombre'] if fluido is not None
+                  else _i18n.t("Composición principal"))
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"{_i18n.t(titulos[clave])} — {nombre}")
+        dlg.setStyleSheet('QDialog { background:#e0e0e0; }')
+        root = QVBoxLayout(dlg); root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
+        txt_qss = (f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                   f'color:{TEXT};background:transparent;')
+        lbl_qss = (f'background:{GRAY_LBL};border:1px solid {BORDER};'
+                   f'padding:2px 6px;font-family:"{FONT_F}";font-size:{FS}pt;')
+        ed_qss = (f'QLineEdit {{ background:{WHITE};border:1px solid {BORDER};'
+                  f'font-family:"{FONT_F}";font-size:{FS}pt;padding:0px 4px; }}')
+        btn_qss = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
+                   f'font-family:"{FONT_F}";font-size:{FS}pt;')
+
+        def etiqueta(txt):
+            l = QLabel(txt); l.setStyleSheet(lbl_qss); l.setFixedHeight(22)
+            l.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            return l
+
+        def campo():
+            e = QLineEdit(); e.setStyleSheet(ed_qss); e.setFixedSize(110, 22)
+            e.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            return e
+
+        cols = QHBoxLayout(); cols.setSpacing(14)
+        # ── Condiciones ────────────────────────────────────────
+        c1 = QVBoxLayout(); c1.setSpacing(3)
+        l1 = QLabel(_i18n.t("Condiciones:")); l1.setStyleSheet(txt_qss); c1.addWidget(l1)
+        gl = QGridLayout(); gl.setSpacing(4); gl.setContentsMargins(0, 0, 0, 0)
+        cmb = None
+        txt_P = f"{_i18n.t('Presion')} ({_u.u('P')}):"
+        txt_T = f"{_i18n.t('Temperatura')} ({_u.u('T')}):"
+        if clave == 'equilibrio':
+            ed_P, ed_T = campo(), campo()
+            gl.addWidget(etiqueta(txt_P), 0, 0); gl.addWidget(ed_P, 0, 1)
+            gl.addWidget(etiqueta(txt_T), 1, 0); gl.addWidget(ed_T, 1, 1)
+        else:
+            tipos = (TabSaturacion if clave == 'saturacion' else TabHidratos).TIPOS
+            cmb = QComboBox(); cmb.setFixedHeight(22); _aplicar_estilo_combo(cmb)
+            for k in tipos:
+                cmb.addItem(_i18n.t(k), k)
+            gl.addWidget(etiqueta(_i18n.t("Calcular:")), 0, 0); gl.addWidget(cmb, 0, 1)
+            lbl_c = etiqueta(txt_P); ed_c = campo(); ed_c.setFixedWidth(150)
+            gl.addWidget(lbl_c, 1, 0); gl.addWidget(ed_c, 1, 1)
+            def _tipo(_i=None):
+                u_in = tipos[cmb.currentData()][1]
+                lbl_c.setText(txt_P if u_in == 'P' else txt_T)
+            cmb.currentIndexChanged.connect(_tipo); _tipo()
+        c1.addLayout(gl); c1.addStretch()
+        cols.addLayout(c1)
+
+        # ── Composición ────────────────────────────────────────
+        c2 = QVBoxLayout(); c2.setSpacing(3)
+        l2 = QLabel(_i18n.t("Composición:")); l2.setStyleSheet(txt_qss); c2.addWidget(l2)
+        act = [i for i in sorted(set(self._comp_activos)) if i <= NC]
+        if fluido is not None:
+            f_ = 100.0 if fluido.get('pct') else 1.0
+            zf = fluido.get('z') or []
+            z0 = [(zf[i] * f_ if i < len(zf) else 0.0) for i in range(NC + 1)]
+        else:
+            z0 = list(self.tab_eq.z_ingresada())
+        tc = QTableWidget(len(act) + 2, 2)
+        tc.horizontalHeader().hide(); tc.verticalHeader().hide()
+        tc.setShowGrid(True)
+        tc.setStyleSheet(
+            f'QTableWidget {{ background:{WHITE}; border:1px solid {BORDER};'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER};'
+            f' selection-background-color:{SEL_BG}; selection-color:{TEXT}; }}'
+            f'QTableWidget::item {{ padding:2px 6px; }}')
+        tc.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        tc.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        tc.setColumnWidth(0, 210); tc.setColumnWidth(1, 110)
+        tc.setItem(0, 0, cell(_i18n.t("Componente"), bg=GRAY_LBL,
+                              align=Qt.AlignmentFlag.AlignCenter))
+        tc.setItem(0, 1, cell(_i18n.t("Composición"), bg=GRAY_LBL,
+                              align=Qt.AlignmentFlag.AlignCenter))
+        for r, i in enumerate(act, 1):
+            nom = NOMBRES[i] if i < NC else _eng.componente_etiqueta(NC)
+            tc.setItem(r, 0, cell(_i18n.t(nom), bg=GRAY_LBL))
+            it = cell("", bg=WHITE, editable=True)
+            v = z0[i] if i < len(z0) else 0.0
+            if v:
+                _set_comp_item(it, v)
+            tc.setItem(r, 1, it)
+        rs = len(act) + 1
+        tc.setItem(rs, 0, cell(_i18n.t("Sumatorias:"), bg=GRAY_LBL))
+        tc.setItem(rs, 1, cell("", bg=GRAY_EMPTY, color=TEXT_RES))
+        for r in range(rs + 1):
+            tc.setRowHeight(r, ROW_H)
+        fix_table_size(tc)
+        c2.addWidget(tc)
+        cols.addLayout(c2)
+        root.addLayout(cols)
+        try:
+            self.gestor_edicion.registrar(tc)
+        except Exception:
+            pass
+
+        def _crudo():
+            z = [0.0] * (NC + 1)
+            for r, i in enumerate(act, 1):
+                z[i] = _get_comp_item(tc.item(r, 1)) or 0.0
+            return z
+
+        def _upd_suma(*_a):
+            tc.blockSignals(True)
+            tc.item(rs, 1).setText(f"{sum(_crudo()):.4f}")
+            tc.blockSignals(False)
+
+        def _on_cambio(it):
+            if it.column() != 1 or it.row() in (0, rs):
+                return
+            v = _a_float(it.text())
+            tc.blockSignals(True)
+            if v is not None and it.data(_UR_TXT) != it.text():
+                _set_comp_item(it, v)
+            tc.blockSignals(False)
+            _upd_suma()
+        tc.itemChanged.connect(_on_cambio)
+        _upd_suma()
+
+        def _normalizar():
+            z = _crudo(); s = sum(z)
+            if s <= 0:
+                return
+            base = 100.0 if _comp_frac(z)[1] else 1.0
+            tc.blockSignals(True)
+            for r, i in enumerate(act, 1):
+                _set_comp_item(tc.item(r, 1), z[i] / s * base)
+            tc.blockSignals(False)
+            _upd_suma()
+
+        fila = QHBoxLayout(); fila.setSpacing(8)
+        b_norm = QPushButton(_i18n.t("Normalizar"))
+        b_ok = QPushButton(_i18n.t("Calcular")); b_can = QPushButton(_i18n.t("Cancelar"))
+        for b in (b_norm, b_ok, b_can):
+            b.setFixedHeight(26); b.setMinimumWidth(84); b.setStyleSheet(btn_qss)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+        fila.addWidget(b_norm); fila.addStretch(); fila.addWidget(b_ok); fila.addWidget(b_can)
+        root.addLayout(fila)
+        b_norm.clicked.connect(_normalizar)
+        b_can.clicked.connect(dlg.reject)
+
+        datos = {}
+        def _aceptar():
+            if clave == 'equilibrio':
+                vp_ = _a_float(ed_P.text()); vt_ = _a_float(ed_T.text())
+                if vp_ is None or vt_ is None:
+                    dialogos.advertencia(dlg, _i18n.t("Ingrese la presion y la temperatura."))
+                    return
+                P = _u.p_a_psia(vp_); T_R = _u.t_a_F(vt_) + 459.67
+                if P <= 0 or T_R <= 0:
+                    dialogos.advertencia(dlg, _i18n.t(
+                        "La presión y la temperatura absoluta deben ser mayores que cero."))
+                    return
+                datos.update(P=P, T_R=T_R)
+            else:
+                v = _a_float(ed_c.text())
+                u_in = tipos[cmb.currentData()][1]
+                if v is None:
+                    dialogos.advertencia(dlg, _i18n.t("Ingrese un valor de presion o temperatura."))
+                    return
+                val = _u.p_a_psia(v) if u_in == 'P' else _u.t_a_F(v) + 459.67
+                if val <= 0:
+                    dialogos.advertencia(dlg, _i18n.t(
+                        "La presión y la temperatura absoluta deben ser mayores que cero."))
+                    return
+                datos.update(tipo=cmb.currentData(), u_in=u_in, val=val)
+            z, pct = _comp_frac(_crudo())
+            if abs(sum(z) - 1.0) > 1e-3:
+                dialogos.advertencia(dlg, _i18n.t(
+                    "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)"))
+                return
+            datos.update(z=z, pct=pct)
+            dlg.accept()
+        b_ok.clicked.connect(_aceptar)
+        dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
+        if not dlg.exec():
+            return
+
+        # ── Composición al fluido / composición principal ──────
+        z, pct = datos['z'], datos['pct']
+        if fluido is None:
+            self.tab_eq.set_z(z, pct)
             self._abrir_calculo(clave)
+            w = self._defs_calc[clave][0]
+        else:
+            fluido['z'], fluido['pct'] = list(z), pct
+            self._sync_fluido_z(fluido, 'inicio')
+            self._abrir_calculo_fluido(clave, fluido)
+            sw = self._subventanas.get(f"{clave}@{fluido['nombre']}")
+            w = getattr(sw, '_widget', None) if sw is not None else None
+            if w is None:
+                return
+        # ── Condiciones y cálculo ──────────────────────────────
+        if clave == 'equilibrio':
+            w.sp_P.setValue(_u.p_desde_psia(datos['P']))
+            w.sp_T.setValue(_u.abs_desde_R(datos['T_R']))
+        else:
+            claves_t = list(w.TIPOS.keys())
+            if datos['tipo'] in claves_t:
+                w.cmb_tipo.setCurrentIndex(claves_t.index(datos['tipo']))
+            w.sp_cond.setValue(_u.p_desde_psia(datos['val']) if datos['u_in'] == 'P'
+                               else _u.abs_desde_R(datos['val']))
+        w.calcular()
 
     def _lanzar_multi_envolvente(self, claves):
         """Valida las composiciones y abre/actualiza la ventana de
@@ -3938,7 +4199,7 @@ class MainWindow(QMainWindow):
     def _cargar_fluido_principal(self, z, pct=False):
         """Carga la composicion de un fluido en la pestaña de Equilibrio."""
         self.tab_eq.set_z(z, pct)
-        self._abrir_calculo('equilibrio')
+        self._abrir_calculo_ui('equilibrio')
 
     def _abrir_gestor_componentes(self):
         """Abre (o activa) el gestor de componentes del fluido: ventana de
@@ -4069,7 +4330,7 @@ class MainWindow(QMainWindow):
         """Abre un calculo de fluido desde el arbol del navegador."""
         for f in self.fluidos:
             if f['nombre'] == nombre:
-                self._abrir_calculo_fluido(clave, f)
+                self._abrir_calculo_fluido_ui(clave, f)
                 return
 
     def _abrir_calculo_fluido(self, clave, fluido):

@@ -184,9 +184,9 @@ class TabFlashMultiple(QWidget):
             return
         tit = self._titulos(); n = len(self.spec['puntos'])
         nombre = self.spec['nombre']
-        self.lbl_info.setText(f"{_i18n.t('Fluido:')} {nombre}    ·    "
-                              f"{self.spec.get('eos_nombre', '')}    ·    "
-                              f"{_i18n.t('Densidad')}: {self.spec['metodo']}")
+        # Solo el nombre de la corriente; el cálculo usa su EOS y su método
+        # de densidad.
+        self.lbl_info.setText(nombre)
         t = self.tbl
         t.clear(); t.setRowCount(n + 1); t.setColumnCount(len(tit))
         gris = QBrush(QColor(GRAY_LBL))
