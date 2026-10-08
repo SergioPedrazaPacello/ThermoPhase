@@ -3493,7 +3493,7 @@ class MainWindow(QMainWindow):
         aceptar abre la envolvente de ese fluido con el recorrido trazado."""
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                      QPushButton, QComboBox, QTableWidget,
-                                     QTableWidgetItem, QHeaderView)
+                                     QTableWidgetItem, QHeaderView, QSizePolicy)
         import unidades as _u
         PRIN = self._CLAVE_PRINCIPAL
         claves = [PRIN] + [f['nombre'] for f in self.fluidos]
@@ -3524,16 +3524,24 @@ class MainWindow(QMainWindow):
                                        f"{_i18n.t('Temperatura')} ({_u.u('T')})"])
         tbl.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         tbl.verticalHeader().setDefaultSectionSize(22)
-        tbl.setFixedSize(340, 260)
+        # mismo borde fino de 1 px que las tablas de Equilibrio de fases: cada
+        # cabecera dibuja solo su borde derecho e inferior (sin bordes dobles)
+        tbl.setFixedHeight(260)
+        tbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        tbl.horizontalHeader().setHighlightSections(False)   # sin negrita
+        tbl.verticalHeader().setHighlightSections(False)
         tbl.setStyleSheet(
             f'QTableWidget {{ background:{WHITE}; border:1px solid {BORDER};'
             f' font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER};'
             f' selection-background-color:{SEL_BG}; selection-color:{TEXT}; }}'
-            f'QHeaderView {{ background:{WHITE}; }}'
-            f'QHeaderView::section {{ background:{GRAY_LBL}; border:1px solid {BORDER};'
-            f' font-family:"{FONT_F}"; font-size:{FS}pt; padding:2px; }}'
-            f'QTableCornerButton::section {{ background:{GRAY_LBL};'
-            f' border:1px solid {BORDER}; }}')
+            f'QHeaderView {{ background:{WHITE}; border:none; }}'
+            f'QHeaderView::section {{ background:{GRAY_LBL}; color:{TEXT};'
+            f' border:none; border-right:1px solid {BORDER};'
+            f' border-bottom:1px solid {BORDER};'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; font-weight:normal;'
+            f' padding:2px; }}'
+            f'QTableCornerButton::section {{ background:{GRAY_LBL}; border:none;'
+            f' border-right:1px solid {BORDER}; border-bottom:1px solid {BORDER}; }}')
         root.addWidget(tbl)
         try:
             self.gestor_edicion.registrar(tbl)
