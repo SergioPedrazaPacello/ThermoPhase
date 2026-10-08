@@ -5354,6 +5354,25 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'accepting, the envelope of that fluid is opened, recalculated '
                                  'with its current composition, and the numbered points are '
                                  'plotted. Leaving the list empty removes the path.')]},
+                   {'titulo': ('Marcadores y valores de los puntos', 'Markers and point values'),
+                    'bloques': [('p',
+                                 'En el menú Gráficos, «Mostrar marcadores» muestra u oculta los '
+                                 'triángulos de las curvas de la envolvente y de la comparación de '
+                                 'envolventes; sin ellos, las curvas quedan como línea continua. El '
+                                 'recorrido de presión y temperatura y el punto crítico conservan su '
+                                 'marcador. «Mostrar valores en algunos puntos» marca solo algunos '
+                                 'puntos repartidos a lo largo de cada curva de la envolvente y del '
+                                 'análisis de sensibilidad, y escribe junto a cada uno su valor en la '
+                                 'forma «eje y:eje x», sin nombre ni unidad (las unidades son las de '
+                                 'los ejes).',
+                                 'In the Graphics menu, «Show markers» shows or hides the triangles '
+                                 'of the envelope curves and of the envelope comparison; without '
+                                 'them the curves are drawn as a continuous line. The pressure and '
+                                 'temperature path and the critical point keep their marker. «Show '
+                                 'values at some points» marks only a few points spread along each '
+                                 'curve of the envelope and of the sensitivity analysis, and writes '
+                                 'next to each one its value as «y axis:x axis», without name or '
+                                 'unit (the units are those of the axes).')]},
                    {'titulo': ('Flash múltiple', 'Multiple flash'),
                     'bloques': [('p',
                                  'El flash múltiple repite el cálculo de equilibrio de fases en '

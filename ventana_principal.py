@@ -2582,6 +2582,16 @@ class MainWindow(QMainWindow):
             self._act_hid.setChecked(bool(self.tab_hid._curva_on))
             self._act_hid.blockSignals(False)
         self.tab_hid._actualizar_btn_curva = _btn_sync
+        # Marcadores de las curvas y valores de algunos puntos.
+        m_graf.addSeparator()
+        self._act_marc = QAction("Mostrar marcadores", self, checkable=True)
+        self._act_marc.setChecked(True)
+        self._act_marc.toggled.connect(lambda on: self._opcion_graf('MARCADORES', on))
+        m_graf.addAction(self._act_marc)
+        self._act_etq = QAction("Mostrar valores en algunos puntos", self, checkable=True)
+        self._act_etq.setChecked(False)
+        self._act_etq.toggled.connect(lambda on: self._opcion_graf('ETIQUETAS', on))
+        m_graf.addAction(self._act_etq)
         # Aplicar el estado inicial de los iconos (ocultos) — ribbon y
         # navegador ya existen.
         self._toggle_iconos(self._act_iconos.isChecked())
@@ -2624,6 +2634,30 @@ class MainWindow(QMainWindow):
         m_ayuda.addAction(_act("&Documentación técnica", self._abrir_documentacion))
         m_ayuda.addSeparator()
         m_ayuda.addAction(_act("&Acerca de ThermoPhase...", self._menu_acerca))
+
+    def _opcion_graf(self, nombre, on):
+        """Cambia una opción global de los gráficos y redibuja las
+        envolventes, la comparación y el análisis de sensibilidad abiertos."""
+        import graf_opciones as _go
+        setattr(_go, nombre, bool(on))
+        widgets = [self.tab_env, self.tab_prop]
+        widgets += [getattr(sw, '_widget', None) for sw in self._subventanas.values()]
+        vistos = set()
+        for w in widgets:
+            if w is None or id(w) in vistos:
+                continue
+            vistos.add(id(w))
+            try:
+                if isinstance(w, TabEnvolvente):
+                    if getattr(w, 'result', None) is not None:
+                        w._plot(w.result)
+                elif hasattr(w, 'resultados') and hasattr(w, '_plot'):
+                    if w.resultados:
+                        w._plot()
+                elif getattr(w, '_last', None) is not None and hasattr(w, '_plot'):
+                    w._plot(w._last)
+            except Exception:
+                pass
 
     def _toggle_hidratos_menu(self, on):
         """Muestra u oculta la curva de hidratos en la envolvente principal
@@ -4076,6 +4110,9 @@ class MainWindow(QMainWindow):
             tc.setRowHeight(r, ROW_H)
         fix_table_size(tc)
         c2.addWidget(tc)
+        # Título y tabla arriba, a la par de las condiciones, aunque la
+        # tabla sea corta (pocos componentes).
+        c2.addStretch(1)
         cols.addLayout(c2)
         root.addLayout(cols)
         try:

@@ -23,6 +23,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
 from eos import NC
 import idioma as _i18n
+import graf_opciones as _go
 import unidades as _u
 # Reutilizar el estilo EXACTO de combos de la Envolvente (Fusion + flecha).
 from pestana_envolvente import _aplicar_estilo_combo, COMBO_STYLE
@@ -517,7 +518,7 @@ class TabSensibilidad(QWidget):
     def _plot(self, res):
         key=res['prop_key']; eje=res['eje_x']; curvas=res['curvas']
         d=_PROPS_BY_KEY[key]; etiqueta=_i18n.t(d[1]); mag=d[2]
-        ax=self.ax; ax.clear()
+        ax=self.ax; ax.clear(); _go.limpiar(ax)
         self._hover_annot=None; self._cross_v=None; self._cross_h=None
         ax.set_facecolor('#FFFFFF'); ax.set_axisbelow(True)
         ax.set_position([0.135, 0.11, 0.84, 0.86])
@@ -545,8 +546,9 @@ class TabSensibilidad(QWidget):
                 for v in ys]
             if any(not (isinstance(v,float) and np.isnan(v)) for v in ya):
                 hay=True
-            ax.plot(xa, ya, '-', color=CURVA_COLORS[i % len(CURVA_COLORS)],
-                    linewidth=CURVA_LW, label=fam_label(vf), zorder=3)
+            _go.curva(ax, xa, ya, CURVA_COLORS[i % len(CURVA_COLORS)],
+                      label=fam_label(vf), lw=CURVA_LW, z_line=3,
+                      con_marcadores=False)
 
         ax.set_xlabel(x_label, fontsize=10, color=TEXT)
         ax.set_ylabel(f"{etiqueta}{y_unit}", fontsize=10, color=TEXT)
@@ -556,6 +558,8 @@ class TabSensibilidad(QWidget):
             sp.set_edgecolor('#000000'); sp.set_linewidth(1.4)
         ax.grid(True, linestyle='-', linewidth=0.8, alpha=1.0, color=GRAY_LBL)
         self._aplicar_escala(ax)
+        ax.relim(); ax.autoscale_view()
+        _go.dibujar_etiquetas(ax, fmt_x=_go.fmt_entero, fmt_y=_go.fmt_auto)
         if hay:
             leg=ax.legend(fontsize=8, framealpha=1.0, fancybox=False,
                           edgecolor='#000000', facecolor=GRAY_PLOT_BG,

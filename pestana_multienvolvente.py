@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 import idioma as _i18n
+import graf_opciones as _go
 import unidades as _u
 import dialogos
 from pestana_envolvente import (EnvWorker, TabEnvolvente, _aplicar_estilo_combo,
@@ -298,9 +299,8 @@ class TabMultiEnvolvente(QWidget):
             for seg in self._segmentos(res):
                 T = [_u.t_desde_R(t) for _, t in seg]
                 P = [_u.p_desde_psia(p) for p, _ in seg]
-                ax.plot(T, P, linestyle='-', linewidth=0.7, color=col, alpha=a, zorder=z)
-                ax.plot(T, P, linestyle='none', marker='^', markersize=3, color=col,
-                        alpha=a, zorder=z + 1, label=nombre if primero else None)
+                _go.curva(ax, T, P, col, label=nombre if primero else None,
+                          alpha=a, z_line=z, z_mark=z + 1, etiquetar=False)
                 primero = False
             crit = res.get('critico')
             if crit is not None:

@@ -19,6 +19,7 @@ def _a_float_req(txt):
 
 import numpy as np
 import idioma as _i18n
+import graf_opciones as _go
 import matplotlib
 matplotlib.use('QtAgg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -1096,7 +1097,7 @@ class TabEnvolvente(QWidget):
             pass
 
     def _plot(self,res):
-        ax=self.ax; ax.clear()
+        ax=self.ax; ax.clear(); _go.limpiar(ax)
         self._hover_annot = None   # se invalida al limpiar los ejes
         self._cross_v = None
         self._cross_h = None
@@ -1251,13 +1252,10 @@ class TabEnvolvente(QWidget):
                     lab = _i18n.t(etq) if primero else None
                     primero = False
                     if self._regiones is not None:
-                        ax.plot(Tl, Pl, linestyle='-', color=col, linewidth=0.9,
-                                label=lab, zorder=5)
+                        _go.curva(ax, Tl, Pl, col, label=lab, lw=0.9, z_line=5,
+                                  con_marcadores=False)
                     else:
-                        ax.plot(Tl, Pl, linestyle='-', linewidth=0.7, color=col,
-                                zorder=2)
-                        ax.plot(Tl, Pl, linestyle='none', marker='^', color=col,
-                                markersize=3, label=lab, zorder=3)
+                        _go.curva(ax, Tl, Pl, col, label=lab)
             crit = res.get('critico')
             if crit is not None:
                 # mismo marcador (triángulo, mismo tamaño) que las curvas; color
@@ -1274,16 +1272,10 @@ class TabEnvolvente(QWidget):
             if Ts and Ps:
                 # Mismo estilo que las curvas de burbuja/rocío en mezclas sin
                 # mapa: línea fina + marcadores triangulares encima.
-                if self._regiones is not None:
-                    ax.plot(Ts, Ps, linestyle='-', linewidth=0.9,
-                            color='#c0392b',
-                            label=_i18n.t('Curva de saturación'), zorder=3)
-                else:
-                    ax.plot(Ts, Ps, linestyle='-', linewidth=0.7,
-                            color='#c0392b', zorder=2)
-                    ax.plot(Ts, Ps, linestyle='none', marker='^',
-                            color='#c0392b', markersize=3,
-                            label=_i18n.t('Curva de saturación'), zorder=3)
+                _go.curva(ax, Ts, Ps, '#c0392b', label=_i18n.t('Curva de saturación'),
+                          lw=0.9 if self._regiones is not None else 0.7,
+                          z_line=3 if self._regiones is not None else 2,
+                          con_marcadores=self._regiones is None)
             crit=res.get('critico')
             if crit is not None:
                 ax.plot([_u.t_desde_R(crit[1])], [_u.p_desde_psia(crit[0])],
@@ -1298,24 +1290,16 @@ class TabEnvolvente(QWidget):
             # Sin mapa → marcadores triangulares (estilo original).
             if self._regiones is not None:
                 if Tb and Pb:
-                    ax.plot(Tb, Pb, linestyle='-', color='#c0392b',
-                            linewidth=0.9, label=_i18n.t('Curva de Burbuja'), zorder=5)
+                    _go.curva(ax, Tb, Pb, '#c0392b', label=_i18n.t('Curva de Burbuja'),
+                              lw=0.9, z_line=5, con_marcadores=False)
                 if Td and Pd:
-                    ax.plot(Td, Pd, linestyle='-', color='#1a4fa8',
-                            linewidth=0.9, label=_i18n.t('Curva de Rocío'), zorder=5)
+                    _go.curva(ax, Td, Pd, '#1a4fa8', label=_i18n.t('Curva de Rocío'),
+                              lw=0.9, z_line=5, con_marcadores=False)
             else:
                 if Tb and Pb:
-                    ax.plot(Tb, Pb, linestyle='-', linewidth=0.7,
-                            color='#c0392b', zorder=2)
-                    ax.plot(Tb,Pb,linestyle='none',marker='^',
-                            color='#c0392b',markersize=3,
-                            label=_i18n.t('Curva de Burbuja'))
+                    _go.curva(ax, Tb, Pb, '#c0392b', label=_i18n.t('Curva de Burbuja'))
                 if Td and Pd:
-                    ax.plot(Td, Pd, linestyle='-', linewidth=0.7,
-                            color='#1a4fa8', zorder=2)
-                    ax.plot(Td,Pd,linestyle='none',marker='^',
-                            color='#1a4fa8',markersize=3,
-                            label=_i18n.t('Curva de Rocío'))
+                    _go.curva(ax, Td, Pd, '#1a4fa8', label=_i18n.t('Curva de Rocío'))
 
             # Líneas de isocalidad (finas, un color distinto por línea)
             for idx,pts in getattr(self,'_isocalidad',{}).items():
@@ -1334,14 +1318,10 @@ class TabEnvolvente(QWidget):
                 Ta=[_u.t_desde_R(t) for _,t in agua]
                 Pa=[_u.p_desde_psia(p) for p,_ in agua]
                 if self._regiones is not None:
-                    ax.plot(Ta, Pa, linestyle='-', color=AGUA_COL,
-                            linewidth=0.9, label=_i18n.t('Curva de agua'), zorder=5)
+                    _go.curva(ax, Ta, Pa, AGUA_COL, label=_i18n.t('Curva de agua'),
+                              lw=0.9, z_line=5, con_marcadores=False)
                 else:
-                    ax.plot(Ta, Pa, linestyle='-', linewidth=0.7,
-                            color=AGUA_COL, zorder=2)
-                    ax.plot(Ta, Pa, linestyle='none', marker='^',
-                            color=AGUA_COL, markersize=3,
-                            label=_i18n.t('Curva de agua'))
+                    _go.curva(ax, Ta, Pa, AGUA_COL, label=_i18n.t('Curva de agua'))
             # (El punto trifásico ya no se resalta ni figura en la leyenda.)
 
         # Curva de formación de hidratos (verde, marcador triangular — mismo
@@ -1350,12 +1330,9 @@ class TabEnvolvente(QWidget):
             Th=[_u.t_desde_R(t) for t,_ in self._hidratos_curva]
             Ph=[_u.p_desde_psia(p) for _,p in self._hidratos_curva]
             if Th and Ph:
-                ax.plot(Th, Ph, linestyle='-', linewidth=0.9,
-                        color='#27ae60', zorder=4)
-                ax.plot(Th, Ph, linestyle='none', marker='^',
-                        color='#27ae60', markersize=3,
-                        markeredgecolor='#145214', markeredgewidth=0.4,
-                        label=_i18n.t('Curva de Hidratos'), zorder=4)
+                _go.curva(ax, Th, Ph, '#27ae60', label=_i18n.t('Curva de Hidratos'),
+                          lw=0.9, z_line=4, z_mark=4,
+                          mark_kw=dict(markeredgecolor='#145214', markeredgewidth=0.4))
 
         # Punto marcado por el usuario (triángulo verde)
         if self._punto_usuario is not None:
@@ -1429,6 +1406,10 @@ class TabEnvolvente(QWidget):
             Pg   = self._regiones['Pg']
             ax.set_xlim(float(Tg_F[0]),  float(Tg_F[-1]))
             ax.set_ylim(float(Pg[0]),    float(Pg[-1]))
+        else:
+            ax.relim(); ax.autoscale_view()
+        # Valores de algunos puntos (P:T), con los límites ya fijados
+        _go.dibujar_etiquetas(ax)
         # Nota: set_position() se aplicó al inicio de _plot para que las
         # coordenadas absolutas del axes contenedor de la colorbar sean
         # consistentes.  No repetir aquí.

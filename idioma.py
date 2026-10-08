@@ -548,6 +548,8 @@ TRAD = {
     "Composición:": "Composition:",
     "Composición": "Composition",
     "ThermoPhase — Ingreso de datos": "ThermoPhase — Data input",
+    "Mostrar marcadores": "Show markers",
+    "Mostrar valores en algunos puntos": "Show values at some points",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.
