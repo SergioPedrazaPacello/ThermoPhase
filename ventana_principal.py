@@ -206,6 +206,33 @@ def section_label(text, left=False):
     )
     return lbl
 
+# Composiciones: se MUESTRAN con 4 decimales pero se guarda el valor completo
+# en la celda (rol de datos propio), para calcular con toda la precisión.
+_UR_VAL = Qt.ItemDataRole.UserRole + 10      # valor completo
+_UR_TXT = Qt.ItemDataRole.UserRole + 11      # texto mostrado al guardarlo
+
+
+def _set_comp_item(item, v):
+    """Guarda v completo en la celda y muestra 4 decimales."""
+    v = float(v)
+    t = f"{v:.4f}"
+    item.setData(_UR_VAL, v)
+    item.setText(t)
+    item.setData(_UR_TXT, t)
+
+
+def _get_comp_item(item, defecto=0.0):
+    """Valor de la celda: el completo guardado si el texto no se editó desde
+    entonces; si no, el número escrito."""
+    if item is None:
+        return defecto
+    t = item.text()
+    v = item.data(_UR_VAL)
+    if v is not None and item.data(_UR_TXT) == t:
+        return float(v)
+    return _a_float(t, defecto)
+
+
 def make_table(rows, cols, row_h=22):
     """Tabla sin cabeceras, sin scroll, tamaño fijo."""
     t = QTableWidget(rows, cols)
@@ -770,7 +797,7 @@ class TabEquilibrio(QWidget):
         z = e.get('composicion') or [0.0]*NC
         self.tbl_comp.blockSignals(True)
         for i in range(NC):
-            self.tbl_comp.item(i, 1).setText(_fmt_comp(z[i] if i<len(z) else 0.0))
+            _set_comp_item(self.tbl_comp.item(i, 1), z[i] if i<len(z) else 0.0)
         self.tbl_comp.blockSignals(False)
         self._upd_suma()
         # T y P se guardan en internas (°R, psia); convertir al sistema activo.
@@ -852,6 +879,13 @@ class TabEquilibrio(QWidget):
     def _on_item_changed(self, item):
         if item.column() != 1: return
         if item.row() == self.sum_row: return  # no procesar fila sumatorias
+        # lo escrito se conserva completo y se muestra con 4 decimales
+        if item.data(_UR_TXT) != item.text():
+            v = _a_float(item.text())
+            if v is not None:
+                self.tbl_comp.blockSignals(True)
+                _set_comp_item(item, v)
+                self.tbl_comp.blockSignals(False)
         self._upd_suma()
 
     def z_ingresada(self):
@@ -866,7 +900,7 @@ class TabEquilibrio(QWidget):
             if self.tbl_comp.isRowHidden(i):
                 z.append(0.0); continue
             it = self.tbl_comp.item(i, 1)
-            z.append(_a_float(it.text(), 0.0) if it is not None else 0.0)
+            z.append(_get_comp_item(it))
         return z
 
     def get_z(self):
@@ -916,7 +950,7 @@ class TabEquilibrio(QWidget):
         self.tbl_comp.blockSignals(True)
         for i in range(NC+1):
             v = z[i] if i < len(z) else 0.0
-            self.tbl_comp.item(i, 1).setText(_fmt_comp(v*f))
+            _set_comp_item(self.tbl_comp.item(i, 1), v*f)
         self.tbl_comp.blockSignals(False)
         self._upd_suma()
 
@@ -936,7 +970,7 @@ class TabEquilibrio(QWidget):
         for i in range(NC+1):
             if self.tbl_comp.isRowHidden(i):
                 continue
-            self.tbl_comp.item(i,1).setText(_fmt_comp(z[i]/s*base))
+            _set_comp_item(self.tbl_comp.item(i,1), z[i]/s*base)
         self.tbl_comp.blockSignals(False)
         self._upd_suma()  # actualiza fila sumatorias
         # Ventana de Equilibrio de un fluido: la composición normalizada pasa
@@ -2185,13 +2219,13 @@ class TabFluidos(QWidget):
         f = 100.0 if pct else 1.0
         self.tbl.blockSignals(True)
         for i in range(NC + 1):
-            self.tbl.item(i, 1).setText(_fmt_comp((z[i] if i < len(z) else 0.0)*f))
+            _set_comp_item(self.tbl.item(i, 1), (z[i] if i < len(z) else 0.0)*f)
         self.tbl.blockSignals(False)
         self._upd_suma()
 
     def _leer_crudo(self):
         """Valores tal como se escribieron (fracción o %; punto o coma)."""
-        return [_a_float(self.tbl.item(i, 1).text(), 0.0) for i in range(NC + 1)]
+        return [_get_comp_item(self.tbl.item(i, 1)) for i in range(NC + 1)]
 
     def _leer_z(self):
         """Composición en fracción molar (convierte si se ingresó en %)."""
@@ -2202,7 +2236,7 @@ class TabFluidos(QWidget):
         for i in range(NC + 1):
             if self.tbl.isRowHidden(i):
                 continue
-            s += _a_float(self.tbl.item(i, 1).text(), 0.0)
+            s += _get_comp_item(self.tbl.item(i, 1))
         self.tbl.blockSignals(True)
         self.tbl.item(self._sum_row, 1).setText(f"{s:.4f}")
         self.tbl.blockSignals(False)
@@ -2234,6 +2268,12 @@ class TabFluidos(QWidget):
     def _on_edit(self, item):
         if item.column() != 1 or item.row() >= self._sum_row:
             return
+        if item.data(_UR_TXT) != item.text():
+            v = _a_float(item.text())
+            if v is not None:
+                self.tbl.blockSignals(True)
+                _set_comp_item(item, v)
+                self.tbl.blockSignals(False)
         self._upd_suma()
         if 0 <= self._idx < len(self.fluidos):
             crudo = self._leer_crudo()
@@ -2465,6 +2505,7 @@ class MainWindow(QMainWindow):
         # del gestor) en un mismo diagrama.
         m_graf.addSeparator()
         m_graf.addAction(_act("Comparar envolventes", self._abrir_multi_envolvente))
+        m_graf.addAction(_act("Recorrido de presión y temperatura", self._abrir_recorrido))
         # Aplicar el estado inicial de los iconos (ocultos) — ribbon y
         # navegador ya existen.
         self._toggle_iconos(self._act_iconos.isChecked())
@@ -3430,6 +3471,145 @@ class MainWindow(QMainWindow):
                for i in range(lista_sel.count())]
         self._multi_sel = sel
         self._lanzar_multi_envolvente(sel)
+
+    # ── Recorrido de presión y temperatura sobre la envolvente ─────────
+    def _env_widget_destino(self, clave, abrir=False):
+        """Widget de envolvente de la composición principal o de un fluido
+        (abre su ventana si abrir=True)."""
+        if clave == self._CLAVE_PRINCIPAL:
+            if abrir:
+                self._abrir_calculo('envolvente')
+            return self.tab_env
+        f = next((x for x in self.fluidos if x['nombre'] == clave), None)
+        if f is None:
+            return None
+        if abrir:
+            self._abrir_calculo_fluido('envolvente', f)
+        sw = self._subventanas.get(f"envolvente@{clave}")
+        return getattr(sw, '_widget', None) if sw is not None else None
+
+    def _abrir_recorrido(self):
+        """Selector del fluido y de los puntos (P, T) del recorrido; al
+        aceptar abre la envolvente de ese fluido con el recorrido trazado."""
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                                     QPushButton, QComboBox, QTableWidget,
+                                     QTableWidgetItem, QHeaderView)
+        import unidades as _u
+        PRIN = self._CLAVE_PRINCIPAL
+        claves = [PRIN] + [f['nombre'] for f in self.fluidos]
+        dlg = QDialog(self)
+        dlg.setWindowTitle(_i18n.t("Recorrido de presión y temperatura"))
+        dlg.setStyleSheet('QDialog { background:#e0e0e0; }')
+        root = QVBoxLayout(dlg); root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
+        txt_qss = (f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                   f'color:{TEXT};background:transparent;')
+        btn_qss = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
+                   f'font-family:"{FONT_F}";font-size:{FS}pt;')
+        fila_f = QHBoxLayout()
+        lf = QLabel(_i18n.t("Fluido:")); lf.setStyleSheet(txt_qss)
+        cmb = QComboBox(); cmb.setFixedHeight(24); cmb.setMinimumWidth(240)
+        _aplicar_estilo_combo(cmb)
+        for k in claves:
+            cmb.addItem(_i18n.t("Composición principal") if k == PRIN else k, k)
+        ultimo = getattr(self, '_recorrido_fluido', PRIN)
+        if ultimo in claves:
+            cmb.setCurrentIndex(claves.index(ultimo))
+        fila_f.addWidget(lf); fila_f.addWidget(cmb, 1)
+        root.addLayout(fila_f)
+        info = QLabel(_i18n.t("Puntos del recorrido, en el orden en que se recorren:"))
+        info.setStyleSheet(txt_qss); root.addWidget(info)
+
+        tbl = QTableWidget(0, 2)
+        tbl.setHorizontalHeaderLabels([f"{_i18n.t('Presion')} ({_u.u('P')})",
+                                       f"{_i18n.t('Temperatura')} ({_u.u('T')})"])
+        tbl.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        tbl.verticalHeader().setDefaultSectionSize(22)
+        tbl.setFixedSize(340, 260)
+        tbl.setStyleSheet(
+            f'QTableWidget {{ background:{WHITE}; border:1px solid {BORDER};'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER};'
+            f' selection-background-color:{SEL_BG}; selection-color:{TEXT}; }}'
+            f'QHeaderView {{ background:{WHITE}; }}'
+            f'QHeaderView::section {{ background:{GRAY_LBL}; border:1px solid {BORDER};'
+            f' font-family:"{FONT_F}"; font-size:{FS}pt; padding:2px; }}'
+            f'QTableCornerButton::section {{ background:{GRAY_LBL};'
+            f' border:1px solid {BORDER}; }}')
+        root.addWidget(tbl)
+        try:
+            self.gestor_edicion.registrar(tbl)
+        except Exception:
+            pass
+
+        def _fila(p=None, t=None):
+            r = tbl.rowCount(); tbl.insertRow(r)
+            for c, v in enumerate((p, t)):
+                it = QTableWidgetItem("" if v is None else f"{v:.2f}")
+                it.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                tbl.setItem(r, c, it)
+
+        def _cargar_puntos():
+            tbl.setRowCount(0)
+            w = self._env_widget_destino(cmb.currentData())
+            pts = list(getattr(w, '_recorrido', []) or []) if w is not None else []
+            for P, TF in pts:
+                _fila(_u.p_desde_psia(P), _u.t_desde_F(TF))
+            for _ in range(max(0, 4 - len(pts))):
+                _fila()
+        cmb.currentIndexChanged.connect(lambda _i: _cargar_puntos())
+        _cargar_puntos()
+
+        fila = QHBoxLayout(); fila.setSpacing(8)
+        b_add = QPushButton(_i18n.t("Agregar punto")); b_rem = QPushButton(_i18n.t("Quitar punto"))
+        b_ok = QPushButton(_i18n.t("Aceptar")); b_can = QPushButton(_i18n.t("Cancelar"))
+        for b in (b_add, b_rem, b_ok, b_can):
+            b.setFixedHeight(26); b.setMinimumWidth(84); b.setStyleSheet(btn_qss)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+        fila.addWidget(b_add); fila.addWidget(b_rem); fila.addStretch()
+        fila.addWidget(b_ok); fila.addWidget(b_can)
+        root.addLayout(fila)
+        b_add.clicked.connect(lambda: _fila())
+        def _quitar():
+            r = tbl.currentRow()
+            tbl.removeRow(r if r >= 0 else tbl.rowCount() - 1)
+        b_rem.clicked.connect(_quitar)
+        b_can.clicked.connect(dlg.reject)
+
+        resultado = {}
+        def _aceptar():
+            pts = []
+            for r in range(tbl.rowCount()):
+                tp = (tbl.item(r, 0).text().strip() if tbl.item(r, 0) else "")
+                tt = (tbl.item(r, 1).text().strip() if tbl.item(r, 1) else "")
+                if not tp and not tt:
+                    continue
+                vp = _a_float(tp); vt = _a_float(tt)
+                if vp is None or vt is None:
+                    dialogos.advertencia(dlg, _i18n.t(
+                        "Cada punto debe tener presión y temperatura numéricas.")
+                        + f" ({_i18n.t('Punto')} {len(pts) + 1})")
+                    return
+                P = _u.p_a_psia(vp); TF = _u.t_a_F(vt)
+                if P <= 0 or TF + 459.67 <= 0:
+                    dialogos.advertencia(dlg, _i18n.t(
+                        "La presión y la temperatura absoluta deben ser mayores que cero.")
+                        + f" ({_i18n.t('Punto')} {len(pts) + 1})")
+                    return
+                pts.append((P, TF))
+            resultado['pts'] = pts
+            dlg.accept()
+        b_ok.clicked.connect(_aceptar)
+        dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
+        if not dlg.exec():
+            return
+        clave = cmb.currentData()
+        self._recorrido_fluido = clave
+        w = self._env_widget_destino(clave, abrir=True)
+        if w is None:
+            return
+        w.set_recorrido(resultado.get('pts', []))
+        # La envolvente se recalcula con la composición ACTUAL del fluido
+        # (la validación de la composición la hace el propio cálculo).
+        w.calcular()
 
     def _lanzar_multi_envolvente(self, claves):
         """Valida las composiciones y abre/actualiza la ventana de

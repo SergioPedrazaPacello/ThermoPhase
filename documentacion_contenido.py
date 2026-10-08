@@ -5334,6 +5334,26 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('p',
                                  'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
                                  'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                   {'titulo': ('Recorrido de presión y temperatura', 'Pressure and temperature path'),
+                    'bloques': [('p',
+                                 'El recorrido de presión y temperatura dibuja sobre la envolvente '
+                                 'una serie de puntos (P, T) unidos por flechas en el orden '
+                                 'ingresado, por ejemplo el agotamiento de un yacimiento y el paso '
+                                 'por el separador. Se abre desde el menú Gráficos («Recorrido de '
+                                 'presión y temperatura»): se elige la composición principal o un '
+                                 'fluido del gestor y se ingresan los puntos en las unidades '
+                                 'activas. Al aceptar se abre la envolvente de ese fluido, se '
+                                 'recalcula con su composición actual y se trazan los puntos '
+                                 'numerados. Dejar la lista vacía quita el recorrido.',
+                                 'The pressure and temperature path draws on the envelope a series '
+                                 'of (P, T) points joined by arrows in the order entered, for '
+                                 'example a reservoir depletion followed by the separator. It is '
+                                 'opened from the Graphics menu («Pressure and temperature '
+                                 'path»): the main composition or a fluid from the manager is '
+                                 'chosen and the points are entered in the active units. On '
+                                 'accepting, the envelope of that fluid is opened, recalculated '
+                                 'with its current composition, and the numbered points are '
+                                 'plotted. Leaving the list empty removes the path.')]},
                    {'titulo': ('Comparación de envolventes', 'Envelope comparison'),
                     'bloques': [('p',
                                  'La comparación de envolventes traza en un mismo diagrama P-T '

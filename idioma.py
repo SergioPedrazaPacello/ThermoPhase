@@ -525,6 +525,13 @@ TRAD = {
     "Calculando:": "Calculating:",
     "Seleccionar fluidos": "Select fluids",
     "Comparar envolventes": "Compare envelopes",
+    "Recorrido de presión y temperatura": "Pressure and temperature path",
+    "Recorrido": "Path",
+    "Puntos del recorrido, en el orden en que se recorren:": "Path points, in the order they are followed:",
+    "Agregar punto": "Add point",
+    "Quitar punto": "Remove point",
+    "Cada punto debe tener presión y temperatura numéricas.": "Each point must have numeric pressure and temperature.",
+    "La presión y la temperatura absoluta deben ser mayores que cero.": "Pressure and absolute temperature must be greater than zero.",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

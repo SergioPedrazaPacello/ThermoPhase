@@ -470,6 +470,8 @@ class TabEnvolvente(QWidget):
         self.canvas.setCursor(Qt.CursorShape.ArrowCursor)
         # Punto marcado por el usuario (P_psia, T_F) o None
         self._punto_usuario = None
+        # Recorrido de presión y temperatura: lista de (P_psia, T_F)
+        self._recorrido = []
 
         content.addWidget(self.left_box, stretch=1)
 
@@ -963,6 +965,7 @@ class TabEnvolvente(QWidget):
                 'regiones':      self._regiones,
                 'isocalidad':    self._isocalidad,
                 'punto_usuario': self._punto_usuario,
+                'recorrido':     list(self._recorrido),
             } if self.result is not None else None,
         }
 
@@ -1042,6 +1045,7 @@ class TabEnvolvente(QWidget):
             self._punto_usuario = (float(pu[0]), float(pu[1]))
         else:
             self._punto_usuario = None
+        self._recorrido = [(float(p), float(t)) for p, t in (r.get('recorrido') or [])]
         # Mostrar canvas y actualizar
         self.canvas.setVisible(True)
         self.btn_exp.setEnabled(True)
@@ -1361,6 +1365,47 @@ class TabEnvolvente(QWidget):
                     markeredgecolor='#145214',markeredgewidth=0.5,
                     label=_i18n.t('Punto'), zorder=5)
 
+        # Recorrido de presión y temperatura (puntos numerados unidos por
+        # flechas en el orden ingresado)
+        if self._recorrido:
+            COL_R = '#2b2b2b'
+            Tr = [_u.t_desde_F(t) for _, t in self._recorrido]
+            Pr = [_u.p_desde_psia(p) for p, _ in self._recorrido]
+            if len(Tr) > 1:
+                ax.plot(Tr, Pr, linestyle='-', linewidth=1.1, color=COL_R,
+                        zorder=7, label=_i18n.t('Recorrido'))
+                for i in range(len(Tr) - 1):
+                    ax.annotate('', xy=(Tr[i+1], Pr[i+1]), xytext=(Tr[i], Pr[i]),
+                                arrowprops=dict(arrowstyle='-|>', color=COL_R, lw=1.1,
+                                                shrinkA=5, shrinkB=5,
+                                                mutation_scale=11),
+                                zorder=8)
+            ax.plot(Tr, Pr, linestyle='none', marker='o', markersize=5,
+                    markerfacecolor='#FFFFFF', markeredgecolor=COL_R,
+                    markeredgewidth=1.1, zorder=9,
+                    label=None if len(Tr) > 1 else _i18n.t('Recorrido'))
+            # número de cada punto del lado OPUESTO a sus tramos (no queda
+            # tapado por las flechas que llegan o salen del punto)
+            ax.relim(); ax.autoscale_view()
+            (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+            sx = (x1 - x0) or 1.0; sy = (y1 - y0) or 1.0
+            n = len(Tr)
+            for i, (x, y) in enumerate(zip(Tr, Pr)):
+                dx = dy = 0.0
+                for j in (i - 1, i + 1):
+                    if 0 <= j < n:
+                        ux = (x - Tr[j])/sx; uy = (y - Pr[j])/sy
+                        m = (ux*ux + uy*uy) ** 0.5
+                        if m > 0:
+                            dx += ux/m; dy += uy/m
+                m = (dx*dx + dy*dy) ** 0.5
+                if m < 1e-6:          # punto aislado o tramos opuestos
+                    dx, dy, m = 0.7, 0.7, 1.0
+                ox, oy = 9*dx/m, 9*dy/m
+                ax.annotate(str(i + 1), (x, y), xytext=(ox, oy),
+                            textcoords='offset points', fontsize=8, color=COL_R,
+                            ha='center', va='center', zorder=10)
+
         ax.set_xlabel(f"{_i18n.t('Temperatura')} ({_u.u('T')})", fontsize=10, color=TEXT)
         ax.set_ylabel(f"{_i18n.t('Presion')} ({_u.u('P')})", fontsize=10, color=TEXT)
 
@@ -1388,6 +1433,13 @@ class TabEnvolvente(QWidget):
         # coordenadas absolutas del axes contenedor de la colorbar sean
         # consistentes.  No repetir aquí.
         self.canvas.draw_idle()
+
+    def set_recorrido(self, pts):
+        """Fija el recorrido [(P_psia, T_F), ...] (lista vacía = sin
+        recorrido) y redibuja si ya hay envolvente."""
+        self._recorrido = [(float(p), float(t)) for p, t in (pts or [])]
+        if self.result is not None:
+            self._plot(self.result)
 
     def _colocar_punto(self):
         """Lee P y T de los campos (en unidades activas) y marca el punto."""

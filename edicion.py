@@ -285,7 +285,16 @@ class GestorEdicion(QObject):
             vals = []
             for c in cols:
                 it = sel.get((r, c), None) if (r, c) in sel else None
-                vals.append(self._texto_para_excel(it.text()) if it is not None else '')
+                if it is None:
+                    vals.append('')
+                    continue
+                # composiciones: se copia el valor completo (la celda muestra 4
+                # decimales pero guarda todos)
+                t = it.text()
+                v = it.data(Qt.ItemDataRole.UserRole + 10)
+                if v is not None and it.data(Qt.ItemDataRole.UserRole + 11) == t:
+                    t = repr(float(v))
+                vals.append(self._texto_para_excel(t))
             lineas.append('\t'.join(vals))
         QApplication.clipboard().setText('\r\n'.join(lineas))
 
