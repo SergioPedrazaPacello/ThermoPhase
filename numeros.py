@@ -40,6 +40,17 @@ def a_float(txt, defecto=None):
         return defecto
 
 
+def fmt_comp(v, min_dec=4, max_dec=10):
+    """Texto de una fracción/porcentaje de composición SIN perder precisión:
+    hasta `max_dec` decimales (quita ceros sobrantes y el ruido de coma
+    flotante, p. ej. 6.130000000000001 → 6.13) y al menos `min_dec`."""
+    t = f"{float(v):.{max_dec}f}".rstrip('0')
+    ent, _, dec = t.partition('.')
+    if len(dec) < min_dec:
+        dec = dec + '0'*(min_dec - len(dec))
+    return f"{ent}.{dec}"
+
+
 def es_numero(txt):
     return a_float(txt) is not None
 

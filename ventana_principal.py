@@ -3,7 +3,7 @@ Peng-Robinson EOS — Equilibrio de Fases
 v12: Estructura multi-widget. Títulos como QLabel, datos como QTableWidget pequeños.
      Esto elimina el conflicto de QSS y permite colorear celda por celda.
 """
-from numeros import SpinNum as _SpinNum, a_float as _a_float, composicion_a_fracciones as _comp_frac
+from numeros import SpinNum as _SpinNum, a_float as _a_float, composicion_a_fracciones as _comp_frac, fmt_comp as _fmt_comp
 import sys, os, copy
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -770,7 +770,7 @@ class TabEquilibrio(QWidget):
         z = e.get('composicion') or [0.0]*NC
         self.tbl_comp.blockSignals(True)
         for i in range(NC):
-            self.tbl_comp.item(i, 1).setText(f"{z[i] if i<len(z) else 0.0:.4f}")
+            self.tbl_comp.item(i, 1).setText(_fmt_comp(z[i] if i<len(z) else 0.0))
         self.tbl_comp.blockSignals(False)
         self._upd_suma()
         # T y P se guardan en internas (°R, psia); convertir al sistema activo.
@@ -907,13 +907,16 @@ class TabEquilibrio(QWidget):
             for c in (1,2,3,4):
                 tb.setColumnWidth(c, wv)
 
-    def set_z(self, z):
+    def set_z(self, z, pct=False):
         """Carga una composicion (lista de fracciones) en la tabla, incluida el
-        agua si viene el 14° valor."""
+        agua si viene el 14° valor.  Con pct=True se muestra en porcentaje
+        molar.  Se conservan TODOS los decimales (no se redondea a 4), para
+        que la composición calculada sea exactamente la ingresada."""
+        f = 100.0 if pct else 1.0
         self.tbl_comp.blockSignals(True)
         for i in range(NC+1):
             v = z[i] if i < len(z) else 0.0
-            self.tbl_comp.item(i, 1).setText(f"{v:.4f}")
+            self.tbl_comp.item(i, 1).setText(_fmt_comp(v*f))
         self.tbl_comp.blockSignals(False)
         self._upd_suma()
 
@@ -933,9 +936,14 @@ class TabEquilibrio(QWidget):
         for i in range(NC+1):
             if self.tbl_comp.isRowHidden(i):
                 continue
-            self.tbl_comp.item(i,1).setText(f"{z[i]/s*base:.4f}")
+            self.tbl_comp.item(i,1).setText(_fmt_comp(z[i]/s*base))
         self.tbl_comp.blockSignals(False)
         self._upd_suma()  # actualiza fila sumatorias
+        # Ventana de Equilibrio de un fluido: la composición normalizada pasa
+        # al fluido (y al gestor de fluidos).
+        cb = getattr(self, '_on_z_cambiada', None)
+        if cb is not None:
+            cb()
 
     def _on_vol_local(self, idx):
         """Switch local de corrección de volumen de esta ventana de
@@ -2177,7 +2185,7 @@ class TabFluidos(QWidget):
         f = 100.0 if pct else 1.0
         self.tbl.blockSignals(True)
         for i in range(NC + 1):
-            self.tbl.item(i, 1).setText(f"{(z[i] if i < len(z) else 0.0)*f:.4f}")
+            self.tbl.item(i, 1).setText(_fmt_comp((z[i] if i < len(z) else 0.0)*f))
         self.tbl.blockSignals(False)
         self._upd_suma()
 
@@ -2285,10 +2293,13 @@ class TabFluidos(QWidget):
         if 0 <= self._idx < len(self.fluidos):
             self.fluidos[self._idx]['z'] = z
             self.fluidos[self._idx]['pct'] = pct
+            if self._on_comp_change:
+                self._on_comp_change(self.fluidos[self._idx])
 
     def _cargar(self):
         if 0 <= self._idx < len(self.fluidos):
-            self._cargar_principal(list(self.fluidos[self._idx]['z']))
+            self._cargar_principal(list(self.fluidos[self._idx]['z']),
+                                   bool(self.fluidos[self._idx].get('pct')))
             dialogos.info(self, _i18n.t(
                 "Fluido «%s» cargado en la composicion principal.")
                 % self.fluidos[self._idx]['nombre'])
@@ -3479,9 +3490,9 @@ class MainWindow(QMainWindow):
         self._mostrar_subventana(sw)
         sw._widget.calcular(trabajos, self._eos_main_code())
 
-    def _cargar_fluido_principal(self, z):
+    def _cargar_fluido_principal(self, z, pct=False):
         """Carga la composicion de un fluido en la pestaña de Equilibrio."""
-        self.tab_eq.set_z(z)
+        self.tab_eq.set_z(z, pct)
         self._abrir_calculo('equilibrio')
 
     def _abrir_gestor_componentes(self):
@@ -3721,7 +3732,7 @@ class MainWindow(QMainWindow):
             # fluido (edicion bidireccional con el gestor de Fluidos).
             w = TabEquilibrio(kij_get=gk)
             w._on_props_resize = self._on_props_change
-            w.set_z(fluido['z'])
+            w.set_z(fluido['z'], bool(fluido.get('pct')))
             w.cmb_eos.blockSignals(True)
             w.cmb_eos.setCurrentIndex(_eos_idx(fluido.get('eos', 'PR')))
             w.cmb_eos.blockSignals(False)
@@ -3730,6 +3741,7 @@ class MainWindow(QMainWindow):
                 lambda *_a, f=fluido, ww=w: self._on_fluido_eos(f, ww))
             w.tbl_comp.itemChanged.connect(
                 lambda _it, f=fluido, ww=w: self._on_eq_fluido_comp(f, ww))
+            w._on_z_cambiada = lambda f=fluido, ww=w: self._on_eq_fluido_comp(f, ww)
             return w
         return None
 
@@ -3738,7 +3750,7 @@ class MainWindow(QMainWindow):
         y se refleja en el gestor (y viceversa)."""
         if getattr(self, '_sync_z_lock', False):
             return
-        fluido['z'] = w.get_z()
+        fluido['z'], fluido['pct'] = _comp_frac(w.z_ingresada())
         self._sync_fluido_z(fluido, 'equilibrio')
 
     def _sync_fluido_z(self, fluido, origen):
@@ -3752,7 +3764,7 @@ class MainWindow(QMainWindow):
                 sw = self._subventanas.get(f"equilibrio@{fluido['nombre']}")
                 if sw is not None:
                     for ww in sw.findChildren(TabEquilibrio):
-                        ww.set_z(fluido['z'])
+                        ww.set_z(fluido['z'], bool(fluido.get('pct')))
             if origen != 'fluidos':
                 tf = getattr(self, '_tab_fluidos', None)
                 if (tf is not None and 0 <= tf._idx < len(self.fluidos)
