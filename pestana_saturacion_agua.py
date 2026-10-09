@@ -328,9 +328,9 @@ class TabSaturacionAgua(QWidget):
             estado = "Subsaturada"
         else:
             estado = "Con agua libre"
-        # diferencia en moles de agua por 100 moles de corriente de entrada:
-        # + falta agua para saturar, − agua libre que sobra
-        dif = (r_sat - r_in)*(1.0 - w_in)*100.0
+        # diferencia simple de porcentajes molares: + falta agua para
+        # saturar, − agua libre que sobra
+        dif = (w_sat - w_in)*100.0
         bV, bL = r.get('beta_V', 0.0), r.get('beta_L', 0.0)
         if bV > 1e-9 and bL > 1e-9:
             fases = "Vapor y líquido"
