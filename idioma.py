@@ -550,6 +550,14 @@ TRAD = {
     "ThermoPhase — Ingreso de datos": "ThermoPhase — Data input",
     "Mostrar marcadores": "Show markers",
     "Mostrar valores en algunos puntos": "Show values at some points",
+    "Puntos de saturación e hidratos (a la presión o temperatura de la corrida)": "Saturation and hydrate points (at the run pressure or temperature)",
+    "Temperatura de rocío": "Dew temperature",
+    "Temperatura de burbuja": "Bubble temperature",
+    "Temperatura de hidrato": "Hydrate temperature",
+    "Presión de rocío": "Dew pressure",
+    "Presión de burbuja": "Bubble pressure",
+    "Presión de hidrato": "Hydrate pressure",
+    "Margen de hidrato": "Hydrate margin",
 }
 
 # EN -> ES (inverso) para poder detectar y revertir.

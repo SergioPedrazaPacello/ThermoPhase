@@ -3793,7 +3793,7 @@ class MainWindow(QMainWindow):
         c2 = QVBoxLayout(); c2.setSpacing(3)
         l2 = QLabel(_i18n.t("Propiedades a mostrar:")); l2.setStyleSheet(txt_qss)
         c2.addWidget(l2)
-        lista = QListWidget(); lista.setFixedSize(300, 300)
+        lista = QListWidget(); lista.setFixedSize(400, 300)
         lista.setStyleSheet(
             f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
             f' font-family:"{FONT_F}"; font-size:{FS}pt; outline:0; }}'
@@ -3818,6 +3818,13 @@ class MainWindow(QMainWindow):
             for k, txt in _fm.propiedades_disponibles(agua):
                 it = QListWidgetItem(txt)
                 it.setData(Qt.ItemDataRole.UserRole, k)
+                if k == _fm.SEPARADOR:
+                    # título del grupo: no se marca ni se selecciona
+                    it.setFlags(Qt.ItemFlag.NoItemFlags)
+                    it.setBackground(QBrush(QColor(GRAY_LBL)))
+                    it.setForeground(QBrush(QColor(TEXT)))
+                    lista.addItem(it)
+                    continue
                 it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 it.setCheckState(Qt.CheckState.Checked if k in marcadas
                                  else Qt.CheckState.Unchecked)

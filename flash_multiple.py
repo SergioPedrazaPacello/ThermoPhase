@@ -33,20 +33,107 @@ _DEC = {'H_stream': 2, 'S_stream': 4, 'fv_bg': 6, 'fv_rs': 2, 'fv_rsw': 2,
 DEFAULT_KEYS = ['frac_v', 'frac_l', 'ZV', 'ZL', 'rho_v', 'rho_l']
 
 
+# ── Puntos de saturación y de hidrato de cada corrida ───────────────────
+# (key, etiqueta, magnitud): 'T' temperatura, 'P' presión, 'dT' diferencia
+# de temperatura.  Se calculan con los mismos motores que las ventanas de
+# Puntos de saturación y de Formación de hidratos.
+EXTRAS = [
+    ('sat_T_rocio',   "Temperatura de rocío", 'T'),
+    ('sat_T_burbuja', "Temperatura de burbuja", 'T'),
+    ('hid_T',         "Temperatura de hidrato", 'T'),
+    ('sat_P_rocio',   "Presión de rocío", 'P'),
+    ('sat_P_burbuja', "Presión de burbuja", 'P'),
+    ('hid_P',         "Presión de hidrato", 'P'),
+    ('hid_margen',    "Margen de hidrato", 'dT'),
+]
+_EXTRA_BY_KEY = {k: (k, b, m) for k, b, m in EXTRAS}
+SEPARADOR = '__sep__'
+_DEC.update({k: 2 for k in _EXTRA_BY_KEY})
+
+
 def propiedades_disponibles(agua):
-    """[(key, etiqueta con unidad)] del catálogo (con o sin agua)."""
+    """[(key, etiqueta con unidad)] del catálogo (con o sin agua), seguido
+    del grupo de puntos de saturación e hidratos (precedido de SEPARADOR)."""
     out = []
     for key, base, mag, solo_agua, _f in _PROPS_SENS:
         if solo_agua and not agua:
             continue
         out.append((key, etiqueta(key)))
+    out.append((SEPARADOR, _i18n.t("Puntos de saturación e hidratos (a la presión o temperatura de la corrida)")))
+    for key, _b, _m in EXTRAS:
+        out.append((key, etiqueta(key)))
     return out
 
 
+def _unidad_extra(mag):
+    return _u.u('P') if mag == 'P' else _u.u('T')
+
+
 def etiqueta(key):
+    if key in _EXTRA_BY_KEY:
+        _k, base, mag = _EXTRA_BY_KEY[key]
+        return f"{_i18n.t(base)} [{_unidad_extra(mag)}]"
     _k, base, mag, _sa, _f = _PROPS_BY_KEY[key]
     unidad = f" [{_u.u(mag)}]" if mag else ""
     return f"{_i18n.t(base)}{unidad}"
+
+
+def _convertir_extra(key, v):
+    """Valor interno (°R, psia o ΔT en °R) → unidades activas."""
+    mag = _EXTRA_BY_KEY[key][2]
+    if mag == 'P':
+        return _u.p_desde_psia(v)
+    if mag == 'dT':
+        return _u.t_desde_R(v + 459.67) - _u.t_desde_R(459.67)
+    return _u.t_desde_R(v)
+
+
+def _puntos_extra(keys, z, kij, eos_c, P, T_R):
+    """Puntos de saturación / hidrato de una corrida (unidades internas).
+    None en las celdas cuyo punto no existe o no converge."""
+    out = {}
+    need = set(keys)
+    if not need:
+        return out
+    zz = [float(v) for v in z]
+    agua = len(zz) > 13 and zz[13] > 1e-12
+    z13 = zz[:13]; s13 = sum(z13)
+    if s13 <= 0:
+        return {k: None for k in keys}
+    z13 = [v/s13 for v in z13]
+    if need & {'sat_T_rocio', 'sat_T_burbuja', 'sat_P_rocio', 'sat_P_burbuja'}:
+        import saturacion as _sat
+        zs = ([v/sum(zz[:14]) for v in zz[:14]] if agua else z13)
+        for key, tipo, val, campo in (('sat_T_rocio', 'T_rocio', P, 'T'),
+                                      ('sat_T_burbuja', 'T_burbuja', P, 'T'),
+                                      ('sat_P_rocio', 'P_rocio', T_R, 'P'),
+                                      ('sat_P_burbuja', 'P_burbuja', T_R, 'P')):
+            if key not in need:
+                continue
+            try:
+                r = _sat.punto_saturacion(tipo, val, zs, kij, eos=eos_c)
+                v = r.get(campo) if (r and r.get('exito', True) and r.get(campo)) else None
+                out[key] = float(v) if v else None
+            except Exception:
+                out[key] = None
+    if need & {'hid_T', 'hid_P', 'hid_margen'}:
+        import hidratos as _hid
+        z_full = zz[:14] if agua else None
+        if need & {'hid_T', 'hid_margen'}:
+            try:
+                r = _hid.punto_hidrato(z13, 'T', P, kij, eos_c, z_full=z_full)
+                Th = float(r['T_R']) if r else None
+            except Exception:
+                Th = None
+            out['hid_T'] = Th
+            out['hid_margen'] = (T_R - Th) if Th else None
+        if 'hid_P' in need:
+            try:
+                r = _hid.punto_hidrato(z13, 'P', T_R, kij, eos_c, z_full=z_full)
+                out['hid_P'] = float(r['P_psia']) if r else None
+            except Exception:
+                out['hid_P'] = None
+    return {k: out.get(k) for k in keys}
 
 
 class FlashMultWorker(QThread):
@@ -68,10 +155,17 @@ class FlashMultWorker(QThread):
             _eng.set_eos(self.eos)
             for i, (P, T_R) in enumerate(self.puntos):
                 try:
-                    r = _punto(self.z, T_R, P, self.kij, self.eos, self.metodo,
-                               self.agua, capacidad=cap, fvol=fvol)
                     vals = {}
-                    for k in self.keys:
+                    props = [k for k in self.keys if k not in _EXTRA_BY_KEY]
+                    extras = [k for k in self.keys if k in _EXTRA_BY_KEY]
+                    r = (_punto(self.z, T_R, P, self.kij, self.eos, self.metodo,
+                                self.agua, capacidad=cap, fvol=fvol)
+                         if props else None)
+                    if extras:
+                        vals.update(_puntos_extra(extras, self.z, self.kij,
+                                                  self.eos, P, T_R))
+                        _eng.set_eos(self.eos)
+                    for k in props:
                         try:
                             v = _PROPS_BY_KEY[k][4](r)
                         except Exception:
@@ -226,7 +320,10 @@ class TabFlashMultiple(QWidget):
             v = vals.get(k)
             if v is None:
                 put(c, ""); continue
-            v = _conv_mag(_PROPS_BY_KEY[k][2], v)
+            if k in _EXTRA_BY_KEY:
+                v = _convertir_extra(k, v)
+            else:
+                v = _conv_mag(_PROPS_BY_KEY[k][2], v)
             put(c, f"{v:.{_DEC.get(k, 4)}f}", color=TEXT_RES)
 
     def aplicar_unidades(self, old=None):

@@ -5386,7 +5386,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'trifásico si el fluido contiene agua), con la EOS, los kij y el '
                                  'método de densidad del fluido. El resultado es una tabla con el '
                                  'número de corrida, la presión, la temperatura y las propiedades '
-                                 'elegidas, que puede exportarse a CSV.',
+                                 'elegidas, que puede exportarse a CSV. En el grupo «Puntos de '
+                                 'saturación e hidratos» pueden pedirse, para cada corrida, la '
+                                 'temperatura de rocío, de burbuja y de formación de hidrato a la '
+                                 'presión de la corrida; la presión de rocío, de burbuja y de '
+                                 'formación de hidrato a la temperatura de la corrida; y el margen '
+                                 'frente a hidratos (temperatura de la corrida menos temperatura de '
+                                 'hidrato: positivo fuera de la zona de hidratos). Se calculan con '
+                                 'los mismos métodos que las ventanas de Puntos de saturación y de '
+                                 'Formación de hidratos; la celda queda vacía si el punto no existe.',
                                  'The multiple flash repeats the phase equilibrium calculation over '
                                  'a list of (P, T) conditions for one fluid. It is opened from the '
                                  'Tools menu («Multiple flash») or from the Navigator, under '
@@ -5398,7 +5406,14 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'the fluid contains water), with the EOS, kij and density method '
                                  'of the fluid. The result is a table with the run number, '
                                  'pressure, temperature and the chosen properties, which can be '
-                                 'exported to CSV.')]},
+                                 'exported to CSV. The group «Saturation and hydrate points» adds, '
+                                 'for each run, the dew, bubble and hydrate formation temperatures '
+                                 'at the run pressure; the dew, bubble and hydrate formation '
+                                 'pressures at the run temperature; and the hydrate margin (run '
+                                 'temperature minus hydrate temperature: positive outside the '
+                                 'hydrate region). They are computed with the same methods as the '
+                                 'Saturation points and Hydrate formation windows; the cell is left '
+                                 'empty when the point does not exist.')]},
                    {'titulo': ('Comparación de envolventes', 'Envelope comparison'),
                     'bloques': [('p',
                                  'La comparación de envolventes traza en un mismo diagrama P-T '
