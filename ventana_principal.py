@@ -2539,6 +2539,19 @@ class MainWindow(QMainWindow):
 
         # ── Gráficos ─────────────────────────────────────────
         self._cursor_activo = False   # cursor de lectura desactivado por defecto
+        # ── Cálculos (composición principal) ─────────────────
+        m_calc = menubar.addMenu("&Cálculos")
+        for clave, texto in (('equilibrio',  "Equilibrio de fases"),
+                             ('envolvente',  "Envolvente de fases"),
+                             ('saturacion',  "Puntos de saturación"),
+                             ('hidratos',    "Formación de hidratos"),
+                             ('saturacion_agua', "Contenido de agua de saturación"),
+                             ('propiedades', "Análisis de sensibilidad"),
+                             ('parametros',  "Parámetros de la ecuación de estado")):
+            m_calc.addAction(_act(texto, lambda _=False, c=clave: self._abrir_calculo_ui(c)))
+        m_calc.addSeparator()
+        m_calc.addAction(_act("Flash múltiple", self._abrir_flash_multiple))
+
         m_graf = menubar.addMenu("&Gráficos")
         self._act_cursor = QAction("Activar cursor", self, checkable=True)
         self._act_cursor.setChecked(self._cursor_activo)
@@ -2598,8 +2611,6 @@ class MainWindow(QMainWindow):
 
         # ── Herramientas ─────────────────────────────────────
         m_herr = menubar.addMenu("&Herramientas")
-        m_herr.addAction(_act("&Flash múltiple", self._abrir_flash_multiple))
-        m_herr.addSeparator()
         m_herr.addAction(_act("&Asociar archivos .tpsim con este programa",
                               self._menu_asociar))
         m_herr.addAction(_act("&Quitar asociacion de archivos .tpsim",
@@ -2876,6 +2887,7 @@ class MainWindow(QMainWindow):
                 'envolvente':  self.tab_env.get_estado(),
                 'saturacion':  self.tab_sat.get_estado(),
                 'hidratos':    self.tab_hid.get_estado(),
+                'saturacion_agua': self.tab_satw.get_estado(),
                 'propiedades': self.tab_prop.get_estado(),
             },
         }
@@ -2921,6 +2933,8 @@ class MainWindow(QMainWindow):
             self.tab_hid.set_estado(tabs['hidratos'])
         if 'propiedades' in tabs:
             self.tab_prop.set_estado(tabs['propiedades'])
+        if 'saturacion_agua' in tabs:
+            self.tab_satw.set_estado(tabs['saturacion_agua'])
 
         # 3b. Fluidos guardados
         self._cerrar_ventanas_fluido()
@@ -2964,6 +2978,7 @@ class MainWindow(QMainWindow):
         self.tab_env.set_estado({'entrada': {}, 'resultado': None})
         self.tab_sat.set_estado({'entrada': {}, 'resultado': None})
         self.tab_hid.set_estado({'entrada': {}, 'resultado': None})
+        self.tab_satw.set_estado({'entrada': {}, 'resultado': None})
         self.tab_prop.set_estado({'entrada': {'T_R':0.0,'P_psi':0.0},'resultado':None})
         if hasattr(self, 'tab_par'):
             self.tab_par.refrescar_tabla()
@@ -3053,6 +3068,10 @@ class MainWindow(QMainWindow):
                                        get_kij=lambda: kij_user,
                                        get_metodo_densidad=self._metodo_densidad_main)
         self.tab_par  = TabParametros()
+        from pestana_saturacion_agua import TabSaturacionAgua
+        self.tab_satw = TabSaturacionAgua(
+            get_z=self._getz_main, get_eos=self._eos_main_code,
+            on_cargar=lambda z, d: self._cargar_saturada(z, d, None))
         _avance(0.92, "Construyendo la interfaz…")
 
         # Definicion de cada calculo: clave -> (widget, titulo, icono)
@@ -3061,6 +3080,7 @@ class MainWindow(QMainWindow):
             'envolvente':  (self.tab_env,  "Envolvente de fases",                 "envolvente"),
             'saturacion':  (self.tab_sat,  "Puntos de saturación",                "saturacion"),
             'hidratos':    (self.tab_hid,  "Formación de hidratos",               "hidratos"),
+            'saturacion_agua': (self.tab_satw, "Contenido de agua de saturación",           "saturacion_agua"),
             'propiedades': (self.tab_prop, "Análisis de sensibilidad",             "propiedades"),
             'parametros':  (self.tab_par,  "Parámetros de la ecuación de estado", "parametros"),
         }
@@ -3075,6 +3095,7 @@ class MainWindow(QMainWindow):
             'equilibrio': self.tab_eq,
             'saturacion': self.tab_sat,
             'hidratos':   self.tab_hid,
+            'saturacion_agua': self.tab_satw,
             'parametros': self.tab_par,
         }
         # Tamaño estandar de las ventanas de calculo, fijado AHORA (con los 13
@@ -3459,6 +3480,10 @@ class MainWindow(QMainWindow):
             if hasattr(widget, '_props_sel'):
                 h0 -= (len(PROP_DEFAULT) - len(widget._props_sel)) * ROW_H
             return (w0, h0)
+        if clave_base == 'saturacion_agua':
+            widget.aplicar_componentes(self._comp_activos)
+            h = widget.sizeHint()
+            return (max(self._tam_sub[0], h.width() + 26), h.height() + 12)
         # envolvente / propiedades: no dependen de componentes
         return self._tam_sub
 
@@ -3918,6 +3943,56 @@ class MainWindow(QMainWindow):
         self._mostrar_subventana(sw)
         sw._widget.calcular(spec)
 
+    def _activar_agua(self):
+        """Activa el agua (componente 14) en todo el programa."""
+        if NC not in set(self._comp_activos):
+            self._aplicar_componentes(list(self._comp_activos) + [NC])
+            # el gestor de componentes (si está abierto) se rehace al reabrirlo
+            gc = self._subventanas.pop('gestor_componentes', None)
+            if gc is not None:
+                try:
+                    gc.hide(); gc.deleteLater()
+                except Exception:
+                    pass
+
+    def _cargar_saturada(self, z, destino, fluido=None):
+        """Carga la composición saturada con agua en la composición principal,
+        en el fluido analizado o en un fluido nuevo, y activa el agua."""
+        z = [float(v) for v in z] + [0.0]*(NC + 1 - len(z))
+        self._activar_agua()
+        if destino == 'principal':
+            pct = _comp_frac(self.tab_eq.z_ingresada())[1]
+            self.tab_eq.set_z(z, pct)
+            msg = _i18n.t("La composición saturada se cargó en la composición principal.")
+        elif destino == 'fluido' and fluido is not None:
+            fluido['z'] = list(z); fluido['pct'] = bool(fluido.get('pct'))
+            self._sync_fluido_z(fluido, 'saturacion_agua')
+            msg = _i18n.t("La composición saturada se cargó en el fluido") + f" {fluido['nombre']}."
+        else:
+            base = (fluido['nombre'] if fluido is not None
+                    else _i18n.t("Composición principal"))
+            base = f"{base} ({_i18n.t('saturado con agua')})"
+            existentes = {f['nombre'] for f in self.fluidos}
+            nombre = base; i = 2
+            while nombre in existentes:
+                nombre = f"{base} {i}"; i += 1
+            if fluido is not None:
+                eos_c = fluido.get('eos', 'PR'); kij = copy.deepcopy(fluido.get('kij', KIJ_DEFAULT))
+                kf = fluido.get('kij_fuente', eos_c)
+            else:
+                eos_c = self._eos_main_code(); kij = copy.deepcopy(kij_user); kf = kij_fuente
+            self.fluidos.append({'nombre': nombre, 'z': list(z), 'eos': eos_c,
+                                 'kij': kij, 'kij_fuente': kf})
+            tf = getattr(self, '_tab_fluidos', None)
+            if tf is not None:
+                try:
+                    tf.refrescar()
+                except Exception:
+                    pass
+            self._sync_nav_fluidos()
+            msg = _i18n.t("Se creó el fluido") + f" {nombre}."
+        dialogos.info(self, msg)
+
     def _on_nav_calculo(self, clave):
         if clave == 'flash_multiple':
             self._abrir_flash_multiple()
@@ -3925,7 +4000,7 @@ class MainWindow(QMainWindow):
             self._abrir_calculo_ui(clave)
 
     # ── Ventana de inicio de cálculo (Equilibrio, Saturación, Hidratos) ──
-    _CLAVES_INICIO = ('equilibrio', 'saturacion', 'hidratos')
+    _CLAVES_INICIO = ('equilibrio', 'saturacion', 'hidratos', 'saturacion_agua')
 
     @staticmethod
     def _tiene_calculo(w):
@@ -3972,7 +4047,8 @@ class MainWindow(QMainWindow):
         from pestana_hidratos import TabHidratos
         titulos = {'equilibrio': "Equilibrio de fases",
                    'saturacion': "Puntos de saturación",
-                   'hidratos':   "Formación de hidratos"}
+                   'hidratos':   "Formación de hidratos",
+                   'saturacion_agua': "Contenido de agua de saturación"}
         nombre = (fluido['nombre'] if fluido is not None
                   else _i18n.t("Composición principal"))
         dlg = QDialog(self)
@@ -4007,7 +4083,7 @@ class MainWindow(QMainWindow):
         cmb = None
         txt_P = f"{_i18n.t('Presion')} ({_u.u('P')}):"
         txt_T = f"{_i18n.t('Temperatura')} ({_u.u('T')}):"
-        if clave == 'equilibrio':
+        if clave in ('equilibrio', 'saturacion_agua'):
             ed_P, ed_T = campo(), campo()
             gl.addWidget(etiqueta(txt_P), 0, 0); gl.addWidget(ed_P, 0, 1)
             gl.addWidget(etiqueta(txt_T), 1, 0); gl.addWidget(ed_T, 1, 1)
@@ -4174,7 +4250,7 @@ class MainWindow(QMainWindow):
 
         datos = {}
         def _aceptar():
-            if clave == 'equilibrio':
+            if clave in ('equilibrio', 'saturacion_agua'):
                 vp_ = _a_float(ed_P.text()); vt_ = _a_float(ed_T.text())
                 if vp_ is None or vt_ is None:
                     dialogos.advertencia(dlg, _i18n.t("Ingrese la presion y la temperatura."))
@@ -4241,7 +4317,9 @@ class MainWindow(QMainWindow):
             if w is None:
                 return
         # ── Condiciones y cálculo ──────────────────────────────
-        if clave == 'equilibrio':
+        if clave == 'saturacion_agua':
+            w.set_condiciones(datos['P'], datos['T_R'])
+        elif clave == 'equilibrio':
             w.sp_P.setValue(_u.p_desde_psia(datos['P']))
             w.sp_T.setValue(_u.abs_desde_R(datos['T_R']))
         else:
@@ -4401,6 +4479,13 @@ class MainWindow(QMainWindow):
             k = NC - n_activos
             red = min(k * ROW_H, w.reduccion_maxima())
             sw.setFixedSize(sw.width(), sw._h_full - red)
+        elif hasattr(w, 'alto_ideal'):
+            # Saturación con agua: la fila del agua siempre está visible, así
+            # que el alto se recalcula desde el propio widget.
+            delta = w.alto_ideal() - w.height()
+            if delta != 0:
+                s = sw.size()
+                sw.setFixedSize(s.width(), s.height() + delta)
         else:
             factor = 2 if isinstance(w, TabParametros) else 1
             delta = (n_activos - n_old) * ROW_H * factor
@@ -4456,6 +4541,7 @@ class MainWindow(QMainWindow):
             'envolvente':  "Envolvente",
             'saturacion':  "Saturacion",
             'hidratos':    "Hidratos",
+            'saturacion_agua': "Contenido de agua de saturación",
             'propiedades': "Sensibilidad",
             'parametros':  "Parametros",
         }
@@ -4541,6 +4627,12 @@ class MainWindow(QMainWindow):
                             get_eos_nombre=lambda f=fluido: f.get('eos', 'PR'))
             w._on_props_resize = self._on_props_change
             return w
+        if clave == 'saturacion_agua':
+            from pestana_saturacion_agua import TabSaturacionAgua
+            return TabSaturacionAgua(
+                get_z=gz, get_eos=lambda f=fluido: f.get('eos', 'PR'),
+                on_cargar=lambda z, d, f=fluido: self._cargar_saturada(z, d, f),
+                es_fluido=True)
         if clave == 'propiedades':
             w = TabPropiedades(get_z=gz, get_kij=gk,
                                get_metodo_densidad=self._metodo_densidad_main)

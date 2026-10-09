@@ -5373,6 +5373,45 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'curve of the envelope and of the sensitivity analysis, and writes '
                                  'next to each one its value as «y axis:x axis», without name or '
                                  'unit (the units are those of the axes).')]},
+                   {'titulo': ('Contenido de agua de saturación', 'Saturation water content'),
+                    'bloques': [('p',
+                                 'El contenido de agua de saturación se obtiene agregando a la corriente exactamente el agua '
+                                 'que admite a una presión y temperatura sin formar agua libre: la '
+                                 'fase acuosa queda incipiente, de modo que al bajar la temperatura '
+                                 'a presión constante condensaría agua. Es la opción «Saturate w. '
+                                 'water» de PVTsim. La cantidad se obtiene de un flash multifásico '
+                                 '(Huron-Vidal, con la EOS de la corriente) con un exceso mínimo de '
+                                 'agua libre: el agua disuelta en las fases de hidrocarburo da la '
+                                 'relación agua/hidrocarburo de saturación, que se afina reduciendo '
+                                 'ese exceso. Las proporciones entre hidrocarburos no cambian.',
+                                 'The saturation water content is obtained by adding to the stream exactly the water it can hold '
+                                 'at a given pressure and temperature without forming free water: '
+                                 'the aqueous phase is incipient, so water would condense if the '
+                                 'temperature were lowered at constant pressure. It is the PVTsim '
+                                 '«Saturate w. water» option. The amount is obtained from a '
+                                 'multiphase flash (Huron-Vidal, with the stream EOS) with a minimal '
+                                 'excess of free water: the water dissolved in the hydrocarbon phases '
+                                 'gives the saturation water/hydrocarbon ratio, refined by reducing '
+                                 'that excess. The ratios between hydrocarbons do not change.'),
+                                ('p',
+                                 'Si la composición de entrada ya contiene agua, se satura su parte '
+                                 'de hidrocarburos y el agua ingresada se compara con la de '
+                                 'saturación: la corriente está subsaturada (se informa el agua '
+                                 'faltante), saturada, o con agua libre (se informa el exceso, en % '
+                                 'molar de la corriente de entrada; en la ventana se expresa como porcentaje molar). También se informa el contenido '
+                                 'de agua del gas saturado en lb/MMscf y las fases de hidrocarburo '
+                                 'presentes. La composición saturada puede cargarse en la composición '
+                                 'actual (la composición principal o el fluido analizado) o guardarse como un fluido nuevo; '
+                                 'al cargarla se activa el agua en todo el programa.',
+                                 'If the input composition already contains water, its hydrocarbon '
+                                 'part is saturated and the entered water is compared with the '
+                                 'saturation water: the stream is undersaturated (the missing water '
+                                 'is reported), saturated, or with free water (the excess is '
+                                 'reported, in mol % of the input stream). The water content of the '
+                                 'saturated gas in lb/MMscf and the hydrocarbon phases present are '
+                                 'also reported. The saturated composition can be loaded into the '
+                                 'current composition (the main composition or the analysed fluid) or saved as a new fluid; '
+                                 'loading it activates water in the whole program.')]},
                    {'titulo': ('Flash múltiple', 'Multiple flash'),
                     'bloques': [('p',
                                  'El flash múltiple repite el cálculo de equilibrio de fases en '

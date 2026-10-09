@@ -59,6 +59,7 @@ NAV_CALCULOS = [
     ("envolvente",  "Envolvente de fases"),
     ("saturacion",  "Puntos de saturación"),
     ("hidratos",    "Formación de hidratos"),
+    ("saturacion_agua", "Contenido de agua de saturación"),
     ("propiedades", "Análisis de sensibilidad"),
     ("flash_multiple", "Flash múltiple"),
     ("parametros",  "Parámetros de la ecuación de estado"),
@@ -76,6 +77,7 @@ FUNC_FLUIDO = [
     ("envolvente",  "Envolvente"),
     ("saturacion",  "Saturación"),
     ("hidratos",    "Hidratos"),
+    ("saturacion_agua", "Contenido de agua de saturación"),
     ("propiedades", "Sensibilidad"),
 ]
 

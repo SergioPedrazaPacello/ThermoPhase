@@ -717,6 +717,7 @@ _REGISTRO = {
     "equilibrio": _equilibrio, "envolvente": _envolvente,
     "saturacion": _saturacion, "propiedades": _propiedades,
     "hidratos": _hidratos, "flash_multiple": _tablas,
+    "saturacion_agua": _hidratos,
     "parametros": _parametros, "corriente": _corriente,
     # barra de herramientas
     "eos": _eos, "densidad": _densidad, "unidades": _unidades,
