@@ -5373,6 +5373,45 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'curve of the envelope and of the sensitivity analysis, and writes '
                                  'next to each one its value as «y axis:x axis», without name or '
                                  'unit (the units are those of the axes).')]},
+                   {'titulo': ('Flash de presión y entalpía', 'Pressure-enthalpy flash'),
+                    'bloques': [('p',
+                                 'El selector «Tipo de flash» de la barra superior define, para todo '
+                                 'el programa (composición principal y fluidos), qué variables se '
+                                 'especifican en Equilibrio de fases: presión y temperatura (flash '
+                                 'PT) o presión y entalpía (flash PH). En el flash PH se ingresa la '
+                                 'entalpía molar de la mezcla en lugar de la temperatura, y la '
+                                 'temperatura resultante se muestra como una propiedad más del '
+                                 'resumen. Es el cálculo de una válvula, un choke o una tubería '
+                                 'adiabática, donde la entalpía se conserva (Q = 0 y W = 0 en el '
+                                 'balance de energía con flujo).',
+                                 'The «Flash type» selector in the top bar defines, for the whole '
+                                 'program (main composition and fluids), which variables are '
+                                 'specified in Phase equilibrium: pressure and temperature (PT '
+                                 'flash) or pressure and enthalpy (PH flash). In the PH flash the '
+                                 'molar enthalpy of the mixture is entered instead of the '
+                                 'temperature, and the resulting temperature is shown as one more '
+                                 'property of the summary. It is the calculation of a valve, a choke '
+                                 'or an adiabatic pipe, where enthalpy is conserved (Q = 0 and W = 0 '
+                                 'in the flowing energy balance).'),
+                                ('p',
+                                 'La temperatura se obtiene resolviendo H(T, P) = H especificada, '
+                                 'donde H es la entalpía de la mezcla del flash PT a esa temperatura '
+                                 '(la misma que muestra Equilibrio de fases: suma de las fases '
+                                 'ponderada por su fracción molar, con la EOS, los kij y el método '
+                                 'de densidad de la corriente). A presión constante H crece con T '
+                                 '(dH/dT = Cp, incluido el calor latente), por lo que la solución es '
+                                 'única: se estima con la pendiente local, se acota un intervalo con '
+                                 'cambio de signo y se resuelve con el método de Brent, robusto '
+                                 'aunque aparezca o desaparezca una fase dentro del intervalo.',
+                                 'The temperature is obtained by solving H(T, P) = specified H, '
+                                 'where H is the mixture enthalpy of the PT flash at that '
+                                 'temperature (the same shown in Phase equilibrium: sum of the '
+                                 'phases weighted by their mole fraction, with the stream EOS, kij '
+                                 'and density method). At constant pressure H increases with T '
+                                 '(dH/dT = Cp, including latent heat), so the solution is unique: it '
+                                 'is estimated with the local slope, an interval with a sign change '
+                                 'is bracketed and solved with Brent\'s method, robust even if a '
+                                 'phase appears or disappears inside the interval.')]},
                    {'titulo': ('Contenido de agua de saturación', 'Saturation water content'),
                     'bloques': [('p',
                                  'El contenido de agua de saturación se obtiene agregando a la corriente exactamente el agua '
