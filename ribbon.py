@@ -49,7 +49,8 @@ _SELECTORES = [
                                            "Peng-Robinson (PVTsim)", "SRK (PVTsim)"]),
     ("densidad",   "Densidad:",           ["COSTALD", "EOS"]),
     ("volumen",    "Corrección de volumen:", ["Ninguna", "Peneloux"]),
-    ("flash",      "Tipo de flash:",      ["Presión y temperatura", "Presión y entalpía", "Presión y entropía"]),
+    ("flash",      "Tipo de flash:",      ["Presión y temperatura", "Presión y entalpía", "Presión y entropía",
+               "Presión y fracción de vapor", "Temperatura y fracción de vapor"]),
     ("envolvente", "Método envolvente:",  ["Michelsen", "Ziervogel-Poling"]),
     ("unidades",   "Sistema de unidades:", ["Field", "SI"]),
 ]

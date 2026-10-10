@@ -5436,6 +5436,39 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'efficiency from the resulting ideal enthalpy. The temperature is '
                                  'obtained as in the PH flash, by solving S(T, P) = specified S (at '
                                  'constant pressure dS/dT = Cp/T > 0, so the solution is unique).')]},
+                   {'titulo': ('Flash de presión o temperatura y fracción de vapor',
+                               'Pressure or temperature and vapour fraction flash'),
+                    'bloques': [('p',
+                                 'Con las opciones «Presión y fracción de vapor» (P-β) y «Temperatura '
+                                 'y fracción de vapor» (T-β) del selector «Tipo de flash» se fija la '
+                                 'fracción molar de vapor β y se calcula la temperatura o la presión '
+                                 'a la que la mezcla tiene esa fracción. β se refiere solo a las fases '
+                                 'de hidrocarburo, V/(V + L), sin contar la fase acuosa, igual que en '
+                                 'PVTsim. Con β = 0 se obtiene el punto de burbuja y con β = 1 el de '
+                                 'rocío; si ese punto no existe a la condición dada, se informa. Para '
+                                 'valores intermedios la incógnita se acota entre los puntos de '
+                                 'saturación y se resuelve con el método de Brent: a presión '
+                                 'constante β crece con la temperatura, y a temperatura constante '
+                                 'disminuye con la presión. Entre la cricondenterma y la temperatura '
+                                 'crítica (región retrógrada) una misma β puede darse a dos '
+                                 'presiones; se informa la de menor presión. Sirven para construir '
+                                 'líneas de calidad y para conocer las condiciones de un separador '
+                                 'que deben producir un porcentaje dado de vapor.',
+                                 'With the «Pressure and vapour fraction» (P-β) and «Temperature and '
+                                 'vapour fraction» (T-β) options of the «Flash type» selector, the '
+                                 'molar vapour fraction β is fixed and the temperature or pressure '
+                                 'at which the mixture has that fraction is calculated. β refers only '
+                                 'to the hydrocarbon phases, V/(V + L), excluding the aqueous phase, '
+                                 'as in PVTsim. β = 0 gives the bubble point and β = 1 the dew point; '
+                                 'if that point does not exist at the given condition, it is reported. '
+                                 'For intermediate values the unknown is bracketed between the '
+                                 'saturation points and solved with Brent\'s method: at constant '
+                                 'pressure β increases with temperature, and at constant temperature '
+                                 'it decreases with pressure. Between the cricondentherm and the '
+                                 'critical temperature (retrograde region) the same β may occur at '
+                                 'two pressures; the lower pressure is reported. They are used to '
+                                 'build quality lines and to find the separator conditions that '
+                                 'produce a given percentage of vapour.')]},
                    {'titulo': ('Contenido de agua de saturación', 'Saturation water content'),
                     'bloques': [('p',
                                  'El contenido de agua de saturación se obtiene agregando a la corriente exactamente el agua '
