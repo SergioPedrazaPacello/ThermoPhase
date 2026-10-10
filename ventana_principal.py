@@ -838,6 +838,23 @@ class TabEquilibrio(QWidget):
     def _upd_lbl_H(self):
         import unidades as _u
         self.lbl_H_in.setText(f"{_i18n.t('Entalpia molar')} ({_u.u('H')}):")
+        self._igualar_ancho_entradas()
+
+    def _igualar_ancho_entradas(self):
+        """Mismo ancho de etiquetas en el flash PT y en el PH: todas toman el
+        ancho de la más larga (la de entalpía), esté visible o no."""
+        labs = [getattr(self, n, None) for n in
+                ('lbl_P_in', 'lbl_Tabs_in', 'lbl_Trel_in', 'lbl_H_in')]
+        labs = [l for l in labs if l is not None]
+        if not labs:
+            return
+        w = max(l.sizeHint().width() for l in labs)
+        for l in labs:
+            l.setMinimumWidth(w)
+
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        self._igualar_ancho_entradas()
 
     def get_H(self):
         """Entalpía molar especificada [BTU/lbmol, interna] o None."""

@@ -11,10 +11,51 @@ las fases ponderada por su fracción molar, con la EOS, los kij y el método de
 densidad de la corriente; Peneloux desplaza H en −P·c).  A presión constante
 H crece con T (dH/dT = Cp > 0, incluido el calor latente cuando cambia la
 cantidad de cada fase), de modo que la solución es única: se acota un
-intervalo con cambio de signo y se resuelve con el método de Brent (robusto
+intervalo con cambio de signo y se resuelve con el método de Brent (propio,
+sin scipy) (robusto
 también cuando aparece o desaparece una fase dentro del intervalo).
 """
-from scipy.optimize import brentq
+
+def _brent(f, a, b, fa, fb, xtol=1e-5, maxiter=100):
+    """Método de Brent (interpolación cuadrática inversa + secante +
+    bisección) sobre [a, b] con f(a)·f(b) ≤ 0.  Sin dependencias externas
+    (el programa no requiere scipy); fa y fb ya calculados se reutilizan."""
+    if fa == 0.0:
+        return a
+    if fb == 0.0:
+        return b
+    if abs(fa) < abs(fb):
+        a, b, fa, fb = b, a, fb, fa
+    c, fc = a, fa
+    d = e = b - a
+    mflag = True
+    for _ in range(maxiter):
+        if fb == 0.0 or abs(b - a) < xtol:
+            return b
+        if fa != fc and fb != fc:
+            s = (a*fb*fc/((fa - fb)*(fa - fc)) + b*fa*fc/((fb - fa)*(fb - fc))
+                 + c*fa*fb/((fc - fa)*(fc - fb)))
+        else:
+            s = b - fb*(b - a)/(fb - fa)
+        cond = ((s - (3*a + b)/4)*(s - b) >= 0
+                or (mflag and abs(s - b) >= abs(b - c)/2)
+                or (not mflag and abs(s - b) >= abs(c - d)/2)
+                or (mflag and abs(b - c) < xtol)
+                or (not mflag and abs(c - d) < xtol))
+        if cond:
+            s = (a + b)/2; mflag = True
+        else:
+            mflag = False
+        fs = f(s)
+        d, c, fc = c, b, fb
+        if fa*fs < 0:
+            b, fb = s, fs
+        else:
+            a, fa = s, fs
+        if abs(fa) < abs(fb):
+            a, b, fa, fb = b, a, fb, fa
+    return b
+
 
 T_MIN_R = 150.0          # ≈ −310 °F
 T_MAX_R = 2500.0         # ≈ 2040 °F
@@ -63,7 +104,7 @@ def flash_ph(z, P, H_spec, kij, eos, metodo='EOS', agua=False, T0=530.0,
         b = min(max(b, T_MIN_R), T_MAX_R)
         fb = f(b)
         if fa*fb <= 0:
-            lo, hi = (a, b) if a < b else (b, a)
+            lo, hi, flo, fhi = (a, b, fa, fb) if a < b else (b, a, fb, fa)
             break
         if b in (T_MIN_R, T_MAX_R):
             raise ValueError(
@@ -71,4 +112,4 @@ def flash_ph(z, P, H_spec, kij, eos, metodo='EOS', agua=False, T0=530.0,
                 "calculable (−310 °F a 2040 °F) a esta presión.")
         a, fa = b, fb
         paso *= 2.0
-    return brentq(f, lo, hi, xtol=tol, rtol=1e-12, maxiter=200)
+    return _brent(f, lo, hi, flo, fhi, xtol=tol)
