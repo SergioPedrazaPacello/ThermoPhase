@@ -17,6 +17,11 @@ también cuando aparece o desaparece una fase dentro del intervalo.  El flash PS
 (dS/dT = Cp/T > 0).
 """
 
+class SinSolucion(ValueError):
+    """No existe solución a las condiciones dadas (no es una falla del
+    cálculo): la interfaz lo muestra como advertencia."""
+
+
 def _brent(f, a, b, fa, fb, xtol=1e-5, maxiter=100):
     """Método de Brent (interpolación cuadrática inversa + secante +
     bisección) sobre [a, b] con f(a)·f(b) ≤ 0.  Sin dependencias externas
@@ -115,7 +120,7 @@ def _resolver_T(f, T0, tol, nombre):
             lo, hi, flo, fhi = (a, b, fa, fb) if a < b else (b, a, fb, fa)
             break
         if b in (T_MIN_R, T_MAX_R):
-            raise ValueError(
+            raise SinSolucion(
                 f"La {nombre} especificada está fuera del rango de temperatura "
                 "calculable (−310 °F a 2040 °F) a esta presión.")
         a, fa = b, fb
@@ -228,12 +233,12 @@ def flash_p_beta(z, P, beta, kij, eos, metodo='EOS', agua=False, tol=1e-5):
     if beta <= 0.0:
         Tb = _saturacion('T_burbuja', P, z, kij, eos, agua)
         if Tb is None:
-            raise ValueError("No hay punto de burbuja a esta presión.")
+            raise SinSolucion("No hay punto de burbuja a esta presión.")
         return Tb
     if beta >= 1.0:
         Td = _saturacion('T_rocio', P, z, kij, eos, agua)
         if Td is None:
-            raise ValueError("No hay punto de rocío a esta presión.")
+            raise SinSolucion("No hay punto de rocío a esta presión.")
         return Td
     Tb = _saturacion('T_burbuja', P, z, kij, eos, agua)
     Td = _saturacion('T_rocio', P, z, kij, eos, agua)
@@ -248,7 +253,7 @@ def flash_p_beta(z, P, beta, kij, eos, metodo='EOS', agua=False, tol=1e-5):
         xs = [lo + (hi - lo)*k/40.0 for k in range(41)]
         T = _raiz_en_rejilla(g, xs, tol)
     if T is None:
-        raise ValueError("No existe esa fracción de vapor a esta presión.")
+        raise SinSolucion("No existe esa fracción de vapor a esta presión.")
     return T
 
 
@@ -264,12 +269,12 @@ def flash_t_beta(z, T_R, beta, kij, eos, metodo='EOS', agua=False, tol=1e-4):
     if beta <= 0.0:
         Pb = _saturacion('P_burbuja', T_R, z, kij, eos, agua)
         if Pb is None:
-            raise ValueError("No hay punto de burbuja a esta temperatura.")
+            raise SinSolucion("No hay punto de burbuja a esta temperatura.")
         return Pb
     Pd = _saturacion('P_rocio', T_R, z, kij, eos, agua)
     if beta >= 1.0:
         if Pd is None:
-            raise ValueError("No hay punto de rocío a esta temperatura.")
+            raise SinSolucion("No hay punto de rocío a esta temperatura.")
         return Pd
     Pb = _saturacion('P_burbuja', T_R, z, kij, eos, agua)
     g = lambda P: beta_hc(z, T_R, P, kij, eos, metodo, agua) - beta
@@ -286,5 +291,5 @@ def flash_t_beta(z, T_R, beta, kij, eos, metodo='EOS', agua=False, tol=1e-4):
         xs[0] = lo*1.0000001
         P = _raiz_en_rejilla(g, xs, tol)
     if P is None:
-        raise ValueError("No existe esa fracción de vapor a esta temperatura.")
+        raise SinSolucion("No existe esa fracción de vapor a esta temperatura.")
     return P

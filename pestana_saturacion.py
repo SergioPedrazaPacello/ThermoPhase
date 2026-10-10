@@ -741,6 +741,7 @@ class TabSaturacion(QWidget):
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
         self.lbl_estado.setText("")
         self._res_unit=res_unit; self._tipo_txt=self.cmb_tipo.currentText()
+        self._tipo_calc=tipo
         eos_ctx = _eng.get_eos()          # EOS activa (ya fijada por get_z)
         self.worker=SatWorker(tipo, valor, z, kij, eos_ctx)
         self.worker.done.connect(self._on_done)
@@ -784,7 +785,13 @@ class TabSaturacion(QWidget):
         if not res or not res.get('exito'):
             self.lbl_res_val.setText(""); self.lbl_res2_val.setText("")
             self.last_result = None
-            dialogos.advertencia(self, _i18n.t("No se encontro punto de saturacion"))
+            msg = {'T_rocio': "No se encontró la temperatura de rocío a esta presión.",
+                   'T_burbuja': "No se encontró la temperatura de burbuja a esta presión.",
+                   'P_rocio': "No se encontró la presión de rocío a esta temperatura.",
+                   'P_burbuja': "No se encontró la presión de burbuja a esta temperatura.",
+                   }.get(getattr(self, '_tipo_calc', None),
+                         "No se encontro punto de saturacion")
+            dialogos.advertencia(self, _i18n.t(msg))
             return
         self.last_result = res
         try:

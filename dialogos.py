@@ -80,13 +80,23 @@ def info(parent, texto, titulo=None):
            titulo or _TIT_INFO, texto).exec()
 
 
+# Captura de mensajes: mientras sea una lista, advertencia() y error() no
+# muestran ventana y guardan (tipo, texto).  La usa la ventana de ingreso de
+# datos para mostrar ella misma el aviso si el primer cálculo no da resultado.
+_captura = None
+
+
 def advertencia(parent, texto, titulo=None):
     """Ventana de advertencia (icono triangulo amarillo)."""
+    if _captura is not None:
+        _captura.append(('advertencia', texto)); return
     _crear(parent, QMessageBox.Icon.Warning,
            titulo or _TIT_WARN, texto).exec()
 
 
 def error(parent, texto, titulo=None):
     """Ventana de error (icono X roja)."""
+    if _captura is not None:
+        _captura.append(('error', texto)); return
     _crear(parent, QMessageBox.Icon.Critical,
            titulo or _TIT_ERR, texto).exec()

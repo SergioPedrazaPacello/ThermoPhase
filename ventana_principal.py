@@ -380,10 +380,14 @@ class Worker(QThread):
 # ══════════════════════════════════════════════════════════════
 # Tab 1 — Equilibrio de Fases
 # ══════════════════════════════════════════════════════════════
+from flash_ph import SinSolucion as _SinSol
+
+
 class PHWorker(QThread):
     """Temperatura del flash PH o PS (flash_ph) en segundo plano."""
     done = pyqtSignal(float)
     error = pyqtSignal(str)
+    aviso = pyqtSignal(str)      # sin solución a esas condiciones
 
     def __init__(self, z, P, X, kij, eos, metodo, agua, T0, modo='PH'):
         super().__init__()
@@ -399,6 +403,8 @@ class PHWorker(QThread):
                 return
             fn = _fph.flash_ps if self.modo == 'PS' else _fph.flash_ph
             self.done.emit(float(fn(*self.args)))
+        except _SinSol as ex:
+            self.aviso.emit(str(ex))
         except Exception as ex:
             self.error.emit(str(ex))
 
@@ -489,20 +495,18 @@ class TabEquilibrio(QWidget):
         gl.addWidget(self.sp_F, 2, 1)
 
         # Sincronización bidireccional °R ↔ °F
-        # El campo activo (donde se escribe) queda blanco; el otro queda gris
+        # Ambos campos con fondo blanco; el que se escribe va en negro y el
+        # convertido (calculado) en el azul de los resultados.
         self._sync_lock = False
-        ACTIVO = WHITE
-        INACTIVO = "#B8B8B8"   # plomo más oscuro
+        def _qss_T(activo):
+            return (f'QDoubleSpinBox {{ background:{WHITE};'
+                    f'color:{TEXT if activo else TEXT_RES};'
+                    f'border:1px solid {BORDER};'
+                    f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         def _style_T(activo):
-            self.sp_T.setStyleSheet(
-                f'QDoubleSpinBox {{ background:{ACTIVO if activo else INACTIVO};'
-                f'border:1px solid {BORDER};'
-                f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
+            self.sp_T.setStyleSheet(_qss_T(activo))
         def _style_F(activo):
-            self.sp_F.setStyleSheet(
-                f'QDoubleSpinBox {{ background:{ACTIVO if activo else INACTIVO};'
-                f'border:1px solid {BORDER};'
-                f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
+            self.sp_F.setStyleSheet(_qss_T(activo))
         self._style_T = _style_T; self._style_F = _style_F
         _style_T(True); _style_F(False)
 
@@ -1011,6 +1015,7 @@ class TabEquilibrio(QWidget):
                              self._metodo_dens_efectivo(), agua, T0, modo)
         self._wph.done.connect(self._on_ph_T)
         self._wph.error.connect(self._on_error)
+        self._wph.aviso.connect(self._on_aviso)
         self._wph.start()
 
     def _on_ph_T(self, val):
@@ -1378,6 +1383,11 @@ class TabEquilibrio(QWidget):
     def _on_error(self, msg):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
         dialogos.error(self, _i18n.t(msg))
+
+    def _on_aviso(self, msg):
+        """Sin resultado a esas condiciones: advertencia, no error."""
+        self.btn.setEnabled(True); self.btn.setText(_i18n.t("Realizar Calculo"))
+        dialogos.advertencia(self, _i18n.t(msg))
 
     def _render_trifasico(self, rt, z, eos_code, kij):
         """Puebla las tablas con el resultado del flash trifásico (V-L-W),
@@ -3767,8 +3777,9 @@ class MainWindow(QMainWindow):
         # envolvente / propiedades: no dependen de componentes
         return self._tam_sub
 
-    def _abrir_calculo(self, clave):
-        """Abre (o activa) la ventana del calculo pedido."""
+    def _abrir_calculo(self, clave, mostrar=True):
+        """Abre (o activa) la ventana del calculo pedido.  Con
+        mostrar=False solo la crea (oculta)."""
         if clave not in self._defs_calc:
             return
         sw = self._subventanas.get(clave)
@@ -3788,7 +3799,8 @@ class MainWindow(QMainWindow):
             sw._n_comp = n_comp
             if hasattr(widget, '_props_sel'):
                 sw._n_props = len(widget._props_sel)
-        self._mostrar_subventana(sw)
+        if mostrar:
+            self._mostrar_subventana(sw)
 
     def _abrir_fluidos(self):
         """Abre (o activa) el gestor de Fluidos."""
@@ -4596,68 +4608,152 @@ class MainWindow(QMainWindow):
                     "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)"))
                 return
             datos.update(z=z, pct=pct)
-            dlg.accept()
+            _ejecutar()
         b_ok.clicked.connect(_aceptar)
-        dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
-        if not dlg.exec():
-            if fluido is None:
-                # Restaurar la selección previa de la barra.
-                sel['eos'].setCurrentIndex(i_eos0)
-                if sel.get('volumen') is not None:
-                    sel['volumen'].setCurrentIndex(VOL.index(vol0) if vol0 in VOL else 0)
-                if vol0 != 'Peneloux':
-                    sel['densidad'].setCurrentIndex(DENS.index(dens0) if dens0 in DENS else 0)
-            return
-        if fluido is not None:
-            self._set_eos_fluido(fluido, _eos_code(c_eos.currentIndex()))
-            fluido['densidad'] = DENS[c_dens.currentIndex()]
-            fluido['correccion_volumen'] = VOL[c_vol.currentIndex()]
-            if c_vol.currentIndex() == 1:
-                fluido['densidad'] = estado_dens['prev']
-            sub = self._subventanas.get(f"equilibrio@{fluido['nombre']}")
-            we = getattr(sub, '_widget', None) if sub is not None else None
-            if we is not None and hasattr(we, 'cmb_vol'):
-                self._aplicar_modelo_eq(we, fluido)
 
-        # ── Composición al fluido / composición principal ──────
-        z, pct = datos['z'], datos['pct']
+        # Estado previo (composición y modelo) para restaurarlo si el usuario
+        # cancela después de un intento sin resultado.
+        previo = {}
         if fluido is None:
-            self.tab_eq.set_z(z, pct)
-            self._abrir_calculo(clave)
-            w = self._defs_calc[clave][0]
+            previo['z'] = list(self.tab_eq.z_ingresada())
         else:
-            fluido['z'], fluido['pct'] = list(z), pct
-            self._sync_fluido_z(fluido, 'inicio')
-            self._abrir_calculo_fluido(clave, fluido)
-            sw = self._subventanas.get(f"{clave}@{fluido['nombre']}")
-            w = getattr(sw, '_widget', None) if sw is not None else None
-            if w is None:
-                return
-        # ── Condiciones y cálculo ──────────────────────────────
-        if clave == 'saturacion_agua':
-            w.set_condiciones(datos['P'], datos['T_R'])
-        elif clave == 'equilibrio' and 'beta' in datos:
-            if 'P' in datos:
-                w.sp_P.setValue(_u.p_desde_psia(datos['P']))
+            previo.update(z=list(fluido.get('z') or []), pct=fluido.get('pct'),
+                          eos=fluido.get('eos', 'PR'),
+                          densidad=fluido.get('densidad'),
+                          correccion_volumen=fluido.get('correccion_volumen'))
+        exito = {'ok': False}
+
+        def _ejecutar():
+            """Aplica composición y condiciones a la ventana del cálculo (aún
+            oculta) y calcula sin cerrar esta ventana.  Solo si hay resultado
+            se cierra y se muestra la ventana del cálculo; si no, se avisa y
+            se sigue aquí para corregir los datos."""
+            if fluido is not None:
+                self._set_eos_fluido(fluido, _eos_code(c_eos.currentIndex()))
+                fluido['densidad'] = DENS[c_dens.currentIndex()]
+                fluido['correccion_volumen'] = VOL[c_vol.currentIndex()]
+                if c_vol.currentIndex() == 1:
+                    fluido['densidad'] = estado_dens['prev']
+                sub = self._subventanas.get(f"equilibrio@{fluido['nombre']}")
+                we = getattr(sub, '_widget', None) if sub is not None else None
+                if we is not None and hasattr(we, 'cmb_vol'):
+                    self._aplicar_modelo_eq(we, fluido)
+            # ── Composición al fluido / composición principal ──────
+            z, pct = datos['z'], datos['pct']
+            if fluido is None:
+                self.tab_eq.set_z(z, pct)
+                self._abrir_calculo(clave, mostrar=False)
+                sw = self._subventanas.get(clave)
+                w = self._defs_calc[clave][0]
             else:
-                w.sp_T.setValue(_u.abs_desde_R(datos['T_R']))
-            w.set_B(datos['beta'])
-        elif clave == 'equilibrio' and 'H' in datos:
-            w.sp_P.setValue(_u.p_desde_psia(datos['P']))
-            w.set_H(datos['H'])
-        elif clave == 'equilibrio' and 'S' in datos:
-            w.sp_P.setValue(_u.p_desde_psia(datos['P']))
-            w.set_S(datos['S'])
-        elif clave == 'equilibrio':
-            w.sp_P.setValue(_u.p_desde_psia(datos['P']))
-            w.sp_T.setValue(_u.abs_desde_R(datos['T_R']))
-        else:
-            claves_t = list(w.TIPOS.keys())
-            if datos['tipo'] in claves_t:
-                w.cmb_tipo.setCurrentIndex(claves_t.index(datos['tipo']))
-            w.sp_cond.setValue(_u.p_desde_psia(datos['val']) if datos['u_in'] == 'P'
-                               else _u.abs_desde_R(datos['val']))
-        w.calcular()
+                fluido['z'], fluido['pct'] = list(z), pct
+                self._sync_fluido_z(fluido, 'inicio')
+                self._abrir_calculo_fluido(clave, fluido, mostrar=False)
+                sw = self._subventanas.get(f"{clave}@{fluido['nombre']}")
+                w = getattr(sw, '_widget', None) if sw is not None else None
+                if w is None:
+                    return
+            # ── Condiciones ────────────────────────────────────
+            if clave == 'saturacion_agua':
+                w.set_condiciones(datos['P'], datos['T_R'])
+            elif clave == 'equilibrio' and 'beta' in datos:
+                if 'P' in datos:
+                    w.sp_P.setValue(_u.p_desde_psia(datos['P']))
+                else:
+                    w.sp_F.setValue(_u.t_desde_R(datos['T_R']))
+                w.set_B(datos['beta'])
+            elif clave == 'equilibrio' and 'H' in datos:
+                w.sp_P.setValue(_u.p_desde_psia(datos['P']))
+                w.set_H(datos['H'])
+            elif clave == 'equilibrio' and 'S' in datos:
+                w.sp_P.setValue(_u.p_desde_psia(datos['P']))
+                w.set_S(datos['S'])
+            elif clave == 'equilibrio':
+                w.sp_P.setValue(_u.p_desde_psia(datos['P']))
+                # Se ingresó la temperatura relativa: queda como la escrita.
+                w.sp_F.setValue(_u.t_desde_R(datos['T_R']))
+            else:
+                claves_t = list(w.TIPOS.keys())
+                if datos['tipo'] in claves_t:
+                    w.cmb_tipo.setCurrentIndex(claves_t.index(datos['tipo']))
+                w.sp_cond.setValue(_u.p_desde_psia(datos['val']) if datos['u_in'] == 'P'
+                                   else _u.abs_desde_R(datos['val']))
+            # ── Cálculo con la ventana de ingreso abierta ──────
+            from PyQt6.QtCore import QEventLoop, QTimer
+            txt_ok = b_ok.text()
+            for b in (b_ok, b_can, b_norm):
+                b.setEnabled(False)
+            b_ok.setText(_i18n.t("Calculando..."))
+            msgs = []
+            dialogos._captura = msgs
+            try:
+                w.calcular()
+                lazo = QEventLoop()
+                reloj = QTimer(); reloj.setInterval(50)
+                quieto = {'n': 0}
+                def _libre():
+                    btn = getattr(w, 'btn', None)
+                    return btn is None or btn.isEnabled()
+                def _listo():
+                    return _libre() and (self._tiene_calculo(w) or bool(msgs))
+                def _revisar():
+                    if _listo():
+                        lazo.quit(); return
+                    # Sin cálculo en curso (botón libre) y sin resultado.
+                    quieto['n'] = quieto['n'] + 1 if _libre() else 0
+                    if quieto['n'] >= 10:
+                        lazo.quit()
+                reloj.timeout.connect(_revisar)
+                reloj.start()
+                if not _listo():
+                    lazo.exec()
+                reloj.stop()
+            finally:
+                dialogos._captura = None
+                for b in (b_ok, b_can, b_norm):
+                    b.setEnabled(True)
+                b_ok.setText(txt_ok)
+            if self._tiene_calculo(w):
+                exito['ok'] = True
+                dlg.accept()
+                if sw is not None:
+                    self._mostrar_subventana(sw)
+                for k, m in msgs:
+                    (dialogos.error if k == 'error' else dialogos.advertencia)(
+                        sw if sw is not None else self, m)
+                return
+            # Sin resultado: se avisa aquí y se sigue en la ventana de ingreso.
+            errores = [m for k, m in msgs if k == 'error']
+            avisos = [m for k, m in msgs if k != 'error']
+            if errores:
+                dialogos.error(dlg, errores[0])
+            else:
+                dialogos.advertencia(dlg, avisos[0] if avisos else _i18n.t(
+                    "No se obtuvo resultado con estos datos."))
+
+        dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
+        dlg.exec()
+        if exito['ok']:
+            return
+        if fluido is None:
+            # Restaurar la selección previa de la barra y la composición.
+            sel['eos'].setCurrentIndex(i_eos0)
+            if sel.get('volumen') is not None:
+                sel['volumen'].setCurrentIndex(VOL.index(vol0) if vol0 in VOL else 0)
+            if vol0 != 'Peneloux':
+                sel['densidad'].setCurrentIndex(DENS.index(dens0) if dens0 in DENS else 0)
+            if datos:
+                zp, pp = _comp_frac(previo['z'])
+                self.tab_eq.set_z(zp, pp)
+        elif datos:
+            fluido['z'], fluido['pct'] = previo['z'], previo['pct']
+            self._set_eos_fluido(fluido, previo['eos'])
+            for k in ('densidad', 'correccion_volumen'):
+                if previo[k] is None:
+                    fluido.pop(k, None)
+                else:
+                    fluido[k] = previo[k]
+            self._sync_fluido_z(fluido, 'inicio')
 
     def _lanzar_multi_envolvente(self, claves):
         """Valida las composiciones y abre/actualiza la ventana de
@@ -4862,7 +4958,7 @@ class MainWindow(QMainWindow):
                 self._abrir_calculo_fluido_ui(clave, f)
                 return
 
-    def _abrir_calculo_fluido(self, clave, fluido):
+    def _abrir_calculo_fluido(self, clave, fluido, mostrar=True):
         """Abre un calculo ligado a un fluido concreto, en su propia ventana,
         para poder comparar varios fluidos entre si."""
         etiquetas = {
@@ -4908,7 +5004,8 @@ class MainWindow(QMainWindow):
             sw._n_comp = n_comp
             if hasattr(widget, '_props_sel'):
                 sw._n_props = len(widget._props_sel)
-        self._mostrar_subventana(sw)
+        if mostrar:
+            self._mostrar_subventana(sw)
 
     def _getz_fluido(self, fluido):
         """get_z para las ventanas de un fluido: fija la EOS del fluido antes
