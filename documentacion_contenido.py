@@ -5412,6 +5412,30 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'is estimated with the local slope, an interval with a sign change '
                                  'is bracketed and solved with Brent\'s method, robust even if a '
                                  'phase appears or disappears inside the interval.')]},
+                   {'titulo': ('Flash de presión y entropía', 'Pressure-entropy flash'),
+                    'bloques': [('p',
+                                 'Con la opción «Presión y entropía» del selector «Tipo de flash» se '
+                                 'ingresa la entropía molar de la mezcla en lugar de la temperatura. '
+                                 'Es el cálculo de una compresión o expansión ideal: adiabática '
+                                 '(Q = 0) y reversible (sin entropía generada), en la que la entropía '
+                                 'se conserva. Con la entropía de la succión y la presión de descarga '
+                                 'se obtiene la temperatura de descarga isentrópica de un compresor, '
+                                 'o la de salida de un turboexpansor; la máquina real se corrige con '
+                                 'su eficiencia a partir de la entalpía ideal resultante. La '
+                                 'temperatura se obtiene igual que en el flash PH, resolviendo '
+                                 'S(T, P) = S especificada (a presión constante dS/dT = Cp/T > 0, '
+                                 'por lo que la solución es única).',
+                                 'With the «Pressure and entropy» option of the «Flash type» '
+                                 'selector, the molar entropy of the mixture is entered instead of '
+                                 'the temperature. It is the calculation of an ideal compression or '
+                                 'expansion: adiabatic (Q = 0) and reversible (no entropy '
+                                 'generated), in which entropy is conserved. With the suction '
+                                 'entropy and the discharge pressure, the isentropic discharge '
+                                 'temperature of a compressor or the outlet temperature of a '
+                                 'turboexpander is obtained; the real machine is corrected with its '
+                                 'efficiency from the resulting ideal enthalpy. The temperature is '
+                                 'obtained as in the PH flash, by solving S(T, P) = specified S (at '
+                                 'constant pressure dS/dT = Cp/T > 0, so the solution is unique).')]},
                    {'titulo': ('Contenido de agua de saturación', 'Saturation water content'),
                     'bloques': [('p',
                                  'El contenido de agua de saturación se obtiene agregando a la corriente exactamente el agua '

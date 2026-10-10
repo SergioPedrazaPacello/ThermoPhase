@@ -380,19 +380,20 @@ class Worker(QThread):
 # Tab 1 — Equilibrio de Fases
 # ══════════════════════════════════════════════════════════════
 class PHWorker(QThread):
-    """Temperatura del flash PH (flash_ph.flash_ph) en segundo plano."""
+    """Temperatura del flash PH o PS (flash_ph) en segundo plano."""
     done = pyqtSignal(float)
     error = pyqtSignal(str)
 
-    def __init__(self, z, P, H, kij, eos, metodo, agua, T0):
+    def __init__(self, z, P, X, kij, eos, metodo, agua, T0, modo='PH'):
         super().__init__()
-        self.args = (z, P, H, kij, eos, metodo, agua, T0)
+        self.args = (z, P, X, kij, eos, metodo, agua, T0)
+        self.modo = modo
 
     def run(self):
         try:
             import flash_ph as _fph
-            z, P, H, kij, eos, metodo, agua, T0 = self.args
-            self.done.emit(float(_fph.flash_ph(z, P, H, kij, eos, metodo, agua, T0)))
+            fn = _fph.flash_ps if self.modo == 'PS' else _fph.flash_ph
+            self.done.emit(float(fn(*self.args)))
         except Exception as ex:
             self.error.emit(str(ex))
 
@@ -539,6 +540,19 @@ class TabEquilibrio(QWidget):
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         gl.addWidget(self.sp_H, 3, 1)
         self.lbl_H_in.hide(); self.sp_H.hide()
+        # Entropía molar: entrada del flash PS.
+        self.lbl_S_in = inp_lbl("Entropia molar (BTU/lbmol·°R):")
+        gl.addWidget(self.lbl_S_in, 4, 0)
+        self.sp_S = _SpinNum()
+        self.sp_S.setRange(-1.0e7, 1.0e7); self.sp_S.setDecimals(4)
+        self.sp_S.setSpecialValueText(" "); self.sp_S.setValue(-1.0e7)
+        self.sp_S.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.sp_S.setFixedHeight(22); self.sp_S.setFixedWidth(110)
+        self.sp_S.setStyleSheet(
+            f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
+        gl.addWidget(self.sp_S, 4, 1)
+        self.lbl_S_in.hide(); self.sp_S.hide()
         self._modo_flash = 'PT'
         self._ph_listo = False
         self._temp_auto = False
@@ -838,13 +852,15 @@ class TabEquilibrio(QWidget):
     def _upd_lbl_H(self):
         import unidades as _u
         self.lbl_H_in.setText(f"{_i18n.t('Entalpia molar')} ({_u.u('H')}):")
+        if hasattr(self, 'lbl_S_in'):
+            self.lbl_S_in.setText(f"{_i18n.t('Entropia molar')} ({_u.u('S')}):")
         self._igualar_ancho_entradas()
 
     def _igualar_ancho_entradas(self):
         """Mismo ancho de etiquetas en el flash PT y en el PH: todas toman el
         ancho de la más larga (la de entalpía), esté visible o no."""
         labs = [getattr(self, n, None) for n in
-                ('lbl_P_in', 'lbl_Tabs_in', 'lbl_Trel_in', 'lbl_H_in')]
+                ('lbl_P_in', 'lbl_Tabs_in', 'lbl_Trel_in', 'lbl_H_in', 'lbl_S_in')]
         labs = [l for l in labs if l is not None]
         if not labs:
             return
@@ -867,18 +883,31 @@ class TabEquilibrio(QWidget):
         import unidades as _u
         self.sp_H.setValue(_u.H_desde(H_int) if H_int is not None else -1.0e7)
 
+    def get_S(self):
+        """Entropía molar especificada [BTU/lbmol·°R, interna] o None."""
+        import unidades as _u
+        if self.sp_S.value() <= -1.0e7 + 1e-6 or not self.sp_S.text().strip():
+            return None
+        return self.sp_S.value()/_u.S_desde(1.0)
+
+    def set_S(self, S_int):
+        import unidades as _u
+        self.sp_S.setValue(_u.S_desde(S_int) if S_int is not None else -1.0e7)
+
     def set_modo_flash(self, modo):
-        """'PT' (presión y temperatura) o 'PH' (presión y entalpía).  En PH
-        la temperatura se reemplaza por la entalpía y el resultado de
-        temperatura se muestra como una propiedad más del resumen."""
-        modo = 'PH' if modo == 'PH' else 'PT'
+        """'PT' (presión y temperatura), 'PH' (presión y entalpía) o 'PS'
+        (presión y entropía).  En PH y PS la temperatura se reemplaza por la
+        entalpía o la entropía, y el resultado de temperatura se muestra como
+        una propiedad más del resumen."""
+        modo = modo if modo in ('PH', 'PS') else 'PT'
         if modo == self._modo_flash:
             return
         self._modo_flash = modo
-        ph = modo == 'PH'
+        ph = modo in ('PH', 'PS')
         for w in (self.lbl_Tabs_in, self.sp_T, self.lbl_Trel_in, self.sp_F):
             w.setVisible(not ph)
-        self.lbl_H_in.setVisible(ph); self.sp_H.setVisible(ph)
+        self.lbl_H_in.setVisible(modo == 'PH'); self.sp_H.setVisible(modo == 'PH')
+        self.lbl_S_in.setVisible(modo == 'PS'); self.sp_S.setVisible(modo == 'PS')
         self._upd_lbl_H()
         cambio = False
         if ph and 'temperatura' not in self._props_sel:
@@ -903,14 +932,16 @@ class TabEquilibrio(QWidget):
         return self.cmb_dens.currentText()
 
     def _calcular_ph(self):
-        """Resuelve la temperatura del flash PH en segundo plano y luego
+        """Resuelve la temperatura del flash PH o PS en segundo plano y luego
         corre el cálculo normal a esa temperatura."""
         import unidades as _u
         z = self.get_z()
         P_txt = _a_float(self.sp_P.text())
-        H = self.get_H()
-        if P_txt is None or P_txt <= 0 or H is None:
-            dialogos.advertencia(self, "Ingrese la presion y la entalpia.")
+        ps = self._modo_flash == 'PS'
+        X = self.get_S() if ps else self.get_H()
+        if P_txt is None or P_txt <= 0 or X is None:
+            dialogos.advertencia(self, "Ingrese la presion y la entropia." if ps
+                                 else "Ingrese la presion y la entalpia.")
             return
         if abs(sum(z)-1.0) > 1e-3:
             dialogos.advertencia(self,
@@ -921,8 +952,9 @@ class TabEquilibrio(QWidget):
         agua = bool(self.agua_activa() and z[NC] > 1e-12)
         T0 = self.get_T() if self.sp_T.value() > 0 else 530.0
         self.btn.setEnabled(False); self.btn.setText(_i18n.t("Calculando..."))
-        self._wph = PHWorker(list(z), self.get_P(), H, kij, eos_code,
-                             self._metodo_dens_efectivo(), agua, T0)
+        self._wph = PHWorker(list(z), self.get_P(), X, kij, eos_code,
+                             self._metodo_dens_efectivo(), agua, T0,
+                             self._modo_flash)
         self._wph.done.connect(self._on_ph_T)
         self._wph.error.connect(self._on_error)
         self._wph.start()
@@ -947,6 +979,8 @@ class TabEquilibrio(QWidget):
         T_int_R = _u.R_desde_abs(Tabs_old, old) if Tabs_old > 0 else None
         H_int = (self.sp_H.value()/_u.H_desde(1.0, old)
                  if self.sp_H.value() > -1.0e7 + 1e-6 else None)
+        S_int = (self.sp_S.value()/_u.S_desde(1.0, old)
+                 if self.sp_S.value() > -1.0e7 + 1e-6 else None)
         # 2) Etiquetas de entrada con la unidad nueva
         self.lbl_P_in.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
         self.lbl_Tabs_in.setText(f"{_i18n.t('Temperatura')} ({_u.u_abs()}):")
@@ -954,6 +988,8 @@ class TabEquilibrio(QWidget):
         self._upd_lbl_H()
         if H_int is not None:
             self.set_H(H_int)
+        if S_int is not None:
+            self.set_S(S_int)
         # 3) Valores convertidos al sistema nuevo (sin disparar recursión)
         self._sync_lock = True
         if P_int is not None and P_int > 0:
@@ -994,6 +1030,7 @@ class TabEquilibrio(QWidget):
                 'eos':         _eos_code(self.cmb_eos.currentIndex()),
                 'modo_masico': self.btn_frac.isChecked(),
                 'H':           self.get_H(),
+                'S':           self.get_S(),
             },
             'props': list(self._props_sel),
             'resultado': self.last_result,   # dict o None
@@ -1035,6 +1072,7 @@ class TabEquilibrio(QWidget):
         self.cmb_eos.setCurrentIndex(_eos_idx(eos_code))
         self.cmb_eos.blockSignals(False)
         self.set_H(e.get('H'))
+        self.set_S(e.get('S'))
         # Modo masico / molar
         masico = bool(e.get('modo_masico', False))
         self.btn_frac.setChecked(masico)
@@ -1213,7 +1251,7 @@ class TabEquilibrio(QWidget):
                 self.cmb_dens.setCurrentIndex(iPrev)
 
     def calcular(self):
-        if self._modo_flash == 'PH' and not self._ph_listo:
+        if self._modo_flash in ('PH', 'PS') and not self._ph_listo:
             self._calcular_ph()
             return
         self._ph_listo = False
@@ -3081,7 +3119,7 @@ class MainWindow(QMainWindow):
         # 2b. Tipo de flash
         cmbf = self.selectores.get('flash')
         if cmbf is not None:
-            cmbf.setCurrentIndex(1 if doc.get('modo_flash') == 'PH' else 0)
+            cmbf.setCurrentIndex({'PH': 1, 'PS': 2}.get(doc.get('modo_flash'), 0))
 
         # 3. Cada pestaña restaura inputs + resultados
         tabs = doc.get('tabs', {})
@@ -3439,7 +3477,7 @@ class MainWindow(QMainWindow):
     def _on_tipo_flash(self, idx):
         """Tipo de flash de Equilibrio de fases para todo el programa:
         presión y temperatura (PT) o presión y entalpía (PH)."""
-        self._modo_flash = 'PH' if idx == 1 else 'PT'
+        self._modo_flash = {1: 'PH', 2: 'PS'}.get(idx, 'PT')
         self.tab_eq.set_modo_flash(self._modo_flash)
         for clave, sw in self._subventanas.items():
             w = getattr(sw, '_widget', None)
@@ -4261,10 +4299,16 @@ class MainWindow(QMainWindow):
         cmb = None
         txt_P = f"{_i18n.t('Presion')} ({_u.u('P')}):"
         txt_T = f"{_i18n.t('Temperatura')} ({_u.u('T')}):"
-        modo_ph = (clave == 'equilibrio' and getattr(self, '_modo_flash', 'PT') == 'PH')
+        modo_eq = getattr(self, '_modo_flash', 'PT') if clave == 'equilibrio' else 'PT'
+        modo_ph = modo_eq in ('PH', 'PS')
         if clave in ('equilibrio', 'saturacion_agua'):
             ed_P, ed_T = campo(), campo()
-            txt_2 = (f"{_i18n.t('Entalpia molar')} ({_u.u('H')}):" if modo_ph else txt_T)
+            if modo_eq == 'PH':
+                txt_2 = f"{_i18n.t('Entalpia molar')} ({_u.u('H')}):"
+            elif modo_eq == 'PS':
+                txt_2 = f"{_i18n.t('Entropia molar')} ({_u.u('S')}):"
+            else:
+                txt_2 = txt_T
             gl.addWidget(etiqueta(txt_P), 0, 0); gl.addWidget(ed_P, 0, 1)
             gl.addWidget(etiqueta(txt_2), 1, 0); gl.addWidget(ed_T, 1, 1)
         else:
@@ -4433,9 +4477,14 @@ class MainWindow(QMainWindow):
             if modo_ph:
                 vp_ = _a_float(ed_P.text()); vh_ = _a_float(ed_T.text())
                 if vp_ is None or vh_ is None or _u.p_a_psia(vp_) <= 0:
-                    dialogos.advertencia(dlg, _i18n.t("Ingrese la presion y la entalpia."))
+                    dialogos.advertencia(dlg, _i18n.t(
+                        "Ingrese la presion y la entropia." if modo_eq == 'PS'
+                        else "Ingrese la presion y la entalpia."))
                     return
-                datos.update(P=_u.p_a_psia(vp_), H=vh_/_u.H_desde(1.0))
+                if modo_eq == 'PS':
+                    datos.update(P=_u.p_a_psia(vp_), S=vh_/_u.S_desde(1.0))
+                else:
+                    datos.update(P=_u.p_a_psia(vp_), H=vh_/_u.H_desde(1.0))
             elif clave in ('equilibrio', 'saturacion_agua'):
                 vp_ = _a_float(ed_P.text()); vt_ = _a_float(ed_T.text())
                 if vp_ is None or vt_ is None:
@@ -4508,6 +4557,9 @@ class MainWindow(QMainWindow):
         elif clave == 'equilibrio' and 'H' in datos:
             w.sp_P.setValue(_u.p_desde_psia(datos['P']))
             w.set_H(datos['H'])
+        elif clave == 'equilibrio' and 'S' in datos:
+            w.sp_P.setValue(_u.p_desde_psia(datos['P']))
+            w.set_S(datos['S'])
         elif clave == 'equilibrio':
             w.sp_P.setValue(_u.p_desde_psia(datos['P']))
             w.sp_T.setValue(_u.abs_desde_R(datos['T_R']))

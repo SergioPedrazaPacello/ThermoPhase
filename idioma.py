@@ -578,6 +578,8 @@ TRAD = {
     "Tipo de flash:": "Flash type:",
     "Presión y temperatura": "Pressure and temperature",
     "Presión y entalpía": "Pressure and enthalpy",
+    "Presión y entropía": "Pressure and entropy",
+    "Ingrese la presion y la entropia.": "Enter the pressure and the entropy.",
     "Ingrese la presion y la entalpia.": "Enter the pressure and the enthalpy.",
     "Sin agua": "Without water",
     "Saturada": "Saturated",
