@@ -5334,6 +5334,50 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('p',
                                  'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
                                  'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                   {'titulo': ('Diagramas presión-entalpía y temperatura-entropía',
+                               'Pressure-enthalpy and temperature-entropy diagrams'),
+                    'bloques': [('p',
+                                 'En el menú «Gráficos», «Diagrama de la envolvente» permite ver la '
+                                 'envolvente como presión-temperatura (por defecto), '
+                                 'presión-entalpía (P-H) o temperatura-entropía (T-S). La opción se '
+                                 'aplica a las ventanas de Envolvente de fases de la composición '
+                                 'principal y de los fluidos, no a la comparación de envolventes. '
+                                 'No se recalcula la envolvente: en cada punto la fase incipiente '
+                                 'tiene cantidad nula, así que la entalpía y la entropía de la '
+                                 'corriente son las de la fase existente, evaluadas con la ecuación '
+                                 'de estado de la mezcla: raíz líquida en la curva de burbuja y raíz '
+                                 'de vapor en la de rocío (con la corrección de Peneloux en la '
+                                 'entalpía cuando está activa). Para un componente puro la curva de '
+                                 'saturación da dos ramas, líquido y vapor saturados, que se unen en '
+                                 'el punto crítico. El punto marcado y el recorrido se ubican con un '
+                                 'flash en su presión y temperatura, el mismo de Equilibrio de fases, '
+                                 'por lo que un flash PH o PS cae exactamente sobre el diagrama. En el '
+                                 'diagrama P-H una válvula es una línea vertical y un intercambiador '
+                                 'a presión constante una horizontal; en el T-S una compresión o '
+                                 'expansión isentrópica es vertical. En estos diagramas no se '
+                                 'muestran el mapa de densidad, las líneas de isocalidad ni la curva '
+                                 'de hidratos, y no están disponibles con agua: al calcular la envolvente '
+                                 'con agua se ofrece pasar al diagrama presión-temperatura.',
+                                 'In the «Graphs» menu, «Envelope diagram» shows the envelope as '
+                                 'pressure-temperature (default), pressure-enthalpy (P-H) or '
+                                 'temperature-entropy (T-S). The option applies to the Phase '
+                                 'envelope windows of the main composition and of the fluids, not to '
+                                 'the envelope comparison. The envelope is not recalculated: at each '
+                                 'point the incipient phase has zero amount, so the stream enthalpy '
+                                 'and entropy are those of the existing phase, evaluated with the '
+                                 'mixture equation of state: liquid root on the bubble curve and '
+                                 'vapour root on the dew curve (with the Peneloux enthalpy correction '
+                                 'when active). For a pure component the saturation curve gives two '
+                                 'branches, saturated liquid and vapour, meeting at the critical '
+                                 'point. The marked point and the path are placed with a flash at '
+                                 'their pressure and temperature, the same as in Phase equilibrium, '
+                                 'so a PH or PS flash falls exactly on the diagram. In the P-H '
+                                 'diagram a valve is a vertical line and a constant-pressure '
+                                 'exchanger a horizontal one; in the T-S diagram an isentropic '
+                                 'compression or expansion is vertical. The density map, quality '
+                                 'lines and hydrate curve are not shown in these diagrams, and they '
+                                 'are not available with water: when calculating the envelope with water, '
+                                 'switching to the pressure-temperature diagram is offered.')]},
                    {'titulo': ('Recorrido de presión y temperatura', 'Pressure and temperature path'),
                     'bloques': [('p',
                                  'El recorrido de presión y temperatura dibuja sobre la envolvente '

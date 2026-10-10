@@ -100,3 +100,19 @@ def error(parent, texto, titulo=None):
         _captura.append(('error', texto)); return
     _crear(parent, QMessageBox.Icon.Critical,
            titulo or _TIT_ERR, texto).exec()
+
+
+def pregunta(parent, texto, titulo=None):
+    """Advertencia con botones «Sí» y «No».  Devuelve True si se elige Sí."""
+    mb = _crear(parent, QMessageBox.Icon.Warning, titulo or _TIT_WARN, texto)
+    mb.setStandardButtons(QMessageBox.StandardButton.Yes
+                          | QMessageBox.StandardButton.No)
+    try:
+        import idioma as _i18n
+        si, no = _i18n.t("Sí"), _i18n.t("No")
+    except Exception:
+        si, no = "Sí", "No"
+    mb.button(QMessageBox.StandardButton.Yes).setText(si)
+    mb.button(QMessageBox.StandardButton.No).setText(no)
+    mb.setDefaultButton(QMessageBox.StandardButton.Yes)
+    return mb.exec() == QMessageBox.StandardButton.Yes

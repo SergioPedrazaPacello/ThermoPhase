@@ -396,6 +396,66 @@ class HidratosCurvaWorker(QThread):
             self.error.emit(str(e))
 
 
+def _hs_fase(z, T_R, P, tipo, eos, kij, pen):
+    """H [BTU/lbmol] y S [BTU/lbmol·°R] de la mezcla z como fase única con la
+    raíz `tipo` ('L' o 'V') de la EOS.  En un punto de la envolvente la fase
+    incipiente tiene cantidad nula, así que H y S de la corriente son las de
+    la fase existente: líquido en la burbuja y vapor en el rocío."""
+    import entalpia_entropia_gen as hs
+    import eos as _e
+    Z = hs._pick_Z(z, T_R, P, tipo, eos, kij)
+    H = hs.H_fase(z, T_R, P, Z, eos, kij)
+    if pen:
+        H += _e.dH_peneloux(z, P, eos)
+    return H, hs.S_fase(z, T_R, P, Z, eos, kij)
+
+
+def hs_envolvente(res, z, kij, eos, pen):
+    """Convierte la envolvente (P, T) a (P, T, H, S) en cada punto.  Mezcla:
+    burbuja con la raíz líquida y rocío con la de vapor.  Componente puro:
+    la curva de saturación da dos ramas (líquido y vapor saturados)."""
+    import eos as _e
+    _e.set_eos(eos)
+    def rama(pts, tipo):
+        out = []
+        for P, T in pts or []:
+            try:
+                H, S = _hs_fase(z, T, P, tipo, eos, kij, pen)
+                if np.isfinite(H) and np.isfinite(S):
+                    out.append((P, T, H, S))
+            except Exception:
+                pass
+        return out
+    d = {}
+    if res.get('puro'):
+        curva = res.get('curva') or res.get('burbuja') or []
+        d['liq'] = rama(curva, 'L'); d['vap'] = rama(curva, 'V')
+    else:
+        d['burbuja'] = rama(res.get('burbuja'), 'L')
+        d['rocio'] = rama(res.get('rocio'), 'V')
+    crit = res.get('critico')
+    if crit is not None:
+        c = rama([crit], 'L')
+        d['critico'] = c[0] if c else None
+    return d
+
+
+class HSWorker(QThread):
+    """Entalpía y entropía de los puntos de la envolvente (diagramas P-H y
+    T-S), en segundo plano."""
+    done = pyqtSignal(dict); error = pyqtSignal(str)
+
+    def __init__(self, res, z, kij, eos, pen):
+        super().__init__()
+        self.args = (res, z, kij, eos, pen)
+
+    def run(self):
+        try:
+            self.done.emit(hs_envolvente(*self.args))
+        except Exception as ex:
+            self.error.emit(str(ex))
+
+
 class TabEnvolvente(QWidget):
     def __init__(self, get_z, get_kij, get_metodo_densidad=None):
         super().__init__()
@@ -420,6 +480,12 @@ class TabEnvolvente(QWidget):
         # Modo de puntos especiales en el panel: 'cricond' (cricondentérmica +
         # cricondenbárica, por defecto) o 'critico' (punto crítico P y T).
         self._modo_puntos='cricond'
+        # Diagrama: 'PT' (presión-temperatura), 'PH' (presión-entalpía) o
+        # 'TS' (temperatura-entropía).  H y S de la envolvente se calculan
+        # una vez por envolvente y método de densidad (_hs).
+        self._diagrama = 'PT'
+        self._hs = None; self._hs_clave = None; self._hs_worker = None
+        self._hs_pts = {}
         self._build()
 
     def _build(self):
@@ -675,6 +741,18 @@ class TabEnvolvente(QWidget):
             dialogos.advertencia(self,
                 "La composicion debe sumar 1 (fraccion molar) o 100 (porcentaje molar)")
             return
+        # Con agua la envolvente es trifásica: los diagramas P-H y T-S no
+        # están disponibles.  Se ofrece pasar al diagrama presión-temperatura.
+        if self._diagrama != 'PT' and len(zf_all) > 13 and zf_all[13] > 1e-12:
+            if not dialogos.pregunta(self, _i18n.t(
+                    "Los diagramas presión-entalpía y temperatura-entropía no "
+                    "están disponibles para cálculos trifásicos (con agua).\n\n"
+                    "¿Desea cambiar al diagrama presión-temperatura?")):
+                return
+            if callable(getattr(self, 'on_pedir_diagrama', None)):
+                self.on_pedir_diagrama('PT')
+            else:
+                self.set_diagrama('PT')
         z=self._z_hc()
         kij=self.get_kij()
         metodo = 'michelsen' if self.cmb_metodo.currentIndex()==0 else 'ziervogel'
@@ -686,6 +764,7 @@ class TabEnvolvente(QWidget):
         self.prog.setVisible(True)
         # Contexto para la curva de agua (VLW, estilo PVTsim).
         import eos as _eng
+        self._ctx = (list(z), kij, _eng.get_eos())
         agua_on = len(zf_all) > 13 and zf_all[13] > 1e-12
         self.worker=EnvWorker(z,kij,metodo,max_pts=10000,
                               z_full=zf_all, eos_code=_eng.get_eos(),
@@ -703,6 +782,7 @@ class TabEnvolvente(QWidget):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular Envolvente"))
         self.prog.setVisible(False)
         self.result=res
+        self._hs = None
         self.canvas.setVisible(True)   # mostrar el gráfico ya con datos
         # La envolvente cambió: invalidar cualquier mapa de densidad previo
         self._regiones = None
@@ -854,12 +934,12 @@ class TabEnvolvente(QWidget):
         self.iso_worker.start()
 
     def _on_iso_error(self,msg):
-        self.btn_iso.setEnabled(True); self.btn_iso.setText(_i18n.t("Calcular Isocalidad"))
+        self.btn_iso.setEnabled(self._diagrama == 'PT'); self.btn_iso.setText(_i18n.t("Calcular Isocalidad"))
         self.prog_iso.setVisible(False)
         dialogos.error(self, msg)
 
     def _on_iso_done(self,res):
-        self.btn_iso.setEnabled(True); self.btn_iso.setText(_i18n.t("Calcular Isocalidad"))
+        self.btn_iso.setEnabled(self._diagrama == 'PT'); self.btn_iso.setText(_i18n.t("Calcular Isocalidad"))
         self.prog_iso.setVisible(False)
         # La envolvente del worker es siempre fresca (recalculada con la
         # composición actual): se adopta como resultado principal vigente.
@@ -915,6 +995,8 @@ class TabEnvolvente(QWidget):
         # (RegionesWorker) detecta el caso puro y lo calcula en modo dedicado
         # (sin área bifásica), así que aquí no hay ningún trato especial.
         kij = self.get_kij()
+        import eos as _eng
+        self._ctx = (list(z), kij, _eng.get_eos())
         self.chk_reg.setEnabled(False)
         self.lbl_reg_cargando.setText(_i18n.t("(cargando)"))
         metodo = 'COSTALD'
@@ -938,6 +1020,7 @@ class TabEnvolvente(QWidget):
         """El worker devolvió {envolvente, regiones}.  Actualizamos ambos.
         La envolvente se refresca porque quizás cambió la composición."""
         self.result = data['envolvente']
+        self._hs = None
         self._regiones = data['regiones']
         self._isocalidad = {}    # invalidar isocalidades previas
         self._update_results(self.result)
@@ -947,7 +1030,7 @@ class TabEnvolvente(QWidget):
 
     def _on_regiones_finished(self):
         self.lbl_reg_cargando.setText("")
-        self.chk_reg.setEnabled(True)
+        self.chk_reg.setEnabled(self._diagrama == 'PT')
 
     # ── Guardar / restaurar estado ─────────────────────────────────────
     def get_estado(self):
@@ -994,6 +1077,7 @@ class TabEnvolvente(QWidget):
         if env is None:
             return
         self.result = env
+        self._hs = None; self._ctx = None
         # Reconstruir isocalidad (json convierte las claves int a str)
         raw_iso = r.get('isocalidad') or {}
         self._isocalidad = {}
@@ -1096,6 +1180,210 @@ class TabEnvolvente(QWidget):
         except Exception:
             pass
 
+    # ── Diagramas P-H y T-S ─────────────────────────────────
+    def set_diagrama(self, d):
+        """'PT', 'PH' o 'TS'.  En P-H y T-S no se usan el mapa de densidad ni
+        las líneas de isocalidad (quedan deshabilitados, sin perder lo ya
+        calculado, que reaparece al volver a P-T)."""
+        d = d if d in ('PH', 'TS') else 'PT'
+        if d == self._diagrama:
+            return
+        self._diagrama = d
+        pt = d == 'PT'
+        busy_reg = (self.regiones_worker is not None
+                    and self.regiones_worker.isRunning())
+        self.chk_reg.setEnabled(pt and not busy_reg)
+        busy_iso = self.iso_worker is not None and self.iso_worker.isRunning()
+        self.btn_iso.setEnabled(pt and not busy_iso)
+        for ed in self.ed_iso:
+            ed.setEnabled(pt)
+        if self.result is not None:
+            self._plot(self.result)
+
+    def diagrama(self):
+        return self._diagrama
+
+    def _pen(self):
+        try:
+            return (self.get_metodo_densidad() if self.get_metodo_densidad
+                    else 'COSTALD') == 'Peneloux'
+        except Exception:
+            return False
+
+    def _contexto(self):
+        """(z, kij, eos) con que se calculó la envolvente actual."""
+        ctx = getattr(self, '_ctx', None)
+        if ctx is None:
+            import eos as _eng
+            z = self._z_hc()
+            ctx = (z, self.get_kij(), _eng.get_eos())
+            self._ctx = ctx
+        return ctx
+
+    def _hs_listo(self, res):
+        """H y S de la envolvente si ya están calculados; si no, lanza el
+        cálculo (al terminar se redibuja) y devuelve None."""
+        clave = (id(res), self._pen(), self._contexto()[2])
+        if self._hs is not None and self._hs_clave == clave:
+            return self._hs
+        if self._hs_worker is not None and self._hs_worker.isRunning():
+            return None
+        z, kij, eos = self._contexto()
+        self._hs_clave_pend = clave
+        self._hs_worker = HSWorker(res, list(z), kij, eos, clave[1])
+        self._hs_worker.done.connect(self._on_hs_done)
+        self._hs_worker.error.connect(lambda m: dialogos.error(self, m))
+        self.prog.setVisible(True)
+        self._hs_worker.start()
+        return None
+
+    def _on_hs_done(self, d):
+        self.prog.setVisible(self.worker is not None and self.worker.isRunning())
+        self._hs = d; self._hs_clave = self._hs_clave_pend
+        if self.result is not None and self._diagrama != 'PT':
+            self._plot(self.result)
+
+    def _hs_de_punto(self, P, T_F):
+        """(H, S) de la mezcla en (P [psia], T [°F]) con el mismo flash que
+        Equilibrio de fases (punto marcado y recorrido)."""
+        z, kij, eos = self._contexto()
+        met = 'COSTALD'
+        try:
+            met = self.get_metodo_densidad() or 'COSTALD'
+        except Exception:
+            pass
+        clave = (round(P, 6), round(T_F, 6), met, eos, tuple(z))
+        if clave not in self._hs_pts:
+            from pestana_propiedades import _punto
+            import eos as _eng
+            _eng.set_eos(eos)
+            try:
+                r = _punto(list(z) + [0.0], T_F + 459.67, P, kij, eos, met, False)
+                self._hs_pts[clave] = (r.get('H_stream'), r.get('S_stream'))
+            except Exception:
+                self._hs_pts[clave] = (None, None)
+        return self._hs_pts[clave]
+
+    def _xy_hs(self, P, T_R, H, S):
+        """Coordenadas (x, y) del diagrama activo en unidades de pantalla."""
+        if self._diagrama == 'PH':
+            return _u.H_desde(H), _u.p_desde_psia(P)
+        return _u.S_desde(S), _u.t_desde_R(T_R)
+
+    def _plot_hs(self, res):
+        """Diagrama P-H (presión vs entalpía) o T-S (temperatura vs
+        entropía) de la envolvente."""
+        ax = self.ax
+        ph = self._diagrama == 'PH'
+        if res.get('lm') is not None:
+            ax.text(0.5, 0.5, _i18n.t("El diagrama presión-entalpía y el de "
+                    "temperatura-entropía no están disponibles con agua."),
+                    ha='center', va='center', transform=ax.transAxes,
+                    fontsize=9, color=TEXT, wrap=True)
+        else:
+            d = self._hs_listo(res)
+            if d is not None:
+                def xy(pts):
+                    xs, ys = [], []
+                    for P, T, H, S in pts:
+                        x, y = self._xy_hs(P, T, H, S); xs.append(x); ys.append(y)
+                    return xs, ys
+                if res.get('puro'):
+                    ramas = (('liq', '#c0392b', 'Líquido saturado'),
+                             ('vap', '#1a4fa8', 'Vapor saturado'))
+                else:
+                    ramas = (('burbuja', '#c0392b', 'Curva de Burbuja'),
+                             ('rocio', '#1a4fa8', 'Curva de Rocío'))
+                for k, col, etq in ramas:
+                    xs, ys = xy(d.get(k) or [])
+                    if xs:
+                        _go.curva(ax, xs, ys, col, label=_i18n.t(etq))
+                c = d.get('critico')
+                if c is not None:
+                    x, y = self._xy_hs(*c)
+                    ax.plot([x], [y], linestyle='none', marker='^', markersize=5,
+                            color='#8e44ad', markeredgecolor='#5b2c6f',
+                            markeredgewidth=0.5, label=_i18n.t('Punto crítico'),
+                            zorder=6)
+                # Punto marcado y recorrido: H y S por flash en su (P, T).
+                if self._punto_usuario is not None:
+                    Pp, Tp_F = self._punto_usuario
+                    H, S = self._hs_de_punto(Pp, Tp_F)
+                    if H is not None and S is not None:
+                        x, y = self._xy_hs(Pp, Tp_F + 459.67, H, S)
+                        ax.plot([x], [y], linestyle='none', marker='^',
+                                color='#2d9d2d', markersize=5,
+                                markeredgecolor='#145214', markeredgewidth=0.5,
+                                label=_i18n.t('Punto'), zorder=5)
+                if self._recorrido:
+                    X, Y = [], []
+                    for P, T_F in self._recorrido:
+                        H, S = self._hs_de_punto(P, T_F)
+                        if H is None or S is None:
+                            continue
+                        x, y = self._xy_hs(P, T_F + 459.67, H, S)
+                        X.append(x); Y.append(y)
+                    if X:
+                        self._dibujar_recorrido(ax, X, Y)
+        if ph:
+            ax.set_xlabel(f"{_i18n.t('Entalpia molar')} ({_u.u('H')})", fontsize=10, color=TEXT)
+            ax.set_ylabel(f"{_i18n.t('Presion')} ({_u.u('P')})", fontsize=10, color=TEXT)
+        else:
+            ax.set_xlabel(f"{_i18n.t('Entropia molar')} ({_u.u('S')})", fontsize=10, color=TEXT)
+            ax.set_ylabel(f"{_i18n.t('Temperatura')} ({_u.u('T')})", fontsize=10, color=TEXT)
+        ax.tick_params(labelsize=8, colors='#000000', direction='in',
+                       top=True, right=True, length=4, width=1.0)
+        for sp in ax.spines.values():
+            sp.set_edgecolor('#000000'); sp.set_linewidth(1.4)
+        ax.grid(True, linestyle='-', linewidth=0.8, alpha=1.0, color=GRAY_LBL)
+        if ax.get_legend_handles_labels()[0]:
+            leg = ax.legend(fontsize=8, framealpha=1.0, fancybox=False,
+                            edgecolor='#000000', facecolor=GRAY_PLOT_BG)
+            leg.get_frame().set_linewidth(1.0)
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter('%.0f'))
+        ax.relim(); ax.autoscale_view()
+        _go.dibujar_etiquetas(ax)
+        self.canvas.draw_idle()
+
+    def _dibujar_recorrido(self, ax, Tr, Pr):
+        """Puntos numerados del recorrido unidos por flechas (x = Tr,
+        y = Pr en coordenadas del diagrama)."""
+        COL_R = '#2b2b2b'
+        if len(Tr) > 1:
+            ax.plot(Tr, Pr, linestyle='-', linewidth=1.1, color=COL_R,
+                    zorder=7, label=_i18n.t('Recorrido'))
+            for i in range(len(Tr) - 1):
+                ax.annotate('', xy=(Tr[i+1], Pr[i+1]), xytext=(Tr[i], Pr[i]),
+                            arrowprops=dict(arrowstyle='-|>', color=COL_R, lw=1.1,
+                                            shrinkA=5, shrinkB=5,
+                                            mutation_scale=11),
+                            zorder=8)
+        ax.plot(Tr, Pr, linestyle='none', marker='o', markersize=5,
+                markerfacecolor='#FFFFFF', markeredgecolor=COL_R,
+                markeredgewidth=1.1, zorder=9,
+                label=None if len(Tr) > 1 else _i18n.t('Recorrido'))
+        # número de cada punto del lado OPUESTO a sus tramos (no queda
+        # tapado por las flechas que llegan o salen del punto)
+        ax.relim(); ax.autoscale_view()
+        (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+        sx = (x1 - x0) or 1.0; sy = (y1 - y0) or 1.0
+        n = len(Tr)
+        for i, (x, y) in enumerate(zip(Tr, Pr)):
+            dx = dy = 0.0
+            for j in (i - 1, i + 1):
+                if 0 <= j < n:
+                    ux = (x - Tr[j])/sx; uy = (y - Pr[j])/sy
+                    m = (ux*ux + uy*uy) ** 0.5
+                    if m > 0:
+                        dx += ux/m; dy += uy/m
+            m = (dx*dx + dy*dy) ** 0.5
+            if m < 1e-6:          # punto aislado o tramos opuestos
+                dx, dy, m = 0.7, 0.7, 1.0
+            ox, oy = 9*dx/m, 9*dy/m
+            ax.annotate(str(i + 1), (x, y), xytext=(ox, oy),
+                        textcoords='offset points', fontsize=8, color=COL_R,
+                        ha='center', va='center', zorder=10)
+
     def _plot(self,res):
         ax=self.ax; ax.clear(); _go.limpiar(ax)
         self._hover_annot = None   # se invalida al limpiar los ejes
@@ -1125,6 +1413,12 @@ class TabEnvolvente(QWidget):
         # con transFigure que podía cubrir todo el gráfico si la posición
         # del inset aún no estaba resuelta).
         fig.patches.clear()
+
+        # Diagramas presión-entalpía y temperatura-entropía: sin mapa de
+        # densidad, isocalidad ni curva de hidratos.
+        if self._diagrama != 'PT':
+            self._plot_hs(res)
+            return
 
         # ── Mapa de densidad + fill envolvente + curva de transición ──
         # Cuando el usuario activa el mapa de densidad, se dibuja:
@@ -1345,43 +1639,9 @@ class TabEnvolvente(QWidget):
         # Recorrido de presión y temperatura (puntos numerados unidos por
         # flechas en el orden ingresado)
         if self._recorrido:
-            COL_R = '#2b2b2b'
             Tr = [_u.t_desde_F(t) for _, t in self._recorrido]
             Pr = [_u.p_desde_psia(p) for p, _ in self._recorrido]
-            if len(Tr) > 1:
-                ax.plot(Tr, Pr, linestyle='-', linewidth=1.1, color=COL_R,
-                        zorder=7, label=_i18n.t('Recorrido'))
-                for i in range(len(Tr) - 1):
-                    ax.annotate('', xy=(Tr[i+1], Pr[i+1]), xytext=(Tr[i], Pr[i]),
-                                arrowprops=dict(arrowstyle='-|>', color=COL_R, lw=1.1,
-                                                shrinkA=5, shrinkB=5,
-                                                mutation_scale=11),
-                                zorder=8)
-            ax.plot(Tr, Pr, linestyle='none', marker='o', markersize=5,
-                    markerfacecolor='#FFFFFF', markeredgecolor=COL_R,
-                    markeredgewidth=1.1, zorder=9,
-                    label=None if len(Tr) > 1 else _i18n.t('Recorrido'))
-            # número de cada punto del lado OPUESTO a sus tramos (no queda
-            # tapado por las flechas que llegan o salen del punto)
-            ax.relim(); ax.autoscale_view()
-            (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
-            sx = (x1 - x0) or 1.0; sy = (y1 - y0) or 1.0
-            n = len(Tr)
-            for i, (x, y) in enumerate(zip(Tr, Pr)):
-                dx = dy = 0.0
-                for j in (i - 1, i + 1):
-                    if 0 <= j < n:
-                        ux = (x - Tr[j])/sx; uy = (y - Pr[j])/sy
-                        m = (ux*ux + uy*uy) ** 0.5
-                        if m > 0:
-                            dx += ux/m; dy += uy/m
-                m = (dx*dx + dy*dy) ** 0.5
-                if m < 1e-6:          # punto aislado o tramos opuestos
-                    dx, dy, m = 0.7, 0.7, 1.0
-                ox, oy = 9*dx/m, 9*dy/m
-                ax.annotate(str(i + 1), (x, y), xytext=(ox, oy),
-                            textcoords='offset points', fontsize=8, color=COL_R,
-                            ha='center', va='center', zorder=10)
+            self._dibujar_recorrido(ax, Tr, Pr)
 
         ax.set_xlabel(f"{_i18n.t('Temperatura')} ({_u.u('T')})", fontsize=10, color=TEXT)
         ax.set_ylabel(f"{_i18n.t('Presion')} ({_u.u('P')})", fontsize=10, color=TEXT)
@@ -1508,7 +1768,13 @@ class TabEnvolvente(QWidget):
         self._hover_annot.set_va('top' if dy < 0 else 'bottom')
         self._hover_annot.set_position((dx, dy))
         self._hover_annot.xy = (T, P)
-        self._hover_annot.set_text(f"T = {T:.1f} {_u.u('T')}\nP = {P:.1f} {_u.u('P')}")
+        if self._diagrama == 'PH':
+            txt = f"H = {T:.1f} {_u.u('H')}\nP = {P:.1f} {_u.u('P')}"
+        elif self._diagrama == 'TS':
+            txt = f"S = {T:.3f} {_u.u('S')}\nT = {P:.1f} {_u.u('T')}"
+        else:
+            txt = f"T = {T:.1f} {_u.u('T')}\nP = {P:.1f} {_u.u('P')}"
+        self._hover_annot.set_text(txt)
         self._hover_annot.set_visible(True)
         self._cross_v.set_xdata([T, T]); self._cross_v.set_visible(True)
         self._cross_h.set_ydata([P, P]); self._cross_h.set_visible(True)
@@ -1602,6 +1868,14 @@ class TabEnvolvente(QWidget):
                     crit = self.result.get('critico')
                     if crit is not None:
                         f.write(f"Critico,{crit[0]:.4f},{crit[1]:.4f},{crit[1]-459.67:.4f}\n")
+                elif self._diagrama != 'PT' and self._hs is not None:
+                    # Con el diagrama P-H o T-S: también H [BTU/lbmol] y
+                    # S [BTU/lbmol·°R] de cada punto.
+                    f.seek(0); f.truncate()
+                    f.write("Curva,P (psia),T (R),T (F),H (BTU/lbmol),S (BTU/lbmol-R)\n")
+                    for k, etq in (('burbuja', 'Burbuja'), ('rocio', 'Rocio')):
+                        for p, t, h, sv in self._hs.get(k) or []:
+                            f.write(f"{etq},{p:.4f},{t:.4f},{t-459.67:.4f},{h:.4f},{sv:.6f}\n")
                 else:
                     for p,t in self.result.get('burbuja',[]):
                         f.write(f"Burbuja,{p:.4f},{t:.4f},{t-459.67:.4f}\n")

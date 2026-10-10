@@ -2844,6 +2844,23 @@ class MainWindow(QMainWindow):
         self._act_pts_critico.triggered.connect(
             lambda: self._set_modo_puntos_env('critico'))
 
+        # Diagrama de la envolvente: P-T (por defecto), P-H o T-S.  Afecta a
+        # las ventanas de Envolvente de fases (no a la comparación).
+        m_graf.addSeparator()
+        m_diag = m_graf.addMenu("Diagrama de la envolvente")
+        self._diag_env = 'PT'
+        self.tab_env.on_pedir_diagrama = self._set_diagrama_env
+        self._grp_diag = QActionGroup(self); self._grp_diag.setExclusive(True)
+        self._acts_diag = {}
+        for cod, txt in (('PT', "Presión – Temperatura"),
+                         ('PH', "Presión – Entalpía"),
+                         ('TS', "Temperatura – Entropía")):
+            a = QAction(txt, self, checkable=True)
+            a.setChecked(cod == 'PT')
+            a.triggered.connect(lambda _=False, c=cod: self._set_diagrama_env(c))
+            self._grp_diag.addAction(a); m_diag.addAction(a)
+            self._acts_diag[cod] = a
+
         # Comparación de varias envolventes (composición principal y fluidos
         # del gestor) en un mismo diagrama.
         m_graf.addSeparator()
@@ -2936,6 +2953,18 @@ class MainWindow(QMainWindow):
                     w._plot(w._last)
             except Exception:
                 pass
+
+    def _set_diagrama_env(self, cod):
+        """Diagrama de las ventanas de Envolvente de fases (composición
+        principal y fluidos): 'PT', 'PH' o 'TS'."""
+        self._diag_env = cod
+        if cod in getattr(self, '_acts_diag', {}):
+            self._acts_diag[cod].setChecked(True)
+        widgets = [self.tab_env] + [getattr(sw, '_widget', None)
+                                    for sw in self._subventanas.values()]
+        for w in widgets:
+            if isinstance(w, TabEnvolvente):
+                w.set_diagrama(cod)
 
     def _toggle_hidratos_menu(self, on):
         """Muestra u oculta la curva de hidratos en la envolvente principal
@@ -3147,6 +3176,7 @@ class MainWindow(QMainWindow):
             'kij_user':   copy.deepcopy(kij_user),
             'kij_fuente': kij_fuente,
             'modo_flash': getattr(self, '_modo_flash', 'PT'),
+            'diagrama_envolvente': getattr(self, '_diag_env', 'PT'),
             'eos_activa': _eng.get_eos(),
             'fluidos':    copy.deepcopy(self.fluidos),
             'fluido_estados': fluido_estados,
@@ -3194,6 +3224,8 @@ class MainWindow(QMainWindow):
         if cmbf is not None:
             cmbf.setCurrentIndex({'PH': 1, 'PS': 2, 'PB': 3, 'TB': 4}.get(
                 doc.get('modo_flash'), 0))
+        # 2c. Diagrama de la envolvente
+        self._set_diagrama_env(doc.get('diagrama_envolvente') or 'PT')
 
         # 3. Cada pestaña restaura inputs + resultados
         tabs = doc.get('tabs', {})
@@ -5037,7 +5069,10 @@ class MainWindow(QMainWindow):
                 return 'Peneloux'
             return f.get('densidad', 'COSTALD')
         if clave == 'envolvente':
-            return TabEnvolvente(get_z=gz, get_kij=gk, get_metodo_densidad=gm)
+            w = TabEnvolvente(get_z=gz, get_kij=gk, get_metodo_densidad=gm)
+            w.set_diagrama(getattr(self, '_diag_env', 'PT'))
+            w.on_pedir_diagrama = self._set_diagrama_env
+            return w
         if clave == 'saturacion':
             w = TabSaturacion(get_z=gz, get_kij=gk)
             w._on_props_resize = self._on_props_change
