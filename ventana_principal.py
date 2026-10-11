@@ -4350,6 +4350,8 @@ class MainWindow(QMainWindow):
             sw = self._montar_subventana(clave, widget, "Operaciones unitarias",
                                          tam=(840, 520), redimensionable=True,
                                          pie_texto=_i18n.t("Operaciones unitarias"))
+            # cada hoja (resultados, propiedades, composición) con su tamaño
+            widget.on_tamano = lambda w_, h_, s_=sw: s_.resize(w_, h_ + 20)
         sw._widget.mostrar(dlg.resultado, dlg.entrada)
         if getattr(sw, '_pie', None) is not None:
             sw._pie.setText(f"  {self._nombre_eos(dlg.resultado['ctx_eos'])} EOS"

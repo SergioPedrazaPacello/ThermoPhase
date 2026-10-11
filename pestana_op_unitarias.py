@@ -37,6 +37,10 @@ _UR_VAL = Qt.ItemDataRole.UserRole + 10
 _UR_TXT = Qt.ItemDataRole.UserRole + 11
 
 LB_KG = 0.45359237
+# Unidades de la hoja de composición (iguales para todas las operaciones)
+UNID_COMP = [('xm', "Fracción molar"), ('pm', "Porcentaje molar"),
+             ('xw', "Fracción másica"), ('pw', "Porcentaje másico"),
+             ('nm', "Flujo molar"), ('nw', "Flujo másico")]
 W_CAMPO = 232        # ancho común de campos y listas de la ventana de ingreso
 
 
@@ -225,8 +229,11 @@ BTN_QSS = (f'QPushButton {{ background:{GRAY_LBL};border:2px outset {BORDER};'
            f'QPushButton:disabled {{ color:#808080; }}')
 RADIO_QSS = (f'QRadioButton {{ font-family:"{FONT_F}"; font-size:{FS}pt;'
              f' color:{TEXT}; background:transparent; spacing:6px; }}')
-TBL_QSS = (f'QTableWidget {{ background:{WHITE}; border:1px solid {BORDER};'
-           f' font-family:"{FONT_F}"; font-size:{FS}pt; gridline-color:{BORDER};'
+# Rejilla plana de 1 px dibujada por el delegado (la rejilla nativa se ve
+# gruesa a DPI fraccional): la tabla solo aporta el borde superior/izquierdo.
+TBL_QSS = (f'QTableWidget {{ background:{WHITE};'
+           f' border-top:1px solid {BORDER}; border-left:1px solid {BORDER};'
+           f' font-family:"{FONT_F}"; font-size:{FS}pt;'
            f' selection-background-color:{SEL_BG}; selection-color:{TEXT}; }}'
            f'QTableWidget::item {{ padding:2px 6px; }}')
 
@@ -234,7 +241,9 @@ TBL_QSS = (f'QTableWidget {{ background:{WHITE}; border:1px solid {BORDER};'
 def _tabla(filas, cols):
     t = QTableWidget(filas, cols)
     t.horizontalHeader().hide(); t.verticalHeader().hide()
-    t.setShowGrid(True); t.setStyleSheet(TBL_QSS)
+    t.setShowGrid(False); t.setStyleSheet(TBL_QSS)
+    from pestana_saturacion import GridDelegate
+    t.setItemDelegate(GridDelegate(BORDER, t))
     t.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     t.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     t.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
@@ -242,8 +251,8 @@ def _tabla(filas, cols):
 
 
 def _ajustar(t):
-    w = sum(t.columnWidth(c) for c in range(t.columnCount())) + 2
-    h = sum(t.rowHeight(r) for r in range(t.rowCount())) + 2
+    w = sum(t.columnWidth(c) for c in range(t.columnCount())) + 1
+    h = sum(t.rowHeight(r) for r in range(t.rowCount())) + 1
     t.setFixedSize(w, h)
 
 
@@ -720,6 +729,8 @@ class TabOperacionUnitaria(QWidget):
         self.lbl_op = _seccion("")
         root.addWidget(self.lbl_op)
         bar = QHBoxLayout(); bar.setSpacing(6)
+        self._bar = bar
+        self.on_tamano = None
         self.btn_hojas = []
         for k, txt in enumerate(("Resultados", "Propiedades", "Composición")):
             b = QPushButton(_i18n.t(txt)); b.setCheckable(True); b.setFixedHeight(24)
@@ -754,32 +765,59 @@ class TabOperacionUnitaria(QWidget):
         self.lbl_aviso.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
                                      f'color:{AVISO};background:transparent;')
         v1.addWidget(self.lbl_aviso)
-        v1.addStretch(1)
         self.pila.addWidget(p1)
         # Hoja 2: propiedades de las fases (entrada y salida en una tabla)
         p2 = QWidget(); v2 = QVBoxLayout(p2); v2.setContentsMargins(0, 0, 0, 0); v2.setSpacing(4)
         v2.addWidget(_seccion(_i18n.t("Propiedades de las fases")))
-        self.tbl_prop = _tabla(1, 1); v2.addWidget(self.tbl_prop); v2.addStretch(1)
+        self.tbl_prop = _tabla(1, 1); v2.addWidget(self.tbl_prop)
         self.pila.addWidget(p2)
         # Hoja 3: composiciones de las fases (entrada y salida en una tabla)
         p3 = QWidget(); v3 = QVBoxLayout(p3); v3.setContentsMargins(0, 0, 0, 0); v3.setSpacing(4)
-        v3.addWidget(_seccion(_i18n.t("Composición de las fases [fracción molar]")))
-        self.tbl_comp = _tabla(1, 1); v3.addWidget(self.tbl_comp); v3.addStretch(1)
+        f3 = QHBoxLayout(); f3.setSpacing(6)
+        self.lbl_comp = _seccion(_i18n.t("Composición de las fases")); f3.addWidget(self.lbl_comp, 1)
+        l3 = QLabel(_i18n.t("Unidades:")); l3.setStyleSheet(TXT_QSS); f3.addWidget(l3)
+        self.cmb_ucomp = QComboBox(); self.cmb_ucomp.setFixedSize(170, 22)
+        for k, txt in UNID_COMP:
+            self.cmb_ucomp.addItem(_i18n.t(txt), k)
+        self.cmb_ucomp.currentIndexChanged.connect(lambda _i: (self._render_comp(),
+                                                               self._ajustar_ventana()))
+        f3.addWidget(self.cmb_ucomp)
+        v3.addLayout(f3)
+        self.tbl_comp = _tabla(1, 1); v3.addWidget(self.tbl_comp)
         self.pila.addWidget(p3)
         self._hoja(0)
 
     def set_estilo_combo(self, fn):
-        pass
+        fn(self.cmb_ucomp)
 
     def _hoja(self, i):
         self.pila.setCurrentIndex(i)
         for k, b in enumerate(self.btn_hojas):
             b.setChecked(k == i)
+        self._ajustar_ventana()
+
+    def _ajustar_ventana(self):
+        """Cada hoja con su propio tamaño: las hojas ocultas no cuentan para
+        el tamaño de la pila y la ventana se ajusta a la hoja visible."""
+        from PyQt6.QtWidgets import QSizePolicy as _SP
+        for k in range(self.pila.count()):
+            pg = self.pila.widget(k)
+            if k == self.pila.currentIndex():
+                pg.setSizePolicy(_SP.Policy.Preferred, _SP.Policy.Preferred)
+            else:
+                pg.setSizePolicy(_SP.Policy.Ignored, _SP.Policy.Ignored)
+            pg.layout().activate()
+        self.pila.updateGeometry()
+        self.layout().activate()
+        if self.on_tamano is not None:
+            sz = self.sizeHint()
+            self.on_tamano(sz.width() + 2, sz.height() + 2)
 
     # ── datos ───────────────────────────────────────────────────────────
     def mostrar(self, res, entrada):
         self.res = res; self.entrada = entrada
         self._render()
+        self._ajustar_ventana()
 
     def _corrientes(self):
         """[(título, estado, flujo molar lbmol/h)]."""
@@ -908,11 +946,18 @@ class TabOperacionUnitaria(QWidget):
             return [(_i18n.t("Alimentación"), r['entrada'])]
         return [(_i18n.t("Entrada"), r['entrada']), (_i18n.t("Salida"), r['salida'])]
 
-    @staticmethod
-    def _fases(e):
-        return [(k, _i18n.t(nom)) for k, nom in
-                (('V', "Vapor"), ('L', "Líquido"), ('W', "Fase acuosa"))
-                if k in e['fases']]
+    def _con_agua(self):
+        e = self.res['entrada']; z = e.get('z') or []
+        return (len(z) > NC and z[NC] > 0) or any(
+            'W' in x['fases'] for x in (self.res['entrada'], self.res.get('salida')) if x)
+
+    def _fases(self, e=None):
+        """Siempre las mismas columnas (vapor, líquido y, con agua, fase
+        acuosa), haya o no esa fase; las ausentes se sombrean."""
+        fs = [('V', _i18n.t("Vapor")), ('L', _i18n.t("Líquido"))]
+        if self._con_agua():
+            fs.append(('W', _i18n.t("Acuosa")))
+        return fs
 
     def _encabezado(self, t, grupos, w_col, col0, tit0):
         """Dos filas de encabezado: el nombre de cada corriente sobre sus
@@ -959,14 +1004,14 @@ class TabOperacionUnitaria(QWidget):
             cols += [(e, k) for k, _n in fs]
         t.clearSpans(); t.clear()
         t.setRowCount(len(filas) + 2); t.setColumnCount(len(cols) + 1)
-        w_col = 86 if len(cols) <= 6 else 74
+        w_col = 86 if len(cols) <= 6 else 80
         self._encabezado(t, grupos, w_col, 190, "")
         for c, (e, k) in enumerate(cols, 1):
             f = (dict(beta=1.0, beta_m=1.0, PM=e['PM'], rho=e['rho'], Z=None,
-                      H=e['H'], S=e['S'], mu=None) if k == 'Z' else e['fases'][k])
+                      H=e['H'], S=e['S'], mu=None) if k == 'Z' else e['fases'].get(k))
             for r, (base, un, get, dec, conv) in enumerate(filas, 2):
                 try:
-                    v = get(f)
+                    v = get(f) if f is not None else None
                     v = conv(v) if (conv and v is not None) else v
                 except Exception:
                     v = None
@@ -983,26 +1028,56 @@ class TabOperacionUnitaria(QWidget):
             return
         t = self.tbl_comp
         est = self._estados()
+        n = self.res['n']
         z = est[0][1].get('z') or []
-        con_agua = any('W' in e['fases'] for _t, e in est) or (len(z) > NC and z[NC] > 0)
+        con_agua = self._con_agua()
         idx = list(range(NC + 1 if con_agua else NC))
-        # composición global (la misma en entrada y salida) y cada fase
-        cols = [z]
+        unid = self.cmb_ucomp.currentData() or 'xm'
+        un = {'nm': u_mol(), 'nw': u_mas()}.get(unid)
+        self.lbl_comp.setText(_i18n.t("Composición de las fases") + (f" [{un}]" if un else ""))
+        import eos as _e
+        M = list(PM_COMP) + [_e.prop_agua('PM')]
+
+        def convertir(comp, flujo):
+            """comp: fracciones molares (lista NC+1); flujo: lbmol/h de la fase."""
+            x = [(comp[i] if i < len(comp) else 0.0) for i in range(NC + 1)]
+            if unid in ('xw', 'pw'):
+                m = [x[i]*M[i] for i in range(NC + 1)]; sm = sum(m) or 1.0
+                v = [mi/sm for mi in m]
+                return [vi*100 for vi in v] if unid == 'pw' else v
+            if unid == 'pm':
+                return [xi*100 for xi in x]
+            if unid == 'nm':
+                return [mol_desde(flujo*xi) for xi in x]
+            if unid == 'nw':
+                return [mas_desde(flujo*x[i]*M[i]) for i in range(NC + 1)]
+            return x
+
+        cols = [convertir(z, n)]
         grupos = [(None, [_i18n.t("Global")])]
         for tit, e in est:
             fs = self._fases(e)
-            grupos.append((tit, [n for _k, n in fs]))
-            cols += [e['fases'][k]['comp'] for k, _n in fs]
+            grupos.append((tit, [nm for _k, nm in fs]))
+            for k, _nm in fs:
+                f = e['fases'].get(k)
+                cols.append(convertir(f['comp'], n*f['beta']) if f else None)
         t.clearSpans(); t.clear()
         t.setRowCount(len(idx) + 3); t.setColumnCount(len(cols) + 1)
-        w_col = 86 if len(cols) <= 6 else 74
+        w_col = 86 if len(cols) <= 7 else 80
         self._encabezado(t, grupos, w_col, 210, _i18n.t("Componente"))
+        dec = 4 if unid in ('xm', 'xw', 'pm', 'pw', 'nm') else 2
         for c, comp in enumerate(cols, 1):
             for r, i in enumerate(idx, 2):
-                v = comp[i] if i < len(comp) else 0.0
-                t.setItem(r, c, _cell(f"{v:.6f}" if i == NC else f"{v:.4f}", color=TEXT_RES))
-            tot = sum(comp[i] for i in idx if i < len(comp))
-            t.setItem(len(idx) + 2, c, _cell(f"{tot:.4f}", bg=GRAY_RES, color=TEXT_RES))
+                if comp is None:
+                    t.setItem(r, c, _cell("", bg=GRAY_EMPTY))
+                    continue
+                d = 6 if (i == NC and unid in ('xm', 'xw')) else dec
+                t.setItem(r, c, _cell(f"{comp[i]:.{d}f}", color=TEXT_RES))
+            if comp is None:
+                t.setItem(len(idx) + 2, c, _cell("", bg=GRAY_EMPTY))
+            else:
+                tot = sum(comp[i] for i in idx)
+                t.setItem(len(idx) + 2, c, _cell(f"{tot:.{dec}f}", bg=GRAY_RES, color=TEXT_RES))
         for r, i in enumerate(idx, 2):
             nom = NOMBRES[i] if i < NC else componente_etiqueta(NC)
             t.setItem(r, 0, _cell(_i18n.t(nom), bg=GRAY_LBL))
