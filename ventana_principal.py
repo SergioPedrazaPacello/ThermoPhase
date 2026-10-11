@@ -2818,6 +2818,7 @@ class MainWindow(QMainWindow):
             m_calc.addAction(_act(texto, lambda _=False, c=clave: self._abrir_calculo_ui(c)))
         m_calc.addSeparator()
         m_calc.addAction(_act("Flash múltiple", self._abrir_flash_multiple))
+        m_calc.addAction(_act("Operaciones unitarias", self._abrir_operaciones_unitarias))
 
         m_graf = menubar.addMenu("&Gráficos")
         self._act_cursor = QAction("Activar cursor", self, checkable=True)
@@ -4317,8 +4318,49 @@ class MainWindow(QMainWindow):
             msg = _i18n.t("Se creó el fluido") + f" {nombre}."
         dialogos.info(self, msg)
 
+    def _abrir_operaciones_unitarias(self):
+        """Ventana de ingreso de datos de las operaciones unitarias; si el
+        cálculo da resultado, abre (o actualiza) la ventana de resultados."""
+        import pestana_op_unitarias as _po
+        PRIN = self._CLAVE_PRINCIPAL
+        fuentes = [(PRIN, _i18n.t("Composición principal"))] + \
+                  [(f['nombre'], f['nombre']) for f in self.fluidos]
+        def _registrar(t):
+            try:
+                self.gestor_edicion.registrar(t)
+            except Exception:
+                pass
+        h = dict(estilo_combo=_aplicar_estilo_combo, eos_items=EOS_ITEMS,
+                 eos_code=_eos_code, eos_idx=_eos_idx, kij_base=_eng.kij_base,
+                 registrar=_registrar)
+        dlg = _po.DialogoOU(self, fuentes, self._datos_fluido,
+                            list(self._comp_activos),
+                            getattr(self, '_ou_ultimo', None), h)
+        if not dlg.exec() or dlg.resultado is None:
+            return
+        self._ou_ultimo = dlg.entrada
+        clave = 'operaciones_unitarias'
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            widget = _po.TabOperacionUnitaria(on_nuevo=self._abrir_operaciones_unitarias)
+            widget.set_estilo_combo(_aplicar_estilo_combo)
+            if not hasattr(self, '_tam_sub'):
+                h_ = self.tab_eq.sizeHint()
+                self._tam_sub = (h_.width() + 26, h_.height() + 12)
+            sw = self._montar_subventana(clave, widget, "Operaciones unitarias",
+                                         tam=(840, 520), redimensionable=True,
+                                         pie_texto=_i18n.t("Operaciones unitarias"))
+        sw._widget.mostrar(dlg.resultado, dlg.entrada)
+        if getattr(sw, '_pie', None) is not None:
+            sw._pie.setText(f"  {self._nombre_eos(dlg.resultado['ctx_eos'])} EOS"
+                            if dlg.resultado.get('ctx_eos') else
+                            f"  {dlg.entrada.get('eos_nombre', '')}")
+        self._mostrar_subventana(sw)
+
     def _on_nav_calculo(self, clave):
-        if clave == 'flash_multiple':
+        if clave == 'operaciones_unitarias':
+            self._abrir_operaciones_unitarias()
+        elif clave == 'flash_multiple':
             self._abrir_flash_multiple()
         else:
             self._abrir_calculo_ui(clave)

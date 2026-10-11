@@ -112,6 +112,22 @@ def _resolver_T(f, T0, tol, nombre):
         paso = 20.0
     if abs(fa) < 1e-12:
         return a
+    # Secante: converge en pocas evaluaciones donde H(T) o S(T) es suave
+    # (sin cambio de fase cerca); si no converge, acotamiento + Brent.
+    xa, ya, xb, yb = T0, f0, a, fa
+    for _ in range(8):
+        if yb == ya:
+            break
+        xc = xb - yb*(xb - xa)/(yb - ya)
+        if not (T_MIN_R < xc < T_MAX_R) or abs(xc - xb) > 150.0:
+            break
+        yc = f(xc)
+        if abs(yc) < 1e-12 or abs(xc - xb) < tol:
+            return xc
+        xa, ya, xb, yb = xb, yb, xc, yc
+    if abs(yb) < abs(fa):
+        a, fa = xb, yb
+        paso = max(paso, 1.0) if pend > 1e-12 else paso
     while True:
         b = a + paso if fa < 0 else a - paso
         b = min(max(b, T_MIN_R), T_MAX_R)

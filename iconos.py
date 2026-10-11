@@ -379,6 +379,17 @@ def _tablas(p):
         p.drawLine(QPointF(x, 6), QPointF(x, 26))
 
 
+def _compresor(p):
+    """Operaciones unitarias: compresor (trapecio) con tubos de entrada y
+    salida."""
+    p.setPen(_pen(AZUL_OSC, 1.4))
+    p.setBrush(QBrush(AZUL_CLR))
+    p.drawPolygon(_poly([(9, 7), (23, 11), (23, 21), (9, 25)]))
+    p.setPen(_pen(AZUL_OSC, 1.8))
+    p.drawLine(QPointF(3, 16), QPointF(9, 16))
+    p.drawLine(QPointF(23, 16), QPointF(29, 16))
+
+
 def _calculadora(p):
     p.setPen(_pen(GRIS, 1.4))
     p.setBrush(QBrush(QColor("#3A4657")))
@@ -717,6 +728,7 @@ _REGISTRO = {
     "equilibrio": _equilibrio, "envolvente": _envolvente,
     "saturacion": _saturacion, "propiedades": _propiedades,
     "hidratos": _hidratos, "flash_multiple": _tablas,
+    "operaciones_unitarias": _compresor,
     "saturacion_agua": _hidratos,
     "parametros": _parametros, "corriente": _corriente,
     # barra de herramientas
