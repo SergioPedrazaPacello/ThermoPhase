@@ -4347,11 +4347,13 @@ class MainWindow(QMainWindow):
             if not hasattr(self, '_tam_sub'):
                 h_ = self.tab_eq.sizeHint()
                 self._tam_sub = (h_.width() + 26, h_.height() + 12)
+            # Ventana de tamaño fijo con el ancho de Equilibrio de fases; cada
+            # hoja (resultados, propiedades, composición) con su propia altura.
             sw = self._montar_subventana(clave, widget, "Operaciones unitarias",
-                                         tam=(840, 520), redimensionable=True,
+                                         tam=self._tam_sub,
                                          pie_texto=_i18n.t("Operaciones unitarias"))
-            # cada hoja (resultados, propiedades, composición) con su tamaño
-            widget.on_tamano = lambda w_, h_, s_=sw: s_.resize(w_, h_ + 20)
+            widget.on_tamano = lambda w_, h_, s_=sw: s_.setFixedSize(w_, h_ + 20)
+            widget.set_ancho(self._tam_sub[0])
         sw._widget.mostrar(dlg.resultado, dlg.entrada)
         if getattr(sw, '_pie', None) is not None:
             sw._pie.setText(f"  {self._nombre_eos(dlg.resultado['ctx_eos'])} EOS"

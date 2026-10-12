@@ -327,9 +327,14 @@ class DialogoOU(QDialog):
         h['estilo_combo'](self.cmb_flujo); self.cmb_flujo.addItems(FLUJOS)
         fl = QHBoxLayout(); fl.setSpacing(4); fl.addWidget(self.ed_flujo); fl.addWidget(self.cmb_flujo)
         ge.addWidget(self._etq("Flujo:"), 0, 0); ge.addLayout(fl, 0, 1)
-        self.lbl_T1 = self._etq(""); self.ed_T1 = self._campo()
+        self.lbl_T1 = self._etq("Temperatura:"); self.ed_T1 = self._campo(W_CAMPO - 80)
+        self.cmb_T = QComboBox(); self.cmb_T.setFixedSize(76, 22)
+        h['estilo_combo'](self.cmb_T); self.cmb_T.addItems([_u.u('T'), _u.u_abs()])
+        self._T_abs = False
+        self.cmb_T.currentIndexChanged.connect(self._on_unidad_T)
+        ft = QHBoxLayout(); ft.setSpacing(4); ft.addWidget(self.ed_T1); ft.addWidget(self.cmb_T)
         self.lbl_P1 = self._etq(""); self.ed_P1 = self._campo()
-        ge.addWidget(self.lbl_T1, 1, 0); ge.addWidget(self.ed_T1, 1, 1)
+        ge.addWidget(self.lbl_T1, 1, 0); ge.addLayout(ft, 1, 1)
         ge.addWidget(self.lbl_P1, 2, 0); ge.addWidget(self.ed_P1, 2, 1)
         self.w_metodo = QComboBox(); self.w_metodo.setFixedSize(W_CAMPO, 22)
         h['estilo_combo'](self.w_metodo)
@@ -498,6 +503,34 @@ class DialogoOU(QDialog):
         self._spec_act = None
         self._on_spec()
 
+    # ── temperatura absoluta o relativa ──────────────────────────────────
+    def _T_a_R(self, v, absoluta=None):
+        absoluta = self._T_abs if absoluta is None else absoluta
+        return _u.R_desde_abs(v) if absoluta else _u.t_a_R(v)
+
+    def _R_a_T(self, R, absoluta=None):
+        absoluta = self._T_abs if absoluta is None else absoluta
+        return _u.abs_desde_R(R) if absoluta else _u.t_desde_R(R)
+
+    def _on_unidad_T(self, i):
+        """Cambia la unidad de todas las temperaturas de la ventana (entrada
+        y salida) y convierte los valores ya escritos."""
+        viejo = self._T_abs; nuevo = (i == 1)
+        if viejo == nuevo:
+            return
+        self._guardar_campos()
+        def conv(txt):
+            v = _a_float(txt)
+            if v is None:
+                return txt
+            return f"{self._R_a_T(self._T_a_R(v, viejo), nuevo):.2f}"
+        self.ed_T1.setText(conv(self.ed_T1.text()))
+        if 'T2' in self._valores:
+            self._valores['T2'] = conv(self._valores['T2'])
+        self._T_abs = nuevo
+        self._spec_act = None
+        self._on_spec()
+
     def _on_spec(self):
         self._guardar_campos()
         specs = self._specs()
@@ -510,7 +543,7 @@ class DialogoOU(QDialog):
             self.lbl_x[k].setVisible(vis); self.ed_x[k].setVisible(vis)
             if vis:
                 key, etq, mag, defecto = campos[k]
-                un = _unidad_mag(mag)
+                un = self.cmb_T.currentText() if mag == 'T' else _unidad_mag(mag)
                 self.lbl_x[k].setText(f"{_i18n.t(etq)}" + (f" ({un}):" if un else ":"))
                 self.ed_x[k].setText(self._valores.get(key, defecto))
 
@@ -573,7 +606,6 @@ class DialogoOU(QDialog):
 
     # ── valores iniciales ───────────────────────────────────────────────
     def _aplicar_previo(self, p):
-        self.lbl_T1.setText(f"{_i18n.t('Temperatura')} ({_u.u('T')}):")
         self.lbl_P1.setText(f"{_i18n.t('Presion')} ({_u.u('P')}):")
         self._kij_fuente = None
         if not p:
@@ -592,9 +624,13 @@ class DialogoOU(QDialog):
         self.cmb_op.blockSignals(False); self.w_metodo.blockSignals(False)
         self.ed_flujo.setText(p.get('flujo_txt', "100"))
         self.cmb_flujo.setCurrentText(p.get('flujo_u', u_mol()))
+        self.cmb_T.blockSignals(True)
+        self.cmb_T.setCurrentIndex(1 if p.get('T_abs') else 0)
+        self._T_abs = bool(p.get('T_abs'))
+        self.cmb_T.blockSignals(False)
         T1, P1 = p.get('T1'), p.get('P1')
         if T1:
-            self.ed_T1.setText(f"{_u.t_desde_R(T1):.2f}")
+            self.ed_T1.setText(f"{self._R_a_T(T1):.2f}")
         if P1:
             self.ed_P1.setText(f"{_u.p_desde_psia(P1):.2f}")
         self._valores = dict(p.get('valores') or {})
@@ -626,7 +662,7 @@ class DialogoOU(QDialog):
             return adv("Ingrese un flujo mayor que cero.")
         if vT is None or vP is None:
             return adv("Ingrese la presion y la temperatura.")
-        T1 = _u.t_a_R(vT); P1 = _u.p_a_psia(vP)
+        T1 = self._T_a_R(vT); P1 = _u.p_a_psia(vP)
         if T1 <= 0 or P1 <= 0:
             return adv("La presión y la temperatura absoluta deben ser mayores que cero.")
         import eos as _e
@@ -660,7 +696,7 @@ class DialogoOU(QDialog):
         if 'dT' in vals:
             spec['T2'] = T1 + dT_a(vals['dT']) if op == 'calentador' else T1 - dT_a(vals['dT'])
         if 'T2' in vals:
-            spec['T2'] = _u.t_a_R(vals['T2'])
+            spec['T2'] = self._T_a_R(vals['T2'])
         if 'dPc' in vals:
             spec['dP'] = dP_a(vals['dPc'])
         if 'W' in vals:
@@ -672,7 +708,7 @@ class DialogoOU(QDialog):
         self._guardar_campos()
         self.entrada = dict(op=op, metodo=self.metodo(), spec=cod,
                             flujo_txt=self.ed_flujo.text(), flujo_u=self.cmb_flujo.currentText(),
-                            T1=T1, P1=P1, valores=dict(self._valores),
+                            T1=T1, P1=P1, valores=dict(self._valores), T_abs=self._T_abs,
                             i_eos=self.c_eos.currentIndex(), i_vol=self.c_vol.currentIndex(),
                             i_dens=self.c_dens.currentIndex(), kij_fuente=self._kij_fuente,
                             z_crudo=zc, eos_nombre=self.c_eos.currentText(), metodo_dens=met)
@@ -731,12 +767,13 @@ class TabOperacionUnitaria(QWidget):
         bar = QHBoxLayout(); bar.setSpacing(6)
         self._bar = bar
         self.on_tamano = None
-        self.btn_hojas = []
-        for k, txt in enumerate(("Resultados", "Propiedades", "Composición")):
-            b = QPushButton(_i18n.t(txt)); b.setCheckable(True); b.setFixedHeight(24)
-            b.setStyleSheet(BTN_QSS); b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.clicked.connect(lambda _c=False, i=k: self._hoja(i))
-            bar.addWidget(b); self.btn_hojas.append(b)
+        self.W = 706          # ancho útil común de las tres hojas (set_ancho)
+        lv = QLabel(_i18n.t("Mostrar:")); lv.setStyleSheet(TXT_QSS); bar.addWidget(lv)
+        self.cmb_hoja = QComboBox(); self.cmb_hoja.setFixedSize(170, 22)
+        for txt in ("Resultados", "Propiedades", "Composición"):
+            self.cmb_hoja.addItem(_i18n.t(txt))
+        self.cmb_hoja.currentIndexChanged.connect(self._hoja)
+        bar.addWidget(self.cmb_hoja)
         bar.addStretch(1)
         self.btn_nuevo = QPushButton(_i18n.t("Nuevo cálculo"))
         self.btn_csv = QPushButton(_i18n.t("Exportar CSV"))
@@ -751,16 +788,12 @@ class TabOperacionUnitaria(QWidget):
         root.addWidget(self.pila, 1)
         # Hoja 1: resultados — corrientes a la izquierda y resultados de la
         # operación a la derecha; advertencias debajo.
-        p1 = QWidget(); v1 = QVBoxLayout(p1); v1.setContentsMargins(0, 0, 0, 0); v1.setSpacing(6)
-        h1 = QHBoxLayout(); h1.setSpacing(12)
-        ci = QVBoxLayout(); ci.setSpacing(4)
-        self.lbl_corr = _seccion(_i18n.t("Corrientes")); ci.addWidget(self.lbl_corr)
-        self.tbl_corr = _tabla(1, 1); ci.addWidget(self.tbl_corr); ci.addStretch(1)
-        cd = QVBoxLayout(); cd.setSpacing(4)
-        self.lbl_res_op = _seccion(""); cd.addWidget(self.lbl_res_op)
-        self.tbl_op = _tabla(1, 1); cd.addWidget(self.tbl_op); cd.addStretch(1)
-        h1.addLayout(ci); h1.addLayout(cd); h1.addStretch(1)
-        v1.addLayout(h1)
+        p1 = QWidget(); v1 = QVBoxLayout(p1); v1.setContentsMargins(0, 0, 0, 0); v1.setSpacing(4)
+        self.lbl_corr = _seccion(_i18n.t("Corrientes")); v1.addWidget(self.lbl_corr)
+        self.tbl_corr = _tabla(1, 1); v1.addWidget(self.tbl_corr)
+        v1.addSpacing(4)
+        self.lbl_res_op = _seccion(""); v1.addWidget(self.lbl_res_op)
+        self.tbl_op = _tabla(1, 1); v1.addWidget(self.tbl_op)
         self.lbl_aviso = QLabel(""); self.lbl_aviso.setWordWrap(True)
         self.lbl_aviso.setStyleSheet(f'font-family:"{FONT_F}";font-size:{FS}pt;'
                                      f'color:{AVISO};background:transparent;')
@@ -788,12 +821,32 @@ class TabOperacionUnitaria(QWidget):
         self._hoja(0)
 
     def set_estilo_combo(self, fn):
-        fn(self.cmb_ucomp)
+        fn(self.cmb_ucomp); fn(self.cmb_hoja)
+
+    def set_ancho(self, ancho_ventana):
+        """Ancho fijo de la ventana (el de Equilibrio de fases): las tablas
+        de las tres hojas se reparten ese mismo ancho."""
+        m = self.layout().contentsMargins()
+        self.W = int(ancho_ventana) - m.left() - m.right() - 2
+        if self.res is not None:
+            self._render(); self._ajustar_ventana()
+
+    def _repartir(self, t, col0):
+        """Columna 0 de ancho col0 y el resto del ancho W repartido por igual."""
+        n = t.columnCount() - 1
+        if n <= 0:
+            return
+        t.setColumnWidth(0, col0)
+        resto = self.W - 1 - col0
+        base = resto // n
+        for c in range(1, n + 1):
+            t.setColumnWidth(c, base + (resto - base*n if c == n else 0))
 
     def _hoja(self, i):
         self.pila.setCurrentIndex(i)
-        for k, b in enumerate(self.btn_hojas):
-            b.setChecked(k == i)
+        if self.cmb_hoja.currentIndex() != i:
+            self.cmb_hoja.blockSignals(True); self.cmb_hoja.setCurrentIndex(i)
+            self.cmb_hoja.blockSignals(False)
         self._ajustar_ventana()
 
     def _ajustar_ventana(self):
@@ -811,7 +864,8 @@ class TabOperacionUnitaria(QWidget):
         self.layout().activate()
         if self.on_tamano is not None:
             sz = self.sizeHint()
-            self.on_tamano(sz.width() + 2, sz.height() + 2)
+            m = self.layout().contentsMargins()
+            self.on_tamano(self.W + 2 + m.left() + m.right(), sz.height() + 2)
 
     # ── datos ───────────────────────────────────────────────────────────
     def mostrar(self, res, entrada):
@@ -844,32 +898,19 @@ class TabOperacionUnitaria(QWidget):
             r['datos'].get('metodo'), "")
         self.lbl_op.setText(f"{_i18n.t(ou.NOMBRES[r['op']])}{met}")
         corr = self._corrientes()
-        agua = any('W' in c[1]['fases'] for c in corr)
+        # Solo condiciones y flujos: las propiedades van en su propia hoja.
         filas = [("Presión", _u.u('P')), ("Temperatura", _u.u('T')),
-                 ("Vapor", "% molar"), ("Líquido", "% molar")]
-        if agua:
-            filas.append(("Fase acuosa", "% molar"))
-        filas += [("Entalpía molar", _u.u('H')), ("Entropía molar", _u.u('S')),
-                  ("Densidad", _u.u('dens')), ("Peso molecular", ""),
-                  ("Flujo molar", u_mol()), ("Flujo másico", u_mas()),
-                  ("Flujo volumétrico", u_vol())]
+                 ("Flujo molar", u_mol()), ("Flujo másico", u_mas()),
+                 ("Flujo volumétrico (a P y T)", u_vol())]
         t = self.tbl_corr
         t.clear(); t.setRowCount(len(filas) + 1); t.setColumnCount(len(corr) + 1)
-        t.setColumnWidth(0, 200)
+        self._repartir(t, 230)
         t.setItem(0, 0, _cell("", bg=GRAY_LBL))
         for c, (tit, e, nn) in enumerate(corr, 1):
-            t.setColumnWidth(c, 110)
             t.setItem(0, c, _cell(tit, bg=GRAY_LBL, align=Qt.AlignmentFlag.AlignCenter))
-            pct = lambda k: 100.0*e['fases'][k]['beta'] if k in e['fases'] else 0.0
             vals = [_fmt(_u.p_desde_psia(e['P']), 2), _fmt(_u.t_desde_R(e['T']), 2),
-                    _fmt(pct('V'), 4), _fmt(pct('L'), 4)]
-            if agua:
-                vals.append(_fmt(pct('W'), 4))
-            vals += [_fmt(_u.H_desde(e['H']), 2), _fmt(_u.S_desde(e['S']), 4),
-                     _fmt(_u.dens_desde(e['rho']) if e['rho'] else None, 4),
-                     _fmt(e['PM'], 4), _fmt(mol_desde(nn), 4),
-                     _fmt(mas_desde(nn*e['PM']), 2),
-                     _fmt(vol_desde(nn*e['V']) if e['V'] else None, 2)]
+                    _fmt(mol_desde(nn), 4), _fmt(mas_desde(nn*e['PM']), 2),
+                    _fmt(vol_desde(nn*e['V']) if e['V'] else None, 2)]
             for k, v in enumerate(vals, 1):
                 t.setItem(k, c, _cell(v, color=TEXT_RES))
         for k, (base, un) in enumerate(filas, 1):
@@ -883,12 +924,22 @@ class TabOperacionUnitaria(QWidget):
         self.lbl_res_op.setText(_i18n.t("Resultados de la operación") if filas_op else "")
         self.lbl_res_op.setVisible(bool(filas_op)); self.tbl_op.setVisible(bool(filas_op))
         t = self.tbl_op
-        t.clear(); t.setRowCount(len(filas_op)); t.setColumnCount(2)
-        t.setColumnWidth(0, 230); t.setColumnWidth(1, 110)
-        for k, (base, un, v) in enumerate(filas_op):
-            t.setItem(k, 0, _cell(f"{_i18n.t(base)}" + (f" [{un}]:" if un else ":"), bg=GRAY_LBL))
-            t.setItem(k, 1, _cell(v, color=TEXT_RES))
-            t.setRowHeight(k, ROW_H)
+        # dos pares etiqueta/valor por fila, repartidos en el ancho común
+        nf = (len(filas_op) + 1)//2
+        t.clear(); t.setRowCount(nf); t.setColumnCount(4)
+        wv = 100; we = (self.W - 1 - 2*wv)//2
+        for c, w_ in enumerate((we, wv, self.W - 1 - 2*wv - we, wv)):
+            t.setColumnWidth(c, w_)
+        for k in range(nf*2):
+            fi, c = k % nf, 2*(k // nf)
+            if k < len(filas_op):
+                base, un, v = filas_op[k]
+                t.setItem(fi, c, _cell(f"{_i18n.t(base)}" + (f" [{un}]:" if un else ":"), bg=GRAY_LBL))
+                t.setItem(fi, c + 1, _cell(v, color=TEXT_RES))
+            else:
+                t.setItem(fi, c, _cell("", bg=GRAY_LBL)); t.setItem(fi, c + 1, _cell("", bg=GRAY_RES))
+        for fi in range(nf):
+            t.setRowHeight(fi, ROW_H)
         _ajustar(t)
         av = [_i18n.t("Advertencia:") + " " + _i18n.t(a) for a in r.get('avisos') or []]
         self.lbl_aviso.setText("\n".join(av)); self.lbl_aviso.setVisible(bool(av))
@@ -1004,8 +1055,8 @@ class TabOperacionUnitaria(QWidget):
             cols += [(e, k) for k, _n in fs]
         t.clearSpans(); t.clear()
         t.setRowCount(len(filas) + 2); t.setColumnCount(len(cols) + 1)
-        w_col = 86 if len(cols) <= 6 else 80
-        self._encabezado(t, grupos, w_col, 190, "")
+        self._encabezado(t, grupos, 80, 190, "")
+        self._repartir(t, 190)
         for c, (e, k) in enumerate(cols, 1):
             f = (dict(beta=1.0, beta_m=1.0, PM=e['PM'], rho=e['rho'], Z=None,
                       H=e['H'], S=e['S'], mu=None) if k == 'Z' else e['fases'].get(k))
@@ -1016,7 +1067,7 @@ class TabOperacionUnitaria(QWidget):
                 except Exception:
                     v = None
                 t.setItem(r, c, _cell(_fmt(v, dec), color=TEXT_RES,
-                                      bg=WHITE if v is not None else GRAY_EMPTY))
+                                      bg=WHITE if v is not None else GRAY_RES))
         for r, (base, un, *_x) in enumerate(filas, 2):
             t.setItem(r, 0, _cell(f"{_i18n.t(base)}" + (f" [{un}]:" if un else ":"), bg=GRAY_LBL))
         for r in range(t.rowCount()):
@@ -1063,21 +1114,21 @@ class TabOperacionUnitaria(QWidget):
                 cols.append(convertir(f['comp'], n*f['beta']) if f else None)
         t.clearSpans(); t.clear()
         t.setRowCount(len(idx) + 3); t.setColumnCount(len(cols) + 1)
-        w_col = 86 if len(cols) <= 7 else 80
-        self._encabezado(t, grupos, w_col, 210, _i18n.t("Componente"))
+        self._encabezado(t, grupos, 80, 210, _i18n.t("Componente"))
+        self._repartir(t, 210)
         dec = 4 if unid in ('xm', 'xw', 'pm', 'pw', 'nm') else 2
         for c, comp in enumerate(cols, 1):
             for r, i in enumerate(idx, 2):
                 if comp is None:
-                    t.setItem(r, c, _cell("", bg=GRAY_EMPTY))
+                    t.setItem(r, c, _cell("", bg=GRAY_RES))
                     continue
                 d = 6 if (i == NC and unid in ('xm', 'xw')) else dec
                 t.setItem(r, c, _cell(f"{comp[i]:.{d}f}", color=TEXT_RES))
             if comp is None:
-                t.setItem(len(idx) + 2, c, _cell("", bg=GRAY_EMPTY))
+                t.setItem(len(idx) + 2, c, _cell("", bg=GRAY_RES))
             else:
                 tot = sum(comp[i] for i in idx)
-                t.setItem(len(idx) + 2, c, _cell(f"{tot:.{dec}f}", bg=GRAY_RES, color=TEXT_RES))
+                t.setItem(len(idx) + 2, c, _cell(f"{tot:.{dec}f}", color=TEXT_RES))
         for r, i in enumerate(idx, 2):
             nom = NOMBRES[i] if i < NC else componente_etiqueta(NC)
             t.setItem(r, 0, _cell(_i18n.t(nom), bg=GRAY_LBL))
