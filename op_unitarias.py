@@ -20,7 +20,7 @@ PSI_FT3_BTU = 144.0 / BTU_FT_LBF   # psia·ft³ → BTU
 BTUH_HP = 2544.4336           # BTU/h por hp
 BTUH_KW = 3412.1416           # BTU/h por kW
 SCF_LBMOL = 379.482           # scf/lbmol a 60 °F y 14.696 psia
-N_PACE = 20                   # tramos de presión de la trayectoria PACE
+N_PACE = 50                   # tramos de presión de la trayectoria PACE (como PVTsim)
 
 OPERACIONES = ['compresor', 'expansor', 'enfriador', 'calentador',
                'bomba', 'valvula', 'separador']
@@ -126,29 +126,33 @@ def _T_de_S(z, P, S, ctx, T0):
 
 # ── Funciones X e Y de Schultz ─────────────────────────────────────────
 def _schultz(z, T, P, V, ctx, e=None):
-    """X = (T/V)(∂V/∂T)_P − 1 ;  Y = −(P/V)(∂V/∂P)_T (diferencias finitas).
-    Con una sola fase de hidrocarburo se derivan las raíces de la ecuación de
-    estado (rápido); con varias fases, el volumen total del flash."""
-    dT = max(0.5, 1e-3*T); dP = max(0.05, 1e-3*P)
+    """Funciones de Schultz X = (T/V)(∂V/∂T)_P − 1 e Y = −(P/V)(∂V/∂P)_T,
+    con derivadas exactas (diferencias centrales con paso muy pequeño).  Con
+    una sola fase de hidrocarburo se deriva el volumen de la ecuación de
+    estado (con el traslado de Peneloux si está activo); con varias fases,
+    el volumen total del flash."""
     if e is not None and not ctx['agua'] and len(e['fases']) == 1:
         try:
             import entalpia_entropia_gen as hs
+            import eos as eng
             tipo = 'V' if 'V' in e['fases'] else 'L'
             z13 = list(e['z'][:NC])
-            Zf = lambda T_, P_: hs._pick_Z(z13, T_, P_, tipo, ctx['eos'], ctx['kij'])
-            Z0 = Zf(T, P)
-            V0 = Z0*T/P
-            VT = Zf(T + dT, P)*(T + dT)/P
-            VP = Zf(T, P + dP)*T/(P + dP)
-            return (T/V0)*(VT - V0)/dT - 1.0, -(P/V0)*(VP - V0)/dP
+            pen = ctx['metodo'] == 'Peneloux'
+            def Vf(T_, P_):
+                v = hs._pick_Z(z13, T_, P_, tipo, ctx['eos'], ctx['kij'])*eng.R_GAS*T_/P_
+                return eng.V_liq_peneloux(z13, v, ctx['eos']) if pen else v
+            dT = 1e-5*T; dP = 1e-5*P
+            V0 = Vf(T, P)
+            dVdT = (Vf(T + dT, P) - Vf(T - dT, P))/(2*dT)
+            dVdP = (Vf(T, P + dP) - Vf(T, P - dP))/(2*dP)
+            return (T/V0)*dVdT - 1.0, -(P/V0)*dVdP
         except Exception:
             pass
     try:
-        V_T = estado(z, T + dT, P, ctx)['V']
-        V_P = estado(z, T, P + dP, ctx)['V']
-        X = (T/V)*(V_T - V)/dT - 1.0
-        Y = -(P/V)*(V_P - V)/dP
-        return X, Y
+        dT = 1e-4*T; dP = 1e-4*P
+        dVdT = (estado(z, T + dT, P, ctx)['V'] - estado(z, T - dT, P, ctx)['V'])/(2*dT)
+        dVdP = (estado(z, T, P + dP, ctx)['V'] - estado(z, T, P - dP, ctx)['V'])/(2*dP)
+        return (T/V)*dVdT - 1.0, -(P/V)*dVdP
     except Exception:
         return None, None
 
@@ -192,11 +196,7 @@ def _pace(z, ctx, e1, P2, eta, n_tramos=N_PACE, con_xy=True, progreso=None):
     ΔP corregidos por η.  Devuelve (estado de salida, lista de puntos)."""
     dP = (P2 - e1['P'])/n_tramos
     e = e1; pts = [e1]
-    xs, ys = [], []
-    if con_xy and e1['V']:
-        X, Y = _schultz(z, e1['T'], e1['P'], e1['V'], ctx, e1)
-        if X is not None:
-            xs.append(X); ys.append(Y)
+    xs, ys = [], []        # X e Y al final de cada tramo (como PVTsim)
     for k in range(1, n_tramos + 1):
         Pk = e1['P'] + dP*k if k < n_tramos else P2
         Tks = _T_de_S(z, Pk, e['S'], ctx, e['T'])
@@ -264,7 +264,7 @@ def compresor_pace(z, ctx, n, T1, P1, spec, eta=1.0, P2=None, T2=None,
         """Raíz con una trayectoria gruesa de pocos tramos y luego afinada
         con la trayectoria completa (con la pendiente de la gruesa)."""
         xg, pend = secante(g_grueso, x0, x1, 1e-4, lo, hi)
-        return secante(g_full, xg, None, 1e-6, lo, hi, pend=pend)[0]
+        return secante(g_full, xg, None, 1e-8, lo, hi, pend=pend)[0]
 
     if spec == 'P_eta':
         if P2 <= P1:
@@ -293,7 +293,7 @@ def compresor_pace(z, ctx, n, T1, P1, spec, eta=1.0, P2=None, T2=None,
         # la última trayectoria completa ya es la solución: solo X e Y
         e2, pts, _x, _y = cache[(P2, eta, N_PACE)]
         xs, ys = [], []
-        for p in pts:
+        for p in pts[1:]:
             if p['V']:
                 X, Y = _schultz(z, p['T'], p['P'], p['V'], ctx, p)
                 if X is not None:
