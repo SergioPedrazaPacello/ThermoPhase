@@ -91,7 +91,8 @@ def dP_a(v):        return _u.p_a_psia(v)
 
 
 # Unidades de flujo de entrada → lbmol/h
-FLUJOS = ['lbmol/h', 'kgmol/h', 'lb/h', 'kg/h', 'MMscfd']
+FLUJOS = ['lbmol/h', 'kgmol/h', 'lb/h', 'kg/h', 'MMscfd', 'Sm³/d']
+SM3_KMOL = 23.6446          # Sm³/kmol a 15 °C y 101.325 kPa (gas ideal)
 
 
 def flujo_a_lbmolh(v, unidad, PM):
@@ -103,7 +104,21 @@ def flujo_a_lbmolh(v, unidad, PM):
         return v/PM
     if unidad == 'kg/h':
         return v/LB_KG/PM
+    if unidad == 'Sm³/d':
+        return v/24.0/SM3_KMOL/LB_KG
     return v*1.0e6/ou.SCF_LBMOL/24.0          # MMscfd
+
+
+def u_std():
+    return 'MMscfd' if _field() else 'Sm³/d'
+
+
+def std_desde(n):
+    """Caudal de gas estándar de n lbmol/h: MMscfd (60 °F, 14.696 psia) o
+    Sm³/d (15 °C, 101.325 kPa), ambos como gas ideal."""
+    if _field():
+        return n*ou.SCF_LBMOL*24.0/1.0e6
+    return n*LB_KG*SM3_KMOL*24.0
 
 
 # ── Especificaciones de salida por operación (como PVTsim) ──────────────
@@ -354,8 +369,15 @@ class DialogoOU(QDialog):
         gs.addWidget(self.lbl_spec, 0, 0); gs.addWidget(self.cmb_spec, 0, 1)
         self.lbl_x = [self._etq(""), self._etq("")]
         self.ed_x = [self._campo(), self._campo()]
+        self.cmb_Tx = []
         for k in range(2):
-            gs.addWidget(self.lbl_x[k], k + 1, 0); gs.addWidget(self.ed_x[k], k + 1, 1)
+            c = QComboBox(); c.setFixedSize(76, 22); h['estilo_combo'](c)
+            c.addItems([_u.u('T'), _u.u_abs()]); c.hide()
+            c.currentIndexChanged.connect(self._on_unidad_T)
+            self.cmb_Tx.append(c)
+            fx = QHBoxLayout(); fx.setSpacing(4); fx.addWidget(self.ed_x[k]); fx.addWidget(c)
+            fx.addStretch(1)
+            gs.addWidget(self.lbl_x[k], k + 1, 0); gs.addLayout(fx, k + 1, 1)
         self.lbl_sep = QLabel(_i18n.t(
             "El separador se simula como un flash PT a las condiciones de entrada."))
         self.lbl_sep.setStyleSheet(TXT_QSS); self.lbl_sep.setWordWrap(True)
@@ -516,6 +538,10 @@ class DialogoOU(QDialog):
         """Cambia la unidad de todas las temperaturas de la ventana (entrada
         y salida) y convierte los valores ya escritos."""
         viejo = self._T_abs; nuevo = (i == 1)
+        # todas las listas de temperatura muestran la misma unidad
+        for c in [self.cmb_T] + list(getattr(self, 'cmb_Tx', [])):
+            if c.currentIndex() != i:
+                c.blockSignals(True); c.setCurrentIndex(i); c.blockSignals(False)
         if viejo == nuevo:
             return
         self._guardar_campos()
@@ -541,9 +567,12 @@ class DialogoOU(QDialog):
         for k in range(2):
             vis = k < len(campos)
             self.lbl_x[k].setVisible(vis); self.ed_x[k].setVisible(vis)
+            es_T = vis and campos[k][2] == 'T'
+            self.cmb_Tx[k].setVisible(es_T)
+            self.ed_x[k].setFixedWidth(W_CAMPO - 80 if es_T else W_CAMPO)
             if vis:
                 key, etq, mag, defecto = campos[k]
-                un = self.cmb_T.currentText() if mag == 'T' else _unidad_mag(mag)
+                un = "" if mag == 'T' else _unidad_mag(mag)
                 self.lbl_x[k].setText(f"{_i18n.t(etq)}" + (f" ({un}):" if un else ":"))
                 self.ed_x[k].setText(self._valores.get(key, defecto))
 
@@ -624,10 +653,10 @@ class DialogoOU(QDialog):
         self.cmb_op.blockSignals(False); self.w_metodo.blockSignals(False)
         self.ed_flujo.setText(p.get('flujo_txt', "100"))
         self.cmb_flujo.setCurrentText(p.get('flujo_u', u_mol()))
-        self.cmb_T.blockSignals(True)
-        self.cmb_T.setCurrentIndex(1 if p.get('T_abs') else 0)
+        for c in [self.cmb_T] + self.cmb_Tx:
+            c.blockSignals(True); c.setCurrentIndex(1 if p.get('T_abs') else 0)
+            c.blockSignals(False)
         self._T_abs = bool(p.get('T_abs'))
-        self.cmb_T.blockSignals(False)
         T1, P1 = p.get('T1'), p.get('P1')
         if T1:
             self.ed_T1.setText(f"{self._R_a_T(T1):.2f}")
@@ -874,21 +903,42 @@ class TabOperacionUnitaria(QWidget):
         self._ajustar_ventana()
 
     def _corrientes(self):
-        """[(título, estado, flujo molar lbmol/h)]."""
+        """[(grupo, subtítulo, estado o None, flujo molar lbmol/h)].  En el
+        separador: alimentación (global) y salidas N°1 vapor, N°2 líquido y
+        N°3 acuosa (con agua); una salida sin fase queda vacía."""
         r = self.res; n = r['n']
         if r['op'] == 'separador':
             e = r['entrada']
-            out = [(_i18n.t("Alimentación"), e, n)]
-            nombres = {'V': "Gas", 'L': "Líquido", 'W': "Agua"}
-            for k in ('V', 'L', 'W'):
+            out = [(_i18n.t("Alimentación"), _i18n.t("Global"), e, n)]
+            for k, nom, sal in self._salidas_sep():
                 f = e['fases'].get(k)
+                sub = None
                 if f:
                     sub = dict(T=e['T'], P=e['P'], H=f['H'], S=f['S'], PM=f['PM'],
                                rho=f['rho'], V=(f['PM']/f['rho'] if f['rho'] else None),
-                               fases={k: dict(f, beta=1.0, beta_m=1.0)})
-                    out.append((_i18n.t(nombres[k]), sub, n*f['beta']))
+                               z=f['comp'], fases={k: dict(f, beta=1.0, beta_m=1.0)})
+                out.append((sal, nom, sub, n*f['beta'] if f else 0.0))
             return out
-        return [(_i18n.t("Entrada"), r['entrada'], n), (_i18n.t("Salida"), r['salida'], n)]
+        return [(_i18n.t("Entrada"), None, r['entrada'], n),
+                (_i18n.t("Salida"), None, r['salida'], n)]
+
+    def _salidas_sep(self):
+        s_ = [('V', _i18n.t("Vapor"), _i18n.t("Salida N°1")),
+              ('L', _i18n.t("Líquido"), _i18n.t("Salida N°2"))]
+        if self._con_agua():
+            s_.append(('W', _i18n.t("Acuosa"), _i18n.t("Salida N°3")))
+        return s_
+
+    @staticmethod
+    def _agrupar(cols):
+        """[(grupo, sub)] consecutivos → [(grupo, [subs])]."""
+        g = []
+        for grp, sub in cols:
+            if g and g[-1][0] == grp:
+                g[-1][1].append(sub)
+            else:
+                g.append((grp, [sub]))
+        return g
 
     def _render(self):
         if self.res is None:
@@ -901,19 +951,32 @@ class TabOperacionUnitaria(QWidget):
         # Solo condiciones y flujos: las propiedades van en su propia hoja.
         filas = [("Presión", _u.u('P')), ("Temperatura", _u.u('T')),
                  ("Flujo molar", u_mol()), ("Flujo másico", u_mas()),
+                 ("Flujo volumétrico estándar", u_std()),
                  ("Flujo volumétrico (a P y T)", u_vol())]
         t = self.tbl_corr
-        t.clear(); t.setRowCount(len(filas) + 1); t.setColumnCount(len(corr) + 1)
+        dos = any(sub is not None for _g, sub, _e, _n in corr)   # separador
+        h0 = 2 if dos else 1
+        t.clearSpans(); t.clear()
+        t.setRowCount(len(filas) + h0); t.setColumnCount(len(corr) + 1)
+        if dos:
+            self._encabezado(t, self._agrupar([(g, sb) for g, sb, _e, _n in corr]), 80, 230, "")
+        else:
+            t.setItem(0, 0, _cell("", bg=GRAY_LBL))
+            for c, (tit, _sb, _e, _n) in enumerate(corr, 1):
+                t.setItem(0, c, _cell(tit, bg=GRAY_LBL, align=Qt.AlignmentFlag.AlignCenter))
         self._repartir(t, 230)
-        t.setItem(0, 0, _cell("", bg=GRAY_LBL))
-        for c, (tit, e, nn) in enumerate(corr, 1):
-            t.setItem(0, c, _cell(tit, bg=GRAY_LBL, align=Qt.AlignmentFlag.AlignCenter))
+        for c, (tit, _sb, e, nn) in enumerate(corr, 1):
+            if e is None:
+                for k in range(len(filas)):
+                    t.setItem(k + h0, c, _cell("", bg=GRAY_RES))
+                continue
             vals = [_fmt(_u.p_desde_psia(e['P']), 2), _fmt(_u.t_desde_R(e['T']), 2),
                     _fmt(mol_desde(nn), 4), _fmt(mas_desde(nn*e['PM']), 2),
+                    _fmt(std_desde(nn), 4 if _field() else 1),
                     _fmt(vol_desde(nn*e['V']) if e['V'] else None, 2)]
-            for k, v in enumerate(vals, 1):
-                t.setItem(k, c, _cell(v, color=TEXT_RES))
-        for k, (base, un) in enumerate(filas, 1):
+            for k, v in enumerate(vals):
+                t.setItem(k + h0, c, _cell(v, color=TEXT_RES))
+        for k, (base, un) in enumerate(filas, h0):
             t.setItem(k, 0, _cell(f"{_i18n.t(base)}" + (f" [{un}]:" if un else ":"), bg=GRAY_LBL))
         for k in range(t.rowCount()):
             t.setRowHeight(k, ROW_H)
@@ -1049,10 +1112,16 @@ class TabOperacionUnitaria(QWidget):
                  ("Viscosidad", _u.u('visc'), lambda f: f['mu'], 5, None)]
         cols = []          # (estado, clave de fase)
         grupos = []
-        for tit, e in self._estados():
-            fs = [('Z', _i18n.t("Global"))] + self._fases(e)
-            grupos.append((tit, [n for _k, n in fs]))
-            cols += [(e, k) for k, _n in fs]
+        if self.res['op'] == 'separador':
+            e = self.res['entrada']
+            cols = [(e, 'Z')] + [(e, k) for k, _n, _s in self._salidas_sep()]
+            grupos = [(_i18n.t("Alimentación"), [_i18n.t("Global")])] + \
+                     [(s_, [nm]) for _k, nm, s_ in self._salidas_sep()]
+        else:
+            for tit, e in self._estados():
+                fs = [('Z', _i18n.t("Global"))] + self._fases(e)
+                grupos.append((tit, [n for _k, n in fs]))
+                cols += [(e, k) for k, _n in fs]
         t.clearSpans(); t.clear()
         t.setRowCount(len(filas) + 2); t.setColumnCount(len(cols) + 1)
         self._encabezado(t, grupos, 80, 190, "")
@@ -1105,13 +1174,22 @@ class TabOperacionUnitaria(QWidget):
             return x
 
         cols = [convertir(z, n)]
-        grupos = [(None, [_i18n.t("Global")])]
-        for tit, e in est:
-            fs = self._fases(e)
-            grupos.append((tit, [nm for _k, nm in fs]))
-            for k, _nm in fs:
+        if self.res['op'] == 'separador':
+            # alimentación (global) y cada salida con su fase
+            e = est[0][1]
+            grupos = [(_i18n.t("Alimentación"), [_i18n.t("Global")])]
+            for k, nm, s_ in self._salidas_sep():
+                grupos.append((s_, [nm]))
                 f = e['fases'].get(k)
                 cols.append(convertir(f['comp'], n*f['beta']) if f else None)
+        else:
+            grupos = [(None, [_i18n.t("Global")])]
+            for tit, e in est:
+                fs = self._fases(e)
+                grupos.append((tit, [nm for _k, nm in fs]))
+                for k, _nm in fs:
+                    f = e['fases'].get(k)
+                    cols.append(convertir(f['comp'], n*f['beta']) if f else None)
         t.clearSpans(); t.clear()
         t.setRowCount(len(idx) + 3); t.setColumnCount(len(cols) + 1)
         self._encabezado(t, grupos, 80, 210, _i18n.t("Componente"))
