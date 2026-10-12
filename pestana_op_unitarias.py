@@ -1020,15 +1020,13 @@ class TabOperacionUnitaria(QWidget):
             if op == 'compresor' and d.get('metodo') == 'pace':
                 filas.append(("Eficiencia politrópica", "", _fmt(d.get('eta'), 4)))
             elif op == 'bomba':
-                filas.append(("Eficiencia", "", _fmt(d.get('eta'), 4)))
+                pass
             else:
                 filas.append(("Eficiencia isentrópica", "", _fmt(d.get('eta'), 4)))
             if op != 'bomba' and d.get('T2s') is not None:
                 filas.append(("Temperatura de salida isentrópica", _u.u('T'),
                               _fmt(_u.t_desde_R(d['T2s']), 2)))
                 filas.append(("Cambio de entalpía isentrópico", _u.u('H'), H(d.get('dHs'))))
-            if op == 'bomba':
-                filas.append(("Volumen molar medio", _u.u('V'), _fmt(_u.V_desde(d['V_medio']), 4)))
             filas.append(("Cambio de entalpía", _u.u('H'), H(d.get('dH'))))
             filas.append(("Cambio de temperatura", _u.u('T'), dT()))
             nombre = {'compresor': "Trabajo del compresor", 'expansor': "Trabajo del expansor",
@@ -1048,8 +1046,6 @@ class TabOperacionUnitaria(QWidget):
         elif op == 'valvula':
             filas.append(("Caída de presión", _u.u('P'), _fmt(dP_desde(d['dP']), 2)))
             filas.append(("Cambio de temperatura", _u.u('T'), dT()))
-            jt = dT_desde(d['JT'])/dP_desde(1.0)
-            filas.append(("Coeficiente Joule-Thomson medio", f"{_u.u('T')}/{_u.u('P')}", _fmt(jt, 5)))
         return filas
 
     def _estados(self):

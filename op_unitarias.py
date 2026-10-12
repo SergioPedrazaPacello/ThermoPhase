@@ -352,25 +352,26 @@ def intercambiador(op, z, ctx, n, T1, P1, T2, dP=0.0):
 
 
 def bomba(z, ctx, n, T1, P1, P2, eta=1.0):
-    """η = V̄·ΔP/ΔH, con V̄ el volumen medio entre entrada y salida."""
+    """Bomba como en PVTsim: con η = 1 el bombeo es isentrópico (flash PS a
+    la presión de salida); con η < 1 el cambio de entalpía real es el
+    isentrópico dividido por η y la temperatura de salida sale de un flash
+    PH.  Para un líquido el ΔH isentrópico es ∫V·dP ≈ V̄·ΔP, que es la
+    definición de eficiencia de PVTsim (volumen medio · ΔP / ΔH); con gas
+    presente el volumen cambia mucho con la presión y solo el cálculo
+    isentrópico es correcto."""
     if P2 <= P1:
         raise SinSolucionOU("La presión de salida de la bomba debe ser mayor que la de entrada.")
     res = _base('bomba', z, ctx, n, T1, P1)
     e1 = res['entrada']
     if 'L' not in e1['fases'] and 'W' not in e1['fases']:
         raise SinSolucionOU("La bomba no acepta una corriente de gas en la entrada.")
-    dP = P2 - P1
-    V2 = e1['V']; T2 = T1; e2 = None
-    for _ in range(30):
-        dH = 0.5*(e1['V'] + V2)*dP*PSI_FT3_BTU/eta
-        T2 = _T_de_H(z, P2, e1['H'] + dH, ctx, T2)
-        e2 = estado(z, T2, P2, ctx)
-        if abs(e2['V'] - V2) <= 1e-7*max(1.0, V2):
-            break
-        V2 = e2['V']
+    T2s = _T_de_S(z, P2, e1['S'], ctx, T1)
+    dHs = estado(z, T2s, P2, ctx)['H'] - e1['H']
+    T2 = _T_de_H(z, P2, e1['H'] + dHs/eta, ctx, T2s)
+    e2 = estado(z, T2, P2, ctx)
     res['salida'] = e2
-    res['datos'] = dict(eta=eta, dH=e2['H'] - e1['H'], trabajo=n*(e2['H'] - e1['H']),
-                        V_medio=0.5*(e1['V'] + e2['V']), relacion=P2/P1)
+    res['datos'] = dict(eta=eta, T2s=T2s, dHs=dHs, dH=e2['H'] - e1['H'],
+                        trabajo=n*(e2['H'] - e1['H']), relacion=P2/P1)
     _aviso_fases(res, "bomba")
     return res
 
