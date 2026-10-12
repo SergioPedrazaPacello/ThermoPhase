@@ -352,14 +352,13 @@ def intercambiador(op, z, ctx, n, T1, P1, T2, dP=0.0):
 
 
 def bomba(z, ctx, n, T1, P1, P2, eta=1.0):
-    """Bomba como en PVTsim: ΔH = V·ΔP/η con V el volumen molar de la
-    corriente a la SALIDA (presión y temperatura de descarga), iterando la
-    temperatura de salida con flashes PH hasta que ese volumen converge.
-    (Comparado con PVTsim: con el volumen de salida se reproducen su
-    entalpía y su temperatura de descarga; el promedio de volúmenes de
-    entrada y salida o el camino isentrópico dan otra temperatura.)  El
-    volumen es el de la ecuación de estado (con Peneloux si está activo),
-    como en PVTsim, aunque la densidad del líquido se informe con COSTALD."""
+    """Bomba como en PVTsim: η = V̄·ΔP/ΔH, donde el «volumen medio bombeado»
+    V̄ es el volumen molar de la corriente a la temperatura de ENTRADA y a la
+    presión media (P1 + P2)/2.  Entonces ΔH = V̄·ΔP/η y un flash PH da la
+    temperatura de salida.  (Verificado contra PVTsim en líquido y con
+    cambio de fase: misma ΔH y temperatura de descarga.)  El volumen es el
+    de la ecuación de estado (con Peneloux si está activo), como en PVTsim,
+    aunque la densidad del líquido se informe con COSTALD."""
     if P2 <= P1:
         raise SinSolucionOU("La presión de salida de la bomba debe ser mayor que la de entrada.")
     res = _base('bomba', z, ctx, n, T1, P1)
@@ -368,18 +367,12 @@ def bomba(z, ctx, n, T1, P1, P2, eta=1.0):
         raise SinSolucionOU("La bomba no acepta una corriente de gas en la entrada.")
     ctx_v = dict(ctx, metodo='Peneloux' if ctx['metodo'] == 'Peneloux' else 'EOS')
     dP = P2 - P1
-    T2 = T1; dH = 0.0
-    for _ in range(40):
-        V2 = estado(z, T2, P2, ctx_v)['V']
-        dH = V2*dP*PSI_FT3_BTU/eta
-        T2n = _T_de_H(z, P2, e1['H'] + dH, ctx, T2)
-        if abs(T2n - T2) < 1e-7:
-            T2 = T2n
-            break
-        T2 = T2n
+    V_m = estado(z, T1, 0.5*(P1 + P2), ctx_v)['V']
+    dH = V_m*dP*PSI_FT3_BTU/eta
+    T2 = _T_de_H(z, P2, e1['H'] + dH, ctx, T1)
     e2 = estado(z, T2, P2, ctx)
     res['salida'] = e2
-    res['datos'] = dict(eta=eta, dH=e2['H'] - e1['H'],
+    res['datos'] = dict(eta=eta, dH=e2['H'] - e1['H'], V_medio=V_m,
                         trabajo=n*(e2['H'] - e1['H']), relacion=P2/P1)
     _aviso_fases(res, "bomba")
     return res
