@@ -62,6 +62,8 @@ TRAD = {
     "Exportar resultados a &PDF...": "Export results to &PDF...",
     "&Cascada": "&Cascade", "&Mosaico": "&Tile", "Cerrar &todas": "Close &all",
     "&Acerca de ThermoPhase...": "&About ThermoPhase...",
+    "&Licencia...": "&License...",
+    "&Cerrar sesión": "&Sign out",
     "&Documentación técnica": "&Technical Documentation",
     "Documentación técnica": "Technical Documentation",
     "Espanol": "Spanish", "Español": "Spanish", "Ingles": "English",

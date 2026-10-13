@@ -2929,6 +2929,9 @@ class MainWindow(QMainWindow):
         m_ayuda = menubar.addMenu("A&yuda")
         m_ayuda.addAction(_act("&Documentación técnica", self._abrir_documentacion))
         m_ayuda.addSeparator()
+        m_ayuda.addAction(_act("&Licencia...", self._menu_licencia))
+        m_ayuda.addAction(_act("&Cerrar sesión", self._menu_cerrar_sesion))
+        m_ayuda.addSeparator()
         m_ayuda.addAction(_act("&Acerca de ThermoPhase...", self._menu_acerca))
 
     def _opcion_graf(self, nombre, on):
@@ -5341,6 +5344,29 @@ class MainWindow(QMainWindow):
                                 tam=(900, 640), redimensionable=True,
                                 pie_texto=_i18n.t("Documentación técnica"))
 
+    def _menu_licencia(self):
+        import dialogos as _dlg
+        r = getattr(self, '_licencia', None)
+        if r is None:
+            _dlg.info(self, "No hay información de licencia.", "Licencia")
+            return
+        vence = f"{r.vence:%d/%m/%Y}" if r.vence else "sin vencimiento"
+        modo = ("Sin conexión (período de gracia)" if r.sin_conexion
+                else "Verificada en línea")
+        _dlg.info(self, f"Usuario:\t{r.usuario}\nVence:\t{vence}\nEstado:\t{modo}",
+                  "Licencia")
+
+    def _menu_cerrar_sesion(self):
+        import dialogos as _dlg
+        import licencia as _lic
+        if not _dlg.pregunta(self, "Se olvidará la sesión guardada en este equipo y "
+                                   "ThermoPhase se cerrará.\nEn el próximo inicio se "
+                                   "pedirán usuario y contraseña.\n\n¿Continuar?",
+                             "Cerrar sesión"):
+            return
+        _lic.borrar_sesion()
+        self.close()
+
     def _menu_acerca(self):
         dialogos.info(self,
             "ThermoPhase 1.0\n\n"
@@ -5400,12 +5426,19 @@ def main(app=None, splash=None):
     win = MainWindow()
     _SPLASH_ACTIVO = None
     # Completar la barra (y mantener el splash visible al menos 2 s)
-    splash.terminar(minimo=2.0)
-    # Ingreso de usuario: tras la carga y antes de mostrar la ventana
-    # principal.  Si el usuario cierra el diálogo, el programa termina.
+    # Licencia: si hay sesión recordada, se verifica en silencio durante el
+    # splash; si no la hay (o falla), se pide el ingreso tras el splash.
     import login as _login
-    if not _login.pedir_ingreso():
-        sys.exit(0)
+    import licencia as _lic
+    splash.progreso(0.95, "Verificando licencia…")
+    _res = _login.en_segundo_plano(_lic.reanudar_sesion)
+    splash.terminar(minimo=2.0)
+    if _res is None or not _res.ok:
+        _res = _login.pedir_ingreso(usuario=_lic.usuario_recordado() or (_res.usuario if _res else ""),
+                                    mensaje=(_res.mensaje if _res else ""))
+        if _res is None:
+            sys.exit(0)
+    win._licencia = _res
     # Ventana normal (no maximizada): 60 % del área útil de la pantalla,
     # centrada.  El usuario puede maximizarla con el botón de la barra.
     try:

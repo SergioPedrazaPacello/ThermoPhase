@@ -5,18 +5,20 @@ Se muestra después del splash (cuando el programa ya terminó de cargar) y ante
 de abrir la ventana principal.  Es un recuadro flotante sin marco de ventana
 (igual que el splash): se arrastra con el ratón y se cierra con la «×» o Esc.
 
-Por ahora no valida nada: el botón «Ingresar» cierra el diálogo y deja entrar
-al programa; cerrarlo sale de él.  La verificación en línea de usuario/licencia
-se conectará aquí más adelante.
+«Ingresar» verifica usuario, contraseña y licencia en línea (licencia.py) en un
+hilo aparte; si todo está en regla, el diálogo se cierra y se abre el programa.
+Si se marcó «Recordarme», los siguientes arranques entran sin pedir datos
+(verificación silenciosa durante el splash).
 """
 import os
 import base64
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QCheckBox, QFrame, QGraphicsDropShadowEffect)
 from PyQt6.QtGui import QPixmap, QColor, QFont, QIcon
-from PyQt6.QtCore import Qt, QByteArray
+from PyQt6.QtCore import Qt, QByteArray, QThread, pyqtSignal
 
 from rutas import ruta_recurso
+import licencia
 
 _F = 'Arial Narrow'
 _NAR = '#E2571E'
@@ -34,9 +36,22 @@ def _pixmap_marca():
         return QPixmap()
 
 
+class _Worker(QThread):
+    listo = pyqtSignal(object)
+
+    def __init__(self, usuario, clave, recordar):
+        super().__init__()
+        self._a = (usuario, clave, recordar)
+
+    def run(self):
+        self.listo.emit(licencia.iniciar_sesion(*self._a))
+
+
 class DialogoLogin(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, usuario="", mensaje=""):
         super().__init__(parent)
+        self.resultado = None
+        self._worker = None
         self.setWindowTitle("ThermoPhase")
         ico = ruta_recurso('thermophase.ico')
         if os.path.exists(ico):
@@ -124,13 +139,63 @@ class DialogoLogin(QDialog):
             f'font-family:"{_F}";font-size:12pt;font-weight:bold;}}'
             f'QPushButton:hover{{background:{_NAR_HOVER};}}'
             f'QPushButton:pressed{{background:#B0410F;}}')
-        self.btn_ingresar.clicked.connect(self.accept)
+        self.btn_ingresar.clicked.connect(self._ingresar)
         cuerpo.addWidget(self.btn_ingresar)
+
+        cuerpo.addSpacing(8)
+        self.lbl_estado = QLabel("")
+        self.lbl_estado.setWordWrap(True)
+        self.lbl_estado.setMinimumHeight(34)
+        self.lbl_estado.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        cuerpo.addWidget(self.lbl_estado)
+        self._estado(mensaje, error=bool(mensaje))
 
         v.addWidget(card)
         self.setFixedWidth(380 + 2*_SOMBRA)
         self.setFixedHeight(self.sizeHint().height())
-        self.ed_usuario.setFocus()
+        if usuario:
+            self.ed_usuario.setText(usuario)
+            self.ck_recordar.setChecked(True)
+            self.ed_clave.setFocus()
+        else:
+            self.ed_usuario.setFocus()
+
+    def _estado(self, texto, error=False):
+        self.lbl_estado.setStyleSheet(
+            f'font-family:"{_F}";font-size:10pt;color:{"#C0392B" if error else "#7A7A7A"};'
+            'border:none;background:transparent;')
+        self.lbl_estado.setText(texto)
+
+    def _ingresar(self):
+        if self._worker is not None:
+            return
+        for w in (self.ed_usuario, self.ed_clave, self.ck_recordar, self.btn_ingresar):
+            w.setEnabled(False)
+        self.btn_ingresar.setText("Verificando…")
+        self._estado("Verificando usuario y licencia…")
+        self._worker = _Worker(self.ed_usuario.text(), self.ed_clave.text(),
+                               self.ck_recordar.isChecked())
+        self._worker.listo.connect(self._fin)
+        self._worker.start()
+
+    def _fin(self, r):
+        self._worker.wait()
+        self._worker = None
+        if r.ok:
+            self.resultado = r
+            self.accept()
+            return
+        for w in (self.ed_usuario, self.ed_clave, self.ck_recordar, self.btn_ingresar):
+            w.setEnabled(True)
+        self.btn_ingresar.setText("Ingresar")
+        self._estado(r.mensaje, error=True)
+        self.ed_clave.clear()
+        self.ed_clave.setFocus()
+
+    def reject(self):
+        if self._worker is not None:      # no cerrar a mitad de la verificación
+            return
+        super().reject()
 
     def _campo(self, lay, titulo, clave=False):
         l = QLabel(titulo)
@@ -169,10 +234,10 @@ class DialogoLogin(QDialog):
         self._arrastre = None
 
 
-def pedir_ingreso(parent=None):
-    """Muestra el diálogo de ingreso.  Devuelve True si el usuario pulsó
-    «Ingresar» y False si lo cerró (× o Esc)."""
-    dlg = DialogoLogin(parent)
+def pedir_ingreso(parent=None, usuario="", mensaje=""):
+    """Muestra el diálogo de ingreso.  Devuelve el Resultado de la verificación
+    si el usuario entró, o None si cerró la ventana (× o Esc)."""
+    dlg = DialogoLogin(parent, usuario=usuario, mensaje=mensaje)
     try:
         scr = dlg.screen().availableGeometry()
         dlg.move(scr.x() + (scr.width() - dlg.width())//2,
@@ -181,4 +246,21 @@ def pedir_ingreso(parent=None):
         pass
     dlg.raise_()
     dlg.activateWindow()
-    return dlg.exec() == QDialog.DialogCode.Accepted
+    if dlg.exec() == QDialog.DialogCode.Accepted:
+        return dlg.resultado
+    return None
+
+
+def en_segundo_plano(func, *args):
+    """Ejecuta func(*args) en un hilo mientras se atienden los eventos de Qt
+    (para que la animación del splash no se congele).  Devuelve su resultado."""
+    import threading
+    import time
+    from PyQt6.QtWidgets import QApplication
+    caja = {}
+    h = threading.Thread(target=lambda: caja.setdefault('r', func(*args)), daemon=True)
+    h.start()
+    while h.is_alive():
+        QApplication.processEvents()
+        time.sleep(0.01)
+    return caja.get('r')
