@@ -456,6 +456,7 @@ class DialogoOU(QDialog):
         self._valores = {}          # valores escritos por clave de campo
         self._aplicar_previo(previo)
         self.adjustSize(); self.setFixedSize(self.sizeHint())
+        self._tam_fijo = self.size()
 
     # ── helpers de construcción ─────────────────────────────────────────
     def _lbl_txt(self, t):
@@ -573,8 +574,12 @@ class DialogoOU(QDialog):
             if vis:
                 key, etq, mag, defecto = campos[k]
                 un = "" if mag == 'T' else _unidad_mag(mag)
-                self.lbl_x[k].setText(f"{_i18n.t(etq)}" + (f" ({un}):" if un else ":"))
                 self.ed_x[k].setText(self._valores.get(key, defecto))
+                self.lbl_x[k].setText(f"{_i18n.t(etq)}" + (f" ({un}):" if un else ":"))
+        # la ventana conserva su ancho al mostrar u ocultar la lista de
+        # unidad de temperatura
+        if getattr(self, '_tam_fijo', None) is not None:
+            self.setFixedSize(self._tam_fijo)
 
     # ── composición ─────────────────────────────────────────────────────
     def _crudo(self):
