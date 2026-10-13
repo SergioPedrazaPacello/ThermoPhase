@@ -2,21 +2,36 @@
 ThermoPhase — ventana de ingreso de usuario.
 
 Se muestra después del splash (cuando el programa ya terminó de cargar) y antes
-de abrir la ventana principal.  Por ahora no valida nada: el botón «Ingresar»
-cierra el diálogo y deja entrar al programa; cerrar la ventana sale de él.
-La verificación en línea de usuario/licencia se conectará aquí más adelante.
+de abrir la ventana principal.  Es un recuadro flotante sin marco de ventana
+(igual que el splash): se arrastra con el ratón y se cierra con la «×» o Esc.
+
+Por ahora no valida nada: el botón «Ingresar» cierra el diálogo y deja entrar
+al programa; cerrarlo sale de él.  La verificación en línea de usuario/licencia
+se conectará aquí más adelante.
 """
 import os
+import base64
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QCheckBox, QFrame, QGraphicsDropShadowEffect)
 from PyQt6.QtGui import QPixmap, QColor, QFont, QIcon
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QByteArray
 
 from rutas import ruta_recurso
 
 _F = 'Arial Narrow'
 _NAR = '#E2571E'
 _NAR_HOVER = '#C94A15'
+_SOMBRA = 24          # margen transparente alrededor del recuadro para la sombra
+
+
+def _pixmap_marca():
+    try:
+        from logo_marca import PNG_B64
+        pm = QPixmap()
+        pm.loadFromData(QByteArray(base64.b64decode(PNG_B64)), 'PNG')
+        return pm
+    except Exception:
+        return QPixmap()
 
 
 class DialogoLogin(QDialog):
@@ -26,37 +41,55 @@ class DialogoLogin(QDialog):
         ico = ruta_recurso('thermophase.ico')
         if os.path.exists(ico):
             self.setWindowIcon(QIcon(ico))
-        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowTitleHint
-                            | Qt.WindowType.WindowCloseButtonHint)
-        self.setObjectName('fondo')
-        self.setFixedSize(460, 420)
-        self.setStyleSheet("QDialog#fondo{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
-                           "stop:0 #F4F4F4,stop:1 #E2E2E2);}")
+        # Sin marco ni barra de título; ventana propia (aparece en la barra de tareas)
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setFixedSize(380 + 2*_SOMBRA, 400 + 2*_SOMBRA)
+        self._arrastre = None
 
         v = QVBoxLayout(self)
-        v.setContentsMargins(40, 34, 40, 34)
+        v.setContentsMargins(_SOMBRA, _SOMBRA - 6, _SOMBRA, _SOMBRA + 6)
 
         card = QFrame()
         card.setObjectName('card')
         # Mismo degradado vertical que el fondo del splash (blanco → gris claro)
         card.setStyleSheet("QFrame#card{background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
-                           "stop:0 #FFFFFF,stop:1 #E9E9E9);"
-                           "border:1px solid #D6D6D6;border-radius:10px;}")
+                           "stop:0 #FFFFFF,stop:1 #E6E6E6);"
+                           "border:1px solid #CFCFCF;border-radius:10px;}")
         sh = QGraphicsDropShadowEffect(card)
-        sh.setBlurRadius(28)
-        sh.setOffset(0, 6)
-        sh.setColor(QColor(0, 0, 0, 45))
+        sh.setBlurRadius(24)
+        sh.setOffset(0, 5)
+        sh.setColor(QColor(0, 0, 0, 70))
         card.setGraphicsEffect(sh)
 
         c = QVBoxLayout(card)
-        c.setContentsMargins(34, 34, 34, 30)
+        c.setContentsMargins(34, 10, 12, 30)
         c.setSpacing(0)
+
+        # Botón de cierre propio (no hay barra de título)
+        sup = QHBoxLayout()
+        sup.addStretch()
+        b_x = QPushButton("✕")
+        b_x.setFixedSize(26, 26)
+        b_x.setCursor(Qt.CursorShape.PointingHandCursor)
+        b_x.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        b_x.setToolTip("Salir")
+        b_x.setStyleSheet('QPushButton{background:transparent;border:none;border-radius:13px;'
+                          'color:#8A8A8A;font-size:11pt;}'
+                          'QPushButton:hover{background:#E4E4E4;color:#303030;}')
+        b_x.clicked.connect(self.reject)
+        sup.addWidget(b_x)
+        c.addLayout(sup)
+
+        cuerpo = QVBoxLayout()
+        cuerpo.setContentsMargins(0, 0, 22, 0)
+        cuerpo.setSpacing(0)
+        c.addLayout(cuerpo)
 
         marca = QLabel()
         marca.setAlignment(Qt.AlignmentFlag.AlignCenter)
         marca.setStyleSheet('background:transparent;border:none;')
-        ruta_marca = ruta_recurso('marca.png')
-        pm = QPixmap(ruta_marca) if os.path.exists(ruta_marca) else QPixmap()
+        pm = _pixmap_marca()
         if not pm.isNull():
             dpr = self.devicePixelRatioF() or 1.0
             pm = pm.scaledToWidth(int(250 * dpr), Qt.TransformationMode.SmoothTransformation)
@@ -66,11 +99,11 @@ class DialogoLogin(QDialog):
             marca.setText("ThermoPhase")
             marca.setStyleSheet(f'font-family:"{_F}";font-size:26pt;color:#303030;'
                                 'background:transparent;border:none;')
-        c.addWidget(marca)
-        c.addSpacing(30)
+        cuerpo.addWidget(marca)
+        cuerpo.addSpacing(30)
 
-        self.ed_usuario = self._campo(c, "USUARIO")
-        self.ed_clave = self._campo(c, "CONTRASEÑA", clave=True)
+        self.ed_usuario = self._campo(cuerpo, "USUARIO")
+        self.ed_clave = self._campo(cuerpo, "CONTRASEÑA", clave=True)
 
         fila = QHBoxLayout()
         self.ck_recordar = QCheckBox("Recordarme en este equipo")
@@ -80,8 +113,8 @@ class DialogoLogin(QDialog):
             f'QCheckBox::indicator:checked{{background:{_NAR};border:1px solid {_NAR};}}')
         fila.addWidget(self.ck_recordar)
         fila.addStretch()
-        c.addLayout(fila)
-        c.addSpacing(18)
+        cuerpo.addLayout(fila)
+        cuerpo.addSpacing(18)
 
         self.btn_ingresar = QPushButton("Ingresar")
         self.btn_ingresar.setFixedHeight(38)
@@ -93,7 +126,7 @@ class DialogoLogin(QDialog):
             f'QPushButton:hover{{background:{_NAR_HOVER};}}'
             f'QPushButton:pressed{{background:#B0410F;}}')
         self.btn_ingresar.clicked.connect(self.accept)
-        c.addWidget(self.btn_ingresar)
+        cuerpo.addWidget(self.btn_ingresar)
 
         v.addWidget(card)
         self.ed_usuario.setFocus()
@@ -120,10 +153,24 @@ class DialogoLogin(QDialog):
         lay.addSpacing(14)
         return e
 
+    # ── arrastre con el ratón (no hay barra de título) ───────────────────
+    def mousePressEvent(self, ev):
+        if ev.button() == Qt.MouseButton.LeftButton:
+            self._arrastre = ev.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            ev.accept()
+
+    def mouseMoveEvent(self, ev):
+        if self._arrastre is not None and ev.buttons() & Qt.MouseButton.LeftButton:
+            self.move(ev.globalPosition().toPoint() - self._arrastre)
+            ev.accept()
+
+    def mouseReleaseEvent(self, ev):
+        self._arrastre = None
+
 
 def pedir_ingreso(parent=None):
     """Muestra el diálogo de ingreso.  Devuelve True si el usuario pulsó
-    «Ingresar» y False si cerró la ventana."""
+    «Ingresar» y False si lo cerró (× o Esc)."""
     dlg = DialogoLogin(parent)
     try:
         scr = dlg.screen().availableGeometry()
@@ -131,4 +178,6 @@ def pedir_ingreso(parent=None):
                  scr.y() + (scr.height() - dlg.height())//2)
     except Exception:
         pass
+    dlg.raise_()
+    dlg.activateWindow()
     return dlg.exec() == QDialog.DialogCode.Accepted
