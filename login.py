@@ -44,7 +44,6 @@ class DialogoLogin(QDialog):
         # Sin marco ni barra de título; ventana propia (aparece en la barra de tareas)
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(380 + 2*_SOMBRA, 400 + 2*_SOMBRA)
         self._arrastre = None
 
         v = QVBoxLayout(self)
@@ -63,7 +62,7 @@ class DialogoLogin(QDialog):
         card.setGraphicsEffect(sh)
 
         c = QVBoxLayout(card)
-        c.setContentsMargins(34, 10, 12, 30)
+        c.setContentsMargins(34, 8, 10, 26)
         c.setSpacing(0)
 
         # Botón de cierre propio (no hay barra de título)
@@ -100,10 +99,10 @@ class DialogoLogin(QDialog):
             marca.setStyleSheet(f'font-family:"{_F}";font-size:26pt;color:#303030;'
                                 'background:transparent;border:none;')
         cuerpo.addWidget(marca)
-        cuerpo.addSpacing(30)
+        cuerpo.addSpacing(22)
 
-        self.ed_usuario = self._campo(cuerpo, "USUARIO")
-        self.ed_clave = self._campo(cuerpo, "CONTRASEÑA", clave=True)
+        self.ed_usuario = self._campo(cuerpo, "Usuario")
+        self.ed_clave = self._campo(cuerpo, "Contraseña", clave=True)
 
         fila = QHBoxLayout()
         self.ck_recordar = QCheckBox("Recordarme en este equipo")
@@ -114,7 +113,7 @@ class DialogoLogin(QDialog):
         fila.addWidget(self.ck_recordar)
         fila.addStretch()
         cuerpo.addLayout(fila)
-        cuerpo.addSpacing(18)
+        cuerpo.addSpacing(12)
 
         self.btn_ingresar = QPushButton("Ingresar")
         self.btn_ingresar.setFixedHeight(38)
@@ -129,12 +128,14 @@ class DialogoLogin(QDialog):
         cuerpo.addWidget(self.btn_ingresar)
 
         v.addWidget(card)
+        self.setFixedWidth(380 + 2*_SOMBRA)
+        self.setFixedHeight(self.sizeHint().height())
         self.ed_usuario.setFocus()
 
     def _campo(self, lay, titulo, clave=False):
         l = QLabel(titulo)
-        l.setStyleSheet(f'font-family:"{_F}";font-size:9pt;color:#7A7A7A;border:none;'
-                        'background:transparent;letter-spacing:0.5px;')
+        l.setStyleSheet(f'font-family:"{_F}";font-size:10pt;color:#555;border:none;'
+                        'background:transparent;')
         e = QLineEdit()
         e.setFixedHeight(34)
         e.setStyleSheet(
@@ -148,9 +149,9 @@ class DialogoLogin(QDialog):
             f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
             e.setFont(f)
         lay.addWidget(l)
-        lay.addSpacing(4)
+        lay.addSpacing(3)
         lay.addWidget(e)
-        lay.addSpacing(14)
+        lay.addSpacing(10)
         return e
 
     # ── arrastre con el ratón (no hay barra de título) ───────────────────
