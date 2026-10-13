@@ -5401,6 +5401,11 @@ def main(app=None, splash=None):
     _SPLASH_ACTIVO = None
     # Completar la barra (y mantener el splash visible al menos 2 s)
     splash.terminar(minimo=2.0)
+    # Ingreso de usuario: tras la carga y antes de mostrar la ventana
+    # principal.  Si el usuario cierra el diálogo, el programa termina.
+    import login as _login
+    if not _login.pedir_ingreso():
+        sys.exit(0)
     # Ventana normal (no maximizada): 60 % del área útil de la pantalla,
     # centrada.  El usuario puede maximizarla con el botón de la barra.
     try:
