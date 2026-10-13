@@ -2624,17 +2624,17 @@ class TabFluidos(QWidget):
 
     def _nuevo(self):
         self.fluidos.append({'nombre': self._nombre_nuevo(), 'z': [0.0] * (NC + 1),
-                             'eos': 'PR', 'kij': copy.deepcopy(KIJ_DEFAULT),
-                             'kij_fuente': 'PR'})
+                             'eos': 'PR_PVT', 'kij': _eng.kij_base('PR_PVT'),
+                             'kij_fuente': 'PR_PVT', 'densidad': 'EOS'})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
     def _capturar(self):
         z = list(self._get_z_actual())
         self.fluidos.append({'nombre': self._nombre_nuevo(_i18n.t("Cromatografia")),
-                             'z': z, 'eos': 'PR',
-                             'kij': copy.deepcopy(KIJ_DEFAULT),
-                             'kij_fuente': 'PR'})
+                             'z': z, 'eos': 'PR_PVT',
+                             'kij': _eng.kij_base('PR_PVT'),
+                             'kij_fuente': 'PR_PVT', 'densidad': 'EOS'})
         self._idx = len(self.fluidos) - 1
         self._refrescar_lista()
 
@@ -3272,15 +3272,16 @@ class MainWindow(QMainWindow):
 
     # ── Slots del menu ─────────────────────────────────────────────
     def _menu_nuevo(self):
-        """Reinicia el estado: composicion vacia, PR, kij por defecto de PR."""
+        """Reinicia el estado: composicion vacia y el modelo por defecto
+        (Peng-Robinson PVTsim, densidad EOS, kij por defecto de esa EOS)."""
         global kij_user
         import eos as _eng
-        _eng.set_eos('PR')
-        kij_user = copy.deepcopy(_eng.KIJ_DEFAULT_PR)
+        _eng.set_eos('PR_PVT')
+        kij_user = _eng.kij_base('PR_PVT')
         # Reset pestañas
         self.tab_eq.set_estado({'entrada': {
             'composicion': [0.0]*NC, 'T_R': 0.0, 'P_psi': 0.0,
-            'densidad': 'COSTALD', 'eos': 'Peng-Robinson', 'modo_masico': False,
+            'densidad': 'EOS', 'eos': 'PR_PVT', 'modo_masico': False,
         }, 'resultado': None})
         self.tab_env.set_estado({'entrada': {}, 'resultado': None})
         self.tab_sat.set_estado({'entrada': {}, 'resultado': None})
@@ -3297,7 +3298,7 @@ class MainWindow(QMainWindow):
         self._sync_nav_fluidos()
         self.current_path = None
         self._actualizar_titulo()
-        self._lbl_info.setText("Peng-Robinson EOS")
+        self._modelo_por_defecto()
 
     def _cerrar_ventanas_fluido(self):
         """Cierra y elimina las ventanas ligadas a fluidos (claves con '@')."""
@@ -3486,10 +3487,27 @@ class MainWindow(QMainWindow):
 
         # Cablear cambio de EOS desde el calculo de Equilibrio.
         self.tab_eq.eos_changed.connect(self._on_eos_changed)
+        # Modelo por defecto: Peng-Robinson (PVTsim) y densidad EOS.
+        self._modelo_por_defecto()
 
         # Al iniciar NO se abre ninguna subventana: el area queda vacia.
 
     # ── Selectores globales de la barra superior ─────────────
+    def _modelo_por_defecto(self):
+        """Ecuación de estado Peng-Robinson (PVTsim), sin corrección de
+        volumen y densidad EOS: el modelo con que arranca el programa (y una
+        simulación nueva)."""
+        sel = self.selectores
+        if sel.get('volumen') is not None:
+            sel['volumen'].setCurrentIndex(0)
+        i_pr = EOS_CODES.index('PR_PVT')
+        sel['eos'].setCurrentIndex(i_pr)
+        if self.tab_eq.cmb_eos.currentIndex() != i_pr:
+            self.tab_eq.cmb_eos.setCurrentIndex(i_pr)
+        else:
+            self._on_eos_changed('PR_PVT')        # propaga EOS y kij
+        sel['densidad'].setCurrentIndex(1)            # EOS
+
     def _cablear_selectores(self):
         """Enlaza los tres desplegables globales con el desplegable
         correspondiente de cada ventana (en ambos sentidos)."""

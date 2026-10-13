@@ -602,6 +602,7 @@ TRAD = {
     "Diagrama de la envolvente": "Envelope diagram",
     "Politrópico": "Polytropic",
     "Mostrar:": "Show:",
+    "Gestor de componentes": "Component manager",
     "Salida N°1": "Outlet No. 1",
     "Salida N°2": "Outlet No. 2",
     "Salida N°3": "Outlet No. 3",

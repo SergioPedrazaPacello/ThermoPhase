@@ -357,6 +357,12 @@ class NavigatorPanel(QWidget):
         self._aplicar_icono(self._nodo_comp, icono("componentes", 16))
         self._nodo_comp.setData(0, Qt.ItemDataRole.UserRole, "componentes")
         self.tree_datos.addTopLevelItem(self._nodo_comp)
+        # Acceso al gestor de componentes (agregar o quitar componentes, como
+        # el agua): primer elemento dentro de «Componentes».
+        self._item_gestor = QTreeWidgetItem(["Gestor de componentes"])
+        self._aplicar_icono(self._item_gestor, icono("componentes", 16))
+        self._item_gestor.setData(0, Qt.ItemDataRole.UserRole, ('gestor',))
+        self._nodo_comp.addChild(self._item_gestor)
         self._comp_items = []      # hojas de componente en orden canonico
         # 13 HC + agua (índice 13). El agua nace INACTIVA (hexágono por defecto).
         try:
@@ -405,7 +411,9 @@ class NavigatorPanel(QWidget):
 
     def _on_dato_click(self, item, col):
         data = item.data(0, Qt.ItemDataRole.UserRole)
-        if isinstance(data, tuple) and data and data[0] == 'calc':
+        if isinstance(data, tuple) and data and data[0] == 'gestor':
+            self.gestor_comp_pedido.emit()
+        elif isinstance(data, tuple) and data and data[0] == 'calc':
             # Hoja de funcionalidad de un fluido: (‘calc’, nombre, clave)
             self.fluido_calc_pedido.emit(data[1], data[2])
         elif isinstance(data, tuple) and data and data[0] == 'comp':
