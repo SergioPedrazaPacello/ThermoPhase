@@ -5,7 +5,9 @@ Sin dependencias externas: solo la biblioteca estándar (urllib, json, ssl).
 
 Flujo:
   1. iniciar_sesion(usuario, clave, recordar)
-       POST /auth/v1/token?grant_type=password   → tokens de sesión
+       usuario = correo   → POST /auth/v1/token?grant_type=password
+       usuario = nombre   → POST /functions/v1/ingresar  (Edge Function)
+                                                   → tokens de sesión
        POST /rest/v1/rpc/verificar_licencia      → ¿licencia activa, vigente y
                                                    este equipo permitido?
   2. reanudar_sesion()  (al arrancar, si se marcó «Recordarme»)
@@ -224,8 +226,13 @@ def iniciar_sesion(usuario, clave, recordar=False):
     if not usuario or not clave:
         return Resultado(False, "Ingresa tu usuario y contraseña.", usuario)
     try:
-        t = _post('/auth/v1/token?grant_type=password',
-                  {'email': usuario, 'password': clave})
+        if '@' in usuario:
+            t = _post('/auth/v1/token?grant_type=password',
+                      {'email': usuario, 'password': clave})
+        else:
+            # Nombre de usuario: el servidor (Edge Function «ingresar») lo
+            # traduce a correo sin revelarlo y devuelve los tokens.
+            t = _post('/functions/v1/ingresar', {'usuario': usuario, 'clave': clave})
         return _verificar(t['access_token'], usuario, recordar, t.get('refresh_token'))
     except _SinConexion:
         return Resultado(False, "No hay conexión con el servidor de licencias. "
