@@ -15,6 +15,8 @@ def main():
     from PyQt6.QtWidgets import QApplication
     from PyQt6.QtGui import QIcon
     app = QApplication(sys.argv)
+    import fuentes
+    fuentes.instalar_qt()   # Arial Narrow o su equivalente incluida
     from rutas import ruta_recurso
     import os
     _ico = ruta_recurso('thermophase.ico')

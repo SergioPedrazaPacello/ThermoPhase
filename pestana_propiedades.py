@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
+import matplotlib
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
@@ -601,7 +602,7 @@ class TabSensibilidad(QWidget):
         if self._hover_annot is None:
             self._hover_annot = self.ax.annotate(
                 "", xy=(0,0), xytext=(12,12), textcoords="offset points",
-                fontsize=8, fontfamily='Arial Narrow', color="#000000",
+                fontsize=8, fontfamily=matplotlib.rcParams['font.family'], color="#000000",
                 bbox=dict(boxstyle="round,pad=0.4", fc=GRAY_PLOT_BG,
                           ec="#888888", lw=0.8), zorder=10)
         if self._cross_v is None:

@@ -5401,6 +5401,8 @@ def main(app=None, splash=None):
     global _SPLASH_ACTIVO
     if app is None:
         app = QApplication.instance() or QApplication(sys.argv)
+    import fuentes as _fuentes
+    _fuentes.instalar_qt()
     # Fuente global Arial Narrow (todo el cromo retro la hereda).
     _f = QFont("Arial Narrow", 9)
     app.setFont(_f)

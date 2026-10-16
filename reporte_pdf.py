@@ -63,6 +63,14 @@ def _registrar_fuente():
     for base in ('/usr/share/fonts', '/usr/local/share/fonts'):
         rutas += glob.glob(os.path.join(base, '**', 'ArialN*.ttf'),
                            recursive=True)
+    # Equivalente libre incluida en el programa (mismas medidas que Arial Narrow)
+    try:
+        import fuentes as _fuentes
+        _r = _fuentes.rutas_ttf().get('Regular')
+        if _r:
+            rutas.append(_r)
+    except Exception:
+        pass
     # Fallbacks con soporte Unicode completo (subindices N₂, CO₂)
     for base in ('/usr/share/fonts', '/usr/local/share/fonts'):
         rutas += glob.glob(os.path.join(base, '**', 'LiberationSans-Regular.ttf'),

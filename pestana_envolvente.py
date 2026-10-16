@@ -103,7 +103,9 @@ def _aplicar_estilo_combo(combo):
 # )
 
 # Configurar matplotlib para usar Arial Narrow
-matplotlib.rcParams['font.family'] = ['Arial Narrow', 'Arial', 'sans-serif']
+import fuentes as _fuentes
+_fuentes.instalar_matplotlib()
+matplotlib.rcParams['font.family'] = _fuentes.FAMILIAS_MPL
 
 BTN_STYLE=(f'background:{GRAY_HDR};border:2px outset {BORDER};'
            f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;')
@@ -1746,7 +1748,7 @@ class TabEnvolvente(QWidget):
             self._hover_annot = self.ax.annotate(
                 "", xy=(0,0), xytext=(12,12),
                 textcoords="offset points",
-                fontsize=8, fontfamily='Arial Narrow', color="#000000",
+                fontsize=8, fontfamily=matplotlib.rcParams['font.family'], color="#000000",
                 bbox=dict(boxstyle="round,pad=0.4", fc=GRAY_PLOT_BG,
                           ec="#888888", lw=0.8),
                 zorder=10)
