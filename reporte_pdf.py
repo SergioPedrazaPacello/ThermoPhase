@@ -66,7 +66,8 @@ def _registrar_fuente():
     # Equivalente libre incluida en el programa (mismas medidas que Arial Narrow)
     try:
         import fuentes as _fuentes
-        _r = _fuentes.rutas_ttf().get('Regular')
+        _rt = _fuentes.rutas_ttf()
+        _r = _rt.get('ArialNarrow') or _rt.get('Regular')
         if _r:
             rutas.append(_r)
     except Exception:

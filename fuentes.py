@@ -13,6 +13,11 @@ Narrow) dentro del programa (fuentes_datos.py, sin archivos externos) y:
   · matplotlib y ReportLab (que necesitan archivos): la extrae una vez a
     %APPDATA%\\ThermoPhase\\fuentes y la registra.
 Si Arial Narrow sí está instalada, se usa la original y esto no hace nada.
+
+Prioridad cuando NO está instalada en el sistema:
+  1. Arial Narrow incluida en fuente_arial_narrow.py (uso personal; borrar ese
+     archivo antes de distribuir el programa).
+  2. Liberation Sans Narrow incluida (libre).
 """
 import os
 import base64
@@ -28,6 +33,15 @@ def _bytes(estilo):
     return base64.b64decode(TTF_B64[estilo])
 
 
+def _bytes_arial():
+    """Arial Narrow incluida (o None si se borró fuente_arial_narrow.py)."""
+    try:
+        from fuente_arial_narrow import TTF_B64
+        return base64.b64decode(TTF_B64)
+    except Exception:
+        return None
+
+
 def rutas_ttf():
     """Extrae (una sola vez) los TTF a una carpeta de caché y devuelve
     {estilo: ruta}.  Devuelve {} si no se pudo escribir."""
@@ -36,13 +50,16 @@ def rutas_ttf():
     rutas = {}
     try:
         os.makedirs(d, exist_ok=True)
-        for e in _ESTILOS:
-            r = os.path.join(d, f'LiberationSansNarrow-{e}.ttf')
-            datos = _bytes(e)
+        pares = [(e, f'LiberationSansNarrow-{e}.ttf', _bytes(e)) for e in _ESTILOS]
+        an = _bytes_arial()
+        if an:
+            pares.insert(0, ('ArialNarrow', 'ARIALN.TTF', an))
+        for clave, nombre, datos in pares:
+            r = os.path.join(d, nombre)
             if not (os.path.exists(r) and os.path.getsize(r) == len(datos)):
                 with open(r, 'wb') as fh:
                     fh.write(datos)
-            rutas[e] = r
+            rutas[clave] = r
     except Exception:
         return {}
     return rutas
@@ -65,6 +82,9 @@ def instalar_qt():
             return
         from PyQt6.QtGui import QFontDatabase, QFont
         from PyQt6.QtCore import QByteArray
+        an = _bytes_arial()
+        if an and QFontDatabase.addApplicationFontFromData(QByteArray(an)) >= 0:
+            return          # registrada con su propio nombre «Arial Narrow»
         ok = False
         for e in _ESTILOS:
             if QFontDatabase.addApplicationFontFromData(QByteArray(_bytes(e))) >= 0:
