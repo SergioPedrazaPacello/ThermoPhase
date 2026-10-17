@@ -458,6 +458,83 @@ class HSWorker(QThread):
             self.error.emit(str(ex))
 
 
+class VentanaEnvolventeLibre(QWidget):
+    """Ventana independiente y redimensionable con SOLO el gráfico de una
+    envolvente (sin panel de opciones).  Muestra lo mismo que la pestaña
+    (isocalidad, punto marcado, recorrido, hidratos, diagrama P-T/P-H/T-S)
+    excepto el mapa de densidad.  Se actualiza sola cuando la pestaña
+    redibuja.  Clic derecho: guardar o copiar la imagen."""
+
+    def __init__(self, tab, titulo=None):
+        super().__init__(None)
+        self._tab = tab
+        self.setWindowFlags(Qt.WindowType.Window)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        base = titulo or _i18n.t("Envolvente de fases")
+        self.setWindowTitle(f"{base} - {_i18n.t('Vista ampliada')}")
+        try:
+            self.setWindowIcon(tab.window().windowIcon())
+        except Exception:
+            pass
+        self.setStyleSheet(f"background-color: {GRAY_PLOT_BG};")
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0); lay.setSpacing(0)
+        self.fig = Figure(figsize=(1, 1))
+        self.fig.patch.set_facecolor(GRAY_PLOT_BG)
+        # Márgenes recalculados en CADA dibujado (al redimensionar o al
+        # actualizarse desde la pestaña), según el tamaño de las etiquetas.
+        try:
+            self.fig.set_layout_engine('tight', pad=0.8)
+        except Exception:
+            pass
+        self.ax = self.fig.add_subplot(111)
+        self.canvas = FigureCanvas(self.fig)
+        self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                  QSizePolicy.Policy.Expanding)
+        self.canvas.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.canvas.customContextMenuRequested.connect(self._menu)
+        lay.addWidget(self.canvas)
+        self.setMinimumSize(420, 320)
+        self.resize(1000, 700)
+
+    def ajustar(self):
+        """Redibuja (el motor 'tight' ajusta los márgenes al tamaño actual).
+        Un primer dibujado síncrono fija las etiquetas de los ejes; el
+        segundo calcula los márgenes ya con ellas."""
+        try:
+            self.canvas.draw()
+        except Exception:
+            pass
+        self.canvas.draw_idle()
+
+    def _menu(self, pos):
+        from PyQt6.QtWidgets import QMenu
+        m = QMenu(self)
+        a_g = m.addAction(_i18n.t("Guardar imagen..."))
+        a_c = m.addAction(_i18n.t("Copiar imagen"))
+        r = m.exec(self.canvas.mapToGlobal(pos))
+        if r is a_g:
+            self._guardar()
+        elif r is a_c:
+            from PyQt6.QtWidgets import QApplication
+            QApplication.clipboard().setPixmap(self.canvas.grab())
+
+    def _guardar(self):
+        from PyQt6.QtWidgets import QFileDialog
+        ruta, _ = QFileDialog.getSaveFileName(
+            self, _i18n.t("Guardar imagen..."), "envolvente.png",
+            "PNG (*.png);;PDF (*.pdf);;SVG (*.svg)")
+        if ruta:
+            try:
+                self.fig.savefig(ruta, dpi=200, facecolor=self.fig.get_facecolor())
+            except Exception as ex:
+                dialogos.error(self, str(ex))
+
+    def closeEvent(self, ev):
+        self._tab._cerrar_libre(self)
+        super().closeEvent(ev)
+
+
 class TabEnvolvente(QWidget):
     def __init__(self, get_z, get_kij, get_metodo_densidad=None):
         super().__init__()
@@ -1386,7 +1463,59 @@ class TabEnvolvente(QWidget):
                         textcoords='offset points', fontsize=8, color=COL_R,
                         ha='center', va='center', zorder=10)
 
-    def _plot(self,res):
+    def _plot(self, res):
+        """Dibuja la envolvente en la pestaña y actualiza las ventanas
+        ampliadas abiertas (mismo contenido, sin mapa de densidad)."""
+        self._plot_base(res)
+        self._refrescar_libres()
+
+    # ── Ventana ampliada (solo el gráfico, redimensionable) ──────────────
+    def abrir_libre(self, titulo=None):
+        """Abre (o trae al frente) la ventana ampliada de esta envolvente."""
+        if self.result is None:
+            dialogos.info(self, _i18n.t("Primero calcula la envolvente."))
+            return None
+        self._libres = [w for w in getattr(self, '_libres', []) if w is not None]
+        if self._libres:
+            w = self._libres[0]
+        else:
+            w = VentanaEnvolventeLibre(self, titulo)
+            self._libres.append(w)
+            self._dibujar_en_libre(w)
+        w.showNormal(); w.raise_(); w.activateWindow()
+        return w
+
+    def _cerrar_libre(self, w):
+        try:
+            self._libres.remove(w)
+        except (AttributeError, ValueError):
+            pass
+
+    def _refrescar_libres(self):
+        for w in list(getattr(self, '_libres', [])):
+            try:
+                self._dibujar_en_libre(w)
+            except Exception:
+                pass
+
+    def _dibujar_en_libre(self, w):
+        """Ejecuta el mismo dibujo de la pestaña sobre la figura de la
+        ventana ampliada, sin el mapa de densidad."""
+        if self.result is None:
+            return
+        guard = ('ax', 'canvas', 'fig', '_regiones', '_hover_annot',
+                 '_cross_v', '_cross_h', '_bg')
+        prev = {k: getattr(self, k, None) for k in guard}
+        try:
+            self.ax, self.canvas, self.fig = w.ax, w.canvas, w.fig
+            self._regiones = None
+            self._plot_base(self.result)
+        finally:
+            for k, v in prev.items():
+                setattr(self, k, v)
+        w.ajustar()
+
+    def _plot_base(self,res):
         ax=self.ax; ax.clear(); _go.limpiar(ax)
         self._hover_annot = None   # se invalida al limpiar los ejes
         self._cross_v = None

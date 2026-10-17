@@ -2701,6 +2701,19 @@ class _Ventana(QWidget):
         ev.ignore()
         self.hide()
 
+    def changeEvent(self, ev):
+        # Recordar la última ventana de envolvente activa (para «Vista
+        # ampliada» del menú Gráficos).
+        try:
+            if (ev.type() == ev.Type.ActivationChange and self.isActiveWindow()
+                    and isinstance(getattr(self, '_widget', None), TabEnvolvente)):
+                p = self.parent()
+                if p is not None:
+                    p._ult_env = self
+        except Exception:
+            pass
+        super().changeEvent(ev)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -2861,6 +2874,9 @@ class MainWindow(QMainWindow):
             a.triggered.connect(lambda _=False, c=cod: self._set_diagrama_env(c))
             self._grp_diag.addAction(a); m_diag.addAction(a)
             self._acts_diag[cod] = a
+
+        # Envolvente en una ventana aparte, solo el gráfico y redimensionable.
+        m_graf.addAction(_act("Envolvente en vista ampliada", self._abrir_env_ampliada))
 
         # Comparación de varias envolventes (composición principal y fluidos
         # del gestor) en un mismo diagrama.
@@ -5343,6 +5359,22 @@ class MainWindow(QMainWindow):
         self._montar_subventana(clave, widget, _i18n.t("Documentación técnica"),
                                 tam=(900, 640), redimensionable=True,
                                 pie_texto=_i18n.t("Documentación técnica"))
+
+    def _abrir_env_ampliada(self):
+        """Abre la envolvente de la última ventana de envolvente activa (o la
+        principal) en una ventana aparte, solo el gráfico y redimensionable."""
+        win = getattr(self, '_ult_env', None)
+        if win is None or not win.isVisible():
+            vis = [w for w in self._subventanas.values()
+                   if isinstance(getattr(w, '_widget', None), TabEnvolvente)
+                   and w.isVisible()]
+            win = vis[0] if len(vis) == 1 else None
+            if win is None:
+                win = next((w for w in self._subventanas.values()
+                            if getattr(w, '_widget', None) is self.tab_env), None)
+        tab = win._widget if win is not None else self.tab_env
+        titulo = win.windowTitle() if win is not None else None
+        tab.abrir_libre(titulo)
 
     def _menu_licencia(self):
         import dialogos as _dlg
