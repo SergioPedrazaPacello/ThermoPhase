@@ -23,7 +23,7 @@ from eos import (
     calcular, R_GAS, set_eos as _set_eos, get_eos as _get_eos
 )
 import eos as _eng
-from pestana_envolvente import TabEnvolvente
+from pestana_envolvente import TabEnvolvente, qss_casilla as _qss_casilla
 from pestana_saturacion import TabSaturacion
 from pestana_hidratos import TabHidratos
 from pestana_propiedades import TabPropiedades
@@ -2503,16 +2503,19 @@ class TabFluidos(QWidget):
 
         root.addWidget(section_label(
             "Abrir calculo del fluido seleccionado (ventana independiente):", left=True))
-        g3 = QHBoxLayout(); g3.setSpacing(4)
+        g3 = QHBoxLayout(); g3.setSpacing(6)
+        self.cmb_calc = QComboBox(); self.cmb_calc.setFixedSize(300, 24)
+        _aplicar_estilo_combo(self.cmb_calc)
         for txt, clave in [("Equilibrio de fases", "equilibrio"),
                            ("Envolvente de fases", "envolvente"),
                            ("Puntos de saturación", "saturacion"),
                            ("Formación de hidratos", "hidratos"),
-                           ("Análisis de sensibilidad", "propiedades"),
-                           ("Parámetros EOS", "parametros")]:
-            b = QPushButton(txt); b.setStyleSheet(BTN)
-            b.clicked.connect(lambda _=False, c=clave: self._abrir(c))
-            g3.addWidget(b)
+                           ("Contenido de agua de saturación", "saturacion_agua"),
+                           ("Parámetros de la ecuación de estado", "parametros")]:
+            self.cmb_calc.addItem(txt, clave)
+        b = QPushButton("Abrir"); b.setStyleSheet(BTN); b.setFixedWidth(90)
+        b.clicked.connect(lambda: self._abrir(self.cmb_calc.currentData()))
+        g3.addWidget(self.cmb_calc); g3.addWidget(b)
         g3.addStretch()
         root.addLayout(g3)
         root.addStretch()
@@ -2826,10 +2829,11 @@ class MainWindow(QMainWindow):
                              ('saturacion',  "Puntos de saturación"),
                              ('hidratos',    "Formación de hidratos"),
                              ('saturacion_agua', "Contenido de agua de saturación"),
-                             ('propiedades', "Análisis de sensibilidad"),
                              ('parametros',  "Parámetros de la ecuación de estado")):
             m_calc.addAction(_act(texto, lambda _=False, c=clave: self._abrir_calculo_ui(c)))
+        # Cálculos que piden elegir el fluido al abrirse
         m_calc.addSeparator()
+        m_calc.addAction(_act("Análisis de sensibilidad", self._abrir_sensibilidad))
         m_calc.addAction(_act("Flash múltiple", self._abrir_flash_multiple))
         m_calc.addAction(_act("Operaciones unitarias", self._abrir_operaciones_unitarias))
 
@@ -4185,7 +4189,10 @@ class MainWindow(QMainWindow):
             f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
             f' font-family:"{FONT_F}"; font-size:{FS}pt; outline:0; }}'
             f'QListWidget::item {{ height:20px; padding-left:2px; }}'
-            f'QListWidget::item:selected {{ background:{SEL_BG}; color:{TEXT}; }}')
+            f'QListWidget::item:selected {{ background:{SEL_BG}; color:{TEXT}; }}'
+            # Casilla dibujada por el propio programa: en algunos equipos
+            # (estilo de Windows 11) la marca de las filas tildadas no se veía.
+            + _qss_casilla('QListWidget'))
         c2.addWidget(lista)
         cols.addLayout(c1, 1); cols.addLayout(c2)
         root.addLayout(cols)
@@ -4403,6 +4410,8 @@ class MainWindow(QMainWindow):
             self._abrir_operaciones_unitarias()
         elif clave == 'flash_multiple':
             self._abrir_flash_multiple()
+        elif clave == 'propiedades':
+            self._abrir_sensibilidad()
         else:
             self._abrir_calculo_ui(clave)
 
@@ -5360,11 +5369,11 @@ class MainWindow(QMainWindow):
                                 tam=(900, 640), redimensionable=True,
                                 pie_texto=_i18n.t("Documentación técnica"))
 
-    def _abrir_env_ampliada(self):
-        """Pide qué envolvente mostrar (composición principal o un fluido del
-        gestor) y la abre en una ventana aparte, solo el gráfico y
-        redimensionable.  Si esa envolvente aún no está calculada, la calcula
-        y abre la vista al terminar."""
+    def _elegir_fluido(self, titulo, texto, prefijo=None):
+        """Ventanita con la composición principal y los fluidos del gestor.
+        Devuelve la clave elegida (_CLAVE_PRINCIPAL o el nombre del fluido)
+        o None si se cancela.  `prefijo` (p. ej. 'envolvente') preselecciona
+        la última ventana activa de ese cálculo."""
         from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                      QListWidget, QListWidgetItem, QPushButton,
                                      QLabel)
@@ -5373,13 +5382,13 @@ class MainWindow(QMainWindow):
         disponibles = [PRIN] + [f['nombre'] for f in self.fluidos]
 
         dlg = QDialog(self)
-        dlg.setWindowTitle(_i18n.t("Envolvente en vista ampliada"))
+        dlg.setWindowTitle(_i18n.t(titulo))
         dlg.setStyleSheet('QDialog { background:#e0e0e0; }')
         root = QVBoxLayout(dlg)
         root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
         txt_qss = (f'font-family:"{FONT_F}";font-size:{FS}pt;'
                    f'color:{TEXT};background:transparent;')
-        info = QLabel(_i18n.t("Seleccione la envolvente a mostrar:"))
+        info = QLabel(_i18n.t(texto))
         info.setStyleSheet(txt_qss); root.addWidget(info)
         lw = QListWidget(); lw.setFixedSize(260, 200)
         lw.setStyleSheet(f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
@@ -5395,7 +5404,7 @@ class MainWindow(QMainWindow):
         pre = 0
         if ult is not None:
             for n, k in enumerate(disponibles):
-                if k != PRIN and ult is self._subventanas.get(f"envolvente@{k}"):
+                if k != PRIN and prefijo and ult is self._subventanas.get(f"{prefijo}@{k}"):
                     pre = n
         lw.setCurrentRow(pre)
         root.addWidget(lw)
@@ -5411,8 +5420,33 @@ class MainWindow(QMainWindow):
         lw.itemDoubleClicked.connect(lambda _: dlg.accept())
         dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
         if not dlg.exec() or lw.currentItem() is None:
+            return None
+        return lw.currentItem().data(Qt.ItemDataRole.UserRole)
+
+    def _abrir_sensibilidad(self):
+        """Análisis de sensibilidad: primero se elige el fluido."""
+        k = self._elegir_fluido("Análisis de sensibilidad",
+                                "Seleccione el fluido a analizar:")
+        if k is None:
             return
-        k = lw.currentItem().data(Qt.ItemDataRole.UserRole)
+        if k == self._CLAVE_PRINCIPAL:
+            self._abrir_calculo_ui('propiedades')
+            return
+        fluido = next((f for f in self.fluidos if f['nombre'] == k), None)
+        if fluido is not None:
+            self._abrir_calculo_fluido_ui('propiedades', fluido)
+
+    def _abrir_env_ampliada(self):
+        """Pide qué envolvente mostrar (composición principal o un fluido del
+        gestor) y la abre en una ventana aparte, solo el gráfico y
+        redimensionable.  Si esa envolvente aún no está calculada, la calcula
+        y abre la vista al terminar."""
+        k = self._elegir_fluido("Envolvente en vista ampliada",
+                                "Seleccione la envolvente a mostrar:", 'envolvente')
+        if k is None:
+            return
+        PRIN = self._CLAVE_PRINCIPAL
+        nombre_prin = _i18n.t("Composición principal")
 
         base = _i18n.t("Envolvente de fases")
         if k == PRIN:

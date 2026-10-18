@@ -293,7 +293,7 @@ class RetroWorker(QThread):
     La región queda entre la curva de rocío (punto crítico → cricondentérmica)
     y la curva que une esos máximos."""
     done = pyqtSignal(dict); error = pyqtSignal(str)
-    BETAS = (0.995, 0.99, 0.98, 0.97, 0.95, 0.93, 0.90, 0.87, 0.85,
+    BETAS = (0.999, 0.995, 0.99, 0.98, 0.97, 0.95, 0.93, 0.90, 0.87, 0.85,
              0.80, 0.75, 0.70, 0.65, 0.60, 0.55, 0.50)
 
     def __init__(self, z, kij, eos_code=None):
@@ -530,6 +530,17 @@ def _svg_check():
     return r.replace('\\', '/')
 
 
+def qss_casilla(widget='QCheckBox'):
+    """QSS de una casilla de verificación dibujada por el programa (cuadro
+    blanco con borde gris y marca ✓), igual en cualquier Windows/tema."""
+    r = _svg_check()
+    q = (f'{widget}::indicator {{ width:12px; height:12px; border:1px solid #707070;'
+         f' background:#FFFFFF; }}')
+    if r:
+        q += f'{widget}::indicator:checked {{ image:url({r}); }}'
+    return q
+
+
 def _dialogo_ejes(parent, ejes):
     """Ventanita para fijar mínimo/máximo de cada eje.
 
@@ -547,10 +558,7 @@ def _dialogo_ejes(parent, ejes):
         'QFrame#caja { background:#F4F4F4; border:1px solid #BDBDBD; border-radius:2px; }'
         'QFrame#caja QLabel { background:transparent; border:none; font-weight:normal; }'
         'QFrame#caja QCheckBox { background:transparent; }'
-        'QCheckBox::indicator { width:12px; height:12px; border:1px solid #707070;'
-        ' background:#FFFFFF; }'
-        + (f'QCheckBox::indicator:checked {{ image:url({_svg_check()}); }}'
-           if _svg_check() else '') +
+        + qss_casilla('QCheckBox') +
         'QLineEdit { background:#FFFFFF; border:1px solid #A0A0A0; padding:1px 4px; }'
         'QLineEdit:disabled { background:#FFFFFF; color:#8A8A8A; border:1px solid #C8C8C8; }')
     lay = QVBoxLayout(dlg)
@@ -917,7 +925,7 @@ class TabEnvolvente(QWidget):
         self.chk_reg.setStyleSheet(
             f'QCheckBox {{ color:{TEXT}; font-family:"{FONT_F}"; '
             f'font-size:{FS}pt; padding:2px 0px; }}'
-            f'QCheckBox::indicator {{ width:12px; height:12px; }}')
+            + qss_casilla('QCheckBox'))
         self.chk_reg.toggled.connect(self._on_toggle_regiones)
         h_reg.addWidget(self.chk_reg)
         self.lbl_reg_cargando = QLabel("")
@@ -1859,7 +1867,8 @@ class TabEnvolvente(QWidget):
             return
         Pct, Tct = tramo[-1]
         locus = [(Pct, Tct)] + [(p, t) for p, t, _ in d['maximos']] + [(Pc, Tc)]
-        poly = [xy(p, t) for p, t in tramo] + [xy(p, t) for p, t in locus[::-1]]
+        # crítico → (rocío) → cricondentérmica → (máximos de T) → crítico
+        poly = [xy(p, t) for p, t in tramo] + [xy(p, t) for p, t in locus]
         ax.add_patch(Polygon(poly, closed=True, facecolor='#f5b041', alpha=0.45,
                              edgecolor='none', zorder=0.8,
                              label=_i18n.t('Región retrógrada (molar)')))

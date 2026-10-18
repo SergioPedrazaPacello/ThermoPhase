@@ -71,6 +71,8 @@ TRAD = {
     "Mostrar región retrógrada": "Show retrograde region",
     "Ajustar ejes...": "Adjust axes...",
     "Seleccione la envolvente a mostrar:": "Select the envelope to show:",
+    "Selección de fluido": "Fluid selection",
+    "Seleccione el fluido a analizar:": "Select the fluid to analyze:",
     "Abrir": "Open",
     "Ajustar ejes": "Adjust axes",
     "Automático": "Automatic",

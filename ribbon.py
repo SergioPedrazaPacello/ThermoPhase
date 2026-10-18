@@ -56,16 +56,23 @@ _SELECTORES = [
 ]
 
 # Items del arbol "Cálculos": (clave, texto). La clave abre la subventana MDI.
-NAV_CALCULOS = [
+# Dos grupos: cálculos de la composición principal (sin selector de fluido) y
+# cálculos que piden elegir el fluido al abrirse.
+NAV_CALC_PRINCIPAL = [
     ("equilibrio",  "Equilibrio de fases"),
     ("envolvente",  "Envolvente de fases"),
     ("saturacion",  "Puntos de saturación"),
     ("hidratos",    "Formación de hidratos"),
     ("saturacion_agua", "Contenido de agua de saturación"),
-    ("propiedades", "Análisis de sensibilidad"),
-    ("flash_multiple", "Flash múltiple"),
     ("parametros",  "Parámetros de la ecuación de estado"),
 ]
+NAV_CALC_SELECCION = [
+    ("propiedades", "Análisis de sensibilidad"),
+    ("flash_multiple", "Flash múltiple"),
+]
+NAV_CALCULOS = NAV_CALC_PRINCIPAL + NAV_CALC_SELECCION
+NAV_GRUPOS_CALC = [("Composición principal", NAV_CALC_PRINCIPAL),
+                   ("Selección de fluido", NAV_CALC_SELECCION)]
 
 # Accesos del arbol "Datos": (icono, texto, clave)
 NAV_DATOS = [
@@ -74,13 +81,15 @@ NAV_DATOS = [
 ]
 
 # Funcionalidades que cuelgan de cada fluido en el arbol (nombres abreviados).
+# Solo los cálculos que no piden elegir fluido (el fluido es obvio) más los
+# parámetros de la EOS para cambiar sus kij.
 FUNC_FLUIDO = [
     ("equilibrio",  "Equilibrio"),
     ("envolvente",  "Envolvente"),
     ("saturacion",  "Saturación"),
     ("hidratos",    "Hidratos"),
     ("saturacion_agua", "Contenido de agua de saturación"),
-    ("propiedades", "Sensibilidad"),
+    ("parametros",  "Parámetros EOS"),
 ]
 
 # Estilo plano (sin relieve) de las listas desplegables de la barra.
@@ -334,18 +343,22 @@ class NavigatorPanel(QWidget):
         v.addWidget(_seccion("Cálculos"))
         self.tree_calc = _tree_base()
         self.tree_calc.setRootIsDecorated(True)
-        raiz = QTreeWidgetItem(["Cálculos"])
-        raiz.setFlags(raiz.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-        self.tree_calc.addTopLevelItem(raiz)
-        for clave, texto in NAV_CALCULOS:
-            it = QTreeWidgetItem([texto])
-            self._aplicar_icono(it, icono(clave, 16))
-            it.setData(0, Qt.ItemDataRole.UserRole, clave)
-            raiz.addChild(it)
-            self._leaf_por_clave[clave] = it
-        raiz.setExpanded(True)
+        for titulo, items in NAV_GRUPOS_CALC:
+            raiz = QTreeWidgetItem([titulo])
+            raiz.setFlags(raiz.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+            raiz.setData(0, Qt.ItemDataRole.UserRole, ('grupo',))
+            self.tree_calc.addTopLevelItem(raiz)
+            for clave, texto in items:
+                it = QTreeWidgetItem([texto])
+                self._aplicar_icono(it, icono(clave, 16))
+                it.setData(0, Qt.ItemDataRole.UserRole, clave)
+                raiz.addChild(it)
+                self._leaf_por_clave[clave] = it
+            raiz.setExpanded(True)
         self.tree_calc.itemClicked.connect(self._on_calc_click)
-        self.tree_calc.setFixedHeight(24 + 22 * (len(NAV_CALCULOS) + 1))
+        self.tree_calc.itemExpanded.connect(lambda *_: self._ajustar_alto_calc())
+        self.tree_calc.itemCollapsed.connect(lambda *_: self._ajustar_alto_calc())
+        self._ajustar_alto_calc()
         v.addWidget(self.tree_calc)
 
         # Datos (Componentes + Fluidos como arbol expandible)
@@ -404,9 +417,19 @@ class NavigatorPanel(QWidget):
         scroll.setStyleSheet(f'QScrollArea {{ background:{CARA}; border:none; }}')
         outer.addWidget(scroll, 1)
 
+    def _ajustar_alto_calc(self):
+        n = 0
+        for i in range(self.tree_calc.topLevelItemCount()):
+            r = self.tree_calc.topLevelItem(i); n += 1
+            if r.isExpanded():
+                n += r.childCount()
+        self.tree_calc.setFixedHeight(24 + 22 * max(n, 1))
+
     def _on_calc_click(self, item, col):
         clave = item.data(0, Qt.ItemDataRole.UserRole)
-        if clave:
+        if isinstance(clave, tuple):          # cabecera de grupo
+            item.setExpanded(not item.isExpanded())
+        elif clave:
             self.calculo_pedido.emit(str(clave))
 
     def _on_dato_click(self, item, col):
