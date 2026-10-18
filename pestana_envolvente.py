@@ -287,6 +287,51 @@ class IsoWorker(QThread):
             self.error.emit(str(e))
 
 
+class RetroWorker(QThread):
+    """Región de condensación retrógrada (base molar): envolvente Michelsen,
+    familia de isocalidad y, de cada una, su punto de máxima temperatura.
+    La región queda entre la curva de rocío (punto crítico → cricondentérmica)
+    y la curva que une esos máximos."""
+    done = pyqtSignal(dict); error = pyqtSignal(str)
+    BETAS = (0.995, 0.99, 0.98, 0.97, 0.95, 0.93, 0.90, 0.87, 0.85,
+             0.80, 0.75, 0.70, 0.65, 0.60, 0.55, 0.50)
+
+    def __init__(self, z, kij, eos_code=None):
+        super().__init__(); self.z = z; self.kij = kij; self.eos_code = eos_code
+
+    def run(self):
+        try:
+            import eos as _eng
+            if self.eos_code:
+                _eng.set_eos(self.eos_code)
+            from envolvente_michelsen import construir_envolvente, construir_isocalidad
+            r = construir_envolvente(self.z, self.kij, max_pts=10000)
+            ev = r.get('envolvente', []); crit = r.get('critico')
+            if crit is None or not ev:
+                self.error.emit(_i18n.t("No se encontró el punto crítico: no se "
+                                        "puede delimitar la región retrógrada."))
+                return
+            ic = min(range(len(ev)), key=lambda i: (ev[i][0]-crit[0])**2 + (ev[i][1]-crit[1])**2)
+            rocio = ev[ic:]
+            ict = max(range(len(rocio)), key=lambda i: rocio[i][1])
+            tramo = rocio[:ict+1]                      # crítico → cricondentérmica
+            lineas = {}; maximos = []
+            for b in self.BETAS:
+                rr = construir_isocalidad(self.z, b, self.kij, max_pts=2000,
+                                          p_max=crit[0]*1.02, critico=crit)
+                pts = rr.get('puntos', []) or []
+                lineas[b] = pts
+                if pts:
+                    j = max(range(len(pts)), key=lambda i: pts[i][1])
+                    if pts[j][1] > crit[1] + 0.5:
+                        maximos.append((pts[j][0], pts[j][1], b))
+            maximos.sort(key=lambda m: -m[2])          # de β≈1 hacia el crítico
+            self.done.emit(dict(crit=crit, tramo=tramo, lineas=lineas,
+                                maximos=maximos))
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class RegionesWorker(QThread):
     """Worker que recalcula la envolvente (Michelsen) con la composición
     ACTUAL y luego el mapa de densidad + curva de transición.  Todo en
@@ -458,6 +503,136 @@ class HSWorker(QThread):
             self.error.emit(str(ex))
 
 
+class _LocDesplazado(ticker.MaxNLocator):
+    """Ticks «redondos» en la escala absoluta (°R/K) aunque los datos estén en
+    la relativa (°F/°C): se buscan en v+off y se devuelven en v."""
+    def __init__(self, off):
+        super().__init__(nbins='auto', steps=[1, 2, 2.5, 5, 10]); self._off = off
+
+    def tick_values(self, vmin, vmax):
+        return super().tick_values(vmin + self._off, vmax + self._off) - self._off
+
+
+def _svg_check():
+    """Ruta de un SVG con la marca ✓ (para el indicador de la casilla)."""
+    import os
+    base = os.getenv('APPDATA') or os.path.join(os.path.expanduser('~'), '.config')
+    d = os.path.join(base, 'ThermoPhase'); r = os.path.join(d, 'chk.svg')
+    try:
+        os.makedirs(d, exist_ok=True)
+        if not os.path.exists(r):
+            with open(r, 'w') as fh:
+                fh.write('<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12">'
+                         '<path d="M2.5 6.2 L5 8.7 L9.6 3.4" fill="none" stroke="#000" '
+                         'stroke-width="1.7"/></svg>')
+    except Exception:
+        return None
+    return r.replace('\\', '/')
+
+
+def _dialogo_ejes(parent, ejes):
+    """Ventanita para fijar mínimo/máximo de cada eje.
+
+    ejes: lista de dict(nombre='Eje X', titulo='Temperatura', unidad='°F',
+          lim=(a, b), auto=True, es_T=True).  En los ejes de temperatura se
+          muestra un selector relativa/absoluta (°F/°R o °C/K) junto al
+          nombre, como en Operaciones unitarias; los valores se convierten
+          al cambiarlo y se devuelven siempre en la unidad del gráfico.
+    Devuelve [(auto, min, max, absoluta), ...] o None si se cancela.  Con
+    absoluta=True el eje del gráfico se muestra en °R (o K)."""
+    from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QComboBox
+    dlg = QDialog(parent)
+    dlg.setWindowTitle(_i18n.t("Ajustar ejes"))
+    dlg.setStyleSheet(
+        'QFrame#caja { background:#F4F4F4; border:1px solid #BDBDBD; border-radius:2px; }'
+        'QFrame#caja QLabel { background:transparent; border:none; font-weight:normal; }'
+        'QFrame#caja QCheckBox { background:transparent; }'
+        'QCheckBox::indicator { width:12px; height:12px; border:1px solid #707070;'
+        ' background:#FFFFFF; }'
+        + (f'QCheckBox::indicator:checked {{ image:url({_svg_check()}); }}'
+           if _svg_check() else '') +
+        'QLineEdit { background:#FFFFFF; border:1px solid #A0A0A0; padding:1px 4px; }'
+        'QLineEdit:disabled { background:#FFFFFF; color:#8A8A8A; border:1px solid #C8C8C8; }')
+    lay = QVBoxLayout(dlg)
+    filas = []
+    off = _u.offset_abs_rel()
+    for e in ejes:
+        caja = QFrame(); caja.setObjectName('caja'); gl = QGridLayout(caja)
+        gl.setContentsMargins(10, 8, 10, 10); gl.setVerticalSpacing(6)
+        cab = QHBoxLayout(); cab.setSpacing(6)
+        lbl = QLabel(f"{e['nombre']}: {e['titulo']}" +
+                     ("" if e['es_T'] else f" ({e['unidad']})"))
+        cab.addWidget(lbl)
+        cmb = None
+        if e['es_T']:
+            cmb = QComboBox(); cmb.addItems([_u.u('T'), _u.u_abs()]); cmb.setFixedSize(64, 22)
+            try:
+                from ventana_principal import _aplicar_estilo_combo
+                _aplicar_estilo_combo(cmb)
+            except Exception:
+                pass
+            cab.addWidget(cmb)
+            cmb.blockSignals(True); cmb.setCurrentIndex(1 if e.get('abs') else 0)
+            cmb.blockSignals(False)
+        cab.addStretch(1)
+        gl.addLayout(cab, 0, 0, 1, 2)
+        ck = QCheckBox(_i18n.t("Automático")); ck.setChecked(e['auto'])
+        d0 = off if (e['es_T'] and e.get('abs')) else 0.0   # mostrar en la unidad elegida
+        e_min = QLineEdit(f"{e['lim'][0] + d0:.4g}"); e_max = QLineEdit(f"{e['lim'][1] + d0:.4g}")
+        for ed in (e_min, e_max):
+            ed.setFixedSize(110, 22); ed.setAlignment(Qt.AlignmentFlag.AlignRight)
+        gl.addWidget(ck, 1, 0, 1, 2)
+        gl.addWidget(QLabel(_i18n.t("Mínimo")), 2, 0); gl.addWidget(e_min, 2, 1)
+        gl.addWidget(QLabel(_i18n.t("Máximo")), 3, 0); gl.addWidget(e_max, 3, 1)
+
+        def sync(on, a=e_min, b=e_max):
+            a.setEnabled(not on); b.setEnabled(not on)
+        ck.toggled.connect(sync); sync(e['auto'])
+        if cmb is not None:
+            def conv(idx, a=e_min, b=e_max, st={'i': 0}):
+                d = off if idx == 1 else -off
+                for ed in (a, b):
+                    try:
+                        ed.setText(f"{_a_float_req(ed.text()) + d:.4g}")
+                    except ValueError:
+                        pass
+                st['i'] = idx
+            cmb.currentIndexChanged.connect(conv)
+        lay.addWidget(caja)
+        filas.append((ck, e_min, e_max, cmb, e))
+    bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                          QDialogButtonBox.StandardButton.Cancel)
+    bb.button(QDialogButtonBox.StandardButton.Ok).setText(_i18n.t("Aceptar"))
+    bb.button(QDialogButtonBox.StandardButton.Cancel).setText(_i18n.t("Cancelar"))
+    lay.addWidget(bb)
+    out = {}
+
+    def aceptar():
+        res = []
+        for ck, e_min, e_max, cmb, e in filas:
+            es_abs = cmb is not None and cmb.currentIndex() == 1
+            if ck.isChecked():
+                res.append((True, None, None, es_abs)); continue
+            try:
+                a, b = _a_float_req(e_min.text()), _a_float_req(e_max.text())
+            except ValueError:
+                dialogos.advertencia(dlg, _i18n.t("Valor inválido en el eje") +
+                                     f" «{e['nombre']}».")
+                return
+            if not a < b:
+                dialogos.advertencia(dlg, _i18n.t("El mínimo debe ser menor que el máximo")
+                                     + f" («{e['nombre']}»).")
+                return
+            if es_abs:                                         # absoluta → relativa
+                a -= off; b -= off
+            res.append((False, a, b, es_abs))
+        out['r'] = res; dlg.accept()
+
+    bb.accepted.connect(aceptar); bb.rejected.connect(dlg.reject)
+    dlg.setFixedSize(dlg.sizeHint())
+    return out.get('r') if dlg.exec() else None
+
+
 class VentanaEnvolventeLibre(QWidget):
     """Ventana independiente y redimensionable con SOLO el gráfico de una
     envolvente (sin panel de opciones).  Muestra lo mismo que la pestaña
@@ -466,12 +641,27 @@ class VentanaEnvolventeLibre(QWidget):
     redibuja.  Clic derecho: guardar o copiar la imagen."""
 
     def __init__(self, tab, titulo=None):
-        super().__init__(None)
+        # Dueña = ventana principal del programa: así Windows la mantiene
+        # SIEMPRE por delante de ella (no se va atrás al hacer clic en el
+        # programa), igual que las demás ventanas de cálculo.
+        dueña = tab.window()
+        while dueña is not None and dueña.parentWidget() is not None:
+            dueña = dueña.parentWidget().window()
+        super().__init__(dueña)
         self._tab = tab
+        self._retro_on = False
+        self._titulo_base = None
+        # Límites fijados por el usuario: None = automático.  Se recuerdan
+        # junto con los títulos de los ejes (si cambian unidades o diagrama,
+        # se vuelve a automático).
+        self._lim_x = None; self._lim_y = None; self._lim_clave = None
+        self._abs = {'x': False, 'y': False}      # eje de T mostrado en °R/K
+        self._lab_orig = ('', '')
         self.setWindowFlags(Qt.WindowType.Window)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         base = titulo or _i18n.t("Envolvente de fases")
-        self.setWindowTitle(f"{base} - {_i18n.t('Vista ampliada')}")
+        self._titulo_base = f"{base} - {_i18n.t('Vista ampliada')}"
+        self.setWindowTitle(self._titulo_base)
         try:
             self.setWindowIcon(tab.window().windowIcon())
         except Exception:
@@ -510,14 +700,75 @@ class VentanaEnvolventeLibre(QWidget):
     def _menu(self, pos):
         from PyQt6.QtWidgets import QMenu
         m = QMenu(self)
+        a_r = None
+        if getattr(self._tab, '_diagrama', 'PT') == 'PT':
+            a_r = m.addAction(_i18n.t("Mostrar región retrógrada"))
+            a_r.setCheckable(True); a_r.setChecked(self._retro_on)
+        a_e = m.addAction(_i18n.t("Ajustar ejes..."))
+        m.addSeparator()
         a_g = m.addAction(_i18n.t("Guardar imagen..."))
         a_c = m.addAction(_i18n.t("Copiar imagen"))
         r = m.exec(self.canvas.mapToGlobal(pos))
-        if r is a_g:
+        if r is None:
+            return
+        if a_r is not None and r is a_r:
+            self._tab._toggle_retro(self, a_r.isChecked())
+        elif r is a_e:
+            self._ajustar_ejes()
+        elif r is a_g:
             self._guardar()
         elif r is a_c:
             from PyQt6.QtWidgets import QApplication
             QApplication.clipboard().setPixmap(self.canvas.grab())
+
+    def _clave_ejes(self):
+        return self._lab_orig
+
+    def _ajustar_ejes(self):
+        def eje(nombre, etiqueta, lim, auto):
+            # "Temperatura (°F)" → título y unidad por separado
+            tit, uni = etiqueta, ''
+            if etiqueta.endswith(')') and ' (' in etiqueta:
+                k = etiqueta.rfind(' (')
+                tit, uni = etiqueta[:k], etiqueta[k+2:-1]
+            return dict(nombre=nombre, titulo=tit, unidad=uni, lim=lim, auto=auto,
+                        es_T=(uni == _u.u('T')))
+        r = _dialogo_ejes(self, [
+            dict(eje(_i18n.t("Eje X"), self._lab_orig[0], self.ax.get_xlim(),
+                     self._lim_x is None), abs=self._abs['x']),
+            dict(eje(_i18n.t("Eje Y"), self._lab_orig[1], self.ax.get_ylim(),
+                     self._lim_y is None), abs=self._abs['y'])])
+        if r is None:
+            return
+        (ax_auto, x0, x1, xa), (ay_auto, y0, y1, ya) = r
+        self._abs = {'x': bool(xa), 'y': bool(ya)}
+        self._lim_x = None if ax_auto else (x0, x1)
+        self._lim_y = None if ay_auto else (y0, y1)
+        self._lim_clave = self._clave_ejes()
+        self._tab._dibujar_en_libre(self)     # redibuja en automático y aplica
+
+    def aplicar_limites(self):
+        """Aplica los límites del usuario y la temperatura absoluta (si siguen
+        valiendo para estos ejes: al cambiar unidades o diagrama se vuelve a
+        automático y a temperatura relativa)."""
+        self._lab_orig = (self.ax.get_xlabel(), self.ax.get_ylabel())
+        if self._lim_clave is not None and self._lim_clave != self._lab_orig:
+            self._lim_x = self._lim_y = self._lim_clave = None
+            self._abs = {'x': False, 'y': False}
+        if self._lim_x is not None:
+            self.ax.set_xlim(*self._lim_x)
+        if self._lim_y is not None:
+            self.ax.set_ylim(*self._lim_y)
+        rel = f"({_u.u('T')})"
+        for eje, lab, set_lab in (('x', self._lab_orig[0], self.ax.set_xlabel),
+                                  ('y', self._lab_orig[1], self.ax.set_ylabel)):
+            if self._abs[eje] and lab.endswith(rel):
+                axis = self.ax.xaxis if eje == 'x' else self.ax.yaxis
+                off = _u.offset_abs_rel()
+                axis.set_major_locator(_LocDesplazado(off))
+                axis.set_major_formatter(ticker.FuncFormatter(
+                    lambda v, _p, o=off: f"{round(v + o, 6):g}"))
+                set_lab(lab[:-len(rel)] + f"({_u.u_abs()})")
 
     def _guardar(self):
         from PyQt6.QtWidgets import QFileDialog
@@ -853,6 +1104,7 @@ class TabEnvolvente(QWidget):
         self.worker.start()
 
     def _on_error(self,msg):
+        self._libre_pend = None
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular Envolvente"))
         self.prog.setVisible(False)
         dialogos.error(self, msg)
@@ -876,6 +1128,11 @@ class TabEnvolvente(QWidget):
         # borde de temperatura, que acaban de cambiar).
         if self._hidratos_on:
             self._lanzar_curva_hidratos()
+        # Vista ampliada pedida antes de que la envolvente estuviera calculada
+        t = getattr(self, '_libre_pend', None)
+        if t is not None:
+            self._libre_pend = None
+            self.abrir_libre(t)
 
     # ── Curva de formación de hidratos (superpuesta) ──────────
     def _topes_hidratos(self):
@@ -1510,10 +1767,119 @@ class TabEnvolvente(QWidget):
             self.ax, self.canvas, self.fig = w.ax, w.canvas, w.fig
             self._regiones = None
             self._plot_base(self.result)
+            if (w._retro_on and self._diagrama == 'PT'):
+                if (getattr(self, '_retro_data', None) is not None
+                        and self._retro_key == self._retro_clave()):
+                    lims = (w.ax.get_xlim(), w.ax.get_ylim())
+                    self._dibujar_retro(w.ax, self._retro_data)
+                    w.ax.set_xlim(lims[0]); w.ax.set_ylim(lims[1])
+                    w.setWindowTitle(w._titulo_base)
+                else:
+                    self._asegurar_retro()
+            elif w._titulo_base:
+                w.setWindowTitle(w._titulo_base)
         finally:
             for k, v in prev.items():
                 setattr(self, k, v)
+        w.aplicar_limites()
         w.ajustar()
+
+    # ── Región retrógrada (solo en la vista ampliada, diagrama P-T) ──────
+    def _retro_clave(self):
+        try:
+            return (tuple(round(v, 10) for v in self._z_hc()),
+                    self._eos_nombre_actual())
+        except Exception:
+            return None
+
+    def _toggle_retro(self, w, on):
+        if not on:
+            w._retro_on = False
+            self._dibujar_en_libre(w)
+            return
+        res = self.result or {}
+        if self._diagrama != 'PT':
+            dialogos.info(w, _i18n.t("La región retrógrada solo se muestra en el "
+                                     "diagrama presión-temperatura."))
+            return
+        if res.get('lm') is not None or res.get('agua'):
+            dialogos.advertencia(w, _i18n.t("Región retrógrada no disponible para "
+                                            "mezclas con agua."))
+            return
+        if res.get('puro'):
+            dialogos.info(w, _i18n.t("Un componente puro no tiene región retrógrada."))
+            return
+        w._retro_on = True
+        self._asegurar_retro()
+        self._dibujar_en_libre(w)
+
+    def _asegurar_retro(self):
+        """Lanza el cálculo si no hay datos para la composición/EOS actual."""
+        clave = self._retro_clave()
+        if getattr(self, '_retro_data', None) is not None and self._retro_key == clave:
+            return
+        wk = getattr(self, '_retro_worker', None)
+        if wk is not None and wk.isRunning():
+            return
+        self._retro_data = None; self._retro_key = clave
+        self._retro_worker = RetroWorker(self._z_hc(), self.get_kij(),
+                                         self._eos_nombre_actual())
+        self._retro_worker.done.connect(self._on_retro_done)
+        self._retro_worker.error.connect(self._on_retro_error)
+        for w in getattr(self, '_libres', []):
+            w.setWindowTitle(w._titulo_base + "  —  " +
+                             _i18n.t("calculando región retrógrada..."))
+        self._retro_worker.start()
+
+    def _on_retro_done(self, d):
+        self._retro_data = d
+        self._refrescar_libres()
+
+    def _on_retro_error(self, msg):
+        for w in getattr(self, '_libres', []):
+            w._retro_on = False
+        self._refrescar_libres()
+        dialogos.advertencia(self, msg)
+
+    def _dibujar_retro(self, ax, d):
+        """Superpone isocalidad, curva de máximos de T y la región sombreada."""
+        from matplotlib.patches import Polygon
+        Pc, Tc = d['crit']
+        xy = lambda P, T: (_u.t_desde_R(T), _u.p_desde_psia(P))
+        primero = True
+        for b, pts in d['lineas'].items():
+            if not pts:
+                continue
+            ax.plot([_u.t_desde_R(t) for _, t in pts], [_u.p_desde_psia(p) for p, _ in pts],
+                    '-', lw=0.6, color='#9a9a9a', zorder=1.5,
+                    label=_i18n.t('Isocalidad (% molar de vapor)') if primero else None)
+            primero = False
+        tramo = d['tramo']
+        if not tramo:
+            return
+        Pct, Tct = tramo[-1]
+        locus = [(Pct, Tct)] + [(p, t) for p, t, _ in d['maximos']] + [(Pc, Tc)]
+        poly = [xy(p, t) for p, t in tramo] + [xy(p, t) for p, t in locus[::-1]]
+        ax.add_patch(Polygon(poly, closed=True, facecolor='#f5b041', alpha=0.45,
+                             edgecolor='none', zorder=0.8,
+                             label=_i18n.t('Región retrógrada (molar)')))
+        X = [xy(p, t)[0] for p, t in locus]; Y = [xy(p, t)[1] for p, t in locus]
+        # Línea discontinua fina; marcadores cuadrados solo en los máximos de
+        # cada isocalidad (no en los extremos crítico/cricondentérmica).
+        n = len(locus)
+        ax.plot(X, Y, '--', color='#d35400', lw=0.8, zorder=5.5,
+                marker='s', ms=3.5, markevery=list(range(1, n-1)),
+                markerfacecolor='#d35400', markeredgecolor='#8a3600',
+                markeredgewidth=0.4,
+                label=_i18n.t('Máximos de T de las isocalidad'))
+        for p, t, b in d['maximos']:
+            x, y = xy(p, t)
+            ax.annotate(f"{b*100:g}%", (x, y), xytext=(4, -2), textcoords='offset points',
+                        fontsize=7, color='#555555', zorder=5.7)
+        if ax.get_legend_handles_labels()[0]:
+            leg = ax.legend(fontsize=8, framealpha=1.0, fancybox=False,
+                            edgecolor='#000000', facecolor=GRAY_PLOT_BG)
+            leg.get_frame().set_linewidth(1.0)
 
     def _plot_base(self,res):
         ax=self.ax; ax.clear(); _go.limpiar(ax)

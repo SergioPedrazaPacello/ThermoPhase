@@ -5361,19 +5361,78 @@ class MainWindow(QMainWindow):
                                 pie_texto=_i18n.t("Documentación técnica"))
 
     def _abrir_env_ampliada(self):
-        """Abre la envolvente de la última ventana de envolvente activa (o la
-        principal) en una ventana aparte, solo el gráfico y redimensionable."""
-        win = getattr(self, '_ult_env', None)
-        if win is None or not win.isVisible():
-            vis = [w for w in self._subventanas.values()
-                   if isinstance(getattr(w, '_widget', None), TabEnvolvente)
-                   and w.isVisible()]
-            win = vis[0] if len(vis) == 1 else None
-            if win is None:
-                win = next((w for w in self._subventanas.values()
-                            if getattr(w, '_widget', None) is self.tab_env), None)
-        tab = win._widget if win is not None else self.tab_env
-        titulo = win.windowTitle() if win is not None else None
+        """Pide qué envolvente mostrar (composición principal o un fluido del
+        gestor) y la abre en una ventana aparte, solo el gráfico y
+        redimensionable.  Si esa envolvente aún no está calculada, la calcula
+        y abre la vista al terminar."""
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
+                                     QListWidget, QListWidgetItem, QPushButton,
+                                     QLabel)
+        PRIN = self._CLAVE_PRINCIPAL
+        nombre_prin = _i18n.t("Composición principal")
+        disponibles = [PRIN] + [f['nombre'] for f in self.fluidos]
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(_i18n.t("Envolvente en vista ampliada"))
+        dlg.setStyleSheet('QDialog { background:#e0e0e0; }')
+        root = QVBoxLayout(dlg)
+        root.setContentsMargins(14, 12, 14, 12); root.setSpacing(8)
+        txt_qss = (f'font-family:"{FONT_F}";font-size:{FS}pt;'
+                   f'color:{TEXT};background:transparent;')
+        info = QLabel(_i18n.t("Seleccione la envolvente a mostrar:"))
+        info.setStyleSheet(txt_qss); root.addWidget(info)
+        lw = QListWidget(); lw.setFixedSize(260, 200)
+        lw.setStyleSheet(f'QListWidget {{ background:{WHITE}; border:1px solid {BORDER};'
+                         f' font-family:"{FONT_F}"; font-size:{FS}pt; outline:0; }}'
+                         f'QListWidget::item {{ height:22px; padding-left:4px; }}'
+                         f'QListWidget::item:selected {{ background:{SEL_BG};'
+                         f' color:{TEXT}; }}')
+        for k in disponibles:
+            it = QListWidgetItem(nombre_prin if k == PRIN else k)
+            it.setData(Qt.ItemDataRole.UserRole, k); lw.addItem(it)
+        # preselección: la última ventana de envolvente activa
+        ult = getattr(self, '_ult_env', None)
+        pre = 0
+        if ult is not None:
+            for n, k in enumerate(disponibles):
+                if k != PRIN and ult is self._subventanas.get(f"envolvente@{k}"):
+                    pre = n
+        lw.setCurrentRow(pre)
+        root.addWidget(lw)
+        fila = QHBoxLayout(); fila.addStretch()
+        btn_qss = (f'background:{GRAY_LBL};border:2px outset {BORDER};'
+                   f'font-family:"{FONT_F}";font-size:{FS}pt;')
+        b_ok = QPushButton(_i18n.t("Abrir")); b_no = QPushButton(_i18n.t("Cancelar"))
+        for b in (b_ok, b_no):
+            b.setFixedHeight(26); b.setMinimumWidth(84); b.setStyleSheet(btn_qss)
+            b.setCursor(Qt.CursorShape.PointingHandCursor); fila.addWidget(b)
+        root.addLayout(fila)
+        b_ok.clicked.connect(dlg.accept); b_no.clicked.connect(dlg.reject)
+        lw.itemDoubleClicked.connect(lambda _: dlg.accept())
+        dlg.adjustSize(); dlg.setFixedSize(dlg.sizeHint())
+        if not dlg.exec() or lw.currentItem() is None:
+            return
+        k = lw.currentItem().data(Qt.ItemDataRole.UserRole)
+
+        base = _i18n.t("Envolvente de fases")
+        if k == PRIN:
+            tab = self.tab_env
+            titulo = f"{base} - {nombre_prin}"
+        else:
+            fluido = next((f for f in self.fluidos if f['nombre'] == k), None)
+            if fluido is None:
+                return
+            self._abrir_calculo_fluido('envolvente', fluido, mostrar=False)
+            sw = self._subventanas.get(f"envolvente@{k}")
+            if sw is None:
+                return
+            tab = sw._widget
+            titulo = f"{base} - {k}"
+        if tab.result is None:
+            # Calcular primero; la vista se abre sola al terminar.
+            tab._libre_pend = titulo
+            tab.calcular()
+            return
         tab.abrir_libre(titulo)
 
     def _menu_licencia(self):
