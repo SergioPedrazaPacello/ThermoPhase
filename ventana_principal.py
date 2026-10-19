@@ -2836,6 +2836,7 @@ class MainWindow(QMainWindow):
         m_calc.addAction(_act("Análisis de sensibilidad", self._abrir_sensibilidad))
         m_calc.addAction(_act("Flash múltiple", self._abrir_flash_multiple))
         m_calc.addAction(_act("Operaciones unitarias", self._abrir_operaciones_unitarias))
+        m_calc.addAction(_act("Historial de pozo", self._abrir_historial))
 
         m_graf = menubar.addMenu("&Gráficos")
         self._act_cursor = QAction("Activar cursor", self, checkable=True)
@@ -4361,6 +4362,43 @@ class MainWindow(QMainWindow):
             self._sync_nav_fluidos()
             msg = _i18n.t("Se creó el fluido") + f" {nombre}."
         dialogos.info(self, msg)
+
+    def _abrir_historial(self):
+        """Historial de envolventes de un pozo: ingreso de muestras (fecha +
+        composición) y, al calcular, la ventana de resultados (tamaño fijo)."""
+        import historial_pozo as _hp
+        PRIN = self._CLAVE_PRINCIPAL
+        fuentes = [(PRIN, _i18n.t("Composición principal"))] + \
+                  [(f['nombre'], f['nombre']) for f in self.fluidos]
+        def _registrar(t):
+            try:
+                self.gestor_edicion.registrar(t)
+            except Exception:
+                pass
+        h = dict(estilo_combo=_aplicar_estilo_combo, eos_items=EOS_ITEMS,
+                 eos_code=_eos_code, eos_idx=_eos_idx, kij_base=_eng.kij_base,
+                 registrar=_registrar)
+        dlg = _hp.DialogoHistorial(self, fuentes, self._datos_fluido,
+                                   list(self._comp_activos),
+                                   getattr(self, '_hist_ultimo', None), h)
+        if not dlg.exec() or dlg.resultado is None:
+            return
+        self._hist_ultimo = dlg.entrada
+        clave = 'historial_pozo'
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            widget = _hp.TabHistorial(on_nuevo=self._abrir_historial,
+                                      estilo_combo=_aplicar_estilo_combo, dueña=self)
+            sw = self._montar_subventana(clave, widget, "Historial de pozo",
+                                         tam=(widget.ANCHO, widget.ALTO),
+                                         pie_texto="")
+        sw._widget.mostrar(dlg.resultado, dlg.entrada)
+        if getattr(sw, '_pie', None) is not None:
+            met = dlg.entrada.get('metodo', '')
+            met = "Michelsen" if met == 'michelsen' else "Ziervogel-Poling"
+            sw._pie.setText(f"  {self._nombre_eos(dlg.entrada['eos'])} EOS  ·  "
+                            f"{_i18n.t('Envolvente')}: {met}")
+        self._mostrar_subventana(sw)
 
     def _abrir_operaciones_unitarias(self):
         """Ventana de ingreso de datos de las operaciones unitarias; si el
