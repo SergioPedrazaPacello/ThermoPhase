@@ -4394,10 +4394,7 @@ class MainWindow(QMainWindow):
                                          pie_texto="")
         sw._widget.mostrar(dlg.resultado, dlg.entrada)
         if getattr(sw, '_pie', None) is not None:
-            met = dlg.entrada.get('metodo', '')
-            met = "Michelsen" if met == 'michelsen' else "Ziervogel-Poling"
-            sw._pie.setText(f"  {self._nombre_eos(dlg.entrada['eos'])} EOS  ·  "
-                            f"{_i18n.t('Envolvente')}: {met}")
+            sw._pie.setText(f"  {self._nombre_eos(dlg.entrada['eos'])} EOS")
         self._mostrar_subventana(sw)
 
     def _abrir_operaciones_unitarias(self):
@@ -5557,6 +5554,19 @@ class MainWindow(QMainWindow):
         self._lbl_info.setText(f"{_eos_nombre(eos)} EOS")
         self._refrescar_pies()
 
+QSS_SCROLL = """
+QScrollBar:vertical { background:#E2E2E2; width:10px; margin:0; border:none; border-left:1px solid #C8C8C8; }
+QScrollBar:horizontal { background:#E2E2E2; height:10px; margin:0; border:none; border-top:1px solid #C8C8C8; }
+QScrollBar::handle:vertical { background:#B8B8B8; border:1px solid #8A8A8A; min-height:28px; margin:1px; }
+QScrollBar::handle:horizontal { background:#B8B8B8; border:1px solid #8A8A8A; min-width:28px; margin:1px; }
+QScrollBar::handle:hover { background:#A0A0A0; }
+QScrollBar::handle:pressed { background:#888888; }
+QScrollBar::add-line, QScrollBar::sub-line { width:0px; height:0px; border:none; background:none; }
+QScrollBar::add-page, QScrollBar::sub-page { background:none; }
+QAbstractScrollArea::corner { background:#E2E2E2; border:none; }
+"""
+
+
 def main(app=None, splash=None):
     """Arranca la aplicacion.  main.py crea la aplicacion y el splash ANTES de
     importar este módulo (que carga numpy, matplotlib y los modelos) y los
@@ -5577,6 +5587,10 @@ def main(app=None, splash=None):
         _pal.setColor(_grp, _QPal.ColorRole.Highlight, QColor(SEL_BG))
         _pal.setColor(_grp, _QPal.ColorRole.HighlightedText, QColor(TEXT))
     app.setPalette(_pal)
+    # Barras de desplazamiento: un solo estilo en todo el programa (delgadas,
+    # planas, sin flechas).  Con reglas completas Qt las dibuja igual en
+    # tablas, áreas de desplazamiento, listas de combos y cuadros de texto.
+    app.setStyleSheet(QSS_SCROLL)
     # Icono global de la aplicacion
     _ico2 = ruta_recurso('thermophase.ico')
     if os.path.exists(_ico2):

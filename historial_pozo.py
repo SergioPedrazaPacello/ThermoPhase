@@ -16,7 +16,7 @@ import datetime as _dt
 from PyQt6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout,
                              QGridLayout, QLabel, QPushButton, QComboBox,
                              QDateEdit, QAbstractItemView, QSizePolicy,
-                             QProgressBar)
+                             QFrame)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QDate
 
 import numpy as np
@@ -33,12 +33,13 @@ from eos import NC, NOMBRES, componente_etiqueta
 from pestana_op_unitarias import (_titulo, _tabla, _cell, _ajustar, _set_comp,
                                   _get_comp, _a_float, TXT_QSS, LBL_QSS,
                                   BTN_QSS, WHITE, GRAY_LBL, GRAY_EMPTY,
-                                  TEXT, TEXT_RES, ROW_H, FONT_F, FS)
+                                  TEXT, TEXT_RES, ROW_H, FONT_F, FS, BORDER)
 
 GRAY_PLOT_BG = "#DCDCDC"
 FMT_FECHA = "dd/MM/yyyy"
 METODOS = [("Michelsen", 'michelsen'), ("Ziervogel-Poling", 'ziervogel')]
 W_CAMPO = 232
+SB_ALTO = 10          # alto de la barra de desplazamiento (estilo global)
 
 
 def _fecha_txt(iso):
@@ -149,10 +150,8 @@ class DialogoHistorial(QDialog):
         fb0.addWidget(self.b_ok); fb0.addWidget(self.b_can)
         vb.addLayout(fb0)
         fp = QHBoxLayout(); fp.setSpacing(6); fp.addStretch()
-        self.lbl_prog = self._lbl(""); self.lbl_prog.setVisible(False)
-        self.prog = QProgressBar(); self.prog.setFixedSize(160, 14); self.prog.setVisible(False)
-        self.prog.setTextVisible(False)
-        fp.addWidget(self.lbl_prog); fp.addWidget(self.prog)
+        self.lbl_prog = self._lbl(""); self.lbl_prog.setFixedHeight(18)
+        fp.addWidget(self.lbl_prog)
         vb.addLayout(fp); vb.addStretch()
         fm.addLayout(vb)
         root.addLayout(fm)
@@ -213,8 +212,8 @@ class DialogoHistorial(QDialog):
         self.tm.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectColumns)
         self.tm.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tm.itemSelectionChanged.connect(self._on_sel_muestra)
-        hh = (len(self.act) + 2) * ROW_H + 1
-        self.tm.setFixedSize(540, hh + 18)          # + barra horizontal
+        self._tm_alto = (len(self.act) + 2) * ROW_H + 2
+        self.tm.setFixedSize(540, self._tm_alto)
         c2.addWidget(self.tm)
         fq = QHBoxLayout(); fq.setSpacing(6)
         self.lbl_n = self._lbl("")
@@ -356,6 +355,10 @@ class DialogoHistorial(QDialog):
         for r in range(self.rs + 1):
             t.setRowHeight(r, ROW_H)
         t.blockSignals(False)
+        # Alto justo: sin hueco bajo «Sumatorias»; si las muestras no caben a
+        # lo ancho, se suma solo el alto de la barra horizontal.
+        ancho = sum(t.columnWidth(c) for c in range(t.columnCount())) + 2
+        t.setFixedHeight(self._tm_alto + (SB_ALTO if ancho > t.width() else 0))
         self.lbl_n.setText(_i18n.t("Muestras:") + f" {n}")
         self.b_ok.setEnabled(n >= 1)
 
@@ -377,8 +380,7 @@ class DialogoHistorial(QDialog):
                             muestras=[dict(fecha=m['fecha'], z=list(m['z'])) for m in self.muestras])
         for w in (self.b_ok, self.b_add, self.b_quitar, self.b_norm):
             w.setEnabled(False)
-        self.prog.setRange(0, len(self.muestras)); self.prog.setValue(0)
-        self.prog.setVisible(True); self.lbl_prog.setVisible(True)
+        self.lbl_prog.setText(_i18n.t("Calculando muestra") + f" 1 / {len(self.muestras)}…")
         self._worker = HistWorker(self.entrada['muestras'], eos_code,
                                   self.entrada['metodo'], self.h['kij_base'](eos_code))
         self._worker.progreso.connect(self._on_prog)
@@ -387,12 +389,11 @@ class DialogoHistorial(QDialog):
         self._worker.start()
 
     def _on_prog(self, k, n):
-        self.prog.setValue(k - 1)
         self.lbl_prog.setText(_i18n.t("Calculando muestra") + f" {k} / {n}…")
 
     def _fin(self):
         self._worker.wait(); self._worker = None
-        self.prog.setVisible(False); self.lbl_prog.setVisible(False)
+        self.lbl_prog.setText("")
         for w in (self.b_ok, self.b_add, self.b_quitar, self.b_norm):
             w.setEnabled(True)
 
@@ -423,8 +424,30 @@ def _estilo_ax(ax, chico=False):
     ax.grid(True, linestyle='-', linewidth=0.7, color=GRAY_LBL)
 
 
+def _caja(widget, margen=6):
+    """Recuadro como el de la Envolvente de fases: fondo del gráfico y borde
+    gris, con un margen de 6 px alrededor del canvas."""
+    f = QFrame(); f.setObjectName('cajaGraf')
+    f.setStyleSheet(f'QFrame#cajaGraf {{ background:{GRAY_PLOT_BG}; border:1px solid {BORDER}; }}')
+    l = QVBoxLayout(f); l.setContentsMargins(margen, margen, margen, margen); l.setSpacing(0)
+    l.addWidget(widget)
+    return f
+
+
+def _barra_titulo(texto):
+    """Barra de título «ThermoPhase — …» (mismo estilo que la Envolvente)."""
+    t = QLabel(texto)
+    t.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    t.setFixedHeight(22)
+    t.setStyleSheet(f'background:#A8A8A8; color:{TEXT}; border:1px solid {BORDER};'
+                    f' font-family:"{FONT_F}"; font-size:{FS}pt; padding:0px 6px;')
+    return t
+
+
 class TabHistorial(QWidget):
-    ANCHO, ALTO = 1180, 660
+    ANCHO, ALTO = 1180, 712
+    W_ENV = 740                     # ancho del canvas de envolventes
+    H_MINI = 186                    # alto de cada canvas de tendencia
 
     def __init__(self, on_nuevo=None, estilo_combo=None, dueña=None):
         super().__init__()
@@ -432,33 +455,44 @@ class TabHistorial(QWidget):
         self._dueña = dueña
         self.res = []; self.entrada = {}; self._v3d = None
         self.setFixedSize(self.ANCHO, self.ALTO)
-        self.setStyleSheet(f'background:{GRAY_PLOT_BG};')
-        root = QHBoxLayout(self); root.setContentsMargins(6, 6, 6, 6); root.setSpacing(6)
+        # Fondo de la ventana como la Envolvente; cada gráfico en su recuadro.
+        self.setObjectName('histTab')
+        self.setAutoFillBackground(True)
+        self.setStyleSheet(f'QWidget#histTab {{ background:{GRAY_LBL}; }}')
+        root = QVBoxLayout(self); root.setContentsMargins(4, 10, 4, 4); root.setSpacing(3)
+        self.lbl_titulo = _barra_titulo("ThermoPhase — " + _i18n.t("Historial de pozo"))
+        root.addWidget(self.lbl_titulo)
+        cont = QHBoxLayout(); cont.setContentsMargins(6, 4, 6, 4); cont.setSpacing(8)
 
+        # ancho disponible para la columna derecha
+        self.W_MINI = self.ANCHO - 8 - 12 - (self.W_ENV + 14) - 8 - 14
+        alto_der = 3*(self.H_MINI + 14) + 22 + 26 + 4*4
         self.fig = Figure(figsize=(1, 1)); self.fig.patch.set_facecolor(GRAY_PLOT_BG)
         self.ax = self.fig.add_subplot(111)
         self.canvas = FigureCanvas(self.fig)
-        self.canvas.setFixedSize(740, self.ALTO - 12)
-        self.fig.set_size_inches(740/self.fig.dpi, (self.ALTO - 12)/self.fig.dpi)
+        self.canvas.setStyleSheet(f'background-color:{GRAY_PLOT_BG};')
+        h_env = alto_der - 14
+        self.canvas.setFixedSize(self.W_ENV, h_env)
+        self.fig.set_size_inches(self.W_ENV/self.fig.dpi, h_env/self.fig.dpi)
         try:
-            self.fig.set_layout_engine('tight', pad=0.8)
+            self.fig.set_layout_engine('tight', pad=0.6)
         except Exception:
             pass
-        root.addWidget(self.canvas)
+        cont.addWidget(_caja(self.canvas), 0, Qt.AlignmentFlag.AlignTop)
 
         der = QVBoxLayout(); der.setSpacing(4)
-        self.f_ct, self.ax_ct, self.c_ct = self._mini(); der.addWidget(self.c_ct)
-        self.f_cb, self.ax_cb, self.c_cb = self._mini(); der.addWidget(self.c_cb)
+        self.f_ct, self.ax_ct, self.c_ct = self._mini(); der.addWidget(_caja(self.c_ct))
+        self.f_cb, self.ax_cb, self.c_cb = self._mini(); der.addWidget(_caja(self.c_cb))
         fc = QHBoxLayout(); fc.setSpacing(6)
-        l = QLabel(_i18n.t("Componente:")); l.setStyleSheet(TXT_QSS)
+        l = QLabel(_i18n.t("Componente:")); l.setStyleSheet(TXT_QSS + 'background:transparent;')
+        l.setFixedWidth(74)
         self.cmb_comp = QComboBox()
-        self.cmb_comp.setFixedSize(self.ANCHO - 740 - 24 - 74 - 6, 22)
+        self.cmb_comp.setFixedSize(self.W_MINI + 14 - 74 - 6, 22)
         if estilo_combo:
             estilo_combo(self.cmb_comp)
-        l.setFixedWidth(74)
         fc.addWidget(l); fc.addWidget(self.cmb_comp)
         der.addLayout(fc)
-        self.f_co, self.ax_co, self.c_co = self._mini(); der.addWidget(self.c_co)
+        self.f_co, self.ax_co, self.c_co = self._mini(); der.addWidget(_caja(self.c_co))
         fb = QHBoxLayout(); fb.setSpacing(6); fb.addStretch()
         self.b_3d = QPushButton(_i18n.t("Mostrar vista 3D"))
         self.b_nuevo = QPushButton(_i18n.t("Modificar datos"))
@@ -466,7 +500,11 @@ class TabHistorial(QWidget):
             b.setFixedHeight(26); b.setMinimumWidth(110); b.setStyleSheet(BTN_QSS)
             b.setCursor(Qt.CursorShape.PointingHandCursor); fb.addWidget(b)
         der.addLayout(fb)
-        root.addLayout(der)
+        der.addStretch(1)
+        cont.addLayout(der)
+        cont.addStretch(1)
+        root.addLayout(cont)
+        root.addStretch(1)
         self.cmb_comp.currentIndexChanged.connect(lambda _i: self._dibujar_comp())
         self.b_3d.clicked.connect(self.abrir_3d)
         self.b_nuevo.clicked.connect(lambda: self.on_nuevo and self.on_nuevo())
@@ -474,7 +512,8 @@ class TabHistorial(QWidget):
     def _mini(self):
         f = Figure(figsize=(1, 1)); f.patch.set_facecolor(GRAY_PLOT_BG)
         a = f.add_subplot(111); c = FigureCanvas(f)
-        w, h = self.ANCHO - 740 - 24, 190
+        c.setStyleSheet(f'background-color:{GRAY_PLOT_BG};')
+        w, h = self.W_MINI, self.H_MINI
         c.setFixedSize(w, h); f.set_size_inches(w/f.dpi, h/f.dpi)
         try:
             f.set_layout_engine('tight', pad=0.5)
@@ -579,6 +618,12 @@ class TabHistorial(QWidget):
             self.redibujar()
 
     def retraducir_grafico(self):
+        self.lbl_titulo.setText("ThermoPhase — " + _i18n.t("Historial de pozo"))
+        if self._v3d is not None:
+            try:
+                self._v3d.retraducir()
+            except Exception:
+                pass
         if self.res:
             self.mostrar(self.res, self.entrada)
 
@@ -601,14 +646,28 @@ class Ventana3D(QWidget):
         self._tab = tab
         self.setWindowFlags(Qt.WindowType.Window)
         self.setWindowTitle(_i18n.t("Historial de pozo") + " - " + _i18n.t("Vista 3D"))
-        self.setStyleSheet(f'background:{GRAY_PLOT_BG};')
-        lay = QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        self.setObjectName('hist3d')
+        self.setStyleSheet(f'QWidget#hist3d {{ background:{GRAY_LBL}; }}')
+        lay = QVBoxLayout(self); lay.setContentsMargins(4, 10, 4, 4); lay.setSpacing(3)
+        self.lbl_titulo = _barra_titulo("")
+        lay.addWidget(self.lbl_titulo)
         self.fig = Figure(figsize=(1, 1)); self.fig.patch.set_facecolor(GRAY_PLOT_BG)
         self.canvas = FigureCanvas(self.fig)
+        self.canvas.setStyleSheet(f'background-color:{GRAY_PLOT_BG};')
         self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        lay.addWidget(self.canvas)
-        self.setMinimumSize(500, 400); self.resize(900, 680)
+        caja = _caja(self.canvas)
+        envol = QVBoxLayout(); envol.setContentsMargins(6, 4, 6, 4); envol.addWidget(caja)
+        lay.addLayout(envol, 1)
+        self.setMinimumSize(560, 460); self.resize(940, 720)
         self.ax = None
+        self.retraducir(redibujar=False)
+
+    def retraducir(self, redibujar=True):
+        self.setWindowTitle(_i18n.t("Historial de pozo") + " - " + _i18n.t("Vista 3D"))
+        self.lbl_titulo.setText("ThermoPhase — " + _i18n.t("Historial de pozo") + ": "
+                                + _i18n.t("Vista 3D"))
+        if redibujar and self.ax is not None:
+            self.dibujar()
 
     def closeEvent(self, ev):
         self._tab._v3d = None
@@ -627,13 +686,24 @@ class Ventana3D(QWidget):
                     [_u.p_desde_psia(p) for p, _ in pts], color=col, lw=1.6,
                     label=_fecha_txt(r['fecha']))
         ax.set_xlabel(f"{_i18n.t('Temperatura')} ({_u.u('T')})", fontsize=9, labelpad=8)
+        ax.set_ylabel(_i18n.t("Fecha de muestreo"), fontsize=9, labelpad=14)
         ax.set_zlabel(f"{_i18n.t('Presion')} ({_u.u('P')})", fontsize=9, labelpad=8)
         ax.set_yticks(fn); ax.set_yticklabels([x.strftime('%m/%Y') for x in f], fontsize=7)
         ax.tick_params(labelsize=7)
         ax.view_init(*vista)
         try:
             ax.set_facecolor(GRAY_PLOT_BG)
+            for eje in (ax.xaxis, ax.yaxis, ax.zaxis):
+                eje.set_pane_color((1.0, 1.0, 1.0, 1.0))
         except Exception:
             pass
+        if tab.res:
+            # Cuadro de leyendas como en la vista 2D (fijo a la figura).
+            leg = self.fig.legend(*ax.get_legend_handles_labels(),
+                                  title=_i18n.t("Fecha de muestreo"), fontsize=8,
+                                  title_fontsize=8, framealpha=1.0, fancybox=False,
+                                  edgecolor='#000000', facecolor=GRAY_PLOT_BG,
+                                  loc='upper left', bbox_to_anchor=(0.02, 0.98))
+            leg.get_frame().set_linewidth(1.0)
         self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
         self.canvas.draw_idle()
