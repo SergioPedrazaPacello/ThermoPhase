@@ -576,10 +576,15 @@ class DialogoOU(QDialog):
                 un = "" if mag == 'T' else _unidad_mag(mag)
                 self.ed_x[k].setText(self._valores.get(key, defecto))
                 self.lbl_x[k].setText(f"{_i18n.t(etq)}" + (f" ({un}):" if un else ":"))
-        # la ventana conserva su ancho al mostrar u ocultar la lista de
-        # unidad de temperatura
+        # La ventana conserva su ANCHO al mostrar u ocultar la lista de unidad
+        # de temperatura, pero su ALTO se ajusta a las filas visibles de la
+        # operación elegida (sin huecos ni traslapes).
         if getattr(self, '_tam_fijo', None) is not None:
-            self.setFixedSize(self._tam_fijo)
+            lay = self.layout()
+            lay.invalidate(); lay.activate()
+            w = self._tam_fijo.width()
+            alto = lay.totalHeightForWidth(w) if lay.hasHeightForWidth() else lay.sizeHint().height()
+            self.setFixedSize(w, max(alto, lay.totalMinimumSize().height()))
 
     # ── composición ─────────────────────────────────────────────────────
     def _crudo(self):
