@@ -99,7 +99,6 @@ def qss():
         + flecha("QScrollBar::down-arrow:vertical:disabled", 'abajo_off')
         + flecha("QScrollBar::left-arrow:horizontal:disabled", 'izquierda_off')
         + flecha("QScrollBar::right-arrow:horizontal:disabled", 'derecha_off')
-        + f"QAbstractScrollArea::corner {{ background:{CARA}; border:none; }}\n"
     )
 
 
@@ -126,8 +125,12 @@ _FILTRO = None
 def instalar(app):
     global _FILTRO
     try:
+        # Solo por barra (filtro de eventos), NUNCA con app.setStyleSheet: una
+        # hoja de estilo global hace que Qt use QStyleSheetStyle en TODOS los
+        # widgets y en Windows cambia métricas (alto mínimo de filas, botones,
+        # combos), lo que desajustaba el alto de las ventanas al quitar
+        # componentes y hacía aparecer barras en Parámetros de la EOS.
         hoja = qss()
-        app.setStyleSheet(hoja)
         _FILTRO = _Filtro(hoja)
         app.installEventFilter(_FILTRO)
     except Exception:

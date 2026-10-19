@@ -2109,7 +2109,7 @@ class TabParametros(QWidget):
         ancho_tabla = (NC + 1 + extra_c) * WK + 2  # columnas kij + borde (1 px por lado)
         margen_lat = 13                    # margen lateral izquierdo/derecho
         ancho = ancho_tabla + 2*margen_lat
-        h_tbl = (NC+1+extra_f)*ROW_H + 2   # alto de cada tabla (filas + borde)
+        h_tbl = (NC+1+extra_f)*_alto_fila(self) + 2   # alto de cada tabla (filas + borde)
         alto = 8 + 22 + 3 + h_tbl + 3 + 22 + 3 + h_tbl + 3 + 30
         return (ancho, alto)
 
@@ -3843,13 +3843,14 @@ class MainWindow(QMainWindow):
             quitados_hc = NC - n_hc
             w0, h0 = widget.tam_ideal()
             # 2 tablas dependientes de componentes (propiedades criticas + kij)
-            return (w0, h0 - quitados_hc * ROW_H * 2)
+            return (w0, h0 - quitados_hc * _alto_fila(widget) * 2)
         if clave_base in ('equilibrio', 'saturacion', 'hidratos'):
             w0, h0 = self._tam_sub
-            h0 -= quitados * ROW_H
+            fila = _alto_fila(widget)
+            h0 -= quitados * fila
             # Delta por propiedades respecto al numero por defecto (6).
             if hasattr(widget, '_props_sel'):
-                h0 -= (len(PROP_DEFAULT) - len(widget._props_sel)) * ROW_H
+                h0 -= (len(PROP_DEFAULT) - len(widget._props_sel)) * fila
             return (w0, h0)
         if clave_base == 'saturacion_agua':
             widget.aplicar_componentes(self._comp_activos)
@@ -5078,7 +5079,7 @@ class MainWindow(QMainWindow):
                 sw.setFixedSize(s.width(), s.height() + delta)
         else:
             factor = 2 if isinstance(w, TabParametros) else 1
-            delta = (n_activos - n_old) * ROW_H * factor
+            delta = (n_activos - n_old) * _alto_fila(w) * factor
             if delta != 0:
                 s = sw.size()
                 sw.setFixedSize(s.width(), s.height() + delta)
@@ -5560,6 +5561,20 @@ class MainWindow(QMainWindow):
         self._lbl_info.setText(f"{_eos_nombre(eos)} EOS")
         self._refrescar_pies()
 
+
+
+def _alto_fila(w):
+    """Alto REAL de una fila de las tablas del widget.  Las filas se piden de
+    ROW_H px, pero el estilo de Windows puede imponer un mínimo mayor; si se
+    descontara ROW_H por cada componente quitado sobraría espacio."""
+    alto = ROW_H
+    try:
+        from PyQt6.QtWidgets import QTableWidget as _QT
+        for t in w.findChildren(_QT):
+            alto = max(alto, t.verticalHeader().minimumSectionSize())
+    except Exception:
+        pass
+    return alto
 
 
 def main(app=None, splash=None):
