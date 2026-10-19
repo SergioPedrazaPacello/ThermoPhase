@@ -713,6 +713,8 @@ class VentanaEnvolventeLibre(QWidget):
             a_r = m.addAction(_i18n.t("Mostrar región retrógrada"))
             a_r.setCheckable(True); a_r.setChecked(self._retro_on)
         a_e = m.addAction(_i18n.t("Ajustar ejes..."))
+        import graficos_menu as _gm
+        _gm.accion_cuadricula(m, self.canvas)
         m.addSeparator()
         a_g = m.addAction(_i18n.t("Guardar imagen..."))
         a_c = m.addAction(_i18n.t("Copiar imagen"))
@@ -855,6 +857,7 @@ class TabEnvolvente(QWidget):
         self.ax=self.fig.add_subplot(111)
         self.ax.set_position([0.115, 0.085, 0.86, 0.895])
         self.canvas=FigureCanvas(self.fig)
+        import graficos_menu as _gm; _gm.instalar(self.canvas)
         # Mismo color que left_box: el margen de 6 px queda visible alrededor
         self.canvas.setStyleSheet(f"background-color: {GRAY_PLOT_BG};")
         self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding,

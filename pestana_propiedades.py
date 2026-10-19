@@ -285,6 +285,7 @@ class TabSensibilidad(QWidget):
         self.ax=self.fig.add_subplot(111)
         self.ax.set_position([0.135, 0.11, 0.84, 0.86])
         self.canvas=FigureCanvas(self.fig)
+        import graficos_menu as _gm; _gm.instalar(self.canvas)
         self.canvas.setStyleSheet(f"background-color: {GRAY_PLOT_BG};")
         self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding,
                                   QSizePolicy.Policy.Expanding)

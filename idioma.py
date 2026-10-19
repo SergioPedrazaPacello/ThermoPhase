@@ -68,6 +68,7 @@ TRAD = {
     "Primero calcula la envolvente.": "Calculate the envelope first.",
     "Guardar imagen...": "Save image...",
     "Copiar imagen": "Copy image",
+    "Mostrar líneas de cuadrícula": "Show gridlines",
     "Mostrar región retrógrada": "Show retrograde region",
     "Ajustar ejes...": "Adjust axes...",
     "Seleccione la envolvente a mostrar:": "Select the envelope to show:",

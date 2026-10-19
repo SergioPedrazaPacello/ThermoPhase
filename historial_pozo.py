@@ -29,6 +29,7 @@ import matplotlib.ticker as ticker
 import idioma as _i18n
 import unidades as _u
 import dialogos
+import graficos_menu as _gm
 from eos import NC, NOMBRES, componente_etiqueta
 from pestana_op_unitarias import (_titulo, _tabla, _cell, _ajustar, _set_comp,
                                   _get_comp, _a_float, TXT_QSS, LBL_QSS,
@@ -39,7 +40,6 @@ GRAY_PLOT_BG = "#DCDCDC"
 FMT_FECHA = "dd/MM/yyyy"
 METODOS = [("Michelsen", 'michelsen'), ("Ziervogel-Poling", 'ziervogel')]
 W_CAMPO = 232
-SB_ALTO = 10          # alto de la barra de desplazamiento (estilo global)
 
 
 def _fecha_txt(iso):
@@ -212,8 +212,7 @@ class DialogoHistorial(QDialog):
         self.tm.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectColumns)
         self.tm.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tm.itemSelectionChanged.connect(self._on_sel_muestra)
-        self._tm_alto = (len(self.act) + 2) * ROW_H + 2
-        self.tm.setFixedSize(540, self._tm_alto)
+        self.tm.setFixedSize(540, (len(self.act) + 2) * ROW_H + 2)
         c2.addWidget(self.tm)
         fq = QHBoxLayout(); fq.setSpacing(6)
         self.lbl_n = self._lbl("")
@@ -235,6 +234,7 @@ class DialogoHistorial(QDialog):
         self._aplicar_previo(previo)
         self._refrescar_tabla()
         self.adjustSize(); self.setFixedSize(self.sizeHint())
+        self._listo = True
 
     # ── widgets ─────────────────────────────────────────────────────────
     def _lbl(self, t):
@@ -355,12 +355,27 @@ class DialogoHistorial(QDialog):
         for r in range(self.rs + 1):
             t.setRowHeight(r, ROW_H)
         t.blockSignals(False)
-        # Alto justo: sin hueco bajo «Sumatorias»; si las muestras no caben a
-        # lo ancho, se suma solo el alto de la barra horizontal.
-        ancho = sum(t.columnWidth(c) for c in range(t.columnCount())) + 2
-        t.setFixedHeight(self._tm_alto + (SB_ALTO if ancho > t.width() else 0))
+        self._ajustar_alto_tm()
         self.lbl_n.setText(_i18n.t("Muestras:") + f" {n}")
         self.b_ok.setEnabled(n >= 1)
+
+    def _ajustar_alto_tm(self):
+        """Alto justo de la tabla de muestras, con la altura REAL de las filas
+        (en Windows la fila mínima puede ser mayor que ROW_H): sin hueco bajo
+        «Sumatorias» y sin cortar filas.  Si las muestras no caben a lo ancho,
+        se suma la barra horizontal."""
+        t = self.tm
+        marco = 2 * t.frameWidth()
+        alto = sum(t.rowHeight(r) for r in range(t.rowCount())) + marco
+        ancho = sum(t.columnWidth(c) for c in range(t.columnCount())) + marco
+        if ancho > t.width():
+            alto += t.horizontalScrollBar().sizeHint().height()
+        if t.height() != alto:
+            t.setFixedHeight(alto)
+            if getattr(self, '_listo', False):
+                self.setMinimumSize(0, 0); self.setMaximumSize(16777215, 16777215)
+                self.layout().activate(); self.adjustSize()
+                self.setFixedSize(self.sizeHint())
 
     def _aplicar_previo(self, p):
         if not p:
@@ -470,6 +485,7 @@ class TabHistorial(QWidget):
         self.fig = Figure(figsize=(1, 1)); self.fig.patch.set_facecolor(GRAY_PLOT_BG)
         self.ax = self.fig.add_subplot(111)
         self.canvas = FigureCanvas(self.fig)
+        _gm.instalar(self.canvas)
         self.canvas.setStyleSheet(f'background-color:{GRAY_PLOT_BG};')
         h_env = alto_der - 14
         self.canvas.setFixedSize(self.W_ENV, h_env)
@@ -512,6 +528,7 @@ class TabHistorial(QWidget):
     def _mini(self):
         f = Figure(figsize=(1, 1)); f.patch.set_facecolor(GRAY_PLOT_BG)
         a = f.add_subplot(111); c = FigureCanvas(f)
+        _gm.instalar(c)
         c.setStyleSheet(f'background-color:{GRAY_PLOT_BG};')
         w, h = self.W_MINI, self.H_MINI
         c.setFixedSize(w, h); f.set_size_inches(w/f.dpi, h/f.dpi)
@@ -653,6 +670,7 @@ class Ventana3D(QWidget):
         lay.addWidget(self.lbl_titulo)
         self.fig = Figure(figsize=(1, 1)); self.fig.patch.set_facecolor(GRAY_PLOT_BG)
         self.canvas = FigureCanvas(self.fig)
+        _gm.instalar(self.canvas)
         self.canvas.setStyleSheet(f'background-color:{GRAY_PLOT_BG};')
         self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         caja = _caja(self.canvas)
@@ -694,7 +712,15 @@ class Ventana3D(QWidget):
         try:
             ax.set_facecolor(GRAY_PLOT_BG)
             for eje in (ax.xaxis, ax.yaxis, ax.zaxis):
-                eje.set_pane_color((1.0, 1.0, 1.0, 1.0))
+                # Paneles con el gris tenue de siempre y contorno negro.
+                # (gris por defecto de matplotlib sobre el fondo, ya mezclado y
+                # opaco, para que el contorno salga negro y no grisáceo)
+                eje.set_pane_color((0.906, 0.906, 0.906, 1.0))
+                eje.pane.set_edgecolor('#000000'); eje.pane.set_linewidth(1.0)
+                eje.pane.set_closed(True)          # dibuja también el 4.º lado
+                # Cuadrícula lo más fina posible.
+                eje._axinfo['grid'].update(linewidth=0.3, color='#B0B0B0')
+                eje.line.set_color('#000000'); eje.line.set_linewidth(1.0)
         except Exception:
             pass
         if tab.res:
