@@ -48,7 +48,8 @@ ED_STYLE=(f'QLineEdit {{ background:{WHITE};border:1px solid {BORDER};'
           f'padding:1px 4px; }}')
 
 # Paleta y grosor idénticos a las líneas de isocalidad de la Envolvente.
-CURVA_COLORS = ['#c0392b','#e67e22','#27ae60','#2980b9','#8e44ad']
+CURVA_COLORS = ['#c0392b','#e67e22','#27ae60','#2980b9','#8e44ad',
+                '#212121','#7f4f24','#00a3a3','#d4ac0d','#c71585','#7f8c8d','#1b4f72']
 CURVA_LW = 0.7
 
 
@@ -339,6 +340,14 @@ class TabSensibilidad(QWidget):
         self.btn.setStyleSheet(BTN_STYLE); self.btn.setFixedHeight(30)
         self.btn.clicked.connect(self.calcular)
         vr.addWidget(self.btn)
+        # Vista 3D: temperatura, presión y la propiedad (mismo formato que la
+        # vista 3D del Historial de pozo).
+        self.btn_3d=QPushButton(_i18n.t("Mostrar vista 3D"))
+        self.btn_3d.setStyleSheet(BTN_STYLE); self.btn_3d.setFixedHeight(26)
+        self.btn_3d.setEnabled(False)
+        self.btn_3d.clicked.connect(self.abrir_3d)
+        vr.addWidget(self.btn_3d)
+        self._v3d=None
 
         # Escala de los ejes del gráfico (se aplica al gráfico actual sin
         # recalcular).  Semilog con eje Y logarítmico es la forma de la carta
@@ -485,6 +494,7 @@ class TabSensibilidad(QWidget):
         self.btn.setEnabled(True); self.btn.setText(_i18n.t("Calcular"))
         self.prog.setVisible(False)
         self._last=res; self._plot(res)
+        self.btn_3d.setEnabled(True)
 
     def _on_error(self, msg):
         import dialogos
@@ -570,6 +580,21 @@ class TabSensibilidad(QWidget):
             leg.get_title().set_fontsize(8)
         self.canvas.setVisible(True)
         self.canvas.draw_idle()
+        if getattr(self, '_v3d', None) is not None:
+            try:
+                self._v3d.retraducir()
+                self._v3d.dibujar()
+            except Exception:
+                pass
+
+    # ── Vista 3D ──────────────────────────────────────────────
+    def abrir_3d(self):
+        if not self._last:
+            return
+        if self._v3d is None:
+            self._v3d = VentanaSens3D(self, self.window())
+        self._v3d.dibujar()
+        self._v3d.showNormal(); self._v3d.raise_(); self._v3d.activateWindow()
 
     # ── Cursor interactivo (crucecita + lectura), con blitting ────
     def set_cursor(self, on):
@@ -654,6 +679,7 @@ class TabSensibilidad(QWidget):
     def retraducir_grafico(self):
         self._retitular_rangos()
         self.btn.setText(_i18n.t("Calcular"))
+        self.btn_3d.setText(_i18n.t("Mostrar vista 3D"))
         prop_sel=self.cmb_prop.currentData(); eje_sel=self.cmb_eje.currentData()
         self._llenar_props(prop_sel)
         self.cmb_eje.blockSignals(True); self.cmb_eje.clear()
@@ -694,6 +720,61 @@ class TabSensibilidad(QWidget):
                 self.ed_P_n.setText(str(e['P'][2]))
         except Exception:
             pass
+
+
+import historial_pozo as _hp
+
+
+class VentanaSens3D(_hp.Ventana3DBase):
+    """Análisis de sensibilidad en 3D: temperatura (X), presión (Y) y la
+    propiedad (Z).  Cada curva calculada se dibuja como línea 3D y, si hay
+    dos o más, una superficie tenue une la familia."""
+
+    def __init__(self, tab, dueña=None):
+        super().__init__(dueña)
+        self._tab = tab
+        self.retraducir(redibujar=False)
+
+    def _titulos(self):
+        t = _i18n.t("Análisis de sensibilidad") + " - " + _i18n.t("Vista 3D")
+        return t, "ThermoPhase — " + _i18n.t("Análisis de sensibilidad") + ": " + _i18n.t("Vista 3D")
+
+    def closeEvent(self, ev):
+        self._tab._v3d = None
+        super().closeEvent(ev)
+
+    def _trazar(self, ax):
+        res = self._tab._last
+        if not res:
+            return
+        key = res['prop_key']; eje = res['eje_x']; curvas = res['curvas']
+        d = _PROPS_BY_KEY[key]; etiqueta = _i18n.t(d[1]); mag = d[2]
+        def _z(v):
+            return np.nan if (v is None or (isinstance(v, float) and np.isnan(v))) else _conv_mag(mag, v)
+        X = []; Y = []; Z = []
+        for i, (vf, xs, ys) in enumerate(curvas):
+            if eje == 'T':
+                T = [_u.abs_desde_R(v) for v in xs]; P = [_u.p_desde_psia(vf)]*len(xs)
+                lab = f"{_u.p_desde_psia(vf):.0f} {_u.u('P')}"
+            else:
+                P = [_u.p_desde_psia(v) for v in xs]; T = [_u.abs_desde_R(vf)]*len(xs)
+                lab = f"{_u.abs_desde_R(vf):.0f} {_u.u_abs()}"
+            zz = [_z(v) for v in ys]
+            ax.plot(T, P, zz, color=CURVA_COLORS[i % len(CURVA_COLORS)], lw=1.6, label=lab)
+            X.append(T); Y.append(P); Z.append(zz)
+        if len(curvas) >= 2:
+            try:
+                Za = np.ma.masked_invalid(np.array(Z, dtype=float))
+                ax.plot_surface(np.array(X, dtype=float), np.array(Y, dtype=float), Za,
+                                color='#9FB6CD', alpha=0.28, linewidth=0,
+                                antialiased=True, shade=False, zorder=1)
+            except Exception:
+                pass
+        y_unit = f" ({_u.u(mag)})" if mag else ""
+        ax.set_xlabel(f"{_i18n.t('Temperatura')} ({_u.u_abs()})", fontsize=9, labelpad=8)
+        ax.set_ylabel(f"{_i18n.t('Presion')} ({_u.u('P')})", fontsize=9, labelpad=8)
+        ax.set_zlabel(f"{etiqueta}{y_unit}", fontsize=9, labelpad=8)
+        _hp.leyenda_3d(self.fig, ax, _i18n.t('Presion') if eje == 'T' else _i18n.t('Temperatura'))
 
 
 # Alias de compatibilidad con el wiring existente.

@@ -630,7 +630,7 @@ class TabEquilibrio(QWidget):
         dens_row = QHBoxLayout(); dens_row.setSpacing(4)
         dens_row.addStretch()
         lbl_dens = QLabel("Densidad:")
-        lbl_dens.setFixedHeight(22); lbl_dens.setFixedWidth(72)
+        lbl_dens.setFixedHeight(22); lbl_dens.setFixedWidth(66)
         lbl_dens.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         lbl_dens.setStyleSheet(
             f'background:{GRAY_LBL};border:1px solid {BORDER};'
@@ -638,13 +638,19 @@ class TabEquilibrio(QWidget):
         dens_row.addWidget(lbl_dens, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.cmb_dens = QComboBox()
         self.cmb_dens.addItems(["COSTALD", "EOS"])
-        self.cmb_dens.setFixedHeight(22); self.cmb_dens.setFixedWidth(110)
+        self.cmb_dens.setFixedHeight(22); self.cmb_dens.setFixedWidth(92)
         _aplicar_estilo_combo(self.cmb_dens)
         dens_row.addWidget(self.cmb_dens, alignment=Qt.AlignmentFlag.AlignVCenter)
         # Corrección de volumen a la derecha de densidad, en la misma fila.
-        dens_row.addSpacing(10)
+        dens_row.addSpacing(6)
         lbl_vol = QLabel("Corrección de volumen:")
         lbl_vol.setFixedHeight(22)
+        # Ancho mínimo según la fuente real (en algunos equipos la Arial
+        # Narrow o su sustituta es más ancha y la etiqueta se recortaba).
+        from PyQt6.QtGui import QFontMetrics as _QFM
+        _fm = _QFM(QFont(FONT_F, int(round(float(FS)))))
+        lbl_vol.setMinimumWidth(max(_fm.horizontalAdvance(t) for t in
+                                    ("Corrección de volumen:", "Volume correction:")) + 16)
         lbl_vol.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter)
         lbl_vol.setStyleSheet(
             f'background:{GRAY_LBL};border:1px solid {BORDER};'
@@ -652,7 +658,7 @@ class TabEquilibrio(QWidget):
         dens_row.addWidget(lbl_vol, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.cmb_vol = QComboBox()
         self.cmb_vol.addItems(["Ninguna", "Peneloux"])
-        self.cmb_vol.setFixedHeight(22); self.cmb_vol.setFixedWidth(110)
+        self.cmb_vol.setFixedHeight(22); self.cmb_vol.setFixedWidth(92)
         _aplicar_estilo_combo(self.cmb_vol)
         dens_row.addWidget(self.cmb_vol, alignment=Qt.AlignmentFlag.AlignVCenter)
         rp.addLayout(dens_row)
@@ -5568,6 +5574,10 @@ def main(app=None, splash=None):
     # Fuente global Arial Narrow (todo el cromo retro la hereda).
     _f = QFont("Arial Narrow", 9)
     app.setFont(_f)
+    # Los menús (clic derecho y desplegables) toman en Windows la fuente de
+    # menú del sistema (Segoe UI); se fuerza la del programa.
+    for _cls in ("QMenu", "QMenuBar", "QToolTip"):
+        app.setFont(_f, _cls)
     # Selección en tablas/listas: gris tenue en lugar del azul del sistema
     # (activa e inactiva), con texto negro.
     from PyQt6.QtGui import QPalette as _QPal

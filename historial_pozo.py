@@ -459,6 +459,84 @@ def _barra_titulo(texto):
     return t
 
 
+def estilo_3d(ax):
+    """Formato común de los gráficos 3D: caras con gris tenue y contorno
+    negro, cuadrícula mínima y líneas de ejes negras."""
+    try:
+        ax.set_facecolor(GRAY_PLOT_BG)
+        for eje in (ax.xaxis, ax.yaxis, ax.zaxis):
+            # (gris por defecto de matplotlib sobre el fondo, ya mezclado y
+            # opaco, para que el contorno salga negro y no grisáceo)
+            eje.set_pane_color((0.906, 0.906, 0.906, 1.0))
+            eje.pane.set_edgecolor('#000000'); eje.pane.set_linewidth(1.0)
+            eje.pane.set_closed(True)          # dibuja también el 4.º lado
+            eje._axinfo['grid'].update(linewidth=0.3, color='#B0B0B0')
+            eje.line.set_color('#000000'); eje.line.set_linewidth(1.0)
+    except Exception:
+        pass
+
+
+def leyenda_3d(fig, ax, titulo):
+    """Cuadro de leyendas como en la vista 2D, fijo a la figura."""
+    h, l = ax.get_legend_handles_labels()
+    if not h:
+        return
+    leg = fig.legend(h, l, title=titulo, fontsize=8, title_fontsize=8,
+                     framealpha=1.0, fancybox=False, edgecolor='#000000',
+                     facecolor=GRAY_PLOT_BG, loc='upper left',
+                     bbox_to_anchor=(0.02, 0.98))
+    leg.get_frame().set_linewidth(1.0)
+
+
+class Ventana3DBase(QWidget):
+    """Ventana 3D con barra de título y gráfico enmarcado; se gira con el
+    ratón y es redimensionable.  Las subclases implementan _trazar(ax) y
+    _titulos() -> (título de ventana, texto de la barra)."""
+
+    def __init__(self, dueña=None):
+        super().__init__(dueña)
+        self.setWindowFlags(Qt.WindowType.Window)
+        self.setObjectName('ventana3d')
+        self.setStyleSheet(f'QWidget#ventana3d {{ background:{GRAY_LBL}; }}')
+        lay = QVBoxLayout(self); lay.setContentsMargins(4, 10, 4, 4); lay.setSpacing(3)
+        self.lbl_titulo = _barra_titulo("")
+        lay.addWidget(self.lbl_titulo)
+        self.fig = Figure(figsize=(1, 1)); self.fig.patch.set_facecolor(GRAY_PLOT_BG)
+        self.canvas = FigureCanvas(self.fig)
+        _gm.instalar(self.canvas)
+        self.canvas.setStyleSheet(f'background-color:{GRAY_PLOT_BG};')
+        self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        envol = QVBoxLayout(); envol.setContentsMargins(6, 4, 6, 4)
+        envol.addWidget(_caja(self.canvas))
+        lay.addLayout(envol, 1)
+        self.setMinimumSize(560, 460); self.resize(940, 720)
+        self.ax = None
+
+    def _titulos(self):
+        return "", ""
+
+    def _trazar(self, ax):
+        pass
+
+    def retraducir(self, redibujar=True):
+        tv, tb = self._titulos()
+        self.setWindowTitle(tv); self.lbl_titulo.setText(tb)
+        if redibujar and self.ax is not None:
+            self.dibujar()
+
+    def dibujar(self):
+        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+        vista = (self.ax.elev, self.ax.azim) if self.ax is not None else (22, -60)
+        self.fig.clear()
+        ax = self.ax = self.fig.add_subplot(111, projection='3d')
+        self._trazar(ax)
+        ax.tick_params(labelsize=7)
+        ax.view_init(*vista)
+        estilo_3d(ax)
+        self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        self.canvas.draw_idle()
+
+
 class TabHistorial(QWidget):
     ANCHO, ALTO = 1180, 712
     W_ENV = 740                     # ancho del canvas de envolventes
@@ -654,49 +732,24 @@ class TabHistorial(QWidget):
         self._v3d.showNormal(); self._v3d.raise_(); self._v3d.activateWindow()
 
 
-class Ventana3D(QWidget):
-    """Envolventes en 3D (temperatura, fecha, presión).  Se gira con el
-    ratón; redimensionable."""
+class Ventana3D(Ventana3DBase):
+    """Envolventes en 3D (temperatura, fecha, presión)."""
 
     def __init__(self, tab, dueña=None):
         super().__init__(dueña)
         self._tab = tab
-        self.setWindowFlags(Qt.WindowType.Window)
-        self.setWindowTitle(_i18n.t("Historial de pozo") + " - " + _i18n.t("Vista 3D"))
-        self.setObjectName('hist3d')
-        self.setStyleSheet(f'QWidget#hist3d {{ background:{GRAY_LBL}; }}')
-        lay = QVBoxLayout(self); lay.setContentsMargins(4, 10, 4, 4); lay.setSpacing(3)
-        self.lbl_titulo = _barra_titulo("")
-        lay.addWidget(self.lbl_titulo)
-        self.fig = Figure(figsize=(1, 1)); self.fig.patch.set_facecolor(GRAY_PLOT_BG)
-        self.canvas = FigureCanvas(self.fig)
-        _gm.instalar(self.canvas)
-        self.canvas.setStyleSheet(f'background-color:{GRAY_PLOT_BG};')
-        self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        caja = _caja(self.canvas)
-        envol = QVBoxLayout(); envol.setContentsMargins(6, 4, 6, 4); envol.addWidget(caja)
-        lay.addLayout(envol, 1)
-        self.setMinimumSize(560, 460); self.resize(940, 720)
-        self.ax = None
         self.retraducir(redibujar=False)
 
-    def retraducir(self, redibujar=True):
-        self.setWindowTitle(_i18n.t("Historial de pozo") + " - " + _i18n.t("Vista 3D"))
-        self.lbl_titulo.setText("ThermoPhase — " + _i18n.t("Historial de pozo") + ": "
-                                + _i18n.t("Vista 3D"))
-        if redibujar and self.ax is not None:
-            self.dibujar()
+    def _titulos(self):
+        return (_i18n.t("Historial de pozo") + " - " + _i18n.t("Vista 3D"),
+                "ThermoPhase — " + _i18n.t("Historial de pozo") + ": " + _i18n.t("Vista 3D"))
 
     def closeEvent(self, ev):
         self._tab._v3d = None
         super().closeEvent(ev)
 
-    def dibujar(self):
-        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+    def _trazar(self, ax):
         tab = self._tab
-        vista = (self.ax.elev, self.ax.azim) if self.ax is not None else (22, -60)
-        self.fig.clear()
-        ax = self.ax = self.fig.add_subplot(111, projection='3d')
         f = tab._fechas(); fn = mdates.date2num(f)
         for r, x, col in zip(tab.res, fn, tab._colores()):
             pts = list(r['burbuja']) + list(r['rocio'])
@@ -707,29 +760,4 @@ class Ventana3D(QWidget):
         ax.set_ylabel(_i18n.t("Fecha de muestreo"), fontsize=9, labelpad=14)
         ax.set_zlabel(f"{_i18n.t('Presion')} ({_u.u('P')})", fontsize=9, labelpad=8)
         ax.set_yticks(fn); ax.set_yticklabels([x.strftime('%m/%Y') for x in f], fontsize=7)
-        ax.tick_params(labelsize=7)
-        ax.view_init(*vista)
-        try:
-            ax.set_facecolor(GRAY_PLOT_BG)
-            for eje in (ax.xaxis, ax.yaxis, ax.zaxis):
-                # Paneles con el gris tenue de siempre y contorno negro.
-                # (gris por defecto de matplotlib sobre el fondo, ya mezclado y
-                # opaco, para que el contorno salga negro y no grisáceo)
-                eje.set_pane_color((0.906, 0.906, 0.906, 1.0))
-                eje.pane.set_edgecolor('#000000'); eje.pane.set_linewidth(1.0)
-                eje.pane.set_closed(True)          # dibuja también el 4.º lado
-                # Cuadrícula lo más fina posible.
-                eje._axinfo['grid'].update(linewidth=0.3, color='#B0B0B0')
-                eje.line.set_color('#000000'); eje.line.set_linewidth(1.0)
-        except Exception:
-            pass
-        if tab.res:
-            # Cuadro de leyendas como en la vista 2D (fijo a la figura).
-            leg = self.fig.legend(*ax.get_legend_handles_labels(),
-                                  title=_i18n.t("Fecha de muestreo"), fontsize=8,
-                                  title_fontsize=8, framealpha=1.0, fancybox=False,
-                                  edgecolor='#000000', facecolor=GRAY_PLOT_BG,
-                                  loc='upper left', bbox_to_anchor=(0.02, 0.98))
-            leg.get_frame().set_linewidth(1.0)
-        self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
-        self.canvas.draw_idle()
+        leyenda_3d(self.fig, ax, _i18n.t("Fecha de muestreo"))
