@@ -1670,6 +1670,18 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             pass
 
     envolvente, crit = _refinar_critico(z, kij, envolvente, crit)
+    if _ASIM and (sin_critico or (envolvente and max(p for p, _ in envolvente) > 9000.0)):
+        # sólo en mezclas con pared líquido-líquido (las comunes no pagan nada)
+        try:
+            envolvente = _corregir_frontera(z, kij, envolvente)
+            envolvente = [(p, t) for p, t in envolvente if p <= 10000.0*1.01]
+        except Exception:
+            pass
+    if _ASIM:
+        try:
+            envolvente = _suavizar_critico(z, kij, envolvente, crit)
+        except Exception:
+            pass
     global _DENSIFICANDO
     if not _DENSIFICANDO:
         _DENSIFICANDO = True
@@ -1684,6 +1696,156 @@ def construir_envolvente(z, kij=None, progress_cb=None,
     pared_ll = bool(_ASIM and envolvente and max(p for p, _ in envolvente) > 9000.0)
     return {'envolvente': envolvente, 'critico': crit, 'sin_critico': sin_critico,
             'pared_ll': pared_ll}
+
+
+# ── Corrección de la frontera en mezclas con separación líquido-líquido ────
+def _corregir_frontera(z, kij, env, dP=0.003, dT=1.0):
+    """En mezclas muy asimétricas las ecuaciones de saturación tienen más de
+    una solución: la continuación puede seguir una rama INTERIOR (la mezcla ya
+    está en dos fases a ambos lados del punto).  La frontera física es la
+    EXTERIOR.  Cada punto se verifica con la prueba general de estabilidad:
+    si a ambos lados en P (±0,3 %) la mezcla es inestable, el punto es
+    interior y se reemplaza por el borde real buscado hacia presión
+    mayor a la misma T (bisección)."""
+    import estabilidad_ll as _ll
+    zz = list(z)
+    def inest(T, P):
+        return _ll.inestable(zz, float(T), float(P), kij)
+    out = []
+    # Las ramas interiores aparecen en la parte ALTA de la envolvente (lazo y
+    # pared); la rama de rocío de baja presión no se revisa.
+    P_ref = max((p for p, _ in env if p < 9000.0), default=0.0)
+    n = len(env)
+    for k, (P, T) in enumerate(env):
+        if P < 0.3*P_ref:
+            out.append((P, T)); continue
+        # pendiente local: tramo casi vertical (pared) → corregir en T
+        a = env[max(k-1, 0)]; b = env[min(k+1, n-1)]
+        dTl = abs(b[1]-a[1]); dlP = abs(np.log(max(b[0], 1e-6)/max(a[0], 1e-6)))
+        vertical = dlP > 0.01 and dTl < 150.0*dlP    # < 1,5 °F por 1 % de P
+        if vertical:
+            if not (inest(T+dT, P) and inest(T-dT, P)):
+                out.append((P, T)); continue
+            # interior: el lado monofásico de la pared está a mayor T
+            lo = T + dT; hi = None; Tt = lo
+            for _ in range(15):
+                Tt += 3.0
+                if not inest(Tt, P):
+                    hi = Tt; break
+                lo = Tt
+            if hi is None:
+                out.append((P, T)); continue
+            while hi - lo > 0.05:
+                m = 0.5*(lo+hi)
+                if inest(m, P): lo = m
+                else: hi = m
+            out.append((P, 0.5*(lo+hi)))
+            continue
+        if not (inest(T, P*(1+dP)) and inest(T, P*(1-dP))):
+            out.append((P, T)); continue
+        # interior: buscar el borde exterior subiendo en P
+        lo = P*(1+dP); hi = None; Pt = lo
+        for _ in range(12):
+            Pt *= 1.04
+            if not inest(T, Pt):
+                hi = Pt; break
+            lo = Pt
+        if hi is None:
+            out.append((P, T)); continue
+        while hi/lo > 1.0005:
+            m = 0.5*(lo+hi)
+            if inest(T, m): lo = m
+            else: hi = m
+        out.append((0.5*(lo+hi), T))
+    return out
+
+
+# ── Suavizado de la envolvente alrededor del punto crítico ──────────────────
+def _suavizar_critico(z, kij, env, crit, ancho=25.0):
+    """Las dos ramas se trazan por continuación hasta CERCA del crítico y se
+    detienen antes (la zona crítica está mal condicionada); el crítico exacto
+    (método directo) se intercala después.  En mezclas asimétricas eso deja
+    un «salto» o un zigzag en la unión.  Aquí, sólo si se detecta ese defecto,
+    se recalcula el tramo |T − Tc| < ancho con puntos de frontera obtenidos
+    por bisección de estabilidad a T fija (barrido en T, curva monótona en T
+    cerca del crítico) y se reemplaza el tramo original."""
+    if crit is None or len(env) < 12:
+        return env
+    Pc, Tc = float(crit[0]), float(crit[1])
+    ic = min(range(len(env)), key=lambda k: abs(env[k][1]-Tc) + abs(env[k][0]-Pc)/10.0)
+    # tramo contiguo alrededor del crítico con |T−Tc| < ancho
+    i0 = ic
+    while i0 > 0 and abs(env[i0-1][1]-Tc) < ancho:
+        i0 -= 1
+    i1 = ic
+    while i1 < len(env)-1 and abs(env[i1+1][1]-Tc) < ancho:
+        i1 += 1
+    tramo = env[max(i0-1, 0):min(i1+2, len(env))]
+    if len(tramo) < 3:
+        return env
+    # ¿defecto?  (a) zigzag en T  (b) segmento contiguo al crítico muy largo
+    dT = [tramo[k+1][1]-tramo[k][1] for k in range(len(tramo)-1)]
+    zig = any(a*b < 0 for a, b in zip(dT, dT[1:]) if abs(a) > 0.05 and abs(b) > 0.05)
+    Ts = [t for _, t in env]; lP = [np.log(max(p, 1e-6)) for p, _ in env]
+    sT = max(max(Ts)-min(Ts), 1.0); sP = max(max(lP)-min(lP), 0.1)
+    def d(a, b): return max(abs(a[1]-b[1])/sT, abs(np.log(a[0]/b[0]))/sP)
+    segs = [d(env[k], env[k+1]) for k in range(len(env)-1)]
+    med = float(np.median(segs)) if segs else 0.0
+    cerca = [d(env[k], env[k+1]) for k in range(max(ic-2, 0), min(ic+2, len(env)-1))]
+    salto = bool(cerca) and med > 0 and max(cerca) > 3.0*med
+    if not (zig or salto):
+        return env
+    # pendiente local → si la curva es casi vertical en T no se usa este método
+    a, b = env[max(i0-1, 0)], env[min(i1+1, len(env)-1)]
+    if abs(b[1]-a[1]) < 2.0:
+        return env
+    import estabilidad_ll as _ll
+    zz = list(z)
+
+    def bif(T, P):
+        # prueba general de Michelsen (vapor-líquido y líquido-líquido)
+        try:
+            return _ll.inestable(zz, T, P, kij)
+        except Exception:
+            return False
+
+    def interp(T):                       # estimación de P en el tramo original
+        pts = sorted(tramo, key=lambda q: q[1])
+        for (p0, t0), (p1, t1) in zip(pts, pts[1:]):
+            if t0 <= T <= t1 and t1 > t0:
+                return p0 + (p1-p0)*(T-t0)/(t1-t0)
+        return Pc
+
+    def borde(T):
+        pe = interp(T)
+        for f in (0.04, 0.08, 0.15, 0.25):
+            lo, hi = pe*(1-f), pe*(1+f)
+            blo, bhi = bif(T, lo), bif(T, hi)
+            if blo != bhi:
+                break
+        else:
+            return None
+        while abs(hi/lo - 1.0) > 5e-4:
+            m = 0.5*(lo+hi)
+            if bif(T, m) == blo: lo = m
+            else: hi = m
+        return 0.5*(lo+hi)
+
+    n = 7
+    nuevos_b = []; nuevos_d = []
+    for k in range(n, 0, -1):            # lado de burbuja (T < Tc)
+        T = Tc - ancho*k/(n+0.5)
+        P = borde(T)
+        if P is not None:
+            nuevos_b.append((P, T))
+    for k in range(1, n+1):              # lado de rocío (T > Tc)
+        T = Tc + ancho*k/(n+0.5)
+        P = borde(T)
+        if P is not None:
+            nuevos_d.append((P, T))
+    if len(nuevos_b) < n//2 or len(nuevos_d) < n//2:
+        return env
+    return env[:i0] + nuevos_b + [(Pc, Tc)] + nuevos_d + env[i1+1:]
 
 
 # ── Densificación y verificación final de la envolvente ─────────────────────

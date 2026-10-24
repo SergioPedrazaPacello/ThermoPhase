@@ -37,6 +37,10 @@ from pestana_op_unitarias import (_titulo, _tabla, _cell, _ajustar, _set_comp,
                                   TEXT, TEXT_RES, ROW_H, FONT_F, FS, BORDER)
 
 GRAY_PLOT_BG = "#DCDCDC"
+# Mismo grosor de línea y tamaño de marcador que la Envolvente de fases y el
+# Análisis de sensibilidad (graf_opciones.curva: lw=0.7, ms=3).
+LW_2D = 0.7
+MS_2D = 3
 FMT_FECHA = "dd/MM/yyyy"
 METODOS = [("Michelsen", 'michelsen'), ("Ziervogel-Poling", 'ziervogel')]
 W_CAMPO = 232
@@ -656,13 +660,13 @@ class TabHistorial(QWidget):
         for r, col in zip(self.res, self._colores()):
             pts = list(r['burbuja']) + list(r['rocio'])
             ax.plot([_u.t_desde_R(t) for _, t in pts], [_u.p_desde_psia(p) for p, _ in pts],
-                    '-', color=col, lw=1.5, label=_fecha_txt(r['fecha']))
+                    '-', color=col, lw=LW_2D, label=_fecha_txt(r['fecha']))
             if r['critico'] is not None:
                 ax.plot([_u.t_desde_R(r['critico'][1])], [_u.p_desde_psia(r['critico'][0])],
-                        '^', color=col, ms=6, mec='#000000', mew=0.4)
+                        '^', color=col, ms=MS_2D, mec='#000000', mew=0.3)
             p, t = r['cricondenterma']
-            ax.plot([_u.t_desde_R(t)], [_u.p_desde_psia(p)], 's', color=col, ms=5,
-                    mec='#000000', mew=0.4)
+            ax.plot([_u.t_desde_R(t)], [_u.p_desde_psia(p)], 's', color=col, ms=MS_2D,
+                    mec='#000000', mew=0.3)
         ax.set_xlabel(f"{_i18n.t('Temperatura')} ({_u.u('T')})", fontsize=10)
         ax.set_ylabel(f"{_i18n.t('Presion')} ({_u.u('P')})", fontsize=10)
         if self.res:
@@ -676,9 +680,9 @@ class TabHistorial(QWidget):
     def _tendencia(self, ax, canvas, ys, titulo, marcador, color):
         ax.clear(); _estilo_ax(ax, chico=True)
         f = self._fechas()
-        ax.plot(f, ys, '-', color=color, lw=1.2, zorder=2)
+        ax.plot(f, ys, '-', color=color, lw=LW_2D, zorder=2)
         for x, y, c in zip(f, ys, self._colores()):
-            ax.plot([x], [y], marcador, color=c, ms=6, mec='#000000', mew=0.5, zorder=3)
+            ax.plot([x], [y], marcador, color=c, ms=MS_2D, mec='#000000', mew=0.3, zorder=3)
         ax.set_title(titulo, fontsize=9, loc='right')
         if len(f) == 1:
             ax.set_xlim(f[0] - _dt.timedelta(days=60), f[0] + _dt.timedelta(days=60))

@@ -54,7 +54,7 @@ def lnphi_mg(x, T, P, kij):
     return mejor[1], mejor[2]
 
 
-def prueba(z, T, P, kij, tol=1e-10, max_it=300):
+def prueba(z, T, P, kij, tol=1e-10, max_it=300, primera=False):
     """Prueba de estabilidad de Michelsen con varias fases de prueba.
 
     Devuelve dict(inestable, tm, w) — w es la composición de la fase de prueba
@@ -77,7 +77,7 @@ def prueba(z, T, P, kij, tol=1e-10, max_it=300):
     for W in semillas:
         W = np.where(z > 1e-12, np.clip(W, 1e-300, None), 0.0)
         tm = None
-        for _ in range(max_it):
+        for it in range(max_it):
             y = W/W.sum()
             lw, _ = lnphi_mg(y, T, P, kij)
             if lw is None:
@@ -88,6 +88,15 @@ def prueba(z, T, P, kij, tol=1e-10, max_it=300):
             W = Wn
             if dif < tol:
                 break
+            if primera and it >= 6:
+                # modo rápido: cortar en cuanto la tendencia es clara
+                yy = W/W.sum()
+                if np.max(np.abs(np.log(yy[act]/z[act]))) < 1e-3:
+                    break                                  # va a la solución trivial
+                if dif < 1e-4 and W.sum() > 1.0 + 1e-5:
+                    break                                  # ya convergiendo con ΣW > 1
+                if dif < 1e-4 and W.sum() < 1.0 - 1e-5:
+                    break                                  # punto estacionario estable
         y = W/W.sum()
         if np.max(np.abs(np.log(y[act]/z[act]))) < 1e-4:
             continue                                   # solución trivial
@@ -98,13 +107,15 @@ def prueba(z, T, P, kij, tol=1e-10, max_it=300):
         tm = 1.0 + float(np.sum(W[act]*(np.log(W[act]) + lw[act] - d[act] - 1.0)))
         if tm < mejor['tm']:
             mejor = {'inestable': tm < -1e-8, 'tm': tm, 'w': list(y)}
+            if primera and mejor['inestable']:
+                return mejor                 # basta con una fase de prueba inestable
     return mejor
 
 
 def inestable(z, T, P, kij):
     """Atajo: True si la mezcla se separa (vapor-líquido o líquido-líquido)."""
     try:
-        return bool(prueba(z, T, P, kij)['inestable'])
+        return bool(prueba(z, T, P, kij, tol=1e-9, max_it=150, primera=True)['inestable'])
     except Exception:
         return False
 
