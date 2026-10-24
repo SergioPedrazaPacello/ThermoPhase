@@ -1561,7 +1561,124 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             pass
 
     envolvente, crit = _refinar_critico(z, kij, envolvente, crit)
+    try:
+        envolvente = _densificar(z, kij, envolvente, crit, P_ini)
+    except Exception:
+        pass
     return {'envolvente': envolvente, 'critico': crit}
+
+
+# ── Densificación y verificación final de la envolvente ─────────────────────
+def _densificar(z, kij, envolvente, crit, P_ini=14.7, umbral=0.035, max_ins=14):
+    """Repasa la envolvente ya ensamblada y corrige los tramos mal trazados
+    con el calculador de puntos de saturación (barrido de estabilidad +
+    Newton, independiente de la continuación):
+
+      1. Huecos: entre dos puntos consecutivos muy separados (distancia
+         normalizada en T y en ln P mayor que `umbral`) se insertan puntos
+         intermedios.  Se fija la variable que más cambia en el tramo (T en
+         tramos «horizontales», P en tramos casi verticales) y se resuelve
+         la otra; un punto sólo se acepta si cae dentro de la caja del tramo.
+      2. Extremos dudosos: el punto contiguo a un hueco se recalcula a su
+         misma P; si la T verdadera difiere más de 3 °F, se reemplaza.
+      3. Cola de baja presión: si una rama termina muy por encima de P_ini,
+         se prolonga hasta P_ini.
+
+    Los tramos que tocan el punto crítico no se modifican.  En envolventes
+    bien trazadas no hay huecos y esta función no cambia nada."""
+    if len(envolvente) < 6:
+        return envolvente
+    import saturacion as _sat
+    env = [(float(p), float(t)) for p, t in envolvente]
+    # índice del crítico (divide burbuja | rocío)
+    if crit is not None:
+        ic = min(range(len(env)), key=lambda k: abs(env[k][1]-crit[1]) + abs(env[k][0]-crit[0])/10.0)
+    else:
+        ic = max(range(len(env)), key=lambda k: env[k][0])
+    Ts = [t for _, t in env]; lPs = [np.log(max(p, 1e-6)) for p, _ in env]
+    spanT = max(max(Ts) - min(Ts), 1.0); spanP = max(max(lPs) - min(lPs), 0.1)
+    cache = {}
+
+    def sat(tipo, valor):
+        clave = (tipo, round(float(valor), 6))
+        if clave not in cache:
+            try:
+                r = _sat.punto_saturacion(tipo, float(valor), list(z), kij)
+                cache[clave] = (float(r['P']), float(r['T'])) if r and r.get('exito', True) and 'T' in r else None
+            except Exception:
+                cache[clave] = None
+        return cache[clave]
+
+    def dist(a, b):
+        return max(abs(a[1]-b[1])/spanT, abs(np.log(a[0]/b[0]))/spanP)
+
+    def lado(i):                     # 'burbuja' antes del crítico, 'rocio' después
+        return 'burbuja' if i < ic else 'rocio'
+
+    # ── 2) extremos dudosos de huecos grandes: verificar a la misma P ────────
+    for i in range(1, len(env)):
+        if i - 1 == ic or i == ic or dist(env[i-1], env[i]) <= 3*umbral:
+            continue
+        for k in (i-1, i):
+            if k == ic:
+                continue
+            P, T = env[k]
+            r = sat('T_' + lado(k), P)
+            if r is not None and abs(r[1] - T) > 3.0 and abs(np.log(r[0]/P)) < 1e-3:
+                env[k] = (P, r[1])
+
+    # ── 1) huecos: insertar puntos intermedios ──────────────────────────────
+    nueva = [env[0]]
+    ic_nuevo = ic if ic == 0 else None
+    for i in range(1, len(env)):
+        a, b = env[i-1], env[i]
+        d = dist(a, b)
+        if d > umbral and (i - 1) != ic and i != ic:
+            n = min(max_ins, int(np.ceil(d/umbral)) - 1)
+            fijaT = abs(a[1]-b[1])/spanT >= abs(np.log(a[0]/b[0]))/spanP
+            tip = ('P_' if fijaT else 'T_') + lado(i)
+            Tlo, Thi = sorted((a[1], b[1])); Plo, Phi = sorted((a[0], b[0]))
+            mT = 0.25*(Thi-Tlo) + 2.0; mP = 0.25*(Phi-Plo) + 2.0
+            for k in range(1, n+1):
+                f = k/(n+1)
+                if fijaT:
+                    r = sat(tip, a[1] + f*(b[1]-a[1]))
+                else:
+                    r = sat(tip, float(np.exp(np.log(a[0]) + f*(np.log(b[0])-np.log(a[0])))))
+                if r is not None and Tlo-mT <= r[1] <= Thi+mT and Plo-mP <= r[0] <= Phi+mP:
+                    nueva.append(r)
+        nueva.append(b)
+        if i == ic:
+            ic_nuevo = len(nueva) - 1
+    env = nueva
+    if ic_nuevo is not None:
+        ic = ic_nuevo
+
+    # ── 3) colas de baja presión ────────────────────────────────────────────
+    def cola(extremo, tipo):
+        P0 = extremo[0]
+        if P0 <= max(P_ini, 1.0)*1.6:
+            return []
+        Ps = np.exp(np.linspace(np.log(P0), np.log(max(P_ini, 1.0)), 8))[1:]
+        pts = []
+        prev = extremo
+        for P in Ps:
+            r = sat(tipo, P)
+            if r is None or abs(r[1]-prev[1]) > 0.25*spanT:
+                break
+            pts.append(r); prev = r
+        return pts
+    try:
+        if ic > 0:
+            c0 = cola(env[0], 'T_burbuja')
+            if c0:
+                env = list(reversed(c0)) + env
+                ic += len(c0)
+        if ic < len(env) - 1:
+            env = env + cola(env[-1], 'T_rocio')
+    except Exception:
+        pass
+    return env
 
 
 def _refinar_critico(z, kij, envolvente, crit):
