@@ -651,7 +651,7 @@ def _envolvente_por_banda(z, act, crit, P_ini=14.7):
     """
     if kij_g is None or crit is None:
         return None, None, None, None
-    from eos import analisis_estabilidad
+    analisis_estabilidad = _estab_combinada
     zc = np.array(z, dtype=float)
     Pc, Tc = crit
 
@@ -791,7 +791,7 @@ def _critico_por_cierre_banda(z, act, crit_ini):
     """
     if kij_g is None or crit_ini is None:
         return crit_ini
-    from eos import analisis_estabilidad
+    analisis_estabilidad = _estab_combinada
     zc = np.array(z, dtype=float)
     Pc0, Tc0 = crit_ini
     T_win = 250.0
@@ -885,7 +885,7 @@ def _cerrar_burbuja_por_bordes(z, act, P_desde, P_hasta, T_hint, crit):
     """
     if kij_g is None or P_hasta <= P_desde:
         return []
-    from eos import analisis_estabilidad
+    analisis_estabilidad = _estab_combinada
     zc = np.array(z, dtype=float)
 
     def bif(T, P):
@@ -1022,7 +1022,7 @@ def _rama_alta_presion(z, act, env_pmax, max_pts, paso_max, crit_ref=None):
 
     Devuelve (línea [alta P … crítico], crítico) o ([], None).
     """
-    from eos import analisis_estabilidad
+    analisis_estabilidad = _estab_combinada
     za = np.asarray(z, dtype=float)
 
     def bif(T, P, maxit=45):
@@ -1175,6 +1175,44 @@ def _rama_alta_presion(z, act, env_pmax, max_pts, paso_max, crit_ref=None):
     return linea, crit_hp
 
 
+# ── Estabilidad combinada (vapor-líquido + líquido-líquido) ──────────────────
+_ASIM = False      # mezcla asimétrica (posible separación líquido-líquido)
+_USAR_LL = False   # activar la prueba líquido-líquido en las bisecciones
+
+
+def _estab_combinada(z, T, P, kij, **kw):
+    """Prueba de estabilidad del motor + (en mezclas asimétricas) la prueba
+    general de Michelsen que detecta la separación líquido-líquido."""
+    from eos import analisis_estabilidad as _ae
+    r = _ae(z, T, P, kij, **kw)
+    if _ASIM and _USAR_LL and not r.get('inestable', False):
+        try:
+            import estabilidad_ll as _ll
+            if _ll.inestable(z, T, P, kij):
+                r = dict(r, inestable=True)
+        except Exception:
+            pass
+    return r
+
+
+def _filtrar_burbuja_falsa(z, pts):
+    """Quita los puntos de una rama de BURBUJA que en realidad están dentro de
+    la región de dos líquidos: justo por encima de una burbuja verdadera la
+    mezcla es líquido estable; si allí se separa en dos líquidos, el punto es
+    una «falsa burbuja» (Michelsen & Mollerup, cap. 12)."""
+    if not _ASIM or not pts:
+        return pts
+    import estabilidad_ll as _ll
+    # La rama va en P ascendente desde baja presión.  La falsa burbuja ocupa
+    # el tramo de baja T/baja P; en cuanto aparece un punto verdadero, el
+    # resto de la rama ya es verdadero (se deja de probar: en las mezclas
+    # comunes esto cuesta una sola prueba).
+    for k, (P, T) in enumerate(pts):
+        if not _ll.inestable(z, float(T), float(P)*1.03, kij_g):
+            return pts[k:]
+    return []
+
+
 # ── Punto de entrada principal ───────────────────────────────────────────────
 def construir_envolvente(z, kij=None, progress_cb=None,
                          P_ini=14.7, max_pts=2000, paso_max=0.10):
@@ -1320,7 +1358,20 @@ def construir_envolvente(z, kij=None, progress_cb=None,
         return rama, crit
 
     # ── Trazar ambas ramas ──────────────────────────────────────────────────
+    global _ASIM
+    try:
+        import estabilidad_ll as _ll
+        _ASIM = _ll.asimetrica(z)
+    except Exception:
+        _ASIM = False
     pts_burb, crit_b = _trazar_rama(_semilla_burbuja)
+    if _ASIM and pts_burb:
+        n0 = len(pts_burb)
+        pts_burb = _filtrar_burbuja_falsa(z, pts_burb)
+        if len(pts_burb) < 0.5*n0:
+            # la mayor parte era falsa: descartar la rama (la frontera real la
+            # trazan la rama de alta presión y los cierres por estabilidad)
+            pts_burb = []
     if progress_cb: progress_cb(len(pts_burb))
     pts_dew, crit_d = _trazar_rama(_semilla_rocio)
     if progress_cb: progress_cb(len(pts_burb)+len(pts_dew))
@@ -1356,6 +1407,16 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             if pts_dew:  env_pmax = max(env_pmax, max(p for p, _ in pts_dew))
             rama_hp, crit_hp = _rama_alta_presion(z, act, env_pmax, max_pts,
                                                   paso_max, crit_ref=crit)
+            if (not rama_hp) and _ASIM:
+                # La prueba del motor no ve la separación líquido-líquido: se
+                # repite con la prueba general (más lenta, sólo cuando hace falta).
+                global _USAR_LL
+                _USAR_LL = True
+                try:
+                    rama_hp, crit_hp = _rama_alta_presion(z, act, env_pmax, max_pts,
+                                                          paso_max, crit_ref=crit)
+                finally:
+                    _USAR_LL = False
             if rama_hp and len(rama_hp) >= 10:
                 # Dos formas de armar la rama de burbuja con la vertical de alta
                 # presión, y se elige la de trazado MÁS continuo (menor salto
@@ -1517,12 +1578,60 @@ def construir_envolvente(z, kij=None, progress_cb=None,
                 if mj1 < mj:
                     envolvente = nueva
 
+    # ── Tope de presión en mezclas asimétricas ──────────────────────────────
+    # Con separación líquido-líquido la frontera sube casi vertical hasta
+    # presión infinita (Michelsen & Mollerup, cap. 12).  Se corta en el mismo
+    # techo que la rama de alta presión (10000 psia) y, si el «crítico» quedó
+    # por encima (no hay crítico real en esa rama), se descarta.
+    sin_critico = False
+    if _ASIM and envolvente:
+        P_TOPE = 10000.0
+        if any(p > P_TOPE for p, _ in envolvente):
+            envolvente = [(p, t) for p, t in envolvente if p <= P_TOPE]
+            if crit is not None and crit[0] > P_TOPE:
+                crit = None
+                # crítico real (método directo) si cae sobre la curva
+                try:
+                    import critico as _cr
+                    cd = _cr.punto_critico_directo(list(z), kij)
+                    if cd:
+                        Pc, Tc = float(cd[0]), float(cd[1])
+                        k = min(range(len(envolvente)),
+                                key=lambda i: abs(envolvente[i][1]-Tc) + abs(envolvente[i][0]-Pc)/10.0)
+                        if abs(envolvente[k][1]-Tc) < 15.0 and abs(envolvente[k][0]-Pc) < 0.05*Pc:
+                            envolvente[k] = (Pc, Tc); crit = (Pc, Tc)
+                except Exception:
+                    pass
+                # Sin crítico: toda la frontera es de tipo ROCÍO (la fase
+                # incipiente es un líquido rico en pesados y nunca iguala a la
+                # alimentación), y sube por la pared líquido-líquido.
+                if crit is None:
+                    sin_critico = True
+                    if envolvente[0][0] < envolvente[-1][0]:
+                        envolvente = list(reversed(envolvente))
+
     # ── Crítico estimado (si ambas ramas fallaron en detectarlo) ─────────────
     # En mezclas multicomponente con muchos componentes, sum(lnK)² puede no
     # bajar de 0.5 aunque la envolvente esté completa. Sin crit la GUI pone
     # todo en burbuja. Se usa la cricondenbárica como estimación: suficiente
     # para que el split burbuja/rocío de la GUI sea correcto.
-    if crit is None and len(envolvente) >= 4:
+    if crit is None and len(envolvente) >= 4 and _ASIM and not sin_critico:
+        # Mezcla asimétrica: antes de inventar un crítico en la cricondenbárica,
+        # verificar con el método directo; si no existe, la frontera es sólo
+        # de rocío (fase incipiente rica en pesados que nunca iguala a z).
+        try:
+            import critico as _cr
+            cd = _cr.punto_critico_directo(list(z), kij)
+        except Exception:
+            cd = None
+        if cd:
+            crit = (float(cd[0]), float(cd[1]))
+        else:
+            sin_critico = True
+            ip = max(range(len(envolvente)), key=lambda i: envolvente[i][0])
+            if ip > len(envolvente)//2:
+                envolvente = list(reversed(envolvente))
+    if crit is None and len(envolvente) >= 4 and not sin_critico:
         idx_pmax = max(range(len(envolvente)), key=lambda i: envolvente[i][0])
         crit = envolvente[idx_pmax]
 
@@ -1561,14 +1670,24 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             pass
 
     envolvente, crit = _refinar_critico(z, kij, envolvente, crit)
-    try:
-        envolvente = _densificar(z, kij, envolvente, crit, P_ini)
-    except Exception:
-        pass
-    return {'envolvente': envolvente, 'critico': crit}
+    global _DENSIFICANDO
+    if not _DENSIFICANDO:
+        _DENSIFICANDO = True
+        try:
+            envolvente = _densificar(z, kij, envolvente, crit, P_ini)
+        except Exception:
+            pass
+        finally:
+            _DENSIFICANDO = False
+    # Pared líquido-líquido: la frontera sube sin límite (se cortó en el techo);
+    # no hay una cricondenbárica finita.
+    pared_ll = bool(_ASIM and envolvente and max(p for p, _ in envolvente) > 9000.0)
+    return {'envolvente': envolvente, 'critico': crit, 'sin_critico': sin_critico,
+            'pared_ll': pared_ll}
 
 
 # ── Densificación y verificación final de la envolvente ─────────────────────
+_DENSIFICANDO = False     # evita que un cálculo de saturación interno vuelva a densificar
 def _densificar(z, kij, envolvente, crit, P_ini=14.7, umbral=0.035, max_ins=14):
     """Repasa la envolvente ya ensamblada y corrige los tramos mal trazados
     con el calculador de puntos de saturación (barrido de estabilidad +
@@ -1603,7 +1722,8 @@ def _densificar(z, kij, envolvente, crit, P_ini=14.7, umbral=0.035, max_ins=14):
         clave = (tipo, round(float(valor), 6))
         if clave not in cache:
             try:
-                r = _sat.punto_saturacion(tipo, float(valor), list(z), kij)
+                # sin el respaldo que reconstruye la envolvente (evita recursión)
+                r = _sat.punto_saturacion(tipo, float(valor), list(z), kij, respaldo=False)
                 cache[clave] = (float(r['P']), float(r['T'])) if r and r.get('exito', True) and 'T' in r else None
             except Exception:
                 cache[clave] = None

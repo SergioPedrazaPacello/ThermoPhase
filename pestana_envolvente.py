@@ -220,12 +220,15 @@ class EnvWorker(QThread):
                                  key=lambda i: (env[i][0]-crit[0])**2
                                               +(env[i][1]-crit[1])**2)
                         burb = env[:ic+1]; rocio = env[ic:]
+                    elif r.get('sin_critico'):
+                        burb = []; rocio = env      # frontera sólo de rocío
                     else:
                         burb = env; rocio = []
                     res = {'burbuja': burb, 'rocio': rocio,
                            'critico_burbuja': crit is not None,
                            'critico_rocio':   crit is not None,
-                           'critico': crit}
+                           'critico': crit,
+                           'pared_ll': bool(r.get('pared_ll'))}
             else:
                 res = curva_envolvente(self.z, self.kij)
             self._linea_agua(res)
@@ -264,6 +267,8 @@ class IsoWorker(QThread):
                     ic=min(range(len(ev)),
                            key=lambda i:(ev[i][0]-crit[0])**2+(ev[i][1]-crit[1])**2)
                     burb=ev[:ic+1]; rocio=ev[ic:]
+                elif r.get('sin_critico'):
+                    burb=[]; rocio=ev
                 else:
                     burb=ev; rocio=[]
                 env={'burbuja':burb,'rocio':rocio,
@@ -397,6 +402,13 @@ class RegionesWorker(QThread):
                                'critico_burbuja': True,
                                'critico_rocio':   True,
                                'critico': crit,
+                               'metodo': 'michelsen',
+                               'pared_ll': bool(r_mich.get('pared_ll'))}
+                elif r_mich.get('sin_critico'):
+                    env_res = {'burbuja': [], 'rocio': env_pts,
+                               'critico_burbuja': False,
+                               'critico_rocio':   False,
+                               'critico': None,
                                'metodo': 'michelsen'}
                 else:
                     env_res = {'burbuja': env_pts, 'rocio': [],
@@ -2351,8 +2363,13 @@ class TabEnvolvente(QWidget):
         else:
             # Cricondentérmica = T máxima de la envolvente
             self.res_labels['cric_T'].setText(fv(max(all_T)) if all_T else "")
-            # Cricondenbárica = P máxima de la envolvente
-            self.res_labels['cric_P'].setText(fv(max(all_P)) if all_P else "")
+            # Cricondenbárica = P máxima de la envolvente.  Con pared
+            # líquido-líquido la frontera sube sin límite: no hay una
+            # cricondenbárica finita.
+            if res.get('pared_ll'):
+                self.res_labels['cric_P'].setText("—")
+            else:
+                self.res_labels['cric_P'].setText(fv(max(all_P)) if all_P else "")
 
     def exportar_csv(self):
         if not self.result: return

@@ -900,6 +900,10 @@ def curva_envolvente(z,kij=None,progress_cb=None,tol_cierre=15.0):
                 return {'burbuja': env[:ic+1], 'rocio': env[ic:],
                         'critico_burbuja': True, 'critico_rocio': True,
                         'metodo': etiqueta}
+            if env and r.get('sin_critico') and len(env) >= 10:
+                return {'burbuja': [], 'rocio': env,
+                        'critico_burbuja': False, 'critico_rocio': False,
+                        'metodo': etiqueta}
         except Exception:
             pass
         return None

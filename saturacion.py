@@ -345,7 +345,7 @@ def _P_lo(z, Tc, Pc, om, T):
     return 0.01/np.sum(z/np.maximum(Ps, 1e-300))
 
 
-def _sat_seco(tipo_calc, valor, z13, kij):
+def _sat_seco(tipo_calc, valor, z13, kij, respaldo=True):
     tipo, var_fija = _TIPOS[tipo_calc]
     S = Sistema13(z13, kij)
     cp = E.crit_props(E.get_eos())
@@ -373,7 +373,7 @@ def _sat_seco(tipo_calc, valor, z13, kij):
             cands.append(sol)
 
     # 2) método anterior (GoalSeek) como candidato adicional / respaldo
-    if not cands:
+    if not cands and respaldo:
         try:
             import envolvente as _env
             r = _env.punto_saturacion(tipo_calc, valor, list(z13), kij)
@@ -696,7 +696,7 @@ def _armar_agua(S, sol, z14, eos, tipo):
 # ════════════════════════════════════════════════════════════════════════════
 # Punto de entrada
 # ════════════════════════════════════════════════════════════════════════════
-def punto_saturacion(tipo_calc, valor, z, kij=None, eos=None):
+def punto_saturacion(tipo_calc, valor, z, kij=None, eos=None, respaldo=True):
     """tipo_calc: 'T_rocio' | 'T_burbuja' | 'P_rocio' | 'P_burbuja'.
     valor: P [psia] (para T_*) o T [°R] (para P_*).
     z: 13 comp. (sin agua) o 14 comp. (índice 13 = agua).
@@ -709,4 +709,4 @@ def punto_saturacion(tipo_calc, valor, z, kij=None, eos=None):
     if len(z) > NC and z[IDX_AGUA] > 1e-12:
         return _sat_agua(tipo_calc, valor, z, eos)
     z13 = np.asarray(z[:NC], dtype=float); z13 = z13/z13.sum()
-    return _sat_seco(tipo_calc, valor, list(z13), kij)
+    return _sat_seco(tipo_calc, valor, list(z13), kij, respaldo=respaldo)

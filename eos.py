@@ -1292,7 +1292,7 @@ def analisis_estabilidad(z,T,P,kij,tol=1e-12,triv_tol=1e-4,tol_S=1e-4,max_iter=1
             "Sv":Sv,"Sl":Sl,"Kv":Kv,"Kl":Kl,"iter":it+1}
 
 # ══ Flash Muskat-McDowell ════════════════════════════════════
-def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'):
+def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS',fases=None):
     """
     Réplica EXACTA de la macro CalculoFlash:
     - Si ΣKi·zi ≤ 1 → fase única LÍQUIDA (x=z, y=0)
@@ -1306,6 +1306,14 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
     K=list(Ki_init)
 
     x=list(z); y=list(z); V=1.0; L=0.0; modo="vapor_unico"
+    it=0
+    # fases: resultado ya convergido de un flash con raíces de mínima Gibbs
+    # (separación líquido-líquido, estabilidad_ll.flash).  Se usan tal cual y
+    # aquí sólo se calculan las propiedades, con la raíz de mínima Gibbs.
+    if fases is not None:
+        V=float(fases['V']); L=1.0-V
+        x=list(fases['x']); y=list(fases['y']); K=list(fases['K'])
+        modo="bifasico"; max_iter=0
     for it in range(max_iter):
         # Criterio del Excel (fórmula D188 con K176=zi·Ki, L176=zi/Ki)
         sumKz=sum(z[i]*K[i] for i in range(NC))      # Σ(zi·Ki)
@@ -1421,7 +1429,7 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
     # son constantes del manual. Validado contra 5 puntos de HYSYS directos
     # (C1/C2 90/10 a 350°R,1000 psi y a 2000 psi con T=400,433,434,450°R)
     # más 3 puntos de gas seco a 620°R (3000, 8000, 15000 psi).
-    if modo in ("vapor_unico","liquido_unico"):
+    if modo in ("vapor_unico","liquido_unico") and fases is None:
         am_glob=am(z,T,kij); bm_glob=bm(z)
         ZVg,ZLg=solve_Z(*AB(am_glob,bm_glob,T,P))
         if abs(ZVg-ZLg)<1e-7:
@@ -1448,7 +1456,7 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
     
     # Si el flash bifásico devolvió fases invertidas (vapor con PM mayor que líquido),
     # intercambiar etiquetas para mantener convención: vapor=fase liviana
-    if modo=="bifasico" and V>0 and L>0 and PM_v>PM_l:
+    if modo=="bifasico" and V>0 and L>0 and PM_v>PM_l and fases is None:
         x,y = y,x
         V,L = L,V
         PM_v,PM_l = PM_l,PM_v
@@ -1466,6 +1474,8 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
     if V>0 and PM_v>0:
         am_v=am(y,T,kij); bm_v=bm(y)
         ZV_fin,_=solve_Z(*AB(am_v,bm_v,T,P))
+        if fases is not None:
+            ZV_fin=_Z_min_gibbs(y,T,P,kij,am_v,bm_v)
         ZV_eos=ZV_fin
         rho_v=P*PM_v/(ZV_fin*R_GAS*T)*factor_rho()
         sg_v=PM_v/28.9625
@@ -1483,6 +1493,8 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         am_l=am(x,T,kij); bm_l=bm(x)
         ZVL_l, ZLL_l = solve_Z(*AB(am_l,bm_l,T,P))
         ZL_fin = ZLL_l
+        if fases is not None:
+            ZL_fin = _Z_min_gibbs(x,T,P,kij,am_l,bm_l)
         ZL_eos = ZL_fin
         # ρ por EOS de Peng-Robinson (siempre calculable).  Es el default
         # cuando el usuario pide método='EOS' y también el fallback cuando
@@ -1559,8 +1571,23 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         "mu_v":mu_v,"mu_l":mu_l,
         "modo":modo,
         "iter":it+1,
-        "sumKz":sumKz,"sumZK":sumZK
+        "sumKz":sumKz,"sumZK":sumZK,
+        "liq_liq": fases is not None
     }
+
+
+def _Z_min_gibbs(x, T, P, kij, am_x, bm_x):
+    """Raíz de la cúbica con menor energía de Gibbs para la composición x."""
+    A, B = AB(am_x, bm_x, T, P)
+    ZV, ZL = solve_Z(A, B)
+    if abs(ZV-ZL) < 1e-12:
+        return ZV
+    xa = np.asarray(x, dtype=float); m = xa > 0
+    g = []
+    for Z in (ZV, ZL):
+        lp = np.asarray(ln_phi_vec(list(x), T, P, Z, am_x, bm_x, kij), dtype=float)
+        g.append(float(np.sum(xa[m]*lp[m])))
+    return ZV if g[0] <= g[1] else ZL
 
 # ══ Punto de entrada ═════════════════════════════════════════
 _CRIT_CACHE = {}
@@ -1732,6 +1759,25 @@ def calcular(z,T,P,kij=None,metodo_densidad='EOS'):
         Ki_arranque=[Ki_wilson(i,T,P) for i in range(NC)]   # Wilson
 
     flash=flash_muskat(z,T,P,Ki_arranque,kij,metodo_densidad=metodo_densidad)
+    # Separación LÍQUIDO-LÍQUIDO: en mezclas asimétricas (mucho C1 con pesados)
+    # a baja T el líquido puede separarse en dos, y la prueba anterior no lo
+    # detecta.  Sólo si el resultado fue de fase única se verifica con la
+    # prueba general de Michelsen (raíz de mínima Gibbs, varias fases de
+    # prueba); en las mezclas comunes no cambia nada.
+    if flash["modo"] in ("liquido_unico", "vapor_unico"):
+        try:
+            import estabilidad_ll as _ll
+            if _ll.asimetrica(z):
+                pr = _ll.prueba(z, T, P, kij)
+                if pr["inestable"]:
+                    f2 = _ll.flash(z, T, P, kij, pr["w"])
+                    if f2 is not None:
+                        flash = flash_muskat(z, T, P, f2["K"], kij,
+                                             metodo_densidad=metodo_densidad, fases=f2)
+                        estab = dict(estab, resultado="INESTABLE - SEPARACION LIQUIDO-LIQUIDO",
+                                     inestable=True)
+        except Exception:
+            pass
     flash["estabilidad"]=estab["resultado"]
     flash["iter_estab"]=estab["iter"]
     flash["inestable"]=estab["inestable"]

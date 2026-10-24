@@ -75,6 +75,8 @@ def envolvente(z, kij, metodo):
                     ic = min(range(len(env)), key=lambda i: (env[i][0]-crit[0])**2
                              + (env[i][1]-crit[1])**2)
                     return env[:ic+1], env[ic:], crit
+                if r.get('sin_critico'):
+                    return [], env, None
                 return env, [], None
         except Exception:
             pass
