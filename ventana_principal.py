@@ -2066,10 +2066,11 @@ class TabParametros(QWidget):
         self.tbl_p.setItem(ra, 0, cell(_eng.componente_etiqueta(_eng.IDX_AGUA),
             bg=GRAY_LBL,
             align=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter))
-        tca = _u.abs_desde_R(_eng.AGUA_TC)
-        pca = _u.p_desde_psia(_eng.AGUA_PC)
+        _tw, _pw, _ow, _mw = _eng.agua_props(self._eos_ctx())
+        tca = _u.abs_desde_R(_tw)
+        pca = _u.p_desde_psia(_pw)
         for c, v in enumerate([f"{tca:.4f}", f"{pca:.4f}",
-                               f"{_eng.AGUA_OMEGA:.8f}", f"{_eng.AGUA_PM}"]):
+                               f"{_ow:.8f}", f"{_mw}"]):
             self.tbl_p.setItem(ra, c+1, cell(v, bg=WHITE, color=TEXT_RES))
         # Cabeceras de Tc y Pc con la unidad activa
         self.tbl_p.setItem(0, 1, cell(
@@ -3406,6 +3407,7 @@ class MainWindow(QMainWindow):
                                        get_kij=lambda: kij_user,
                                        get_metodo_densidad=self._metodo_densidad_main)
         self.tab_par  = TabParametros()
+        _eng.escuchar_props(self._on_props_componente)
         from pestana_saturacion_agua import TabSaturacionAgua
         self.tab_satw = TabSaturacionAgua(
             get_z=self._getz_main, get_eos=self._eos_main_code,
@@ -5085,6 +5087,17 @@ class MainWindow(QMainWindow):
                 sw.setFixedSize(s.width(), s.height() + delta)
         sw._n_comp = n_activos
 
+    def _on_props_componente(self):
+        """Se cambió Tc/Pc/ω/PM de un componente: refrescar las tablas de
+        propiedades críticas (Parámetros de la EOS, global y de cada fluido)."""
+        vistas = [getattr(self, 'tab_par', None)]
+        for sw in getattr(self, '_subventanas', {}).values():
+            vistas.append(getattr(sw, '_widget', None))
+        for w in vistas:
+            if w is not None and hasattr(w, '_llenar_criticas'):
+                try: w._llenar_criticas()
+                except Exception: pass
+
     def _abrir_componente(self, nombre):
         """Abre (o activa) la ventana de propiedades de un componente puro.
         `nombre` es el texto mostrado en el árbol (nombre completo sin ':')."""
@@ -5633,12 +5646,12 @@ def main(app=None, splash=None):
         if _res is None:
             sys.exit(0)
     win._licencia = _res
-    # Ventana normal (no maximizada): 60 % del área útil de la pantalla,
+    # Ventana normal (no maximizada): 60 % del ancho y 78 % del alto útil,
     # centrada.  El usuario puede maximizarla con el botón de la barra.
     try:
         _g = app.primaryScreen().availableGeometry()
         _w = max(920, min(int(_g.width()*0.60), 1600))
-        _h = max(620, min(int(_g.height()*0.60), 1000))
+        _h = max(680, min(int(_g.height()*0.78), 1200))
         win.resize(_w, _h)
         win.move(_g.x() + (_g.width() - _w)//2, _g.y() + (_g.height() - _h)//2)
     except Exception:

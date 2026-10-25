@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
+import numpy as np
 import eos as _eng
 import idioma as _i18n
 
@@ -224,104 +225,227 @@ def _valor_convertido(idx, getter, magnitud, decimales):
 
 
 class VentanaPropComponente(QWidget):
-    """Ventana de solo lectura con todas las propiedades de un componente.
-    El estilo replica el selector de propiedades del equilibrio."""
+    """Ventana del componente puro: nombre y símbolo, y los parámetros Tc, Pc,
+    ω y PM de las cuatro EOS (PR y SRK de HYSYS y de PVTsim).  Los valores son
+    EDITABLES: al cambiarlos se recalculan los parámetros de la EOS en todo el
+    programa (como los kij).  «Restaurar valores originales» vuelve a la base
+    de datos.  Estilo de tablas igual al de Equilibrio de fases."""
+
+    # (clave en eos, etiqueta, magnitud, decimales)
+    _PROPS = [
+        ('TC',    "Temperatura crítica", 'T_abs', 4),
+        ('PC',    "Presión crítica",     'P',     4),
+        ('PM',    "Peso molecular",      'PM',    4),
+        ('OMEGA', "Factor acéntrico",    None,    6),
+    ]
+    # (título del grupo, [(código EOS, cabecera de columna), ...])
+    _GRUPOS = [
+        ("Parámetros de HYSYS",  [('PR', "Peng-Robinson"), ('SRK', "SRK")]),
+        ("Parámetros de PVTsim", [('PR_PVT', "Peng-Robinson"), ('SRK_PVT', "SRK")]),
+    ]
+    W_ET, W_VAL = 236, 128
 
     def __init__(self, idx):
         super().__init__()
         self.idx = idx
+        self._tablas = []        # [(tabla, [codigos EOS])]
         self._build()
+        _eng.escuchar_props(self._oyente)
+
+    # ── estilo compartido con ventana_principal ─────────────────
+    @staticmethod
+    def _vp():
+        import ventana_principal as _vp
+        return _vp
+
+    def _titulo(self, texto):
+        lbl = QLabel(_i18n.t(texto))
+        lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        lbl.setFixedHeight(22)
+        lbl.setStyleSheet(
+            f'background:{GRAY_TIT}; color:{TEXT}; font-family:"{FONT_F}";'
+            f' font-size:{FS}pt; padding:0px 6px; border:1px solid {BORDER};')
+        lbl.setFixedWidth(self._ancho)
+        return lbl
+
+    def _tabla(self, filas, cols):
+        vp = self._vp()
+        t = QTableWidget(filas, cols)
+        t.horizontalHeader().hide(); t.verticalHeader().hide()
+        t.setShowGrid(False)
+        t.setStyleSheet(
+            f'QTableWidget {{ background:{WHITE};'
+            f'border-top:1px solid {BORDER};border-left:1px solid {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;'
+            f'selection-background-color:{vp.SEL_BG};selection-color:{TEXT};}}'
+            f'QTableWidget::item {{ padding:2px 6px; }}')
+        t.setItemDelegate(vp.GridDelegate(BORDER, t))
+        t.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        t.setColumnWidth(0, self.W_ET)
+        for c in range(1, cols):
+            t.setColumnWidth(c, self.W_VAL if cols > 2 else 2*self.W_VAL)
+        for r in range(filas):
+            t.setRowHeight(r, vp.ROW_H)
+        t.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        t.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        t.setFixedWidth(self._ancho)
+        return t
+
+    @staticmethod
+    def _fija(it):
+        it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsSelectable
+                    & ~Qt.ItemFlag.ItemIsEditable)
+        return it
+
+    def _ajustar_alto(self, t):
+        alto = sum(t.rowHeight(r) for r in range(t.rowCount())) + 2
+        t.setFixedHeight(alto)
 
     def _build(self):
-        self.setStyleSheet(f'background:{GRAY_LBL};')
+        vp = self._vp()
+        self._ancho = self.W_ET + 2*self.W_VAL + 2
+        self.setStyleSheet('background:#E6E6E6;')   # fondo como Equilibrio de fases
         root = QVBoxLayout(self)
-        root.setContentsMargins(13, 9, 13, 9); root.setSpacing(3)
+        root.setContentsMargins(13, 6, 13, 8); root.setSpacing(3)
+        DER = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        CEN = Qt.AlignmentFlag.AlignCenter
 
-        # Título con el nombre del componente
+        # ── Propiedades generales ──
+        root.addWidget(self._titulo("Propiedades generales"),
+                       alignment=Qt.AlignmentFlag.AlignHCenter)
+        tg = self._tabla(2, 2)
+        tg.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        tg.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        tg.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         nombre = _eng.componente_etiqueta(self.idx).rstrip(":")
-        title = QLabel(f"ThermoPhase — {nombre}")
-        title.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        title.setFixedHeight(22)
-        title.setStyleSheet(
-            f'background:{GRAY_TIT};color:{TEXT};padding:2px 8px;'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;')
-        root.addWidget(title)
+        for r, (et, val) in enumerate([("Nombre", _i18n.t(nombre)),
+                                       ("Símbolo", _eng.componente_nombre(self.idx))]):
+            tg.setItem(r, 0, vp.cell(_i18n.t(et), bg=GRAY_LBL, align=DER))
+            tg.setItem(r, 1, vp.cell(val, bg=WHITE, color=TEXT_RES, align=CEN))
+        self._ajustar_alto(tg)
+        root.addWidget(tg, alignment=Qt.AlignmentFlag.AlignHCenter)
+        self._tg = tg
 
-        # Filas: cabecera de grupo + una fila por propiedad
-        # Columna 0 = "Nombre de la propiedad [unidad]", Columna 1 = valor
-        filas = []   # ('grupo', texto) | ('prop', etiqueta_con_unidad, valor)
-        for grupo, props in _GRUPOS_PROP:
-            filas.append(('grupo', grupo))
-            for etiqueta, arr, magnitud, dec in props:
-                unidad = _unidad_prop(magnitud)
-                et_full = _i18n.t(etiqueta)
-                if unidad:
-                    et_full = f"{et_full} [{unidad}]"
-                if arr == 'nombre':
-                    valor = _eng.componente_etiqueta(self.idx).rstrip(":")
-                elif arr == 'simbolo':
-                    valor = _eng.componente_nombre(self.idx)
-                else:
-                    valor = _valor_convertido(self.idx, arr, magnitud, dec)
-                filas.append(('prop', et_full, valor))
+        # ── HYSYS y PVTsim ──
+        for titulo, cols in self._GRUPOS:
+            root.addSpacing(3)
+            root.addWidget(self._titulo(titulo), alignment=Qt.AlignmentFlag.AlignHCenter)
+            t = self._tabla(1 + len(self._PROPS), 1 + len(cols))
+            t.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked
+                              | QAbstractItemView.EditTrigger.EditKeyPressed
+                              | QAbstractItemView.EditTrigger.AnyKeyPressed)
+            t.setItem(0, 0, self._fija(vp.cell(_i18n.t("Propiedad"), bg=GRAY_LBL, align=CEN)))
+            for c, (_cod, cab) in enumerate(cols):
+                t.setItem(0, c+1, self._fija(vp.cell(cab, bg=GRAY_LBL, align=CEN)))
+            self._ajustar_alto(t)
+            t.itemChanged.connect(lambda it, t=t, cols=cols: self._on_editar(t, cols, it))
+            root.addWidget(t, alignment=Qt.AlignmentFlag.AlignHCenter)
+            self._tablas.append((t, [c for c, _ in cols]))
+        self._llenar()
 
-        tbl = QTableWidget(len(filas), 2)
-        tbl.horizontalHeader().hide()
-        tbl.verticalHeader().hide()
-        tbl.setShowGrid(True)
-        tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        tbl.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        tbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        tbl.setStyleSheet(
-            f'QTableWidget {{ border:1px solid {BORDER};'
-            f'font-family:"{FONT_F}";font-size:{FS}pt;gridline-color:{BORDER};}}'
-            f'QTableWidget::item {{ padding:2px 6px; }}')
-        # Dos columnas: etiqueta+unidad (ancha) | valor
-        W_ET, W_VAL = 320, 150
-        tbl.setColumnWidth(0, W_ET)
-        tbl.setColumnWidth(1, W_VAL)
-        hh = tbl.horizontalHeader()
-        hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-
-        ROW_H = 24
-        for r, fila in enumerate(filas):
-            tbl.setRowHeight(r, ROW_H)
-            if fila[0] == 'grupo':
-                it = QTableWidgetItem(_i18n.t(fila[1]))
-                it.setBackground(_qcolor(GRAY_LBL))
-                it.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-                tbl.setItem(r, 0, it)
-                tbl.setSpan(r, 0, 1, 2)
-            else:
-                _, etiqueta, valor = fila
-                it_et = QTableWidgetItem(etiqueta)
-                it_et.setBackground(_qcolor(GRAY_RES))
-                it_et.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                tbl.setItem(r, 0, it_et)
-                it_val = QTableWidgetItem(valor)
-                it_val.setBackground(_qcolor(WHITE))
-                it_val.setForeground(_qcolor(TEXT_RES))
-                it_val.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                tbl.setItem(r, 1, it_val)
-
-        alto_tabla = ROW_H * len(filas) + 2
-        tbl.setFixedHeight(alto_tabla)
-        tbl.setFixedWidth(W_ET + W_VAL + 2)
-        tbl.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        tbl.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        root.addWidget(tbl, alignment=Qt.AlignmentFlag.AlignHCenter)
+        # ── Botón restaurar ──
+        root.addSpacing(5)
+        fila = QHBoxLayout(); fila.setContentsMargins(0, 0, 0, 0)
+        fila.addStretch()
+        self.btn_reset = QPushButton(_i18n.t("Restaurar valores originales"))
+        self.btn_reset.setFixedWidth(220)
+        self.btn_reset.setStyleSheet(
+            f'background:{GRAY_LBL};border:2px outset {BORDER};'
+            f'font-family:"{FONT_F}";font-size:{FS}pt;min-height:22px;')
+        self.btn_reset.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_reset.clicked.connect(self._reset)
+        fila.addWidget(self.btn_reset)
+        root.addLayout(fila)
         root.addStretch()
 
-        self._tbl = tbl
-        self._alto_tabla = alto_tabla
-        self._ancho_tabla = W_ET + W_VAL + 2
+    # ── datos ────────────────────────────────────────────────────
+    def _texto(self, eos, clave, magnitud, dec):
+        v = _eng.get_prop_componente(eos, clave, self.idx)
+        if magnitud == 'T_abs':
+            v = _u.abs_desde_R(v)
+        elif magnitud == 'P':
+            v = _u.p_desde_psia(v)
+        return f"{v:.{dec}f}"
+
+    def _llenar(self):
+        vp = self._vp()
+        DER = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        CEN = Qt.AlignmentFlag.AlignCenter
+        for t, cods in self._tablas:
+            t.blockSignals(True)
+            for r, (clave, et, mag, dec) in enumerate(self._PROPS, start=1):
+                un = _unidad_prop(mag)
+                txt = _i18n.t(et) + (f" [{un}]" if un else "")
+                t.setItem(r, 0, self._fija(vp.cell(txt, bg=GRAY_LBL, align=DER)))
+                for c, eos in enumerate(cods, start=1):
+                    it = vp.cell(self._texto(eos, clave, mag, dec), bg=WHITE,
+                                 color=TEXT_RES, align=CEN, editable=True)
+                    it.setData(Qt.ItemDataRole.UserRole, (eos, clave))
+                    if _eng.prop_modificada(eos, clave, self.idx):
+                        it.setToolTip(_i18n.t("Valor modificado. Original: ")
+                                      + self._texto_orig(eos, clave, mag, dec))
+                    t.setItem(r, c, it)
+            t.setCurrentItem(None)
+            t.blockSignals(False)
+        if hasattr(self, 'btn_reset'):
+            self.btn_reset.setEnabled(_eng.componente_modificado(self.idx))
+
+    def _texto_orig(self, eos, clave, magnitud, dec):
+        v = _eng.get_prop_original(eos, clave, self.idx)
+        if magnitud == 'T_abs':
+            v = _u.abs_desde_R(v)
+        elif magnitud == 'P':
+            v = _u.p_desde_psia(v)
+        return f"{v:.{dec}f}"
+
+    def _on_editar(self, t, cols, item):
+        dato = item.data(Qt.ItemDataRole.UserRole)
+        if not dato:
+            return
+        eos, clave = dato
+        from numeros import a_float
+        v = a_float(item.text())
+        ok = v is not None and np.isfinite(v)
+        if ok:
+            if clave == 'TC':
+                v = _u.R_desde_abs(v); ok = v > 0
+            elif clave == 'PC':
+                v = _u.p_a_psia(v); ok = v > 0
+            elif clave == 'PM':
+                ok = v > 0
+            elif clave == 'OMEGA':
+                ok = -1.0 < v < 5.0
+        if ok:
+            _eng.set_prop_componente(eos, clave, self.idx, v)   # avisa a los oyentes
+        else:
+            self._llenar()                                        # valor inválido: revertir
+        if hasattr(self, 'btn_reset'):
+            self.btn_reset.setEnabled(_eng.componente_modificado(self.idx))
+
+    def _reset(self):
+        _eng.restablecer_componente(self.idx)
+        try:
+            import dialogos
+            dialogos.info(self, _i18n.t("Valores originales restaurados."))
+        except Exception:
+            pass
+
+    def _oyente(self):
+        try:
+            self._llenar()
+            self.btn_reset.setEnabled(_eng.componente_modificado(self.idx))
+        except RuntimeError:
+            # La ventana se cerró (objeto Qt destruido): dejar de escuchar.
+            try: _eng._OYENTES_PROPS.remove(self._oyente)
+            except ValueError: pass
+
+    def aplicar_unidades(self, old=None):
+        self._llenar()
 
     def tam_ideal(self):
         """Tamaño (ancho, alto) ajustado al contenido."""
-        ancho = self._ancho_tabla + 2*13
-        alto = 22 + 3 + self._alto_tabla + 9 + 9 + 4
-        return (ancho, alto)
+        sh = self.sizeHint()
+        return (max(sh.width(), self._ancho + 26), sh.height())
 
 
 class VentanaGestorComponentes(QWidget):

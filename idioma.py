@@ -421,6 +421,10 @@ TRAD = {
     "La propiedad seleccionada requiere agua en la mezcla.":
         "The selected property requires water in the mixture.",
     "Propiedades generales": "General properties",
+    "Parámetros de HYSYS": "HYSYS parameters",
+    "Parámetros de PVTsim": "PVTsim parameters",
+    "Valor modificado. Original: ": "Modified value. Original: ",
+    "Valores originales restaurados.": "Original values restored.",
     "Formador de hidrato (estructuras)": "Hydrate former (structures)",
     "Anfitrión (red del hidrato)": "Host (hydrate lattice)",
     "Parámetros de HYSYS (EOS PR y SRK de HYSYS)": "HYSYS parameters (HYSYS PR and SRK EOS)",

@@ -334,6 +334,16 @@ PM_PVT = [28.013519, 44.0098, 16.042879, 30.06982, 44.09676, 58.123699,
           58.123699, 72.150642, 72.150642, 86.177582, 100.2045,
           114.2315, 128.25841]
 
+# Copias INDEPENDIENTES por ecuación de estado.  En las bases originales PR y
+# SRK comparten Tc/Pc/PM (y en PVTsim también ω), pero el usuario puede editar
+# cada EOS por separado desde la ventana del componente, así que cada una tiene
+# su propia lista (se modifican en el lugar; ver set_prop_componente).
+PM_SRK = list(PM)
+TC_PVT_SRK = list(TC_PVT)
+PC_PVT_SRK = list(PC_PVT)
+OMEGA_PVT_SRK = list(OMEGA_PVT)
+PM_PVT_SRK = list(PM_PVT)
+
 # ── Parámetros individuales SRK (Soave-Redlich-Kwong 1972) ───────
 # Constantes EXACTAS derivadas de las condiciones criticas:
 #   Omega_a = 1 / (9 (2^(1/3) - 1))   = 0.4274802335...
@@ -706,8 +716,9 @@ def c_peneloux_red(i, eos=None):
     v = (_CPEN_SRK_DB if srk else _CPEN_PR_DB)[i]
     if v is not None:
         return v
-    Tc = TC_PVT[i]/1.8; Pc = PC_PVT[i]/PSIA_ATM_STD
-    Z_RA = 0.29056 - 0.08775*OMEGA_PVT[i]
+    _tcp, _pcp, _omp, _pmp = crit_props('SRK_PVT' if srk else 'PR_PVT')
+    Tc = _tcp[i]/1.8; Pc = _pcp[i]/PSIA_ATM_STD
+    Z_RA = 0.29056 - 0.08775*_omp[i]
     if srk:
         return 0.40768*Tc/Pc*(0.29441 - Z_RA)
     return 0.50033*Tc/Pc*(0.25969 - Z_RA)
@@ -788,6 +799,9 @@ _OA_SRK, _OB_SRK = OMEGA_A_SRK, OMEGA_B_SRK
 _TC_PVT_A = np.array(TC_PVT)
 _PC_PVT_A = np.array(PC_PVT)
 _OM_PVT_A = np.array(OMEGA_PVT)
+_TC_PVT_SRK_A = np.array(TC_PVT_SRK)
+_PC_PVT_SRK_A = np.array(PC_PVT_SRK)
+_OM_PVT_SRK_A = np.array(OMEGA_PVT_SRK)
 
 def _mi_pr_arr(om):  return 0.37464 + 1.54226*om - 0.26992*om**2
 def _mi_srk_arr(om): return 0.480   + 1.574 *om - 0.176 *om**2
@@ -807,16 +821,17 @@ _PC_PVT_EF = _PC_PVT_A*(PSIA_ATM_PVT/PSIA_ATM_STD)   # Pc efectiva (psia) de PVT
 _AI_PR_PVT  = OMEGA_A_PR_EXACTO*R_GAS**2*_TC_PVT_A**2/_PC_PVT_EF
 _BI_PR_PVT  = _OB_PR *R_GAS*_TC_PVT_A/_PC_PVT_EF
 _MI_PR_PVT  = _mi_pr_arr(_OM_PVT_A)
-_AI_SRK_PVT = _OA_SRK*R_GAS**2*_TC_PVT_A**2/_PC_PVT_EF
-_BI_SRK_PVT = _OB_SRK*R_GAS*_TC_PVT_A/_PC_PVT_EF
-_MI_SRK_PVT = _mi_srk_arr(_OM_PVT_A)
+_PC_PVT_SRK_EF = _PC_PVT_SRK_A*(PSIA_ATM_PVT/PSIA_ATM_STD)
+_AI_SRK_PVT = _OA_SRK*R_GAS**2*_TC_PVT_SRK_A**2/_PC_PVT_SRK_EF
+_BI_SRK_PVT = _OB_SRK*R_GAS*_TC_PVT_SRK_A/_PC_PVT_SRK_EF
+_MI_SRK_PVT = _mi_srk_arr(_OM_PVT_SRK_A)
 
 # Tablas por codigo de EOS: (AI, BI, MI, TC)
 _PARAMS_EOS = {
     'PR':      (_AI_PR,      _BI_PR,      _MI_PR,      _TC),
     'SRK':     (_AI_SRK,     _BI_SRK,     _MI_SRK,     _TC_SRK),
     'PR_PVT':  (_AI_PR_PVT,  _BI_PR_PVT,  _MI_PR_PVT,  _TC_PVT_A),
-    'SRK_PVT': (_AI_SRK_PVT, _BI_SRK_PVT, _MI_SRK_PVT, _TC_PVT_A),
+    'SRK_PVT': (_AI_SRK_PVT, _BI_SRK_PVT, _MI_SRK_PVT, _TC_PVT_SRK_A),
 }
 
 _AA_CACHE = {'eos': None, 'T': None, 'val': None}
@@ -843,10 +858,143 @@ def tc_eos(eos):  return _PARAMS_EOS.get(eos, _PARAMS_EOS['PR'])[3]
 def crit_props(eos):
     """(TC[°R], PC[psia], OMEGA, PM) de la EOS — para la tabla de parametros."""
     if es_pvtsim(eos):
+        if es_srk(eos):
+            return TC_PVT_SRK, PC_PVT_SRK, OMEGA_PVT_SRK, PM_PVT_SRK
         return TC_PVT, PC_PVT, OMEGA_PVT, PM_PVT
     if es_srk(eos):
-        return TC_SRK, PC_SRK, OMEGA_SRK, PM
+        return TC_SRK, PC_SRK, OMEGA_SRK, PM_SRK
     return TC, PC, OMEGA, PM
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  PARÁMETROS DE COMPONENTE EDITABLES (Tc, Pc, ω, PM por EOS)
+# ══════════════════════════════════════════════════════════════════════
+# La ventana de cada componente permite modificar Tc, Pc, ω y PM de cada una
+# de las 4 EOS.  Las listas se modifican EN EL LUGAR (los módulos que hicieron
+# «from eos import TC» ven el cambio) y los arreglos precalculados (a_i, b_i,
+# m_i, Tc) se recalculan también en el lugar; luego se vacían las cachés.
+# El agua (índice 13) tiene sus propios valores por EOS en AGUA_PROPS.
+PROPS_CLAVES = ('TC', 'PC', 'OMEGA', 'PM')
+
+# Agua: HYSYS (flash_agua) y PVTsim (base de datos de PVTsim).
+AGUA_PROPS = {
+    'PR':      [1165.13822021484, 3208.233924, 0.34400001168251, 18.015100479126],
+    'SRK':     [1165.13822021484, 3208.233924, 0.34400001168251, 18.015100479126],
+    'PR_PVT':  [AGUA_TC, AGUA_PC, AGUA_OMEGA, AGUA_PM],
+    'SRK_PVT': [AGUA_TC, AGUA_PC, AGUA_OMEGA, AGUA_PM],
+}
+
+
+def _listas_eos(eos):
+    return list(crit_props(eos))
+
+
+_PROPS_ORIG = {e: [list(a) for a in _listas_eos(e)]
+               for e in ('PR', 'SRK', 'PR_PVT', 'SRK_PVT')}
+_AGUA_ORIG = {e: list(v) for e, v in AGUA_PROPS.items()}
+_OYENTES_PROPS = []
+
+
+def agua_props(eos):
+    """(Tc °R, Pc psia, ω, PM) del agua para la EOS indicada."""
+    return tuple(AGUA_PROPS.get(eos, AGUA_PROPS['PR']))
+
+
+def get_prop_componente(eos, clave, i):
+    k = PROPS_CLAVES.index(clave)
+    if i >= NC:
+        return AGUA_PROPS[eos][k]
+    return _listas_eos(eos)[k][i]
+
+
+def get_prop_original(eos, clave, i):
+    k = PROPS_CLAVES.index(clave)
+    if i >= NC:
+        return _AGUA_ORIG[eos][k]
+    return _PROPS_ORIG[eos][k][i]
+
+
+def prop_modificada(eos, clave, i):
+    a = get_prop_componente(eos, clave, i); b = get_prop_original(eos, clave, i)
+    return abs(a - b) > 1e-12*max(1.0, abs(b))
+
+
+def componente_modificado(i):
+    return any(prop_modificada(e, c, i) for e in _PROPS_ORIG for c in PROPS_CLAVES)
+
+
+def escuchar_props(fn):
+    """Registra fn() para cuando cambien los parámetros de un componente."""
+    if fn not in _OYENTES_PROPS:
+        _OYENTES_PROPS.append(fn)
+
+
+def recalcular_parametros(avisar=True):
+    """Recalcula EN EL LUGAR los arreglos derivados de Tc/Pc/ω y vacía las
+    cachés que dependen de ellos."""
+    TCa = np.array(TC); PCa = np.array(PC); OMa = np.array(OMEGA)
+    _AI_PR[:] = 0.45724*R_GAS**2*TCa**2/PCa
+    _BI_PR[:] = 0.07780*R_GAS*TCa/PCa
+    _MI_PR[:] = _mi_pr_arr(OMa)
+    _TC[:] = TCa
+    TCs = np.array(TC_SRK); PCs = np.array(PC_SRK); OMs = np.array(OMEGA_SRK)
+    _AI_SRK[:] = OMEGA_A_SRK*R_GAS**2*TCs**2/PCs
+    _BI_SRK[:] = OMEGA_B_SRK*R_GAS*TCs/PCs
+    _MI_SRK[:] = _mi_srk_arr(OMs)
+    _TC_SRK[:] = TCs
+    _TC_PVT_A[:] = TC_PVT; _PC_PVT_A[:] = PC_PVT; _OM_PVT_A[:] = OMEGA_PVT
+    _PC_PVT_EF[:] = _PC_PVT_A*(PSIA_ATM_PVT/PSIA_ATM_STD)
+    _AI_PR_PVT[:] = OMEGA_A_PR_EXACTO*R_GAS**2*_TC_PVT_A**2/_PC_PVT_EF
+    _BI_PR_PVT[:] = _OB_PR*R_GAS*_TC_PVT_A/_PC_PVT_EF
+    _MI_PR_PVT[:] = _mi_pr_arr(_OM_PVT_A)
+    _TC_PVT_SRK_A[:] = TC_PVT_SRK; _PC_PVT_SRK_A[:] = PC_PVT_SRK
+    _OM_PVT_SRK_A[:] = OMEGA_PVT_SRK
+    _PC_PVT_SRK_EF[:] = _PC_PVT_SRK_A*(PSIA_ATM_PVT/PSIA_ATM_STD)
+    _AI_SRK_PVT[:] = _OA_SRK*R_GAS**2*_TC_PVT_SRK_A**2/_PC_PVT_SRK_EF
+    _BI_SRK_PVT[:] = _OB_SRK*R_GAS*_TC_PVT_SRK_A/_PC_PVT_SRK_EF
+    _MI_SRK_PVT[:] = _mi_srk_arr(_OM_PVT_SRK_A)
+    # Cachés
+    _AA_CACHE['eos'] = None; _AA_CACHE['T'] = None; _AA_CACHE['val'] = None
+    _PS_BURBUJA_CACHE.clear()
+    _CRIT_CACHE.clear()
+    import sys as _sys
+    m = _sys.modules.get('critico')
+    if m is not None and hasattr(m, '_CACHE'):
+        m._CACHE.clear()
+    m = _sys.modules.get('envolvente_michelsen')
+    if m is not None and hasattr(m, '_fijar_criticas_activas'):
+        try: m._fijar_criticas_activas()
+        except Exception: pass
+    if avisar:
+        for fn in list(_OYENTES_PROPS):
+            try: fn()
+            except Exception: pass
+
+
+def set_prop_componente(eos, clave, i, valor):
+    """Fija la propiedad `clave` ('TC' °R, 'PC' psia, 'OMEGA', 'PM') del
+    componente i para la EOS indicada y recalcula todo lo que depende de ella."""
+    k = PROPS_CLAVES.index(clave)
+    valor = float(valor)
+    if i >= NC:
+        AGUA_PROPS[eos][k] = valor
+    else:
+        _listas_eos(eos)[k][i] = valor
+    recalcular_parametros()
+
+
+def restablecer_componente(i=None):
+    """Devuelve a los valores originales el componente i (o todos si None)."""
+    idxs = range(NC + 1) if i is None else [i]
+    for e in _PROPS_ORIG:
+        listas = _listas_eos(e)
+        for ii in idxs:
+            if ii >= NC:
+                AGUA_PROPS[e][:] = _AGUA_ORIG[e]
+            else:
+                for k in range(len(PROPS_CLAVES)):
+                    listas[k][ii] = _PROPS_ORIG[e][k][ii]
+    recalcular_parametros()
 
 # Retro-compatibilidad: nombres antiguos (usados por si algún módulo
 # externo los importaba) apuntan al bloque PR.
@@ -1676,10 +1824,11 @@ def _lbc_params(eos=None):
     PVTsim: su base (Tc, Pc en atm, PM, Vc reducido Vc/R).  HYSYS: Tc, Pc, PM
     de HYSYS y Vc de literatura (Reid 1977) reducido con la misma R."""
     e = eos if eos is not None else _EOS_ACTIVA
+    _tc, _pc, _om, _pm = crit_props(e)
     if es_pvtsim(e):
-        return (np.array(TC_PVT)/1.8, np.array(PC_PVT)/PSIA_ATM_STD,
-                np.array(PM_PVT), np.array(_VC_BASE))
-    return (np.array(TC)/1.8, np.array(PC)/14.696, np.array(PM),
+        return (np.array(_tc)/1.8, np.array(_pc)/PSIA_ATM_STD,
+                np.array(_pm), np.array(_VC_BASE))
+    return (np.array(_tc)/1.8, np.array(_pc)/14.696, np.array(_pm),
             np.array(VC)/(_R_LATM_PVT*1000.0))
 
 

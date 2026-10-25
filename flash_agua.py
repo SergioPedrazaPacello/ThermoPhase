@@ -191,25 +191,14 @@ def _params_14(eos):
     # el agua), sin depender del estado global _METODO: antes, si _METODO aún no
     # era 'hv' al pedir los parámetros, el agua tomaba Tc/Pc de HYSYS (Pc 3208.23
     # vs 3203.72 psia) y desplazaba ~0.07 °R las líneas con fase acuosa.
-    if es_pvt:
-        Tc = np.array(TC_PVT_14, dtype=float)
-        Pc = np.array(PC_PVT_14, dtype=float)
-        om = np.array(OMEGA_PVT_14, dtype=float)
-        PM = np.array(PM_PVT_14, dtype=float)
-    else:
-        if es_pvt:
-            Tc13 = list(_e.TC_PVT); Pc13 = list(_e.PC_PVT)
-            om13 = list(_e.OMEGA_PVT); PM13 = list(_e.PM_PVT)
-        elif es_srk:
-            Tc13 = list(_e.TC_SRK); Pc13 = list(_e.PC_SRK)
-            om13 = list(_e.OMEGA_SRK); PM13 = list(_e.PM)
-        else:
-            Tc13 = list(_e.TC); Pc13 = list(_e.PC)
-            om13 = list(_e.OMEGA); PM13 = list(_e.PM)
-        Tc = np.array(Tc13 + [AGUA_TC])
-        Pc = np.array(Pc13 + [AGUA_PC])
-        om = np.array(om13 + [AGUA_OMEGA_SRK if es_srk else AGUA_OMEGA])
-        PM = np.array(PM13 + [AGUA_PM])
+    # Propiedades de la EOS elegida (editables desde la ventana del
+    # componente): 13 HC de eos.crit_props + agua de eos.AGUA_PROPS.
+    _tc13, _pc13, _om13, _pm13 = _e.crit_props(eos)
+    _tw, _pw, _ow, _mw = _e.agua_props(eos)
+    Tc = np.array(list(_tc13) + [_tw], dtype=float)
+    Pc = np.array(list(_pc13) + [_pw], dtype=float)
+    om = np.array(list(_om13) + [_ow], dtype=float)
+    PM = np.array(list(_pm13) + [_mw], dtype=float)
 
     # kij HC-HC 13×13: SIEMPRE la matriz base de la EOS (kij_base), que para
     # PVTsim es la matriz exacta de su base de datos (validada componente a
