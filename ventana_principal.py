@@ -479,7 +479,7 @@ class TabEquilibrio(QWidget):
         self.sp_P.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.sp_P.setFixedHeight(22); self.sp_P.setFixedWidth(110)
         self.sp_P.setStyleSheet(
-            f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'QDoubleSpinBox {{ background:{WHITE};color:{TEXT};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         gl.addWidget(self.sp_P, 0, 1)
 
@@ -554,7 +554,7 @@ class TabEquilibrio(QWidget):
         self.sp_H.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.sp_H.setFixedHeight(22); self.sp_H.setFixedWidth(110)
         self.sp_H.setStyleSheet(
-            f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'QDoubleSpinBox {{ background:{WHITE};color:{TEXT};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         gl.addWidget(self.sp_H, 3, 1)
         self.lbl_H_in.hide(); self.sp_H.hide()
@@ -567,7 +567,7 @@ class TabEquilibrio(QWidget):
         self.sp_S.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.sp_S.setFixedHeight(22); self.sp_S.setFixedWidth(110)
         self.sp_S.setStyleSheet(
-            f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'QDoubleSpinBox {{ background:{WHITE};color:{TEXT};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         gl.addWidget(self.sp_S, 4, 1)
         self.lbl_S_in.hide(); self.sp_S.hide()
@@ -580,7 +580,7 @@ class TabEquilibrio(QWidget):
         self.sp_B.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.sp_B.setFixedHeight(22); self.sp_B.setFixedWidth(110)
         self.sp_B.setStyleSheet(
-            f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'QDoubleSpinBox {{ background:{WHITE};color:{TEXT};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         gl.addWidget(self.sp_B, 5, 1)
         self.lbl_B_in.hide(); self.sp_B.hide()
@@ -5623,6 +5623,17 @@ def main(app=None, splash=None):
     for _grp in (_QPal.ColorGroup.Active, _QPal.ColorGroup.Inactive):
         _pal.setColor(_grp, _QPal.ColorRole.Highlight, QColor(SEL_BG))
         _pal.setColor(_grp, _QPal.ColorRole.HighlightedText, QColor(TEXT))
+    # Esquema de color CLARO siempre: con Windows en modo oscuro Qt usaría
+    # texto blanco, invisible sobre los campos blancos del programa.
+    for _grp in (_QPal.ColorGroup.Active, _QPal.ColorGroup.Inactive):
+        _pal.setColor(_grp, _QPal.ColorRole.Base, QColor("#FFFFFF"))
+        _pal.setColor(_grp, _QPal.ColorRole.Text, QColor("#000000"))
+        _pal.setColor(_grp, _QPal.ColorRole.WindowText, QColor("#000000"))
+        _pal.setColor(_grp, _QPal.ColorRole.ButtonText, QColor("#000000"))
+    try:
+        app.styleHints().setColorScheme(Qt.ColorScheme.Light)   # Qt ≥ 6.8
+    except Exception:
+        pass
     app.setPalette(_pal)
     # Barras de desplazamiento: un solo estilo retro en todo el programa
     # (delgadas, con flechas y relieve).  Con reglas completas Qt las dibuja

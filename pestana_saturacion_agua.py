@@ -99,7 +99,7 @@ class TabSaturacionAgua(QWidget):
             s.setSpecialValueText(" "); s.setValue(lo)
             s.setFixedHeight(24)
             s.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-            s.setStyleSheet(f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            s.setStyleSheet(f'QDoubleSpinBox {{ background:{WHITE};color:{TEXT};border:1px solid {BORDER};'
                             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
             return s
 

@@ -207,7 +207,7 @@ class TabHidratos(QWidget):
         self.sp_cond.setFixedHeight(24)
         self.sp_cond.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.sp_cond.setStyleSheet(
-            f'QDoubleSpinBox {{ background:{WHITE};border:1px solid {BORDER};'
+            f'QDoubleSpinBox {{ background:{WHITE};color:{TEXT};border:1px solid {BORDER};'
             f'font-family:"{FONT_F}";font-size:{FS}pt; }}')
         gl.addWidget(self.sp_cond, 1, 1)
 

@@ -71,6 +71,29 @@ class SpinNum(QDoubleSpinBox):
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
         self.setLocale(QLocale(QLocale.Language.C))      # muestra con punto
+        # Estilo Fusion por widget (como los combos): el estilo nativo de
+        # Windows 11 («windows11», Qt 6.7+) no respeta la hoja de estilo de
+        # los QDoubleSpinBox y deja el texto invisible.  Con Fusion el QSS se
+        # aplica igual en todas las versiones de Windows.
+        try:
+            from PyQt6.QtWidgets import QStyleFactory
+            from PyQt6.QtGui import QPalette, QColor
+            from PyQt6.QtCore import Qt
+            self._estilo = QStyleFactory.create("Fusion")
+            if self._estilo is not None:
+                self.setStyle(self._estilo)
+            pal = self.palette()
+            for grp in (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive,
+                        QPalette.ColorGroup.Disabled):
+                pal.setColor(grp, QPalette.ColorRole.Base, QColor("#FFFFFF"))
+                pal.setColor(grp, QPalette.ColorRole.Text, QColor("#000000"))
+            self.setPalette(pal)
+            self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            le = self.lineEdit()
+            if le is not None:
+                le.setTextMargins(0, 0, 0, 0)
+        except Exception:
+            pass
 
     def validate(self, text, pos):
         t = text.replace(',', '.')
