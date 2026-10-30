@@ -343,16 +343,25 @@ PROP_RESUMEN = [
     ('frac_masica', 'Fase fraccion [masica]',     None,   4, False),
     ('frac_vol',    'Fase fraccion [volumetrica]', None,  4, False),
     ('sg',          'Gravedad especifica',         None,   4, False),
+    ('sg_real',     'Gravedad especifica real (gas)', None, 4, False),
     ('densidad',    'Densidad masica',             'dens', 4, True),
     ('z',           'Factor de compresibilidad',   None,   4, False),
     ('pm',          'Peso molecular',              None,   4, True),
     ('entalpia',    'Entalpia molar',              'H',    2, True),
     ('entropia',    'Entropia molar',              'S',    4, True),
     ('viscosidad',  'Viscosidad',                  'visc', 5, False),
-    ('hhv_mas',     'HHV masico [BTU/lb]',         None,   1, True),
-    ('lhv_mas',     'LHV masico [BTU/lb]',         None,   1, True),
-    ('hhv_vol',     'HHV volumetrico [BTU/pie3]',  None,   1, True),
-    ('lhv_vol',     'LHV volumetrico [BTU/pie3]',  None,   1, True),
+    ('hhv_vol',     'HHV ideal base seca [BTU/pie3]',    None, 1, True),
+    ('hhv_vol_hum', 'HHV ideal base humeda [BTU/pie3]',  None, 1, True),
+    ('hhv_real',    'HHV real base seca [BTU/pie3]',     None, 1, True),
+    ('hhv_hum',     'HHV real base humeda [BTU/pie3]',   None, 1, True),
+    ('lhv_vol',     'LHV ideal base seca [BTU/pie3]',    None, 1, True),
+    ('lhv_vol_hum', 'LHV ideal base humeda [BTU/pie3]',  None, 1, True),
+    ('lhv_real',    'LHV real base seca [BTU/pie3]',     None, 1, True),
+    ('lhv_real_hum','LHV real base humeda [BTU/pie3]',   None, 1, True),
+    ('hhv_mas',     'HHV masico base seca [BTU/lb]',     None, 1, True),
+    ('hhv_mas_hum', 'HHV masico base humeda [BTU/lb]',   None, 1, True),
+    ('lhv_mas',     'LHV masico base seca [BTU/lb]',     None, 1, True),
+    ('lhv_mas_hum', 'LHV masico base humeda [BTU/lb]',   None, 1, True),
     ('gpm',         'GPM C3+ [gal/1000pie3]',      None,   4, False),
     ('agua_cont',   'Contenido de agua [lb/MMscf]', None,  3, False),
     ('agua_cap',    'Capacidad de agua [lb/MMscf]', None,  3, False),
@@ -1503,9 +1512,10 @@ class TabEquilibrio(QWidget):
         x13,_ = _hc13(x) if (x is not None and hayL) else (None,0)
         zg = rt.get('z');  zg = list(z) if zg is None else list(zg)
         z13,_ = _hc13(zg)
-        PMv_hc = float(sum(y13[i]*PM[i] for i in range(NC))) if y13 else None
-        PMl_hc = float(sum(x13[i]*PM[i] for i in range(NC))) if x13 else None
-        PMz_hc = float(sum(z13[i]*PM[i] for i in range(NC)))
+        _PMe = _eng.crit_props(eos_code)[3]          # PM de la EOS activa
+        PMv_hc = float(sum(y13[i]*_PMe[i] for i in range(NC))) if y13 else None
+        PMl_hc = float(sum(x13[i]*_PMe[i] for i in range(NC))) if x13 else None
+        PMz_hc = float(sum(z13[i]*_PMe[i] for i in range(NC)))
         pcv = _pc.poder_calorifico_fase(y13, PMv_hc) if y13 else {}
         pcl = _pc.poder_calorifico_fase(x13, PMl_hc) if x13 else {}
         pcz = _pc.poder_calorifico_fase(z13, PMz_hc)
@@ -1540,7 +1550,7 @@ class TabEquilibrio(QWidget):
             metodo_fv = getattr(self, '_metodo_densidad_actual', 'EOS')
             if hayL and ({'bo', 'rs'} & set(self._props_sel)):
                 fvol['bo'], fvol['rs'] = _fv.bo_rs(x, pL.get('PM'), pL.get('rho'),
-                                                   eos_code, None, metodo_fv)
+                                                   eos_code, kij, metodo_fv)
             if hayW and ({'bw', 'rs'} & set(self._props_sel)):
                 fvol['bw'], fvol['rsw'] = _fv.bw_rsw(w, pW.get('PM'), pW.get('rho'),
                                                      eos_code, metodo_fv,
@@ -1560,10 +1570,10 @@ class TabEquilibrio(QWidget):
             'entalpia':    (ff(hz(H_mix),2),cf(hz(pV.get('H')),hayV,2), cf(hz(pL.get('H')),hayL,2), cf(hz(pW.get('H')),hayW,2)),
             'entropia':    (ff(sz(S_mix)),  cf(sz(pV.get('S')),hayV), cf(sz(pL.get('S')),hayL), cf(sz(pW.get('S')),hayW)),
             'viscosidad':  ("",             cf(pV.get('mu'),hayV,5), cf(pL.get('mu'),hayL,5), cf(pW.get('mu'),hayW,5)),
-            'hhv_mas':     (pcf(pcz,'hhv_mas'), pcf(pcv,'hhv_mas',hayV), pcf(pcl,'hhv_mas',hayL), ""),
-            'lhv_mas':     (pcf(pcz,'lhv_mas'), pcf(pcv,'lhv_mas',hayV), pcf(pcl,'lhv_mas',hayL), ""),
-            'hhv_vol':     (pcf(pcz,'hhv_vol'), pcf(pcv,'hhv_vol',hayV), pcf(pcl,'hhv_vol',hayL), ""),
-            'lhv_vol':     (pcf(pcz,'lhv_vol'), pcf(pcv,'lhv_vol',hayV), pcf(pcl,'lhv_vol',hayL), ""),
+            **{k: ((pcf(pcz,k), pcf(pcv,k,hayV), pcf(pcl,k,hayL), "")
+                   if _pc.clave_liq_mezcla(k) else ("", pcf(pcv,k,hayV), "", ""))
+               for k in _pc.CLAVES_PCAL},
+            'sg_real':     ("",             pcf(pcv,'sg_real',hayV,4), "", ""),
             'gpm':         ("",             pcf({'g':gpm_v},'g',hayV,4) if gpm_v is not None else "", "", ""),
             'agua_cont':   ("",             cf(agua_cont, hayV, 3), "", ""),
             'agua_cap':    ("",             cf(agua_cap, hayV, 3), "", ""),
@@ -1931,10 +1941,10 @@ class TabEquilibrio(QWidget):
             'entalpia':    (f(Hs, 2),    cv(Hv, vap_ok, 2),cv(Hl, liq_ok, 2)),
             'entropia':    (f(Ss),       cv(Sv, vap_ok), cv(Sl, liq_ok)),
             'viscosidad':  ("",          cv(mu_v, vap_ok, 5),cv(mu_l, liq_ok, 5)),
-            'hhv_mas':     (pcf(pcz,'hhv_mas'), pcf(pcv,'hhv_mas',vap_ok), pcf(pcl,'hhv_mas',liq_ok)),
-            'lhv_mas':     (pcf(pcz,'lhv_mas'), pcf(pcv,'lhv_mas',vap_ok), pcf(pcl,'lhv_mas',liq_ok)),
-            'hhv_vol':     (pcf(pcz,'hhv_vol'), pcf(pcv,'hhv_vol',vap_ok), pcf(pcl,'hhv_vol',liq_ok)),
-            'lhv_vol':     (pcf(pcz,'lhv_vol'), pcf(pcv,'lhv_vol',vap_ok), pcf(pcl,'lhv_vol',liq_ok)),
+            **{k: ((pcf(pcz,k), pcf(pcv,k,vap_ok), pcf(pcl,k,liq_ok))
+                   if _pc.clave_liq_mezcla(k) else ("", pcf(pcv,k,vap_ok), ""))
+               for k in _pc.CLAVES_PCAL},
+            'sg_real':     ("",                 pcf(pcv,'sg_real',vap_ok,4), ""),
             'gpm':         ("",                 gpmf(gpm_v, vap_ok),        ""),
             'agua_cont':   ("",          cv(0.0, vap_ok, 3), ""),
             'agua_cap':    ("",          cv(self._capacidad_seca(r), vap_ok, 3), ""),

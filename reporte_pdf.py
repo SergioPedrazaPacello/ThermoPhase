@@ -327,7 +327,7 @@ def _tabla_propiedades_fase(props, z, y, x, hay_vap, hay_liq, W, pW=None,
         c13 = list(c[:NC]); s_ = sum(c13)
         return [v/s_ for v in c13] if s_ > 0 else c13
     y13, x13, z13 = _hc(y), _hc(x), _hc(z)
-    def _pm13(c): return sum(c[i]*_eng.PM[i] for i in range(NC))
+    def _pm13(c): return sum(c[i]*_eng.crit_props(_eng.get_eos())[3][i] for i in range(NC))
     _pc_v = _pc.poder_calorifico_fase(y13, _pm13(y13) if agua else p.get('PM_v')) if hay_vap else {}
     _pc_l = _pc.poder_calorifico_fase(x13, _pm13(x13) if agua else p.get('PM_l')) if hay_liq else {}
     _pc_z = _pc.poder_calorifico_fase(z13, None) if sz > 0 else {}
@@ -367,7 +367,7 @@ def _tabla_propiedades_fase(props, z, y, x, hay_vap, hay_liq, W, pW=None,
         if sz <= 0: return None
         if key == 'pm':       return _conv_prop(conv, _pm_z) if _pm_z else None
         if key == 'densidad': return _conv_prop(conv, _rho_z) if _rho_z else None
-        if key in ('hhv_mas','lhv_mas','hhv_vol','lhv_vol'):
+        if _pc.clave_liq_mezcla(key):
             v = _pc_z.get(key); return v if _ok(v) else None
         if key == 'gpm':      return _gpm_z if _ok(_gpm_z) else None
         return None
@@ -545,9 +545,15 @@ def _filas_resumen_equilibrio(sel, mezcla, fases, hay, comp, pm_fases, E):
         if sel is not None and key not in sel:
             continue
         unidad = f" [{_u.u(mag)}]" if mag else ""
-        if key in ('hhv_mas', 'lhv_mas', 'hhv_vol', 'lhv_vol'):
-            vm = pcs[0].get(key) if pcs[0] else None
-            vf = [(pcs[k+1].get(key) if (k+1 < len(pcs) and pcs[k+1] and k < 2) else None)
+        if key in _pc.CLAVES_PCAL:
+            solo_gas = not _pc.clave_liq_mezcla(key)
+            vm = (pcs[0].get(key) if pcs[0] else None) if not solo_gas else None
+            vf = [(pcs[k+1].get(key) if (k+1 < len(pcs) and pcs[k+1]
+                                         and (k == 0 or (k == 1 and not solo_gas))) else None)
+                  for k in range(len(fases))]
+        elif key == 'sg_real':
+            vm = None
+            vf = [(pcs[1].get('sg_real') if (len(pcs) > 1 and pcs[1] and k == 0) else None)
                   for k in range(len(fases))]
         elif key == 'gpm':
             vm = None

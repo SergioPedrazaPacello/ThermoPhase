@@ -60,7 +60,7 @@ VM_IDEAL = R_GAS * T_STD / P_STD
 #   N₂  : no combustible → 0
 #   CO₂ : no combustible → 0
 #   C1  : 909.4  / 1010.0
-#   C2  : 1618.7 / 1769.6
+#   C2  : 1618.7 / 1769.7
 #   C3  : 2314.9 / 2516.1
 #   iC4 : 3000.4 / 3251.9
 #   nC4 : 3010.8 / 3262.3
@@ -89,7 +89,7 @@ HHV_VOL = [
     0.0,      # N₂
     0.0,      # CO₂
     1010.0,   # C1
-    1769.6,   # C2
+    1769.7,   # C2   (GPA 2145-96 / ASTM D3588; GPSA-87 daba 1769.6)
     2516.1,   # C3
     3251.9,   # iC4
     3262.3,   # nC4
@@ -134,8 +134,9 @@ def poder_calorifico_fase(frac, PM=None):
     """
     lhv_vol, hhv_vol = _vc_volumetrico(frac)
     if lhv_vol is None:
-        return {'hhv_vol': None, 'lhv_vol': None,
-                'hhv_mas': None, 'lhv_mas': None}
+        out = {'hhv_vol': None, 'lhv_vol': None, 'hhv_mas': None, 'lhv_mas': None}
+        out.update(propiedades_gas_real(None))
+        return out
 
     if PM is None:
         z = np.asarray(frac, dtype=float)
@@ -149,8 +150,10 @@ def poder_calorifico_fase(frac, PM=None):
     else:
         lhv_mas = hhv_mas = None
 
-    return {'hhv_vol': hhv_vol, 'lhv_vol': lhv_vol,
-            'hhv_mas': hhv_mas, 'lhv_mas': lhv_mas}
+    out = {'hhv_vol': hhv_vol, 'lhv_vol': lhv_vol,
+           'hhv_mas': hhv_mas, 'lhv_mas': lhv_mas}
+    out.update(propiedades_gas_real(frac, PM))
+    return out
 
 
 # ── GPM — contenido líquido (riqueza) del gas, C3+ ──────────────────────────
@@ -202,3 +205,93 @@ def gpm_c3(frac):
     z = z / s
     gpm = float(np.dot(z, GAL_POR_LBMOL[:len(z)])) * 1000.0 / VM_IDEAL
     return gpm
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  BASE GAS REAL (GPA 2172 / ASTM D3588, constantes GPA 2145)
+# ══════════════════════════════════════════════════════════════════════════
+# El gas real a 60 °F y 14.696 psia no es ideal: 1 pie³ "real" contiene 1/Z
+# veces los moles de 1 pie³ ideal, por eso
+#     HHV_real = HHV_ideal / Z            G_real = G_ideal · Z_aire / Z_gas
+# con Z de la mezcla por factores de sumatoria (GPA 2172):
+#     Z = 1 − P_b · (Σ xᵢ·√bᵢ)²           P_b = 14.696 psia
+# Base HÚMEDA: el gas se considera saturado con agua a 60 °F y 14.696 psia
+# (x_w = P_v,agua/P_b = 0.25636/14.696 = 0.017444); el agua no aporta calor
+# (base bruta) pero diluye el gas y entra en Z con su factor de sumatoria.
+# Orden: N₂, CO₂, C1, C2, C3, iC4, nC4, iC5, nC5, nC6, nC7, nC8, nC9.
+SUMATORIA_RAIZ_B = [0.0044, 0.0197, 0.0116, 0.0239, 0.0344, 0.0458, 0.0478,
+                    0.0581, 0.0631, 0.0802, 0.0944, 0.1137, 0.1331]
+SUMATORIA_RAIZ_B_AGUA = 0.0623
+SUMATORIA_RAIZ_B_AIRE = 0.0050
+Z_AIRE = 1.0 - P_STD*SUMATORIA_RAIZ_B_AIRE**2          # 0.9996326
+PV_AGUA_60F = 0.25636                                    # psia
+X_AGUA_SAT = PV_AGUA_60F/P_STD                           # 0.017444
+PM_AIRE = 28.9625
+
+
+def z_estandar(frac, x_agua=0.0):
+    """Z del gas a 60 °F y 14.696 psia por factores de sumatoria (GPA 2172).
+    `frac`: composición seca (13 comp.); `x_agua`: fracción de agua agregada."""
+    z = np.asarray(frac, dtype=float)
+    s = z.sum()
+    if s <= 0:
+        return None
+    z = z/s*(1.0 - x_agua)
+    sb = float(np.dot(z, SUMATORIA_RAIZ_B[:len(z)])) + x_agua*SUMATORIA_RAIZ_B_AGUA
+    return 1.0 - P_STD*sb*sb
+
+
+PM_AGUA = 18.0153
+
+
+def propiedades_gas_real(frac, PM=None):
+    """Todas las combinaciones del poder calorífico y la gravedad específica.
+
+    Volumétricas [BTU/pie³ a 60 °F, 14.696 psia]  (superior e inferior):
+        ideal seca   = Σxᵢ·HVᵢ
+        ideal húmeda = Σxᵢ·HVᵢ · (1 − x_w)
+        real seca    = ideal seca / Z
+        real húmeda  = ideal seca · (1 − x_w) / Z_sat
+    Másicas [BTU/lb] (no dependen de ideal/real: no hay pie³):
+        seca   = HV_molar / PM
+        húmeda = HV_molar·(1 − x_w) / [PM·(1 − x_w) + 18.0153·x_w]
+    """
+    lhv, hhv = _vc_volumetrico(frac) if frac is not None else (None, None)
+    claves = ('hhv_vol_hum', 'lhv_vol_hum', 'hhv_real', 'lhv_real', 'hhv_hum',
+              'lhv_real_hum', 'hhv_mas_hum', 'lhv_mas_hum', 'sg_ideal', 'sg_real')
+    if hhv is None:
+        return {k: None for k in claves}
+    z = np.asarray(frac, dtype=float); z = z/z.sum()
+    if PM is None:
+        PM = float(np.dot(z, _PM_EOS[:len(z)]))
+    xw = X_AGUA_SAT
+    Zs = z_estandar(z)
+    Zh = z_estandar(z, xw)
+    g_id = PM/PM_AIRE
+    pm_hum = PM*(1.0 - xw) + PM_AGUA*xw
+    return {'hhv_vol_hum': hhv*(1.0 - xw), 'lhv_vol_hum': lhv*(1.0 - xw),
+            'hhv_real': hhv/Zs, 'lhv_real': lhv/Zs,
+            'hhv_hum': hhv*(1.0 - xw)/Zh, 'lhv_real_hum': lhv*(1.0 - xw)/Zh,
+            'hhv_mas_hum': hhv*VM_IDEAL*(1.0 - xw)/pm_hum if PM > 0 else None,
+            'lhv_mas_hum': lhv*VM_IDEAL*(1.0 - xw)/pm_hum if PM > 0 else None,
+            'sg_ideal': g_id, 'sg_real': g_id*Z_AIRE/Zs}
+
+
+# Claves que se muestran por fase y para la mezcla (base composición).
+CLAVES_PCAL = ('hhv_vol', 'hhv_vol_hum', 'hhv_real', 'hhv_hum',
+               'lhv_vol', 'lhv_vol_hum', 'lhv_real', 'lhv_real_hum',
+               'hhv_mas', 'hhv_mas_hum', 'lhv_mas', 'lhv_mas_hum')
+
+# Combinaciones que SOLO tienen sentido para la fase gas.  La base REAL corrige
+# con el Z del gas a condiciones estándar y la base HÚMEDA supone el gas
+# saturado con agua a 60 °F: ambas describen un gas, no un líquido ni una
+# mezcla bifásica.  Para el líquido y la mezcla quedan solo las bases ideal
+# seca (volumétrica, como si se vaporizara) y másica seca.
+CLAVES_SOLO_GAS = ('hhv_vol_hum', 'hhv_real', 'hhv_hum',
+                   'lhv_vol_hum', 'lhv_real', 'lhv_real_hum',
+                   'hhv_mas_hum', 'lhv_mas_hum')
+
+
+def clave_liq_mezcla(key):
+    """True si la clave de poder calorífico se muestra en líquido y mezcla."""
+    return key in CLAVES_PCAL and key not in CLAVES_SOLO_GAS

@@ -538,7 +538,7 @@ def propiedades_punto(T, P, x, y, kij=None, metodo_densidad='COSTALD'):
     else:
         out['rho_l'] = P*PM_l/(ZL*_R*T) if ZL>0 else None
         out['ZL'] = ZL
-    out['sg_l'] = (out['rho_l']/62.4) if out.get('rho_l') else None
+    out['sg_l'] = (out['rho_l']/_eos_rho_w()) if out.get('rho_l') else None
 
     # Entalpía y entropía molar de cada fase (funciones de partida, misma EOS)
     try:
@@ -1082,3 +1082,8 @@ def curva_pura(z, kij=None, n_pts=200, Tr_min=0.45, Tr_max=0.9990):
             'burbuja': curva, 'rocio': [],
             'critico_burbuja': True, 'critico_rocio': False,
             'metodo': 'puro'}
+
+
+def _eos_rho_w():
+    import eos as _e
+    return _e.RHO_AGUA_60F

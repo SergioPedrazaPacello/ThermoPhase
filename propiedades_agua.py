@@ -446,7 +446,7 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
                         rho_l = (1.0-wgt)*rho_cost + wgt*rho_l_eos
             except Exception:
                 rho_l = rho_l_eos
-        sg_l = rho_l/62.4 if rho_l else None
+        sg_l = rho_l/_eos_rho_w() if rho_l else None
         mu_l = visc_LBC14(list(x), T, P, rho_l, PMl, eos)
         try:
             Hl, Sl = HS_fase14(x, T, P, ZL, eos)
@@ -470,7 +470,7 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
         # líquida HC. Fuera del rango de COSTALD cae a la densidad de la EOS.
         if metodo_densidad == 'COSTALD':
             rho_w = _rho_costald14(list(w), PMw, T, Tc14, rho_w_eos)
-        sg_w = rho_w/62.4 if rho_w else None
+        sg_w = rho_w/_eos_rho_w() if rho_w else None
         # Viscosidad de la fase acuosa por la correlación de AGUA de PVTsim
         # (Meyer/Schmidt), no por LBC (que es de hidrocarburos). Se evalúa con
         # la densidad de la fase (lb/ft³) y (T,P); en el rango de agua líquida
@@ -494,3 +494,8 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
                     'mu': mu_w, 'H': Hw, 'S': Sw}
 
     return out
+
+
+def _eos_rho_w():
+    import eos as _e
+    return _e.RHO_AGUA_60F

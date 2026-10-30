@@ -16,95 +16,111 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                     'bloques': [('p',
                                  'ThermoPhase es un simulador termodinámico de equilibrio de fases '
                                  'para gas natural y condensados basado en ecuaciones de estado '
-                                 'cúbicas. Reproduce los procedimientos de cálculo de Aspen HYSYS '
-                                 'y de PVTsim para un sistema definido de hasta catorce '
-                                 'componentes: trece compuestos de hidrocarburos e inertes, y agua '
-                                 'como componente opcional.',
+                                 'cúbicas. Trabaja con un sistema definido de hasta catorce '
+                                 'componentes —trece compuestos de hidrocarburos e inertes, y agua '
+                                 'como componente opcional— y está orientado al análisis de '
+                                 'muestras de fluido de yacimiento y de superficie.',
                                  'ThermoPhase is a thermodynamic phase-equilibrium simulator for '
                                  'natural gas and condensates based on cubic equations of state. '
-                                 'It reproduces the calculation procedures of Aspen HYSYS and '
-                                 'PVTsim for a defined system of up to fourteen components: '
-                                 'thirteen hydrocarbon and inert compounds, plus water as an '
-                                 'optional component.'),
+                                 'It works with a defined system of up to fourteen components '
+                                 '—thirteen hydrocarbon and inert compounds, plus water as an '
+                                 'optional component— and is aimed at the analysis of reservoir '
+                                 'and surface fluid samples.'),
                                 ('p',
-                                 'Todos los cálculos se ejecutan con una de cuatro ecuaciones de '
-                                 'estado seleccionables (Peng-Robinson y Soave-Redlich-Kwong, cada '
-                                 'una con el juego de parámetros de HYSYS o de PVTsim). La '
-                                 'ecuación seleccionada, sus parámetros de componente y su matriz '
-                                 'de coeficientes de interacción binaria definen el equilibrio de '
-                                 'fases y las propiedades derivadas de la ecuación de estado.',
-                                 'All calculations are performed with one of four selectable '
-                                 'equations of state (Peng-Robinson and Soave-Redlich-Kwong, each '
-                                 'with either the HYSYS or the PVTsim parameter set). The selected '
-                                 'equation, its component parameters, and its binary interaction '
-                                 'coefficient matrix define the phase equilibrium and the '
-                                 'properties derived from the equation of state.'),
+                                 'Los cálculos se ejecutan con una de cuatro ecuaciones de estado: '
+                                 'Peng-Robinson y Soave-Redlich-Kwong, cada una con dos bancos de '
+                                 'parámetros de componente, identificados en el programa como '
+                                 'HYSYS y PVTsim. La ecuación seleccionada, sus parámetros de '
+                                 'componente y su matriz de coeficientes de interacción binaria '
+                                 'determinan el equilibrio de fases y todas las propiedades '
+                                 'derivadas de la ecuación de estado.',
+                                 'Calculations are performed with one of four equations of state: '
+                                 'Peng-Robinson and Soave-Redlich-Kwong, each with two component '
+                                 'parameter banks, identified in the program as HYSYS and PVTsim. '
+                                 'The selected equation, its component parameters and its binary '
+                                 'interaction coefficient matrix determine the phase equilibrium '
+                                 'and all properties derived from the equation of state.'),
                                 ('h3', 'Funciones de cálculo', 'Calculation functions'),
                                 ('ul',
                                  [('Flash isotérmico bifásico vapor-líquido con análisis de '
-                                   'estabilidad de Michelsen.',
+                                   'estabilidad de Michelsen y detección de la separación '
+                                   'líquido-líquido en mezclas asimétricas.',
                                    'Two-phase vapor-liquid isothermal flash with Michelsen '
-                                   'stability analysis.'),
+                                   'stability analysis and detection of liquid-liquid splitting in '
+                                   'asymmetric mixtures.'),
                                   ('Flash trifásico (vapor, líquido de hidrocarburos y fase '
                                    'acuosa) cuando el agua está presente, con la regla de mezcla '
                                    'de Huron-Vidal para los pares con agua.',
-                                   'Three-phase flash (vapor, hydrocarbon liquid, and aqueous '
+                                   'Three-phase flash (vapor, hydrocarbon liquid and aqueous '
                                    'phase) when water is present, with the Huron-Vidal mixing rule '
                                    'for the water pairs.'),
+                                  ('Flash a presión y entalpía, a presión y entropía, y a presión '
+                                   'o temperatura y fracción de vapor especificadas.',
+                                   'Flash at specified pressure and enthalpy, pressure and '
+                                   'entropy, and pressure or temperature and vapor fraction.'),
                                   ('Envolventes de fases de la mezcla sin agua y con agua '
-                                   '(incluidas las fronteras de la fase acuosa), con punto crítico '
-                                   'y líneas de calidad.',
+                                   '(incluidas las fronteras de la fase acuosa), con punto '
+                                   'crítico, líneas de calidad, mapa de densidad y diagramas P-H y '
+                                   'T-S.',
                                    'Phase envelopes of the water-free and water-containing mixture '
-                                   '(including the aqueous-phase boundaries), with critical point '
-                                   'and quality lines.'),
+                                   '(including the aqueous-phase boundaries), with critical point, '
+                                   'quality lines, density map and P-H and T-S diagrams.'),
                                   ('Puntos de saturación: presión y temperatura de burbuja y de '
                                    'rocío, cricondenbara y cricondenterma.',
                                    'Saturation points: bubble and dew pressure and temperature, '
                                    'cricondenbar and cricondentherm.'),
                                   ('Condiciones de formación de hidratos de gas (estructuras sI, '
                                    'sII y sH).',
-                                   'Gas hydrate formation conditions (structures sI, sII, and '
-                                   'sH).'),
-                                  ('Propiedades volumétricas (factor de compresibilidad, densidad '
+                                   'Gas hydrate formation conditions (structures sI, sII and sH).'),
+                                  ('Propiedades volumétricas (factor de compresibilidad y densidad '
                                    'por la ecuación de estado, con corrección de volumen de '
-                                   'Peneloux o por COSTALD), propiedades térmicas (entalpía y '
-                                   'entropía) y propiedades de transporte (viscosidad de '
-                                   'Lohrenz-Bray-Clark).',
-                                   'Volumetric properties (compressibility factor, density from '
-                                   'the equation of state, with the Peneloux volume correction, or '
-                                   'from COSTALD), thermal properties (enthalpy and entropy), and '
+                                   'Peneloux o por COSTALD), térmicas (entalpía y entropía) y de '
+                                   'transporte (viscosidad de Lohrenz-Bray-Clark).',
+                                   'Volumetric properties (compressibility factor and density from '
+                                   'the equation of state, with Peneloux volume correction or by '
+                                   'COSTALD), thermal properties (enthalpy and entropy) and '
                                    'transport properties (Lohrenz-Bray-Clark viscosity).'),
-                                  ('Poder calorífico superior e inferior (GPSA), contenido de '
-                                   'licuables GPM C3+ y contenido y capacidad de agua del gas.',
-                                   'Higher and lower heating values (GPSA), GPM C3+ liquefiable '
-                                   'content, and water content and water capacity of the gas.'),
+                                  ('Propiedades del gas: poder calorífico superior e inferior en '
+                                   'bases ideal y real, seca y húmeda, volumétrica y másica (GPA '
+                                   '2145 y GPA 2172), gravedad específica ideal y real, contenido '
+                                   'de licuables GPM C3+ y contenido y capacidad de agua.',
+                                   'Gas properties: gross and net heating value on ideal and real, '
+                                   'dry and wet, volumetric and mass bases (GPA 2145 and GPA '
+                                   '2172), ideal and real specific gravity, GPM C3+ liquefiable '
+                                   'content, and water content and capacity.'),
+                                  ('Factores volumétricos de formación (B<sub>g</sub>, '
+                                   'B<sub>o</sub>, B<sub>w</sub>) y gas en solución '
+                                   '(R<sub>s</sub>, R<sub>sw</sub>).',
+                                   'Formation volume factors (B<sub>g</sub>, B<sub>o</sub>, '
+                                   'B<sub>w</sub>) and solution gas (R<sub>s</sub>, '
+                                   'R<sub>sw</sub>).'),
+                                  ('Operaciones unitarias (compresor, expansor, bomba, válvula, '
+                                   'intercambiadores y separador), flash múltiple, contenido de '
+                                   'agua de saturación, comparación de envolventes e historial de '
+                                   'envolventes de un pozo.',
+                                   'Unit operations (compressor, expander, pump, valve, heat '
+                                   'exchangers and separator), multiple flash, saturation water '
+                                   'content, envelope comparison and well envelope history.'),
                                   ('Análisis de sensibilidad de las propiedades frente a presión y '
-                                   'temperatura.',
-                                   'Sensitivity analysis of properties versus pressure and '
-                                   'temperature.'),
+                                   'temperatura, con vista bidimensional y tridimensional.',
+                                   'Sensitivity analysis of the properties versus pressure and '
+                                   'temperature, with two- and three-dimensional views.'),
                                   ('Reporte en PDF de los resultados.',
                                    'PDF report of the results.')]),
                                 ('p',
                                  'La interfaz permite definir varios fluidos, cada uno con su '
                                  'composición, su ecuación de estado y su propia matriz de '
-                                 'coeficientes de interacción binaria. Las propiedades de '
-                                 'componente se consultan en una hoja por componente y los '
-                                 'parámetros de la ecuación de estado se revisan y editan en la '
-                                 'ventana de parámetros.',
+                                 'coeficientes de interacción binaria. Los parámetros de '
+                                 'componente de cada ecuación de estado se consultan y modifican '
+                                 'en la hoja de cada componente, y los coeficientes de interacción '
+                                 'binaria en la ventana de parámetros de la ecuación de estado.',
                                  'The interface allows several fluids to be defined, each with its '
-                                 'own composition, equation of state, and binary interaction '
-                                 'coefficient matrix. Component properties are displayed on a '
-                                 'per-component sheet, and the equation-of-state parameters are '
-                                 'reviewed and edited in the parameters window.'),
+                                 'own composition, equation of state and binary interaction '
+                                 'coefficient matrix. The component parameters of each equation of '
+                                 'state are viewed and modified in the sheet of each component, '
+                                 'and the binary interaction coefficients in the equation-of-state '
+                                 'parameters window.'),
                                 ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
                                 ('p',
                                  'Pedersen, K.S., Christensen, P.L. y Shaikh, J.A. (2015). '
                                  '<em>Phase Behavior of Petroleum Reservoir Fluids</em>, 2.ª ed. '
@@ -157,15 +173,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'rule to the water-hydrocarbon pairs.'),
                                 ('p',
                                  'Cada componente tiene además una temperatura normal de '
-                                 'ebullición tabulada (valores API/NIST). Esta propiedad clasifica '
-                                 'los componentes en livianos (T<sub>b</sub> &lt; 230 K) y pesados '
-                                 'en el criterio de identificación de fase de HYSYS; en el sistema '
-                                 'de trece componentes son livianos N₂, CO₂, C1 y C2.',
+                                 'ebullición tabulada (valores API/NIST), que clasifica los '
+                                 'componentes en livianos (T<sub>b</sub> &lt; 230 K) y pesados en '
+                                 'el criterio de identificación de fase por compresibilidad '
+                                 'isotérmica y composición (véase «Identificación de fases»). En '
+                                 'el sistema de trece componentes son livianos N₂, CO₂, C1 y C2.',
                                  'Each component also has a tabulated normal boiling point '
-                                 '(API/NIST values). This property classifies the components as '
-                                 'light (T<sub>b</sub> &lt; 230 K) or heavy in the HYSYS phase '
-                                 'identification criterion; in the thirteen-component system N₂, '
-                                 'CO₂, C1, and C2 are light.'),
+                                 '(API/NIST values), which classifies the components as light '
+                                 '(T<sub>b</sub> &lt; 230 K) or heavy in the phase identification '
+                                 'criterion based on isothermal compressibility and composition '
+                                 '(see «Phase identification»). In the thirteen-component system '
+                                 'the light components are N₂, CO₂, C1 and C2.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  "Poling, B.E., Prausnitz, J.M. y O'Connell, J.P. (2001). <em>The "
@@ -173,29 +191,26 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  "Poling, B.E., Prausnitz, J.M. and O'Connell, J.P. (2001). "
                                  '<em>The Properties of Gases and Liquids</em>, 5th ed. '
                                  'McGraw-Hill.')]},
-                   {'titulo': ('Parámetros de componente de HYSYS', 'HYSYS component parameters'),
+                   {'titulo': ('Banco de parámetros HYSYS', 'HYSYS parameter bank'),
                     'bloques': [('p',
-                                 'El juego de parámetros de HYSYS corresponde a los valores que '
-                                 'Aspen HYSYS reporta en su paquete de fluidos para los métodos '
-                                 'Peng-Robinson y SRK. Se emplea en las ecuaciones de estado PR '
-                                 '(HYSYS) y SRK (HYSYS).',
-                                 'The HYSYS parameter set corresponds to the values that Aspen '
-                                 'HYSYS reports in its fluid package for the Peng-Robinson and SRK '
-                                 'methods. It is used by the PR (HYSYS) and SRK (HYSYS) equations '
-                                 'of state.'),
+                                 'El banco de parámetros HYSYS se emplea en las ecuaciones PR '
+                                 '(HYSYS) y SRK (HYSYS). Contiene, para cada componente, los datos '
+                                 'siguientes:',
+                                 'The HYSYS parameter bank is used by the PR (HYSYS) and SRK '
+                                 '(HYSYS) equations. For each component it contains the following '
+                                 'data:'),
                                 ('ul',
                                  [('Temperatura crítica T<sub>c</sub> (°R) y presión crítica '
-                                   'P<sub>c</sub> (psia): un único juego para PR y SRK, pues HYSYS '
-                                   'no varía las propiedades críticas entre ambos paquetes.',
+                                   'P<sub>c</sub> (psia), con el mismo valor de base para PR y '
+                                   'para SRK.',
                                    'Critical temperature T<sub>c</sub> (°R) and critical pressure '
-                                   'P<sub>c</sub> (psia): a single set for PR and SRK, because '
-                                   'HYSYS does not change the critical properties between the two '
-                                   'packages.'),
-                                  ('Factor acéntrico: dos juegos distintos, ω<sub>PR</sub> para '
+                                   'P<sub>c</sub> (psia), with the same base value for PR and '
+                                   'SRK.'),
+                                  ('Factor acéntrico propio de cada ecuación: ω<sub>PR</sub> para '
                                    'Peng-Robinson y ω<sub>SRK</sub> para SRK (por ejemplo, '
-                                   '0.011498 y 0.00740 para el metano). Cada ecuación toma su '
+                                   '0.011498 y 0.00740 para el metano). Cada ecuación usa su '
                                    'propio factor acéntrico en la función α(T).',
-                                   'Acentric factor: two different sets, ω<sub>PR</sub> for '
+                                   'Acentric factor specific to each equation: ω<sub>PR</sub> for '
                                    'Peng-Robinson and ω<sub>SRK</sub> for SRK (for example, '
                                    '0.011498 and 0.00740 for methane). Each equation uses its own '
                                    'acentric factor in the α(T) function.'),
@@ -203,39 +218,34 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'Molecular weight M (lb/lbmol).'),
                                   ('Volumen crítico V<sub>c</sub> (cm³/mol) de Reid, Prausnitz y '
                                    'Sherwood, empleado en la viscosidad de Lohrenz-Bray-Clark.',
-                                   'Critical volume V<sub>c</sub> (cm³/mol) from Reid, Prausnitz, '
+                                   'Critical volume V<sub>c</sub> (cm³/mol) from Reid, Prausnitz '
                                    'and Sherwood, used in the Lohrenz-Bray-Clark viscosity.'),
-                                  ('Volumen característico V* de COSTALD (ft³/lbmol), con los '
-                                   'valores de HYSYS; la correlación COSTALD usa junto con él el '
-                                   'factor acéntrico ω<sub>SRK</sub>.',
-                                   'COSTALD characteristic volume V* (ft³/lbmol), with the HYSYS '
-                                   'values; the COSTALD correlation uses it together with the '
-                                   'ω<sub>SRK</sub> acentric factor.'),
+                                  ('Volumen característico V* de COSTALD (ft³/lbmol); la '
+                                   'correlación COSTALD lo combina con el factor acéntrico '
+                                   'ω<sub>SRK</sub>.',
+                                   'COSTALD characteristic volume V* (ft³/lbmol); the COSTALD '
+                                   'correlation combines it with the acentric factor '
+                                   'ω<sub>SRK</sub>.'),
                                   ('Capacidad calorífica de gas ideal, polinomio cúbico en T con '
                                    'los coeficientes de Reid, Prausnitz y Sherwood (1977) (véase '
                                    '«Contribución de gas ideal»).',
-                                   'Ideal-gas heat capacity, cubic polynomial in T with the Reid, '
-                                   'Prausnitz, and Sherwood (1977) coefficients (see “Ideal-gas '
-                                   'contribution”).')]),
+                                   'Ideal-gas heat capacity, cubic polynomial in T with the '
+                                   'coefficients of Reid, Prausnitz and Sherwood (1977) (see '
+                                   '«Ideal-gas contribution»).')]),
                                 ('h3', 'Agua', 'Water'),
                                 ('p',
-                                 'Con las ecuaciones de HYSYS, el agua toma T<sub>c</sub> = '
-                                 '1165.14 °R (647.30 K), P<sub>c</sub> = 3208.23 psia, ω = 0.344 '
-                                 '(igual para PR y SRK), M = 18.0151, V<sub>c</sub> = 55.9 '
-                                 'cm³/mol, V* igual a su volumen crítico (0.8954 ft³/lbmol) y el '
-                                 'polinomio de C<sub>p</sub><sup>ig</sup> de Reid, Prausnitz y '
-                                 'Sherwood.',
-                                 'With the HYSYS equations, water uses T<sub>c</sub> = 1165.14 °R '
-                                 '(647.30 K), P<sub>c</sub> = 3208.23 psia, ω = 0.344 (same for PR '
-                                 'and SRK), M = 18.0151, V<sub>c</sub> = 55.9 cm³/mol, V* equal to '
-                                 'its critical volume (0.8954 ft³/lbmol), and the Reid, Prausnitz, '
-                                 'and Sherwood C<sub>p</sub><sup>ig</sup> polynomial.'),
+                                 'En el banco HYSYS el agua toma T<sub>c</sub> = 1165.14 °R '
+                                 '(647.30 K), P<sub>c</sub> = 3208.23 psia, ω = 0.344 (igual para '
+                                 'PR y SRK), M = 18.0151, V<sub>c</sub> = 55.9 cm³/mol, V* igual a '
+                                 'su volumen crítico (0.8954 ft³/lbmol) y el polinomio de '
+                                 'C<sub>p</sub><sup>ig</sup> de Reid, Prausnitz y Sherwood.',
+                                 'In the HYSYS bank water takes T<sub>c</sub> = 1165.14 °R (647.30 '
+                                 'K), P<sub>c</sub> = 3208.23 psia, ω = 0.344 (same for PR and '
+                                 'SRK), M = 18.0151, V<sub>c</sub> = 55.9 cm³/mol, V* equal to its '
+                                 'critical volume (0.8954 ft³/lbmol) and the '
+                                 'C<sub>p</sub><sup>ig</sup> polynomial of Reid, Prausnitz and '
+                                 'Sherwood.'),
                                 ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'AspenTech. <em>Aspen Physical Property System: Physical Property '
-                                 'Methods</em>, métodos HYSPR y HYSSRK. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen Physical Property System: Physical Property '
-                                 'Methods</em>, HYSPR and HYSSRK methods. Aspen Technology, Inc.'),
                                 ('p',
                                  'Reid, R.C., Prausnitz, J.M. y Sherwood, T.K. (1977). <em>The '
                                  'Properties of Gases and Liquids</em>, 3.ª ed. McGraw-Hill.',
@@ -248,16 +258,16 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Hankinson, R.W. and Thomson, G.H. (1979). A new correlation for '
                                  'saturated densities of liquids and their mixtures. <em>AIChE '
                                  'Journal</em>, 25(4), 653–663.')]},
-                   {'titulo': ('Parámetros de componente de PVTsim', 'PVTsim component parameters'),
+                   {'titulo': ('Banco de parámetros PVTsim', 'PVTsim parameter bank'),
                     'bloques': [('p',
-                                 'El juego de parámetros de PVTsim corresponde a la base de datos '
-                                 'de componentes de PVTsim (valores de Reid, Prausnitz y '
-                                 'Sherwood), con toda la precisión almacenada. Se emplea en las '
-                                 'ecuaciones de estado PR (PVTsim) y SRK (PVTsim).',
-                                 'The PVTsim parameter set corresponds to the PVTsim component '
-                                 'database (Reid, Prausnitz, and Sherwood values), with full '
-                                 'stored precision. It is used by the PR (PVTsim) and SRK (PVTsim) '
-                                 'equations of state.'),
+                                 'El banco de parámetros PVTsim se emplea en las ecuaciones PR '
+                                 '(PVTsim) y SRK (PVTsim). Sus propiedades críticas corresponden a '
+                                 'los valores de Reid, Prausnitz y Sherwood y se almacenan con su '
+                                 'precisión completa:',
+                                 'The PVTsim parameter bank is used by the PR (PVTsim) and SRK '
+                                 '(PVTsim) equations. Its critical properties correspond to the '
+                                 'values of Reid, Prausnitz and Sherwood and are stored at full '
+                                 'precision:'),
                                 ('ul',
                                  [('T<sub>c</sub>: almacenada en K y convertida a °R con el factor '
                                    '1.8.',
@@ -266,18 +276,16 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                   ('P<sub>c</sub>: almacenada en atm y convertida a psia con '
                                    '14.69594878 psia/atm; en la ecuación de estado se reescala a '
                                    'la convención de 14.696 psia/atm (véase «Convención de '
-                                   'unidades de PVTsim»).',
+                                   'unidades del banco PVTsim»).',
                                    'P<sub>c</sub>: stored in atm and converted to psia with '
-                                   '14.69594878 psia/atm; within the equation of state it is '
-                                   'rescaled to the 14.696 psia/atm convention (see “PVTsim unit '
-                                   'convention”).'),
-                                  ('Factor acéntrico único ω para PR y SRK: PVTsim no separa el '
-                                   'factor acéntrico por ecuación.',
-                                   'A single acentric factor ω for PR and SRK: PVTsim does not '
-                                   'separate the acentric factor by equation.'),
-                                  ('Peso molecular M propio de la base de PVTsim (por ejemplo, '
-                                   '16.042879 para el metano).',
-                                   'Molecular weight M from the PVTsim database (for example, '
+                                   '14.69594878 psia/atm; in the equation of state it is rescaled '
+                                   'to the 14.696 psia/atm convention (see «PVTsim bank unit '
+                                   'convention»).'),
+                                  ('Factor acéntrico ω con el mismo valor de base para PR y SRK.',
+                                   'Acentric factor ω with the same base value for PR and SRK.'),
+                                  ('Peso molecular M propio del banco (por ejemplo, 16.042879 para '
+                                   'el metano).',
+                                   'Molecular weight M specific to the bank (for example, '
                                    '16.042879 for methane).'),
                                   ('Volumen crítico almacenado en forma reducida V<sub>c</sub>/R '
                                    '(K/atm) y convertido a cm³/mol con R = 82.05736 '
@@ -288,14 +296,14 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    "SRK, almacenado como c'/R (K/atm), para los catorce "
                                    'componentes (véase «Corrección de volumen de Peneloux»).',
                                    "Peneloux volume shift c', different for PR and SRK, stored as "
-                                   "c'/R (K/atm), for all fourteen components (see “Peneloux "
-                                   'volume correction”).'),
-                                  ('Coeficientes de C<sub>p</sub><sup>ig</sup> de gas ideal de la '
-                                   'base de PVTsim, almacenados divididos por R y multiplicados '
-                                   'por R = 8.3147295 J/(mol·K) al usarse.',
-                                   'Ideal-gas C<sub>p</sub><sup>ig</sup> coefficients from the '
-                                   'PVTsim database, stored divided by R and multiplied by R = '
-                                   '8.3147295 J/(mol·K) when used.'),
+                                   "c'/R (K/atm), for the fourteen components (see «Peneloux "
+                                   'volume correction»).'),
+                                  ('Coeficientes de C<sub>p</sub><sup>ig</sup> de gas ideal '
+                                   'almacenados divididos por R y multiplicados por R = 8.3147295 '
+                                   'J/(mol·K) al usarse.',
+                                   'Ideal-gas C<sub>p</sub><sup>ig</sup> coefficients stored '
+                                   'divided by R and multiplied by R = 8.3147295 J/(mol·K) when '
+                                   'used.'),
                                   ('Constantes de Langmuir de hidratos (parámetros A y B por '
                                    'cavidad y estructura) para los componentes formadores de '
                                    'hidrato.',
@@ -303,18 +311,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'structure) for the hydrate-forming components.')]),
                                 ('h3', 'Agua', 'Water'),
                                 ('p',
-                                 'Con las ecuaciones de PVTsim, el agua toma T<sub>c</sub> = '
-                                 '647.30 K (1165.14 °R), P<sub>c</sub> = 218 atm (3203.72 psia), ω '
-                                 "= 0.344, M = 18.015341, V<sub>c</sub> = 56.0 cm³/mol y c'/R = "
-                                 '0.037110969 K/atm (PR) y 0.068562075 K/atm (SRK).',
-                                 'With the PVTsim equations, water uses T<sub>c</sub> = 647.30 K '
+                                 'En el banco PVTsim el agua toma T<sub>c</sub> = 647.30 K '
                                  '(1165.14 °R), P<sub>c</sub> = 218 atm (3203.72 psia), ω = 0.344, '
-                                 "M = 18.015341, V<sub>c</sub> = 56.0 cm³/mol, and c'/R = "
-                                 '0.037110969 K/atm (PR) and 0.068562075 K/atm (SRK).'),
+                                 "M = 18.015341, V<sub>c</sub> = 56.0 cm³/mol y c'/R = 0.037110969 "
+                                 'K/atm (PR) y 0.068562075 K/atm (SRK).',
+                                 'In the PVTsim bank water takes T<sub>c</sub> = 647.30 K (1165.14 '
+                                 '°R), P<sub>c</sub> = 218 atm (3203.72 psia), ω = 0.344, M = '
+                                 "18.015341, V<sub>c</sub> = 56.0 cm³/mol and c'/R = 0.037110969 "
+                                 'K/atm (PR) and 0.068562075 K/atm (SRK).'),
                                 ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
                                 ('p',
                                  'Péneloux, A., Rauzy, E. y Fréze, R. (1982). A consistent '
                                  'correction for Redlich-Kwong-Soave volumes. <em>Fluid Phase '
@@ -331,57 +336,80 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Engineering Science</em>, 43(10), 2661–2672.')]},
                    {'titulo': ('Hoja de componente', 'Component property sheet'),
                     'bloques': [('p',
-                                 'La hoja de componente es una ventana de solo lectura que reúne, '
-                                 'para el componente seleccionado en el árbol de componentes, '
-                                 'todos los parámetros que utiliza ThermoPhase. Los valores se '
-                                 'almacenan en unidades de campo y se presentan convertidos al '
-                                 'sistema de unidades activo.',
-                                 'The component sheet is a read-only window that gathers, for the '
-                                 'component selected in the component tree, all the parameters '
-                                 'that ThermoPhase uses. Values are stored in field units and are '
-                                 'displayed converted to the active unit system.'),
+                                 'La hoja de componente se abre desde el árbol de componentes y '
+                                 'reúne los parámetros del componente que intervienen en las '
+                                 'ecuaciones de estado. Se organiza en tres tablas:',
+                                 'The component sheet is opened from the component tree and '
+                                 'gathers the component parameters used by the equations of state. '
+                                 'It is organized in three tables:'),
                                 ('ul',
-                                 [('Propiedades generales: nombre, símbolo, temperatura normal de '
-                                   'ebullición y estructuras de hidrato en las que el componente '
-                                   'participa como huésped (sI, sII, sH); el agua figura como '
-                                   'anfitrión de la red del hidrato.',
-                                   'General properties: name, symbol, normal boiling point, and '
-                                   'hydrate structures in which the component acts as a guest (sI, '
-                                   'sII, sH); water is shown as the host of the hydrate lattice.'),
-                                  ('Parámetros de HYSYS: T<sub>c</sub>, P<sub>c</sub>, factor '
-                                   'acéntrico PR, factor acéntrico SRK, peso molecular, volumen '
-                                   'crítico para la viscosidad LBC, volumen característico V* de '
-                                   'COSTALD y C<sub>p</sub><sup>ig</sup> de gas ideal a 60 °F.',
-                                   'HYSYS parameters: T<sub>c</sub>, P<sub>c</sub>, PR acentric '
-                                   'factor, SRK acentric factor, molecular weight, critical volume '
-                                   'for LBC viscosity, COSTALD characteristic volume V*, and '
-                                   'ideal-gas C<sub>p</sub><sup>ig</sup> at 60 °F.'),
-                                  ('Parámetros de PVTsim: T<sub>c</sub>, P<sub>c</sub>, factor '
-                                   'acéntrico, peso molecular, volumen crítico para la viscosidad '
-                                   'LBC, traslado de volumen de Peneloux para PR y para SRK, y '
-                                   'C<sub>p</sub><sup>ig</sup> de gas ideal a 60 °F.',
-                                   'PVTsim parameters: T<sub>c</sub>, P<sub>c</sub>, acentric '
-                                   'factor, molecular weight, critical volume for LBC viscosity, '
-                                   'Peneloux volume shift for PR and for SRK, and ideal-gas '
-                                   'C<sub>p</sub><sup>ig</sup> at 60 °F.')]),
+                                 [('Propiedades generales: nombre y símbolo del componente.',
+                                   'General properties: component name and symbol.'),
+                                  ('Parámetros de HYSYS: temperatura crítica, presión crítica, '
+                                   'peso molecular y factor acéntrico, en una columna para '
+                                   'Peng-Robinson y otra para SRK.',
+                                   'HYSYS parameters: critical temperature, critical pressure, '
+                                   'molecular weight and acentric factor, in one column for '
+                                   'Peng-Robinson and another for SRK.'),
+                                  ('Parámetros de PVTsim: las mismas cuatro propiedades, en '
+                                   'columnas para Peng-Robinson y SRK. Aunque en la base de datos '
+                                   'ambas columnas coinciden, se presentan por separado porque '
+                                   'cada ecuación de estado puede modificarse de forma '
+                                   'independiente.',
+                                   'PVTsim parameters: the same four properties, in columns for '
+                                   'Peng-Robinson and SRK. Although both columns coincide in the '
+                                   'database, they are shown separately because each equation of '
+                                   'state can be modified independently.')]),
                                 ('p',
-                                 'La temperatura crítica y la temperatura de ebullición se '
-                                 'muestran como temperatura absoluta (°R en FIELD, K en SI y '
-                                 'Métrico); la presión crítica en la unidad de presión del '
-                                 'sistema; el volumen crítico en cm³/mol en todos los sistemas; V* '
-                                 "y c' en la unidad de volumen molar; y C<sub>p</sub><sup>ig</sup> "
-                                 'en la unidad de entropía molar.',
-                                 'Critical temperature and boiling point are shown as absolute '
-                                 'temperature (°R in FIELD, K in SI and Metric); critical pressure '
-                                 'in the pressure unit of the system; critical volume in cm³/mol '
-                                 "in all systems; V* and c' in the molar-volume unit; and "
-                                 'C<sub>p</sub><sup>ig</sup> in the molar-entropy unit.'),
-                                ('h3', 'Referencias', 'References'),
+                                 'La temperatura crítica se presenta como temperatura absoluta (°R '
+                                 'en FIELD, K en SI y Métrico) y la presión crítica en la unidad '
+                                 'de presión del sistema activo.',
+                                 'The critical temperature is shown as absolute temperature (°R in '
+                                 'FIELD, K in SI and Metric) and the critical pressure in the '
+                                 'pressure unit of the active system.'),
+                                ('h3', 'Edición de parámetros', 'Parameter editing'),
                                 ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.')]},
+                                 'Los valores de las tablas de parámetros son editables. Un valor '
+                                 'modificado se aplica de inmediato a todos los cálculos que '
+                                 'emplean esa ecuación de estado: se recalculan los parámetros '
+                                 'a<sub>c,i</sub>, b<sub>i</sub> y m<sub>i</sub> del componente y '
+                                 'las correlaciones que dependen de sus propiedades críticas '
+                                 '(estimación de Wilson, COSTALD, viscosidad de '
+                                 'Lohrenz-Bray-Clark, poder calorífico másico), y se descartan los '
+                                 'resultados almacenados que dependen de ellos, como las presiones '
+                                 'de burbuja de referencia y los puntos críticos de mezcla. Las '
+                                 'tablas de propiedades críticas de la ventana de parámetros de la '
+                                 'ecuación de estado se actualizan al mismo tiempo. Los parámetros '
+                                 'del agua se aplican a los cálculos con agua.',
+                                 'The values of the parameter tables are editable. A modified '
+                                 'value is applied immediately to every calculation that uses that '
+                                 'equation of state: the component parameters a<sub>c,i</sub>, '
+                                 'b<sub>i</sub> and m<sub>i</sub> are recomputed together with the '
+                                 'correlations that depend on its critical properties (Wilson '
+                                 'estimate, COSTALD, Lohrenz-Bray-Clark viscosity, mass heating '
+                                 'value), and stored results that depend on them, such as '
+                                 'reference bubble pressures and mixture critical points, are '
+                                 'discarded. The critical property tables of the equation-of-state '
+                                 'parameters window are updated at the same time. Water parameters '
+                                 'apply to the calculations with water.'),
+                                ('p',
+                                 'Se aceptan valores positivos de T<sub>c</sub>, P<sub>c</sub> y M '
+                                 'y factores acéntricos entre −1 y 5; un valor no válido se '
+                                 'descarta y la celda recupera el valor vigente. T<sub>c</sub> y '
+                                 'P<sub>c</sub> se ingresan en las unidades del sistema activo. Al '
+                                 'situar el cursor sobre un valor modificado se muestra su valor '
+                                 'original. El comando Restaurar valores originales devuelve todos '
+                                 'los parámetros del componente a los valores de la base de datos. '
+                                 'Las modificaciones permanecen vigentes durante la sesión de '
+                                 'trabajo.',
+                                 'Positive values of T<sub>c</sub>, P<sub>c</sub> and M and '
+                                 'acentric factors between −1 and 5 are accepted; an invalid value '
+                                 'is discarded and the cell returns to the current value. '
+                                 'T<sub>c</sub> and P<sub>c</sub> are entered in the units of the '
+                                 'active system. Hovering over a modified value shows its original '
+                                 'value. The Restore original values command returns all the '
+                                 'component parameters to the database values. Modifications '
+                                 'remain in effect for the working session.')]},
                    {'titulo': ('Sistemas de unidades y constantes', 'Unit systems and constants'),
                     'bloques': [('p',
                                  'El motor de cálculo trabaja siempre en unidades internas de '
@@ -432,11 +460,11 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'Gas constant in the equation of state: R = 10.7316 '
                                    'psia·ft³/(lbmol·°R).'),
                                   ('Constante de los gases en las propiedades térmicas: R = '
-                                   '8.3147295 J/(mol·K), equivalente a 1.98594 BTU/(lbmol·°R) y '
-                                   'coherente con R = 0.08206 L·atm/(mol·K) de PVTsim.',
+                                   '8.3147295 J/(mol·K), equivalente a 1.98594 BTU/(lbmol·°R) y a '
+                                   'R = 0.08206 L·atm/(mol·K).',
                                    'Gas constant in the thermal properties: R = 8.3147295 '
-                                   'J/(mol·K), equivalent to 1.98594 BTU/(lbmol·°R) and consistent '
-                                   'with the PVTsim value R = 0.08206 L·atm/(mol·K).'),
+                                   'J/(mol·K), equivalent to 1.98594 BTU/(lbmol·°R) and to R = '
+                                   '0.08206 L·atm/(mol·K).'),
                                   ('Condiciones estándar: 60 °F (519.67 °R) y 14.696 psia; el '
                                    'volumen molar del gas ideal en esas condiciones es R·T/P = '
                                    '379.48 ft³/lbmol.',
@@ -445,7 +473,12 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'ft³/lbmol.'),
                                   ('Peso molecular del aire para la gravedad específica del gas: '
                                    '28.9625.',
-                                   'Molecular weight of air for gas specific gravity: 28.9625.')]),
+                                   'Molecular weight of air for the gas specific gravity: '
+                                   '28.9625.'),
+                                  ('Densidad del agua a 60 °F, referencia de la gravedad '
+                                   'específica de los líquidos: 62.3664 lb/ft³ (8.33718 lb/gal).',
+                                   'Density of water at 60 °F, reference for the liquid specific '
+                                   'gravity: 62.3664 lb/ft³ (8.33718 lb/gal).')]),
                                 ('eq',
                                  'V_{m}^{\\,\\mathrm{std}} = '
                                  '\\frac{R\\,T_{\\mathrm{std}}}{P_{\\mathrm{std}}} = '
@@ -455,35 +488,41 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'donde V<sub>m</sub><sup>std</sup> es el volumen molar del gas '
                                  'ideal en condiciones estándar, T<sub>std</sub> = 519.67 °R y '
                                  'P<sub>std</sub> = 14.696 psia. Este valor es la base del poder '
-                                 'calorífico volumétrico, del GPM y del contenido de agua por '
-                                 'millón de pies cúbicos estándar.',
+                                 'calorífico volumétrico, del GPM, del contenido de agua por '
+                                 'millón de pies cúbicos estándar y de los factores volumétricos.',
                                  'where V<sub>m</sub><sup>std</sup> is the ideal-gas molar volume '
-                                 'at standard conditions, T<sub>std</sub> = 519.67 °R, and '
+                                 'at standard conditions, T<sub>std</sub> = 519.67 °R and '
                                  'P<sub>std</sub> = 14.696 psia. This value is the basis of the '
-                                 'volumetric heating value, the GPM, and the water content per '
-                                 'million standard cubic feet.'),
+                                 'volumetric heating value, the GPM, the water content per million '
+                                 'standard cubic feet and the formation volume factors.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
                                  'Data Book</em>, 10.ª ed. GPSA.',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
-                                 'Data Book</em>, 10th ed. GPSA.')]},
-                   {'titulo': ('Convención de unidades de PVTsim', 'PVTsim unit convention'),
+                                 'Data Book</em>, 10th ed. GPSA.'),
+                                ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.')]},
+                   {'titulo': ('Convención de unidades del banco PVTsim',
+                               'PVTsim bank unit convention'),
                     'bloques': [('p',
-                                 'PVTsim trabaja internamente en atmósferas y en kelvin. Convierte '
-                                 'la presión de entrada con 1 atm = 14.696 psia, mientras que sus '
-                                 'presiones críticas están almacenadas en atm. Para que el '
-                                 'cociente P/P<sub>c</sub> de ThermoPhase coincida con el de '
-                                 'PVTsim, las presiones críticas en psia (obtenidas con '
-                                 '14.69594878 psia/atm) se reescalan en las ecuaciones de estado '
-                                 'de PVTsim a una presión crítica efectiva:',
-                                 'PVTsim works internally in atmospheres and kelvin. It converts '
-                                 'the input pressure with 1 atm = 14.696 psia, whereas its '
-                                 'critical pressures are stored in atm. For the P/P<sub>c</sub> '
-                                 'ratio in ThermoPhase to match that of PVTsim, the critical '
-                                 'pressures in psia (obtained with 14.69594878 psia/atm) are '
-                                 'rescaled in the PVTsim equations of state to an effective '
-                                 'critical pressure:'),
+                                 'Los parámetros del banco PVTsim están definidos en atmósferas y '
+                                 'kelvin, con la presión del sistema convertida mediante 1 atm = '
+                                 '14.696 psia, mientras que sus presiones críticas se expresan en '
+                                 'psia con 14.69594878 psia/atm. Para conservar el cociente '
+                                 'P/P<sub>c</sub> de esa convención, las ecuaciones de estado del '
+                                 'banco PVTsim emplean una presión crítica efectiva:',
+                                 'The parameters of the PVTsim bank are defined in atmospheres and '
+                                 'kelvin, with the system pressure converted through 1 atm = '
+                                 '14.696 psia, while its critical pressures are expressed in psia '
+                                 'with 14.69594878 psia/atm. To preserve the P/P<sub>c</sub> ratio '
+                                 'of that convention, the equations of state of the PVTsim bank '
+                                 'use an effective critical pressure:'),
                                 ('eq',
                                  'P_{c}^{\\,\\mathrm{ef}} = P_{c}\\;\\frac{14.696}{14.69594878}'),
                                 ('p',
@@ -494,17 +533,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'P<sub>c</sub><sup>ef</sup> is the effective critical pressure in '
                                  'psia that enters the a and b parameters.'),
                                 ('p',
-                                 'PVTsim obtiene el volumen molar de una fase como V = Z·R·T/P con '
-                                 'R = 82.06 cm³·atm/(mol·K), T en K y la presión convertida a atm '
-                                 'con 14.696 psia/atm, y la densidad como ρ = M/V. Frente a la '
+                                 'En la misma convención el volumen molar de una fase es V = '
+                                 'Z·R·T/P con R = 82.06 cm³·atm/(mol·K), T en K y la presión en '
+                                 'atm (14.696 psia/atm), y la densidad es ρ = M/V. Frente a la '
                                  'expresión en unidades de campo con R = 10.7316, esta convención '
                                  'equivale a un factor multiplicativo constante sobre la densidad '
                                  'de la ecuación de estado:',
-                                 'PVTsim obtains the molar volume of a phase as V = Z·R·T/P with R '
-                                 '= 82.06 cm³·atm/(mol·K), T in K, and pressure converted to atm '
-                                 'with 14.696 psia/atm, and the density as ρ = M/V. Compared with '
-                                 'the field-unit expression with R = 10.7316, this convention is '
-                                 'equivalent to a constant multiplicative factor on the '
+                                 'In the same convention the molar volume of a phase is V = '
+                                 'Z·R·T/P with R = 82.06 cm³·atm/(mol·K), T in K and the pressure '
+                                 'in atm (14.696 psia/atm), and the density is ρ = M/V. Compared '
+                                 'with the field-unit expression with R = 10.7316, this convention '
+                                 'is equivalent to a constant multiplying factor on the '
                                  'equation-of-state density:'),
                                 ('eq', '\\rho = \\frac{P\\,M}{Z\\,R\\,T}\\;f_{\\rho}'),
                                 ('eq',
@@ -515,16 +554,16 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'el peso molecular de la fase, Z el factor de compresibilidad, R '
                                  '= 10.7316 psia·ft³/(lbmol·°R), T la temperatura (°R), 62.42796 '
                                  'el factor de g/cm³ a lb/ft³ y f<sub>ρ</sub> el factor de '
-                                 'convención. ThermoPhase aplica f<sub>ρ</sub> a las densidades de '
-                                 'todas las fases con las ecuaciones de PVTsim; con las de HYSYS '
-                                 'f<sub>ρ</sub> = 1.',
-                                 'where ρ is the mass density (lb/ft³), P is the pressure (psia), '
-                                 'M is the phase molecular weight, Z is the compressibility '
-                                 'factor, R = 10.7316 psia·ft³/(lbmol·°R), T is the temperature '
-                                 '(°R), 62.42796 is the factor from g/cm³ to lb/ft³, and '
-                                 'f<sub>ρ</sub> is the convention factor. ThermoPhase applies '
-                                 'f<sub>ρ</sub> to the densities of all phases with the PVTsim '
-                                 'equations; with the HYSYS equations f<sub>ρ</sub> = 1.'),
+                                 'convención. f<sub>ρ</sub> se aplica a las densidades de todas '
+                                 'las fases con las ecuaciones del banco PVTsim; con las del banco '
+                                 'HYSYS f<sub>ρ</sub> = 1.',
+                                 'where ρ is the mass density (lb/ft³), P the pressure (psia), M '
+                                 'the molecular weight of the phase, Z the compressibility factor, '
+                                 'R = 10.7316 psia·ft³/(lbmol·°R), T the temperature (°R), '
+                                 '62.42796 the factor from g/cm³ to lb/ft³ and f<sub>ρ</sub> the '
+                                 'convention factor. f<sub>ρ</sub> is applied to the densities of '
+                                 'all phases with the PVTsim bank equations; with those of the '
+                                 'HYSYS bank f<sub>ρ</sub> = 1.'),
                                 ('p',
                                  'La misma convención se aplica al traslado de volumen de '
                                  'Peneloux, cuyo término P·c/(R·T) se evalúa con 14.696 psia/atm, '
@@ -536,11 +575,8 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'whose term P·c/(R·T) is evaluated with 14.696 psia/atm, and to '
                                  'the reduced density of the Lohrenz-Bray-Clark viscosity, which '
                                  'is evaluated with pressure in atm and the reduced critical '
-                                 'volume V<sub>c</sub>/R, so that the gas constant cancels out.'),
-                                ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]}]},
+                                 'volume V<sub>c</sub>/R, so that the gas constant cancels '
+                                 'out.')]}]},
  {'titulo': ('Ecuaciones de estado cúbicas', 'Cubic equations of state'),
   'subsecciones': [{'titulo': ('Forma general de las ecuaciones cúbicas',
                                'General form of the cubic equations'),
@@ -678,13 +714,9 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  '0.08664034996'),
                                 ('p',
                                  'donde 2<sup>1/3</sup> es la raíz cúbica de 2. ThermoPhase emplea '
-                                 'estos valores exactos en las dos ecuaciones SRK (HYSYS y '
-                                 'PVTsim); el manual de HYSYS publica los mismos valores '
-                                 'truncados, 0.42748 y 0.08664.',
+                                 'estos valores exactos en las dos ecuaciones SRK.',
                                  'where 2<sup>1/3</sup> is the cube root of 2. ThermoPhase uses '
-                                 'these exact values in both SRK equations (HYSYS and PVTsim); the '
-                                 'HYSYS manual publishes the same values truncated to 0.42748 and '
-                                 '0.08664.'),
+                                 'these exact values in both SRK equations.'),
                                 ('h3', 'Constantes de Peng-Robinson', 'Peng-Robinson constants'),
                                 ('p',
                                  'Para Peng-Robinson las condiciones críticas conducen a '
@@ -699,27 +731,27 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'PR (HYSYS): Ω<sub>a</sub> = 0.45724 and Ω<sub>b</sub> = '
                                    '0.07780, the rounded values published by Peng and Robinson.'),
                                   ('PR (PVTsim): Ω<sub>a</sub> = 0.4572355289 (valor exacto) y '
-                                   'Ω<sub>b</sub> = 0.07780 (valor redondeado), combinación que '
-                                   'corresponde a los cálculos de PVTsim.',
+                                   'Ω<sub>b</sub> = 0.07780 (valor redondeado).',
                                    'PR (PVTsim): Ω<sub>a</sub> = 0.4572355289 (exact value) and '
-                                   'Ω<sub>b</sub> = 0.07780 (rounded value), the combination that '
-                                   'corresponds to the PVTsim calculations.')]),
+                                   'Ω<sub>b</sub> = 0.07780 (rounded value).')]),
                                 ('h3',
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('p',
                                  'Los parámetros a<sub>c,i</sub> y b<sub>i</sub> de las cuatro '
-                                 'ecuaciones se calculan una sola vez a partir de la base de datos '
-                                 'de la ecuación correspondiente; con las ecuaciones de PVTsim se '
-                                 'usa la presión crítica efectiva P<sub>c</sub><sup>ef</sup>. En '
-                                 'cada temperatura se evalúa el vector a<sub>i</sub>(T) de todos '
-                                 'los componentes, que se reutiliza durante todo el cálculo a esa '
+                                 'ecuaciones se calculan a partir del banco de parámetros de cada '
+                                 'ecuación; con el banco PVTsim se usa la presión crítica efectiva '
+                                 'P<sub>c</sub><sup>ef</sup>. Se recalculan cada vez que se '
+                                 'modifica un parámetro en la hoja de componente. En cada '
+                                 'temperatura se evalúa el vector a<sub>i</sub>(T) de todos los '
+                                 'componentes, que se reutiliza durante todo el cálculo a esa '
                                  'temperatura.',
                                  'The a<sub>c,i</sub> and b<sub>i</sub> parameters of the four '
-                                 'equations are computed once from the database of the '
-                                 'corresponding equation; with the PVTsim equations the effective '
-                                 'critical pressure P<sub>c</sub><sup>ef</sup> is used. At each '
-                                 'temperature, the vector a<sub>i</sub>(T) of all components is '
+                                 'equations are computed from the parameter bank of each equation; '
+                                 'with the PVTsim bank the effective critical pressure '
+                                 'P<sub>c</sub><sup>ef</sup> is used. They are recomputed whenever '
+                                 'a parameter is modified in the component sheet. At each '
+                                 'temperature the vector a<sub>i</sub>(T) of all components is '
                                  'evaluated and reused throughout the calculation at that '
                                  'temperature.'),
                                 ('h3', 'Referencias', 'References'),
@@ -800,27 +832,27 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('ul',
-                                 [('PR (HYSYS) usa ω<sub>PR</sub> de HYSYS; SRK (HYSYS) usa '
-                                   'ω<sub>SRK</sub> de HYSYS, un juego de factores acéntricos '
-                                   'distinto.',
-                                   'PR (HYSYS) uses the HYSYS ω<sub>PR</sub>; SRK (HYSYS) uses the '
-                                   'HYSYS ω<sub>SRK</sub>, a different set of acentric factors.'),
-                                  ('PR (PVTsim) y SRK (PVTsim) usan el factor acéntrico único de '
+                                 [('PR (HYSYS) usa ω<sub>PR</sub> y SRK (HYSYS) usa '
+                                   'ω<sub>SRK</sub>, dos juegos distintos de factores acéntricos '
+                                   'del banco HYSYS.',
+                                   'PR (HYSYS) uses ω<sub>PR</sub> and SRK (HYSYS) uses '
+                                   'ω<sub>SRK</sub>, two different sets of acentric factors of the '
+                                   'HYSYS bank.'),
+                                  ('PR (PVTsim) y SRK (PVTsim) usan el factor acéntrico del banco '
                                    'PVTsim, cada una con su propia correlación de m.',
-                                   'PR (PVTsim) and SRK (PVTsim) use the single PVTsim acentric '
-                                   'factor, each with its own m correlation.'),
+                                   'PR (PVTsim) and SRK (PVTsim) use the acentric factor of the '
+                                   'PVTsim bank, each with its own correlation for m.'),
                                   ('El agua usa la misma función α clásica con ω = 0.344 en las '
-                                   'cuatro ecuaciones. Los coeficientes de Mathias-Copeman de la '
-                                   'base de datos de PVTsim no se emplean: la solubilidad mutua '
-                                   'agua-hidrocarburo se representa con la función α clásica '
-                                   'combinada con la regla de Huron-Vidal y los parámetros de '
-                                   'Pedersen y colaboradores (2001).',
-                                   'Water uses the same classical α function with ω = 0.344 in all '
-                                   'four equations. The Mathias-Copeman coefficients of the PVTsim '
-                                   'database are not used: the water-hydrocarbon mutual solubility '
-                                   'is represented with the classical α function combined with the '
-                                   'Huron-Vidal rule and the parameters of Pedersen et al. '
-                                   '(2001).')]),
+                                   'cuatro ecuaciones. No se emplean funciones α del tipo '
+                                   'Mathias-Copeman: la solubilidad mutua agua-hidrocarburo se '
+                                   'representa con la función α clásica combinada con la regla de '
+                                   'Huron-Vidal y los parámetros de Pedersen y colaboradores '
+                                   '(2001).',
+                                   'Water uses the same classical α function with ω = 0.344 in the '
+                                   'four equations. Mathias-Copeman type α functions are not used: '
+                                   'the water-hydrocarbon mutual solubility is represented with '
+                                   'the classical α function combined with the Huron-Vidal rule '
+                                   'and the parameters of Pedersen et al. (2001).')]),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Pitzer, K.S., Lippmann, D.Z., Curl, R.F., Huggins, C.M. y '
@@ -861,83 +893,78 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                    {'titulo': ('Las cuatro variantes PR y SRK', 'The four PR and SRK variants'),
                     'bloques': [('p',
                                  'ThermoPhase ofrece cuatro ecuaciones de estado seleccionables, '
-                                 'que resultan de combinar las dos formas cúbicas con los juegos '
-                                 'de parámetros de HYSYS y de PVTsim. Dentro de cada familia la '
-                                 'forma de la ecuación, la correlación de m y el coeficiente de '
-                                 'fugacidad son idénticos; las variantes difieren en los datos de '
-                                 'entrada y en las constantes Ω.',
+                                 'que resultan de combinar las dos formas cúbicas con los bancos '
+                                 'de parámetros HYSYS y PVTsim. Dentro de cada familia la forma de '
+                                 'la ecuación, la correlación de m y el coeficiente de fugacidad '
+                                 'son idénticos; las variantes difieren en los datos de entrada y '
+                                 'en las constantes Ω.',
                                  'ThermoPhase offers four selectable equations of state, obtained '
                                  'by combining the two cubic forms with the HYSYS and PVTsim '
-                                 'parameter sets. Within each family the form of the equation, the '
-                                 'm correlation, and the fugacity coefficient are identical; the '
-                                 'variants differ in the input data and in the Ω constants.'),
+                                 'parameter banks. Within each family the form of the equation, '
+                                 'the correlation for m and the fugacity coefficient are '
+                                 'identical; the variants differ in the input data and in the Ω '
+                                 'constants.'),
                                 ('ul',
                                  [('Peng-Robinson (HYSYS): T<sub>c</sub>, P<sub>c</sub>, '
-                                   'ω<sub>PR</sub> y M de HYSYS; Ω<sub>a</sub> = 0.45724, '
-                                   'Ω<sub>b</sub> = 0.07780; matriz k<sub>ij</sub> de PR de HYSYS.',
-                                   'Peng-Robinson (HYSYS): HYSYS T<sub>c</sub>, P<sub>c</sub>, '
-                                   'ω<sub>PR</sub>, and M; Ω<sub>a</sub> = 0.45724, Ω<sub>b</sub> '
-                                   '= 0.07780; HYSYS PR k<sub>ij</sub> matrix.'),
-                                  ('SRK (HYSYS): las mismas T<sub>c</sub>, P<sub>c</sub> y M de '
-                                   'HYSYS, con ω<sub>SRK</sub>; Ω<sub>a</sub> y Ω<sub>b</sub> '
-                                   'exactos de SRK; matriz k<sub>ij</sub> de SRK de HYSYS.',
-                                   'SRK (HYSYS): the same HYSYS T<sub>c</sub>, P<sub>c</sub>, and '
-                                   'M, with ω<sub>SRK</sub>; exact SRK Ω<sub>a</sub> and '
-                                   'Ω<sub>b</sub>; HYSYS SRK k<sub>ij</sub> matrix.'),
+                                   'ω<sub>PR</sub> y M del banco HYSYS; Ω<sub>a</sub> = 0.45724, '
+                                   'Ω<sub>b</sub> = 0.07780; matriz k<sub>ij</sub> PR del banco '
+                                   'HYSYS.',
+                                   'Peng-Robinson (HYSYS): T<sub>c</sub>, P<sub>c</sub>, '
+                                   'ω<sub>PR</sub> and M of the HYSYS bank; Ω<sub>a</sub> = '
+                                   '0.45724, Ω<sub>b</sub> = 0.07780; PR k<sub>ij</sub> matrix of '
+                                   'the HYSYS bank.'),
+                                  ('SRK (HYSYS): T<sub>c</sub>, P<sub>c</sub>, ω<sub>SRK</sub> y M '
+                                   'del banco HYSYS; Ω<sub>a</sub> y Ω<sub>b</sub> exactos de SRK; '
+                                   'matriz k<sub>ij</sub> SRK del banco HYSYS.',
+                                   'SRK (HYSYS): T<sub>c</sub>, P<sub>c</sub>, ω<sub>SRK</sub> and '
+                                   'M of the HYSYS bank; exact SRK Ω<sub>a</sub> and '
+                                   'Ω<sub>b</sub>; SRK k<sub>ij</sub> matrix of the HYSYS bank.'),
                                   ('Peng-Robinson (PVTsim): T<sub>c</sub>, '
-                                   'P<sub>c</sub><sup>ef</sup>, ω y M de PVTsim; Ω<sub>a</sub> = '
-                                   '0.4572355289, Ω<sub>b</sub> = 0.07780; matriz k<sub>ij</sub> '
-                                   'de PR de PVTsim.',
-                                   'Peng-Robinson (PVTsim): PVTsim T<sub>c</sub>, '
-                                   'P<sub>c</sub><sup>ef</sup>, ω, and M; Ω<sub>a</sub> = '
-                                   '0.4572355289, Ω<sub>b</sub> = 0.07780; PVTsim PR '
-                                   'k<sub>ij</sub> matrix.'),
+                                   'P<sub>c</sub><sup>ef</sup>, ω y M del banco PVTsim; '
+                                   'Ω<sub>a</sub> = 0.4572355289, Ω<sub>b</sub> = 0.07780; matriz '
+                                   'k<sub>ij</sub> PR del banco PVTsim.',
+                                   'Peng-Robinson (PVTsim): T<sub>c</sub>, '
+                                   'P<sub>c</sub><sup>ef</sup>, ω and M of the PVTsim bank; '
+                                   'Ω<sub>a</sub> = 0.4572355289, Ω<sub>b</sub> = 0.07780; PR '
+                                   'k<sub>ij</sub> matrix of the PVTsim bank.'),
                                   ('SRK (PVTsim): T<sub>c</sub>, P<sub>c</sub><sup>ef</sup>, ω y M '
-                                   'de PVTsim; Ω<sub>a</sub> y Ω<sub>b</sub> exactos de SRK; '
-                                   'matriz k<sub>ij</sub> de SRK de PVTsim.',
-                                   'SRK (PVTsim): PVTsim T<sub>c</sub>, '
-                                   'P<sub>c</sub><sup>ef</sup>, ω, and M; exact SRK Ω<sub>a</sub> '
-                                   'and Ω<sub>b</sub>; PVTsim SRK k<sub>ij</sub> matrix.')]),
+                                   'del banco PVTsim; Ω<sub>a</sub> y Ω<sub>b</sub> exactos de '
+                                   'SRK; matriz k<sub>ij</sub> SRK del banco PVTsim.',
+                                   'SRK (PVTsim): T<sub>c</sub>, P<sub>c</sub><sup>ef</sup>, ω and '
+                                   'M of the PVTsim bank; exact SRK Ω<sub>a</sub> and '
+                                   'Ω<sub>b</sub>; SRK k<sub>ij</sub> matrix of the PVTsim '
+                                   'bank.')]),
                                 ('p',
                                  'La ecuación seleccionada determina además otros métodos '
-                                 'asociados. Con las ecuaciones de PVTsim la densidad incorpora el '
-                                 'factor de convención f<sub>ρ</sub> (véase «Convención de '
-                                 'unidades de PVTsim») y la identificación de la fase de una raíz '
-                                 'única sigue el criterio de PVTsim, basado en el punto crítico de '
-                                 'la mezcla; con las ecuaciones de HYSYS esa identificación sigue '
-                                 'el criterio de HYSYS (véase el capítulo «Identificación de '
-                                 'fases»). El peso molecular de las fases se calcula con los pesos '
-                                 'moleculares de la base de datos de la ecuación activa.',
+                                 'asociados. Con el banco PVTsim la densidad incorpora el factor '
+                                 'de convención f<sub>ρ</sub> (véase «Convención de unidades del '
+                                 'banco PVTsim») y la fase de un fluido con una sola raíz real se '
+                                 'identifica a partir del punto crítico de la mezcla; con el banco '
+                                 'HYSYS se identifica por la compresibilidad isotérmica y la '
+                                 'composición (véase el capítulo «Identificación de fases»). El '
+                                 'peso molecular de las fases se calcula con los pesos moleculares '
+                                 'del banco de la ecuación activa.',
                                  'The selected equation also determines other associated methods. '
-                                 'With the PVTsim equations the density includes the convention '
-                                 'factor f<sub>ρ</sub> (see “PVTsim unit convention”), and the '
-                                 'phase identification of a single root follows the PVTsim '
-                                 'criterion, based on the mixture critical point; with the HYSYS '
-                                 'equations that identification follows the HYSYS criterion (see '
-                                 'the “Phase identification” chapter). The phase molecular weight '
-                                 "is computed with the molecular weights of the active equation's "
-                                 'database.'),
+                                 'With the PVTsim bank the density includes the convention factor '
+                                 'f<sub>ρ</sub> (see «PVTsim bank unit convention») and the phase '
+                                 'of a fluid with a single real root is identified from the '
+                                 'mixture critical point; with the HYSYS bank it is identified '
+                                 'from the isothermal compressibility and the composition (see the '
+                                 'chapter «Phase identification»). The molecular weight of the '
+                                 'phases is computed with the molecular weights of the bank of the '
+                                 'active equation.'),
                                 ('p',
-                                 'Las diferencias de parámetros entre HYSYS y PVTsim son pequeñas '
-                                 'en los componentes individuales, pero producen diferencias '
-                                 'apreciables en la envolvente de fases, especialmente en la '
-                                 'cercanía del punto crítico de la mezcla. Disponer de ambos '
-                                 'juegos permite reproducir cada simulador de referencia con su '
-                                 'propia base de datos.',
-                                 'The parameter differences between HYSYS and PVTsim are small for '
-                                 'individual components, but they produce noticeable differences '
+                                 'Las diferencias de parámetros entre ambos bancos son pequeñas en '
+                                 'los componentes individuales, pero producen diferencias '
+                                 'apreciables en la envolvente de fases, especialmente cerca del '
+                                 'punto crítico de la mezcla. Por ello, dentro de un mismo estudio '
+                                 'conviene emplear de forma consistente una sola ecuación de '
+                                 'estado.',
+                                 'The parameter differences between the two banks are small for '
+                                 'individual components, but they produce appreciable differences '
                                  'in the phase envelope, especially near the mixture critical '
-                                 'point. Having both sets available allows each reference '
-                                 'simulator to be reproduced with its own database.'),
-                                ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 'point. Within a given study a single equation of state should '
+                                 'therefore be used consistently.')]},
                    {'titulo': ('Forma cúbica en Z y su resolución',
                                'Cubic form in Z and its solution'),
                     'bloques': [('p',
@@ -1090,41 +1117,42 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('ul',
                                  [('Cuando el rol de la fase es conocido (vapor o líquido de un '
                                    'flash bifásico, fases de prueba vapor y líquido del análisis '
-                                   'de estabilidad del flash de hidrocarburos), ThermoPhase asigna '
+                                   'de estabilidad del flash de hidrocarburos), se asigna '
                                    'directamente la raíz mayor a la fase vapor y la raíz menor a '
                                    'la fase líquida.',
-                                   'When the phase role is known (vapor or liquid of a two-phase '
-                                   'flash, vapor and liquid trial phases of the stability analysis '
-                                   'in the water-free engine), ThermoPhase directly assigns the '
-                                   'largest root to the vapor phase and the smallest root to the '
-                                   'liquid phase.'),
+                                   'When the role of the phase is known (vapor or liquid of a '
+                                   'two-phase flash, vapor and liquid trial phases of the '
+                                   'hydrocarbon flash stability analysis), the largest root is '
+                                   'assigned directly to the vapor phase and the smallest root to '
+                                   'the liquid phase.'),
                                   ('En el trazado de la envolvente de fases por el método de '
-                                   'Michelsen, los coeficientes de fugacidad de cada fase se '
+                                   'Michelsen, en la prueba general de estabilidad y en el flash '
+                                   'líquido-líquido, los coeficientes de fugacidad de cada fase se '
                                    'evalúan con la raíz de menor energía de Gibbs residual, de '
-                                   'modo que la selección es válida tanto en la rama de burbuja '
-                                   'como en la de rocío.',
-                                   'In the phase-envelope tracing by the Michelsen method, the '
-                                   'fugacity coefficients of each phase are evaluated with the '
-                                   'root of lowest residual Gibbs energy, so that the selection is '
-                                   'valid on both the bubble and the dew branch.'),
+                                   'modo que la selección es válida en cualquier rama.',
+                                   'In the Michelsen phase-envelope tracing, in the general '
+                                   'stability test and in the liquid-liquid flash, the fugacity '
+                                   'coefficients of each phase are evaluated with the root of '
+                                   'lowest residual Gibbs energy, so that the selection is valid '
+                                   'on any branch.'),
                                   ('En los cálculos con agua, las fases de prueba del análisis de '
                                    'distancia al plano tangente se evalúan con la raíz de menor '
                                    'Σx<sub>i</sub> ln(x<sub>i</sub>φ<sub>i</sub>), y un fluido '
                                    'monofásico se clasifica como vapor o líquido comparando la '
                                    'energía de Gibbs de sus dos raíces.',
-                                   'In the water-containing calculations, the trial phases of the '
-                                   'tangent-plane-distance analysis are evaluated with the root of '
+                                   'In the calculations with water, the trial phases of the '
+                                   'tangent-plane distance analysis are evaluated with the root of '
                                    'lowest Σx<sub>i</sub> ln(x<sub>i</sub>φ<sub>i</sub>), and a '
                                    'single-phase fluid is classified as vapor or liquid by '
                                    'comparing the Gibbs energy of its two roots.'),
                                   ('Cuando existe una sola raíz real, el criterio de Gibbs no '
                                    'discrimina la fase; su identificación como vapor o líquido '
-                                   'sigue el criterio de HYSYS o de PVTsim según la ecuación '
-                                   'activa (véase el capítulo «Identificación de fases»).',
-                                   'When a single real root exists, the Gibbs criterion does not '
+                                   'sigue el criterio asociado al banco de la ecuación activa '
+                                   '(véase el capítulo «Identificación de fases»).',
+                                   'When there is a single real root, the Gibbs criterion does not '
                                    'discriminate the phase; its identification as vapor or liquid '
-                                   'follows the HYSYS or PVTsim criterion according to the active '
-                                   'equation (see the “Phase identification” chapter).')]),
+                                   'follows the criterion associated with the bank of the active '
+                                   'equation (see the chapter «Phase identification»).')]),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Michelsen, M.L. y Mollerup, J.M. (2007). <em>Thermodynamic '
@@ -1367,77 +1395,71 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('p',
                                  'Cada una de las cuatro ecuaciones de estado tiene su propia '
                                  'matriz de trece por trece componentes, ya que los coeficientes '
-                                 'dependen tanto del simulador de referencia como de la forma de '
-                                 'la ecuación.',
+                                 'dependen del banco de parámetros y de la forma de la ecuación.',
                                  'Each of the four equations of state has its own '
-                                 'thirteen-by-thirteen component matrix, because the coefficients '
-                                 'depend both on the reference simulator and on the form of the '
-                                 'equation.'),
-                                ('h3', 'Base de datos de HYSYS', 'HYSYS database'),
+                                 'thirteen-by-thirteen matrix, since the coefficients depend on '
+                                 'the parameter bank and on the form of the equation.'),
+                                ('h3', 'Matrices del banco HYSYS', 'HYSYS bank matrices'),
                                 ('p',
-                                 'Las matrices de PR (HYSYS) y SRK (HYSYS) reproducen las que '
-                                 'Aspen HYSYS reporta en su paquete de fluidos para cada método. '
-                                 'En la matriz de PR, el par N₂-CO₂ vale −0.02, los pares '
-                                 'N₂-hidrocarburo varían entre 0.036 (N₂-C1) y 0.149 (N₂-nC6), los '
-                                 'pares CO₂-hidrocarburo entre 0.10 y 0.135, y los pares '
-                                 'hidrocarburo-hidrocarburo son todos no nulos y pequeños, '
+                                 'En la matriz PR del banco HYSYS, el par N₂-CO₂ vale −0.02, los '
+                                 'pares N₂-hidrocarburo varían entre 0.036 (N₂-C1) y 0.149 '
+                                 '(N₂-nC6), los pares CO₂-hidrocarburo entre 0.10 y 0.135, y los '
+                                 'pares hidrocarburo-hidrocarburo son todos no nulos y pequeños, '
                                  'crecientes con la diferencia de tamaño molecular (del orden de '
                                  '10<sup>−6</sup> a 0.039, este último para C1-nC9). La matriz de '
                                  'SRK comparte prácticamente los valores hidrocarburo-hidrocarburo '
                                  'y difiere en las filas de N₂ y CO₂.',
-                                 'The PR (HYSYS) and SRK (HYSYS) matrices reproduce those that '
-                                 'Aspen HYSYS reports in its fluid package for each method. In the '
-                                 'PR matrix, the N₂-CO₂ pair is −0.02, the N₂-hydrocarbon pairs '
-                                 'range from 0.036 (N₂-C1) to 0.149 (N₂-nC6), the CO₂-hydrocarbon '
-                                 'pairs from 0.10 to 0.135, and the hydrocarbon-hydrocarbon pairs '
-                                 'are all nonzero and small, increasing with the molecular size '
-                                 'difference (from the order of 10<sup>−6</sup> up to 0.039, the '
-                                 'latter for C1-nC9). The SRK matrix shares essentially the same '
-                                 'hydrocarbon-hydrocarbon values and differs in the N₂ and CO₂ '
-                                 'rows.'),
-                                ('h3', 'Base de datos de PVTsim', 'PVTsim database'),
+                                 'In the PR matrix of the HYSYS bank, the N₂-CO₂ pair is −0.02, '
+                                 'the N₂-hydrocarbon pairs range from 0.036 (N₂-C1) to 0.149 '
+                                 '(N₂-nC6), the CO₂-hydrocarbon pairs from 0.10 to 0.135, and the '
+                                 'hydrocarbon-hydrocarbon pairs are all nonzero and small, '
+                                 'increasing with the molecular size difference (from the order of '
+                                 '10<sup>−6</sup> up to 0.039, the latter for C1-nC9). The SRK '
+                                 'matrix shares essentially the same hydrocarbon-hydrocarbon '
+                                 'values and differs in the N₂ and CO₂ rows.'),
+                                ('h3', 'Matrices del banco PVTsim', 'PVTsim bank matrices'),
                                 ('p',
-                                 'Las matrices de PR (PVTsim) y SRK (PVTsim) provienen de la base '
-                                 'de datos de PVTsim, basada en la recopilación de Knapp y '
-                                 'colaboradores (1982), con nC7, nC8 y nC9 tratados como '
-                                 'n-alcanos. ThermoPhase almacena su triangular inferior y '
-                                 'construye la matriz simétrica completa. En PR (PVTsim) el par '
-                                 'N₂-CO₂ vale −0.017, los pares N₂-hidrocarburo entre 0.031 y '
-                                 '0.150, y los pares CO₂-hidrocarburo 0.12 hasta nC6 y 0.10 desde '
-                                 'nC7. Los pares entre hidrocarburos livianos (C1 a nC6) son '
-                                 'nulos; solo tienen valores distintos de cero algunos pares con '
-                                 'nC7, nC8 y nC9 (por ejemplo, C1-nC7 = 0.0352, C1-nC8 = 0.0496 y '
-                                 'C1-nC9 = 0.0474).',
-                                 'The PR (PVTsim) and SRK (PVTsim) matrices come from the PVTsim '
-                                 'database, based on the compilation by Knapp et al. (1982), with '
-                                 'nC7, nC8, and nC9 treated as n-alkanes. ThermoPhase stores their '
-                                 'lower triangle and builds the complete symmetric matrix. In PR '
-                                 '(PVTsim) the N₂-CO₂ pair is −0.017, the N₂-hydrocarbon pairs '
-                                 'range from 0.031 to 0.150, and the CO₂-hydrocarbon pairs are '
-                                 '0.12 up to nC6 and 0.10 from nC7 onward. Pairs among light '
-                                 'hydrocarbons (C1 to nC6) are zero; only some pairs with nC7, '
-                                 'nC8, and nC9 have nonzero values (for example, C1-nC7 = 0.0352, '
-                                 'C1-nC8 = 0.0496, and C1-nC9 = 0.0474).'),
+                                 'Las matrices PR y SRK del banco PVTsim se basan en la '
+                                 'recopilación de Knapp y colaboradores (1982), con nC7, nC8 y nC9 '
+                                 'tratados como n-alcanos. ThermoPhase almacena su triangular '
+                                 'inferior y construye la matriz simétrica completa. En PR '
+                                 '(PVTsim) el par N₂-CO₂ vale −0.017, los pares N₂-hidrocarburo '
+                                 'entre 0.031 y 0.150, y los pares CO₂-hidrocarburo 0.12 hasta nC6 '
+                                 'y 0.10 desde nC7. Los pares entre hidrocarburos livianos (C1 a '
+                                 'nC6) son nulos; solo tienen valores distintos de cero algunos '
+                                 'pares con nC7, nC8 y nC9 (por ejemplo, C1-nC7 = 0.0352, C1-nC8 = '
+                                 '0.0496 y C1-nC9 = 0.0474).',
+                                 'The PR and SRK matrices of the PVTsim bank are based on the '
+                                 'compilation by Knapp et al. (1982), with nC7, nC8, and nC9 '
+                                 'treated as n-alkanes. ThermoPhase stores their lower triangle '
+                                 'and builds the complete symmetric matrix. In PR (PVTsim) the '
+                                 'N₂-CO₂ pair is −0.017, the N₂-hydrocarbon pairs range from 0.031 '
+                                 'to 0.150, and the CO₂-hydrocarbon pairs are 0.12 up to nC6 and '
+                                 '0.10 from nC7 onward. Pairs among light hydrocarbons (C1 to nC6) '
+                                 'are zero; only some pairs with nC7, nC8, and nC9 have nonzero '
+                                 'values (for example, C1-nC7 = 0.0352, C1-nC8 = 0.0496, and '
+                                 'C1-nC9 = 0.0474).'),
                                 ('h3', 'Pares con agua', 'Water pairs'),
                                 ('p',
                                  'Cuando el agua está activa, el cálculo de catorce componentes '
                                  'forma su matriz con la matriz por defecto de la ecuación activa '
                                  'para los trece primeros componentes y la fila del agua de la '
-                                 'misma familia de ecuaciones. En HYSYS (PR) los valores '
+                                 'misma familia de ecuaciones. En el banco HYSYS (PR) los valores '
                                  'agua-hidrocarburo son del orden de 0.5, con −0.3156 para N₂ y '
-                                 '0.0445 para CO₂; en PVTsim (PR) son 0.45 a 0.53, con −0.48 para '
-                                 'N₂ y 0.0952 para CO₂. Estos coeficientes clásicos solo '
-                                 'intervienen en los pares del agua con nC7, nC8 y nC9; los pares '
-                                 'del agua con N₂ a nC6 se calculan con la regla de Huron-Vidal.',
+                                 '0.0445 para CO₂; en el banco PVTsim (PR) son 0.45 a 0.53, con '
+                                 '−0.48 para N₂ y 0.0952 para CO₂. Estos coeficientes clásicos '
+                                 'solo intervienen en los pares del agua con nC7, nC8 y nC9; los '
+                                 'pares del agua con N₂ a nC6 se calculan con la regla de '
+                                 'Huron-Vidal.',
                                  'When water is active, the fourteen-component calculation builds '
                                  'its matrix from the default matrix of the active equation for '
                                  'the first thirteen components and the water row of the same '
-                                 'equation family. In HYSYS (PR) the water-hydrocarbon values are '
-                                 'of the order of 0.5, with −0.3156 for N₂ and 0.0445 for CO₂; in '
-                                 'PVTsim (PR) they are 0.45 to 0.53, with −0.48 for N₂ and 0.0952 '
-                                 'for CO₂. These classical coefficients only enter the water pairs '
-                                 'with nC7, nC8, and nC9; the water pairs with N₂ to nC6 are '
-                                 'computed with the Huron-Vidal rule.'),
+                                 'equation family. In the HYSYS bank (PR) the water-hydrocarbon '
+                                 'values are of the order of 0.5, with −0.3156 for N₂ and 0.0445 '
+                                 'for CO₂; in the PVTsim bank (PR) they are 0.45 to 0.53, with '
+                                 '−0.48 for N₂ and 0.0952 for CO₂. These classical coefficients '
+                                 'only enter the water pairs with nC7, nC8, and nC9; the water '
+                                 'pairs with N₂ to nC6 are computed with the Huron-Vidal rule.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Knapp, H., Döring, R., Oellrich, L., Plöcker, U. y Prausnitz, '
@@ -1447,48 +1469,43 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Knapp, H., Döring, R., Oellrich, L., Plöcker, U. and Prausnitz, '
                                  'J.M. (1982). <em>Vapor-Liquid Equilibria for Mixtures of Low '
                                  'Boiling Substances</em>. DECHEMA Chemistry Data Series, vol. VI. '
-                                 'DECHEMA.'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 'DECHEMA.')]},
                    {'titulo': ('Edición de los coeficientes de interacción',
                                'Editing the interaction coefficients'),
                     'bloques': [('p',
                                  'La ventana de parámetros de la ecuación de estado presenta dos '
                                  'tablas: las propiedades críticas y el factor acéntrico de la '
                                  'ecuación del contexto, y la matriz de coeficientes de '
-                                 'interacción binaria. La primera es de solo lectura y se expresa '
-                                 'en el sistema de unidades activo; la segunda es editable.',
+                                 'interacción binaria. La primera es de solo lectura en esta '
+                                 'ventana (los parámetros de componente se modifican en la hoja de '
+                                 'cada componente, véase «Hoja de componente») y se expresa en el '
+                                 'sistema de unidades activo; la segunda es editable.',
                                  'The equation-of-state parameters window presents two tables: the '
                                  'critical properties and acentric factor of the equation in '
                                  'context, and the binary interaction coefficient matrix. The '
-                                 'first is read-only and is expressed in the active unit system; '
-                                 'the second is editable.'),
+                                 'first is read-only in this window (component parameters are '
+                                 'modified in the sheet of each component, see «Component property '
+                                 'sheet») and is expressed in the active unit system; the second '
+                                 'is editable.'),
                                 ('ul',
                                  [('La matriz activa es la global o la propia del fluido '
                                    'seleccionado; cada fluido conserva una matriz independiente.',
                                    'The active matrix is either the global one or that of the '
                                    'selected fluid; each fluid keeps an independent matrix.'),
                                   ('Un selector de fuente permite cargar la matriz por defecto de '
-                                   'cualquiera de las cuatro ecuaciones (PR o SRK de HYSYS, PR o '
-                                   'SRK de PVTsim).',
+                                   'cualquiera de las cuatro ecuaciones de estado.',
                                    'A source selector allows the default matrix of any of the four '
-                                   'equations (HYSYS PR or SRK, PVTsim PR or SRK) to be loaded.'),
-                                  ('Al modificar un coeficiente k<sub>ij</sub>, ThermoPhase '
-                                   'actualiza automáticamente su simétrico k<sub>ji</sub>; la '
-                                   'diagonal no es editable.',
-                                   'When a coefficient k<sub>ij</sub> is modified, ThermoPhase '
-                                   'automatically updates its symmetric counterpart '
-                                   'k<sub>ji</sub>; the diagonal is not editable.'),
-                                  ('El comando de restauración devuelve la matriz a los valores '
-                                   'por defecto de la fuente seleccionada.',
-                                   'The restore command returns the matrix to the default values '
-                                   'of the selected source.'),
+                                   'equations of state to be loaded.'),
+                                  ('Al modificar un coeficiente k<sub>ij</sub> se actualiza '
+                                   'automáticamente su simétrico k<sub>ji</sub>; la diagonal no es '
+                                   'editable.',
+                                   'When a coefficient k<sub>ij</sub> is modified, its symmetric '
+                                   'counterpart k<sub>ji</sub> is updated automatically; the '
+                                   'diagonal is not editable.'),
+                                  ('El comando Restaurar valores originales devuelve la matriz a '
+                                   'los valores por defecto de la fuente seleccionada.',
+                                   'The Restore original values command returns the matrix to the '
+                                   'default values of the selected source.'),
                                   ('Con el agua activa se muestran su fila y su columna con los '
                                    'coeficientes clásicos agua-hidrocarburo de la ecuación del '
                                    'contexto, como valores informativos de solo lectura, ya que '
@@ -1504,23 +1521,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'hidden.')]),
                                 ('p',
                                  'La matriz editada se utiliza en los cálculos sin agua: flash '
-                                 'bifásico, envolventes, puntos de saturación y demás funciones '
-                                 'que evalúan la ecuación de estado de trece componentes. Los '
-                                 'cálculos con agua emplean la matriz por defecto de la ecuación '
-                                 'activa, y los parámetros de la regla de Huron-Vidal no se editan '
-                                 'desde la interfaz.',
+                                 'bifásico, envolventes, puntos de saturación, factores '
+                                 'volumétricos y demás funciones que evalúan la ecuación de estado '
+                                 'de trece componentes. Los cálculos con agua emplean la matriz '
+                                 'por defecto de la ecuación activa, y los parámetros de la regla '
+                                 'de Huron-Vidal no se editan desde la interfaz.',
                                  'The edited matrix is used in the water-free calculations: '
-                                 'two-phase flash, envelopes, saturation points, and the other '
-                                 'functions that evaluate the thirteen-component equation of '
-                                 'state. The water-containing calculations use the default matrix '
-                                 'of the active equation, and the Huron-Vidal rule parameters are '
-                                 'not edited from the interface.'),
-                                ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.')]},
+                                 'two-phase flash, envelopes, saturation points, formation volume '
+                                 'factors and the other functions that evaluate the '
+                                 'thirteen-component equation of state. Calculations with water '
+                                 'use the default matrix of the active equation, and the '
+                                 'Huron-Vidal parameters are not edited from the interface.')]},
                    {'titulo': ('Regla de mezcla de Huron-Vidal para agua',
                                'Huron-Vidal mixing rule for water'),
                     'bloques': [('p',
@@ -1531,15 +1542,14 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Huron-Vidal, que iguala la energía de Gibbs de exceso de la '
                                  'ecuación de estado a presión infinita con la de un modelo de '
                                  'composición local del tipo NRTL, con los parámetros publicados '
-                                 'por Pedersen y colaboradores (2001) y empleados por PVTsim.',
+                                 'por Pedersen y colaboradores (2001).',
                                  'The classical rule with a constant k<sub>ij</sub> does not '
                                  'simultaneously represent the solubility of hydrocarbons in the '
                                  'aqueous phase and that of water in the hydrocarbon phases. For '
                                  'the water-hydrocarbon pairs ThermoPhase applies the Huron-Vidal '
                                  'rule, which equates the equation-of-state excess Gibbs energy at '
                                  'infinite pressure with that of an NRTL-type local-composition '
-                                 'model, with the parameters published by Pedersen et al. (2001) '
-                                 'and used by PVTsim.'),
+                                 'model, with the parameters published by Pedersen et al. (2001).'),
                                 ('eq',
                                  'a_m = b_m\\left[\\sum_{i} x_i\\,\\frac{a_i}{b_i} - '
                                  '\\frac{G^{E}_{\\infty}}{\\lambda}\\right] \\qquad b_m = '
@@ -1610,19 +1620,19 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  '3.26 and −6.53, respectively, and α = 0.1444.'),
                                 ('h3', 'Pares con regla clásica', 'Pairs with the classical rule'),
                                 ('p',
-                                 'Los pares del agua con nC7, nC8 y nC9 tienen α = 0 en la base de '
-                                 'datos de PVTsim y se tratan con la regla clásica, usando el '
+                                 'Los pares del agua con nC7, nC8 y nC9 tienen α = 0 en la tabla '
+                                 'de parámetros y se tratan con la regla clásica, usando el '
                                  'k<sub>ij</sub> agua-hidrocarburo de la fila del agua de la '
-                                 'ecuación activa (HYSYS o PVTsim). Todos los pares sin agua '
+                                 'ecuación activa. Todos los pares sin agua '
                                  '(hidrocarburo-hidrocarburo e inertes) usan igualmente la regla '
                                  'clásica, con la matriz k<sub>ij</sub> por defecto de la ecuación '
                                  'activa. Para estos pares la energía de interacción se construye '
                                  'de modo que la regla de Huron-Vidal reproduzca exactamente la '
                                  'regla cuadrática:',
-                                 'The water pairs with nC7, nC8, and nC9 have α = 0 in the PVTsim '
-                                 'database and are treated with the classical rule, using the '
-                                 'water-hydrocarbon k<sub>ij</sub> from the water row of the '
-                                 'active equation (HYSYS or PVTsim). All pairs without water '
+                                 'The water pairs with nC7, nC8, and nC9 have α = 0 in the '
+                                 'parameter table and are treated with the classical rule, using '
+                                 'the water-hydrocarbon k<sub>ij</sub> from the water row of the '
+                                 'active equation. All pairs without water '
                                  '(hydrocarbon-hydrocarbon and inerts) likewise use the classical '
                                  'rule, with the default k<sub>ij</sub> matrix of the active '
                                  'equation. For these pairs the interaction energy is built so '
@@ -1648,14 +1658,13 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'agua (flash trifásico, envolventes con agua, puntos de '
                                    'saturación con agua, hidratos, contenido de agua y análisis de '
                                    'sensibilidad), con cualquiera de las cuatro ecuaciones de '
-                                   'estado; con las de HYSYS se aplica sobre las propiedades '
-                                   'críticas y los k<sub>ij</sub> de HYSYS.',
-                                   'The Huron-Vidal rule is applied in all water-containing '
-                                   'calculations (three-phase flash, envelopes with water, '
-                                   'saturation points with water, hydrates, water content, and '
-                                   'sensitivity analysis), with any of the four equations of '
-                                   'state; with the HYSYS equations it is applied on top of the '
-                                   'HYSYS critical properties and k<sub>ij</sub>.'),
+                                   'estado; cada banco aporta sus propias propiedades críticas y '
+                                   'coeficientes k<sub>ij</sub>.',
+                                   'The Huron-Vidal rule is applied in all calculations with water '
+                                   '(three-phase flash, envelopes with water, saturation points '
+                                   'with water, hydrates, water content and sensitivity analysis), '
+                                   'with any of the four equations of state; each bank supplies '
+                                   'its own critical properties and k<sub>ij</sub> coefficients.'),
                                   ('Los parámetros G<sup>(0)</sup>, G<sup>(T)</sup> y α se toman '
                                    'de la tabla de PR o de SRK según la familia de la ecuación '
                                    'activa.',
@@ -1930,23 +1939,22 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementation in ThermoPhase'),
                                 ('p',
                                  'En el flash de hidrocarburos, los valores de Wilson se calculan '
-                                 'con las propiedades críticas y los factores acéntricos de la '
-                                 'base de componentes de HYSYS para todas las variantes de '
-                                 'ecuación de estado, dado que solo constituyen el punto de '
-                                 'partida. Sirven como semilla de los dos juegos de constantes del '
-                                 'análisis de estabilidad y, cuando dicho análisis declara estable '
-                                 'la mezcla, también como valores iniciales del flash. En el flash '
-                                 'trifásico, la estimación de Wilson usa las propiedades de los 14 '
-                                 'componentes de la ecuación de estado seleccionada.',
+                                 'con las propiedades críticas y los factores acéntricos del banco '
+                                 'PR (HYSYS) para las cuatro variantes de ecuación de estado, dado '
+                                 'que solo constituyen el punto de partida. Sirven como semilla de '
+                                 'los dos juegos de constantes del análisis de estabilidad y, '
+                                 'cuando dicho análisis declara estable la mezcla, también como '
+                                 'valores iniciales del flash. En el flash trifásico, la '
+                                 'estimación de Wilson usa las propiedades de los 14 componentes '
+                                 'de la ecuación de estado seleccionada.',
                                  'In the hydrocarbon flash, the Wilson values are computed with '
-                                 'the critical properties and acentric factors of the HYSYS '
-                                 'component database for all equation-of-state variants, since '
-                                 'they are only the starting point. They seed the two sets of '
-                                 'ratios of the stability analysis and, when that analysis '
-                                 'declares the mixture stable, also serve as the initial values of '
-                                 'the flash. In the three-phase flash, the Wilson estimate uses '
-                                 'the properties of the 14 components of the selected equation of '
-                                 'state.'),
+                                 'the critical properties and acentric factors of the PR (HYSYS) '
+                                 'bank for the four equation-of-state variants, since they are '
+                                 'only the starting point. They seed the two sets of ratios of the '
+                                 'stability analysis and, when that analysis declares the mixture '
+                                 'stable, also serve as the initial values of the flash. In the '
+                                 'three-phase flash, the Wilson estimate uses the properties of '
+                                 'the 14 components of the selected equation of state.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Wilson, G.M. (1969). A modified Redlich-Kwong equation of state, '
@@ -2381,21 +2389,27 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Tratamiento posterior del resultado',
                                  'Post-processing of the result'),
                                 ('p',
-                                 'Si el flash converge a una sola fase y la ecuación de estado '
-                                 'evaluada con la composición global tiene una sola raíz real, la '
-                                 'etiqueta de la fase se determina con el criterio de HYSYS o de '
-                                 'PVTsim según la variante de ecuación de estado activa; si '
-                                 'converge a dos fases y el vapor resulta con mayor peso molecular '
-                                 'que el líquido, las etiquetas de las fases se intercambian. '
-                                 'Ambos tratamientos se describen en el capítulo «Identificación '
-                                 'de fases».',
-                                 'If the flash converges to a single phase and the equation of '
-                                 'state evaluated with the overall composition has a single real '
-                                 'root, the phase label is determined with the HYSYS or PVTsim '
-                                 'criterion according to the active equation-of-state variant; if '
-                                 'it converges to two phases and the vapor has a higher molecular '
-                                 'weight than the liquid, the phase labels are swapped. Both '
-                                 'treatments are described in the “Phase identification” chapter.'),
+                                 'Si el flash converge a una sola fase y la mezcla es asimétrica, '
+                                 'se verifica la separación líquido-líquido con la prueba general '
+                                 'de estabilidad (véase «Separación líquido-líquido en mezclas '
+                                 'asimétricas»). Si el resultado sigue siendo monofásico y la '
+                                 'ecuación de estado evaluada con la composición global tiene una '
+                                 'sola raíz real, la etiqueta de la fase se determina con el '
+                                 'criterio asociado al banco de la ecuación activa; si converge a '
+                                 'dos fases y el vapor resulta con mayor peso molecular que el '
+                                 'líquido, las etiquetas de las fases se intercambian. Ambos '
+                                 'tratamientos se describen en el capítulo «Identificación de '
+                                 'fases».',
+                                 'If the flash converges to a single phase and the mixture is '
+                                 'asymmetric, liquid-liquid splitting is checked with the general '
+                                 'stability test (see «Liquid-liquid splitting in asymmetric '
+                                 'mixtures»). If the result is still single-phase and the equation '
+                                 'of state evaluated with the overall composition has a single '
+                                 'real root, the phase label is determined with the criterion '
+                                 'associated with the bank of the active equation; if it converges '
+                                 'to two phases and the vapor has a higher molecular weight than '
+                                 'the liquid, the phase labels are swapped. Both treatments are '
+                                 'described in the chapter «Phase identification».'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Muskat, M. y McDowell, J.M. (1949). An electrical computer for '
@@ -2418,6 +2432,129 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Pedersen, K.S., Christensen, P.L. and Shaikh, J.A. (2015). '
                                  '<em>Phase Behavior of Petroleum Reservoir Fluids</em>, 2nd ed. '
                                  'CRC Press.')]},
+                   {'titulo': ('Separación líquido-líquido en mezclas asimétricas',
+                               'Liquid-liquid splitting in asymmetric mixtures'),
+                    'bloques': [('p',
+                                 'En mezclas formadas por componentes muy livianos y componentes '
+                                 'pesados, como el metano con el n-nonano, la ecuación de estado '
+                                 'predice que a temperatura baja el líquido se separa en dos fases '
+                                 'líquidas: una rica en el componente liviano y otra rica en el '
+                                 'pesado. El análisis de estabilidad del flash PT evalúa la fase '
+                                 'de prueba de vapor con la raíz de vapor y la de líquido con la '
+                                 'raíz de líquido; esa formulación detecta las separaciones '
+                                 'líquido-vapor, pero puede declarar un líquido único cuando la '
+                                 'separación es entre dos líquidos. Por ello, en las mezclas '
+                                 'asimétricas el resultado monofásico del flash se verifica con '
+                                 'una prueba general de estabilidad.',
+                                 'In mixtures of very light and heavy components, such as methane '
+                                 'with n-nonane, the equation of state predicts that at low '
+                                 'temperature the liquid splits into two liquid phases: one rich '
+                                 'in the light component and one rich in the heavy component. The '
+                                 'stability analysis of the PT flash evaluates the vapor trial '
+                                 'phase with the vapor root and the liquid trial phase with the '
+                                 'liquid root; this formulation detects vapor-liquid splits, but '
+                                 'may declare a single liquid when the split is between two '
+                                 'liquids. Therefore, in asymmetric mixtures the single-phase '
+                                 'result of the flash is verified with a general stability test.'),
+                                ('h3', 'Criterio de asimetría', 'Asymmetry criterion'),
+                                ('eq',
+                                 '\\frac{\\max_{i}\\,T_{c,i}}{\\min_{i}\\,T_{c,i}} > 2.4 \\qquad '
+                                 '(z_i > 10^{-10})'),
+                                ('p',
+                                 'donde T<sub>c,i</sub> es la temperatura crítica de los '
+                                 'componentes presentes en la alimentación. Solo las mezclas que '
+                                 'cumplen esta condición pueden presentar dos fases líquidas en el '
+                                 'intervalo de operación; en las demás la verificación no se '
+                                 'ejecuta y el resultado del flash no cambia.',
+                                 'where T<sub>c,i</sub> is the critical temperature of the '
+                                 'components present in the feed. Only mixtures that meet this '
+                                 'condition can exhibit two liquid phases in the operating range; '
+                                 'for the others the check is not performed and the flash result '
+                                 'is unchanged.'),
+                                ('h3', 'Prueba general de estabilidad', 'General stability test'),
+                                ('p',
+                                 'Se aplica la distancia al plano tangente modificada de '
+                                 'Michelsen, evaluando cada composición —la alimentación y cada '
+                                 'fase de prueba— con la raíz de la cúbica de menor energía de '
+                                 'Gibbs:',
+                                 "Michelsen's modified tangent-plane distance is applied, "
+                                 'evaluating each composition —the feed and each trial phase— with '
+                                 'the cubic root of lowest Gibbs energy:'),
+                                ('eq',
+                                 'tm = 1 + \\sum_i W_i\\left[\\ln W_i + \\ln\\phi_i(w) - \\ln z_i '
+                                 '- \\ln\\phi_i(z) - 1\\right]'),
+                                ('p',
+                                 'donde W<sub>i</sub> son los moles de la fase de prueba y w = '
+                                 'W/ΣW su composición. Se usan cuatro fases de prueba iniciales: '
+                                 'las de Wilson de tipo vapor (z<sub>i</sub>K<sub>i</sub>) y de '
+                                 'tipo líquido (z<sub>i</sub>/K<sub>i</sub>), el componente más '
+                                 'pesado casi puro y el más liviano casi puro (fracción 1 para el '
+                                 'componente dominante y 10<sup>−3</sup> para los demás '
+                                 'presentes). Cada una se itera por sustitución sucesiva sobre ln '
+                                 'W hasta 10<sup>−10</sup> (máximo 300 iteraciones); una solución '
+                                 'con max|ln(w<sub>i</sub>/z<sub>i</sub>)| &lt; 10<sup>−4</sup> es '
+                                 'trivial. La mezcla es inestable si alguna fase de prueba da tm '
+                                 '&lt; −10<sup>−8</sup>, y la de menor tm proporciona la '
+                                 'estimación de la fase incipiente.',
+                                 'where W<sub>i</sub> are the moles of the trial phase and w = '
+                                 'W/ΣW its composition. Four initial trial phases are used: the '
+                                 'Wilson vapor-type (z<sub>i</sub>K<sub>i</sub>) and liquid-type '
+                                 '(z<sub>i</sub>/K<sub>i</sub>) phases, the nearly pure heaviest '
+                                 'component and the nearly pure lightest component (fraction 1 for '
+                                 'the dominant component and 10<sup>−3</sup> for the other present '
+                                 'components). Each is iterated by successive substitution on ln W '
+                                 'to 10<sup>−10</sup> (maximum 300 iterations); a solution with '
+                                 'max|ln(w<sub>i</sub>/z<sub>i</sub>)| &lt; 10<sup>−4</sup> is '
+                                 'trivial. The mixture is unstable if any trial phase gives tm '
+                                 '&lt; −10<sup>−8</sup>, and the one with the lowest tm provides '
+                                 'the estimate of the incipient phase.'),
+                                ('h3', 'Flash líquido-líquido', 'Liquid-liquid flash'),
+                                ('p',
+                                 'Cuando la prueba detecta inestabilidad se resuelve un flash '
+                                 'bifásico por sustitución sucesiva con raíces de mínima energía '
+                                 'de Gibbs en ambas fases. El cálculo arranca con una fase igual a '
+                                 'la alimentación y la otra igual a la fase de prueba, y en cada '
+                                 'iteración actualiza las constantes a partir de las fugacidades:',
+                                 'When the test detects instability, a two-phase flash is solved '
+                                 'by successive substitution with minimum-Gibbs-energy roots in '
+                                 'both phases. The calculation starts with one phase equal to the '
+                                 'feed and the other equal to the trial phase, and at each '
+                                 'iteration updates the ratios from the fugacities:'),
+                                ('eq', '\\ln K_i = \\ln\\phi_i(x) - \\ln\\phi_i(y)'),
+                                ('p',
+                                 'donde x e y son las composiciones de las dos fases. La fracción '
+                                 'de fase se obtiene de la ecuación de Rachford-Rice resuelta por '
+                                 'bisección en [0, 1] y la iteración converge cuando el cambio de '
+                                 'ln K<sub>i</sub> es menor que 10<sup>−12</sup> (máximo 500 '
+                                 'iteraciones). Se rechaza la solución trivial (max|ln '
+                                 'K<sub>i</sub>| &lt; 10<sup>−4</sup>). Las propiedades de ambas '
+                                 'fases se calculan con la raíz de mínima energía de Gibbs; la '
+                                 'fase de menor peso molecular se presenta en la columna de la '
+                                 'fase liviana y la otra en la columna del líquido, y el resultado '
+                                 'de estabilidad se informa como separación líquido-líquido.',
+                                 'where x and y are the compositions of the two phases. The phase '
+                                 'fraction is obtained from the Rachford-Rice equation solved by '
+                                 'bisection in [0, 1] and the iteration converges when the change '
+                                 'of ln K<sub>i</sub> is below 10<sup>−12</sup> (maximum 500 '
+                                 'iterations). The trivial solution (max|ln K<sub>i</sub>| &lt; '
+                                 '10<sup>−4</sup>) is rejected. The properties of both phases are '
+                                 'computed with the minimum-Gibbs-energy root; the phase with the '
+                                 'lower molecular weight is presented in the light-phase column '
+                                 'and the other in the liquid column, and the stability result is '
+                                 'reported as liquid-liquid splitting.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'Michelsen, M.L. (1982). The isothermal flash problem. Part I. '
+                                 'Stability. <em>Fluid Phase Equilibria</em>, 9(1), 1–19.',
+                                 'Michelsen, M.L. (1982). The isothermal flash problem. Part I. '
+                                 'Stability. <em>Fluid Phase Equilibria</em>, 9(1), 1–19.'),
+                                ('p',
+                                 'Michelsen, M.L. y Mollerup, J.M. (2007). <em>Thermodynamic '
+                                 'Models: Fundamentals and Computational Aspects</em>, 2.ª ed. '
+                                 'Tie-Line Publications.',
+                                 'Michelsen, M.L. and Mollerup, J.M. (2007). <em>Thermodynamic '
+                                 'Models: Fundamentals and Computational Aspects</em>, 2nd ed. '
+                                 'Tie-Line Publications.')]},
                    {'titulo': ('Fracciones másicas y propiedades de las fases',
                                'Phase mass fractions and properties'),
                     'bloques': [('p',
@@ -2436,13 +2573,12 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'donde M<sub>V</sub>, M<sub>L</sub> y M<sub>z</sub> son los pesos '
                                  'moleculares del vapor, del líquido y de la alimentación '
                                  '(lb/lbmol) y M<sub>i</sub> el peso molecular del componente i, '
-                                 'tomado de la base de datos de la ecuación de estado activa '
-                                 '(HYSYS o PVTsim).',
+                                 'tomado del banco de parámetros de la ecuación de estado activa.',
                                  'where M<sub>V</sub>, M<sub>L</sub> and M<sub>z</sub> are the '
                                  'molecular weights of the vapor, the liquid and the feed '
                                  '(lb/lbmol) and M<sub>i</sub> the molecular weight of component '
-                                 'i, taken from the database of the active equation of state '
-                                 '(HYSYS or PVTsim).'),
+                                 'i, taken from the parameter bank of the active equation of '
+                                 'state.'),
                                 ('eq',
                                  'w_V = \\frac{\\beta_V\\,M_V}{\\beta_V\\,M_V + \\beta_L\\,M_L} '
                                  '\\qquad w_L = \\frac{\\beta_L\\,M_L}{\\beta_V\\,M_V + '
@@ -2464,16 +2600,8 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  '«Viscosidad».',
                                  'The density, viscosity, and other properties of each phase are '
                                  'then computed with the methods described in the “Volumetric '
-                                 'properties”, “Enthalpy and entropy”, and “Viscosity” chapters.'),
-                                ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.')]}]},
+                                 'properties”, “Enthalpy and entropy”, and “Viscosity” '
+                                 'chapters.')]}]},
  {'titulo': ('Flash trifásico con agua', 'Three-phase flash with water'),
   'subsecciones': [{'titulo': ('Ámbito de aplicación', 'Scope'),
                     'bloques': [('p',
@@ -2503,23 +2631,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'three-phase flash.'),
                                 ('p',
                                  'El procedimiento es el mismo para las cuatro variantes de '
-                                 'ecuación de estado (PR y SRK con base HYSYS, PR y SRK con base '
-                                 'PVTsim): la regla de mezcla de Huron-Vidal para los pares del '
-                                 'agua con N₂ hasta n-hexano y la regla clásica para los demás '
-                                 'pares, que es la combinación empleada por PVTsim. Cada familia '
-                                 'conserva sus propias propiedades de componente y sus '
-                                 'coeficientes de interacción binaria.',
+                                 'ecuación de estado: regla de mezcla de Huron-Vidal para los '
+                                 'pares del agua con N₂ hasta n-hexano y regla clásica para los '
+                                 'demás pares. Cada variante conserva las propiedades de '
+                                 'componente y los coeficientes de interacción binaria de su banco '
+                                 'de parámetros.',
                                  'The procedure is the same for the four equation-of-state '
-                                 'variants (PR and SRK with the HYSYS database, PR and SRK with '
-                                 'the PVTsim database): the Huron-Vidal mixing rule for the pairs '
-                                 'of water with N₂ through n-hexane and the classical rule for the '
-                                 'remaining pairs, which is the combination used by PVTsim. Each '
-                                 'family keeps its own component properties and binary interaction '
-                                 'coefficients.'),
+                                 'variants: Huron-Vidal mixing rule for the pairs of water with N₂ '
+                                 'through n-hexane and classical rule for the remaining pairs. '
+                                 'Each variant keeps the component properties and binary '
+                                 'interaction coefficients of its parameter bank.'),
                                 ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
                                 ('p',
                                  'Pedersen, K.S., Christensen, P.L. y Shaikh, J.A. (2015). '
                                  '<em>Phase Behavior of Petroleum Reservoir Fluids</em>, 2.ª ed. '
@@ -2544,35 +2666,38 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('ul',
-                                 [('Variantes con base PVTsim: T<sub>c</sub>, P<sub>c</sub>, ω y '
-                                   'peso molecular de la base de PVTsim para los 14 componentes, '
-                                   'incluida el agua (T<sub>c</sub> = 1165.14 °R, P<sub>c</sub> = '
-                                   '3203.72 psia, ω = 0.344, M = 18.0153). Las presiones críticas '
-                                   'se reescalan por 14.696/14.69594878 para reproducir la '
-                                   'conversión psia-atm de PVTsim. PR usa Ω<sub>a</sub> = '
-                                   '0.4572355289 y Ω<sub>b</sub> = 0.07780; SRK usa Ω<sub>a</sub> '
-                                   '= 0.42748023354 y Ω<sub>b</sub> = 0.08664034996.',
-                                   'Variants with the PVTsim database: T<sub>c</sub>, '
-                                   'P<sub>c</sub>, ω and molecular weight from the PVTsim database '
-                                   'for the 14 components, including water (T<sub>c</sub> = '
+                                 [('Banco PVTsim: T<sub>c</sub>, P<sub>c</sub>, ω y peso molecular '
+                                   'de los 14 componentes, incluida el agua (T<sub>c</sub> = '
+                                   '1165.14 °R, P<sub>c</sub> = 3203.72 psia, ω = 0.344, M = '
+                                   '18.0153). Las presiones críticas se reescalan por '
+                                   '14.696/14.69594878 (véase «Convención de unidades del banco '
+                                   'PVTsim»). PR usa Ω<sub>a</sub> = 0.4572355289 y Ω<sub>b</sub> '
+                                   '= 0.07780; SRK usa Ω<sub>a</sub> = 0.42748023354 y '
+                                   'Ω<sub>b</sub> = 0.08664034996.',
+                                   'PVTsim bank: T<sub>c</sub>, P<sub>c</sub>, ω and molecular '
+                                   'weight of the 14 components, including water (T<sub>c</sub> = '
                                    '1165.14 °R, P<sub>c</sub> = 3203.72 psia, ω = 0.344, M = '
                                    '18.0153). Critical pressures are rescaled by '
-                                   '14.696/14.69594878 to reproduce the PVTsim psia-atm '
-                                   'conversion. PR uses Ω<sub>a</sub> = 0.4572355289 and '
-                                   'Ω<sub>b</sub> = 0.07780; SRK uses Ω<sub>a</sub> = '
-                                   '0.42748023354 and Ω<sub>b</sub> = 0.08664034996.'),
-                                  ('Variantes con base HYSYS: propiedades de HYSYS para los 13 '
-                                   'hidrocarburos (con el factor acéntrico propio de SRK en esa '
-                                   'variante) y, para el agua, T<sub>c</sub> = 1165.14 °R, '
-                                   'P<sub>c</sub> = 3208.23 psia, ω = 0.344 y M = 18.0151. PR usa '
-                                   'Ω<sub>a</sub> = 0.45724 y Ω<sub>b</sub> = 0.07780; SRK usa las '
-                                   'constantes exactas indicadas arriba.',
-                                   'Variants with the HYSYS database: HYSYS properties for the 13 '
-                                   'hydrocarbons (with the SRK-specific acentric factor in that '
-                                   'variant) and, for water, T<sub>c</sub> = 1165.14 °R, '
-                                   'P<sub>c</sub> = 3208.23 psia, ω = 0.344 and M = 18.0151. PR '
-                                   'uses Ω<sub>a</sub> = 0.45724 and Ω<sub>b</sub> = 0.07780; SRK '
-                                   'uses the exact constants given above.'),
+                                   '14.696/14.69594878 (see «PVTsim bank unit convention»). PR '
+                                   'uses Ω<sub>a</sub> = 0.4572355289 and Ω<sub>b</sub> = 0.07780; '
+                                   'SRK uses Ω<sub>a</sub> = 0.42748023354 and Ω<sub>b</sub> = '
+                                   '0.08664034996.'),
+                                  ('Banco HYSYS: propiedades de los 13 hidrocarburos e inertes '
+                                   '(con el factor acéntrico propio de SRK en esa variante) y, '
+                                   'para el agua, T<sub>c</sub> = 1165.14 °R, P<sub>c</sub> = '
+                                   '3208.23 psia, ω = 0.344 y M = 18.0151. PR usa Ω<sub>a</sub> = '
+                                   '0.45724 y Ω<sub>b</sub> = 0.07780; SRK usa las constantes '
+                                   'exactas indicadas arriba.',
+                                   'HYSYS bank: properties of the 13 hydrocarbons and inerts (with '
+                                   'the SRK-specific acentric factor in that variant) and, for '
+                                   'water, T<sub>c</sub> = 1165.14 °R, P<sub>c</sub> = 3208.23 '
+                                   'psia, ω = 0.344 and M = 18.0151. PR uses Ω<sub>a</sub> = '
+                                   '0.45724 and Ω<sub>b</sub> = 0.07780; SRK uses the exact '
+                                   'constants given above.'),
+                                  ('Los parámetros modificados en la hoja de componente, incluidos '
+                                   'los del agua, se aplican también al flash trifásico.',
+                                   'Parameters modified in the component sheet, including those of '
+                                   'water, also apply to the three-phase flash.'),
                                   ('Función α(T): la función clásica de Soave, con la correlación '
                                    'de m de cada ecuación, para todos los componentes, incluida el '
                                    'agua, en las cuatro variantes.',
@@ -2584,18 +2709,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'Hydrocarbon-hydrocarbon k<sub>ij</sub> coefficients: the '
                                    'default matrix of the active equation of state.'),
                                   ('Coeficientes k<sub>ij</sub> agua-hidrocarburo: la fila del '
-                                   'agua de PVTsim (PR: −0.48 con N₂, 0.0952 con CO₂, 0.45 con C1 '
-                                   'y C2, 0.53 con C3, 0.52 con los butanos y 0.5 con los '
-                                   'restantes; SRK: igual salvo 0.10 con CO₂) o la fila del agua '
-                                   'del paquete de fluidos de HYSYS en las variantes con base '
-                                   'HYSYS (valores del orden de 0.5 con los hidrocarburos).',
-                                   'Water-hydrocarbon k<sub>ij</sub> coefficients: the PVTsim '
-                                   'water row (PR: −0.48 with N₂, 0.0952 with CO₂, 0.45 with C1 '
-                                   'and C2, 0.53 with C3, 0.52 with the butanes and 0.5 with the '
-                                   'rest; SRK: the same except 0.10 with CO₂) or the water row of '
-                                   'the HYSYS fluid package in the variants with the HYSYS '
-                                   'database (values of the order of 0.5 with the '
-                                   'hydrocarbons).')]),
+                                   'agua del banco correspondiente. Banco PVTsim, PR: −0.48 con '
+                                   'N₂, 0.0952 con CO₂, 0.45 con C1 y C2, 0.53 con C3, 0.52 con '
+                                   'los butanos y 0.5 con los restantes; SRK: igual salvo 0.10 con '
+                                   'CO₂. Banco HYSYS: valores del orden de 0.5 con los '
+                                   'hidrocarburos.',
+                                   'Water-hydrocarbon k<sub>ij</sub> coefficients: the water row '
+                                   'of the corresponding bank. PVTsim bank, PR: −0.48 with N₂, '
+                                   '0.0952 with CO₂, 0.45 with C1 and C2, 0.53 with C3, 0.52 with '
+                                   'the butanes and 0.5 with the rest; SRK: the same except 0.10 '
+                                   'with CO₂. HYSYS bank: values of the order of 0.5 with the '
+                                   'hydrocarbons.')]),
                                 ('p',
                                  'Los coeficientes k<sub>ij</sub> agua-hidrocarburo intervienen '
                                  'directamente en la regla clásica de los pares del agua con nC7, '
@@ -2605,37 +2729,28 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'The water-hydrocarbon k<sub>ij</sub> coefficients enter directly '
                                  'the classical rule of the pairs of water with nC7, nC8 and nC9; '
                                  'they do not enter the pairs of water with N₂ through nC6, which '
-                                 'are described by the Huron-Vidal interaction energies.'),
-                                ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.')]},
+                                 'are described by the Huron-Vidal interaction energies.')]},
                    {'titulo': ('Regla de mezcla de Huron-Vidal', 'Huron-Vidal mixing rule'),
                     'bloques': [('p',
                                  'La regla cuadrática clásica no reproduce la solubilidad mutua de '
                                  'agua e hidrocarburos. Los pares del agua con N₂, CO₂ y C1 a nC6 '
                                  'se describen con la regla de mezcla de Huron-Vidal, con los '
-                                 'parámetros de PVTsim para PR o para SRK según la familia de la '
-                                 'ecuación activa; los pares del agua con nC7, nC8 y nC9 y todos '
-                                 'los pares sin agua se tratan con la regla clásica, a la que la '
-                                 'regla de Huron-Vidal se reduce exactamente con α<sub>ji</sub> = '
-                                 '0. En una fase sin agua (fracción de agua ≤ 10⁻¹²) se evalúa '
-                                 'directamente la regla cuadrática.',
+                                 'parámetros de Pedersen y colaboradores para PR o para SRK según '
+                                 'la familia de la ecuación activa; los pares del agua con nC7, '
+                                 'nC8 y nC9 y todos los pares sin agua se tratan con la regla '
+                                 'clásica, a la que la regla de Huron-Vidal se reduce exactamente '
+                                 'con α<sub>ji</sub> = 0. En una fase sin agua (fracción de agua ≤ '
+                                 '10⁻¹²) se evalúa directamente la regla cuadrática.',
                                  'The classical quadratic rule does not reproduce the mutual '
                                  'solubility of water and hydrocarbons. The pairs of water with '
                                  'N₂, CO₂, and C1 through nC6 are described with the Huron-Vidal '
-                                 'mixing rule, with the PVTsim parameters for PR or for SRK '
-                                 'according to the family of the active equation; the pairs of '
-                                 'water with nC7, nC8, and nC9 and all pairs without water are '
-                                 'treated with the classical rule, to which the Huron-Vidal rule '
-                                 'reduces exactly with α<sub>ji</sub> = 0. In a water-free phase '
-                                 '(water fraction ≤ 10⁻¹²) the quadratic rule is evaluated '
-                                 'directly.'),
+                                 'mixing rule, with the parameters of Pedersen et al. for PR or '
+                                 'for SRK according to the family of the active equation; the '
+                                 'pairs of water with nC7, nC8, and nC9 and all pairs without '
+                                 'water are treated with the classical rule, to which the '
+                                 'Huron-Vidal rule reduces exactly with α<sub>ji</sub> = 0. In a '
+                                 'water-free phase (water fraction ≤ 10⁻¹²) the quadratic rule is '
+                                 'evaluated directly.'),
                                 ('p',
                                  'La formulación, los parámetros y el término del coeficiente de '
                                  'fugacidad se describen en «Regla de mezcla de Huron-Vidal para '
@@ -2956,18 +3071,14 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('p',
                                  'La fase acuosa se calcula siempre con la raíz de líquido de la '
                                  'ecuación de estado. Su composición incluye los hidrocarburos y '
-                                 'el CO₂ disueltos, que la regla de Huron-Vidal reproduce con los '
-                                 'parámetros de PVTsim; del mismo modo, las fases de hidrocarburos '
-                                 'contienen el agua disuelta en equilibrio.',
+                                 'el CO₂ disueltos, que la regla de Huron-Vidal representa con sus '
+                                 'parámetros de interacción; del mismo modo, las fases de '
+                                 'hidrocarburos contienen el agua disuelta en equilibrio.',
                                  'The aqueous phase is always computed with the liquid root of the '
                                  'equation of state. Its composition includes the dissolved '
-                                 'hydrocarbons and CO₂, which the Huron-Vidal rule reproduces with '
-                                 'the PVTsim parameters; likewise, the hydrocarbon phases contain '
-                                 'the dissolved water at equilibrium.'),
-                                ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 'hydrocarbons and CO₂, which the Huron-Vidal rule represents with '
+                                 'its interaction parameters; likewise, the hydrocarbon phases '
+                                 'contain the dissolved water at equilibrium.')]},
                    {'titulo': ('Propiedades por fase y de la mezcla',
                                'Phase and mixture properties'),
                     'bloques': [('p',
@@ -2991,34 +3102,37 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('ul',
                                  [('Vapor: densidad de la ecuación de estado ρ = PM/(ZRT), o con '
                                    'la corrección de Peneloux si está seleccionada; gravedad '
-                                   'específica M/28.9625; viscosidad por Lohrenz-Bray-Clark con '
-                                   'los 14 componentes.',
+                                   'específica ideal M/28.9625 (la gravedad específica real se '
+                                   'describe en «Gravedad específica del gas»); viscosidad por '
+                                   'Lohrenz-Bray-Clark con los 14 componentes.',
                                    'Vapor: equation-of-state density ρ = PM/(ZRT), or with the '
-                                   'Peneloux correction if selected; specific gravity M/28.9625; '
-                                   'viscosity by Lohrenz-Bray-Clark with the 14 components.'),
+                                   'Peneloux correction if selected; ideal specific gravity '
+                                   'M/28.9625 (the real specific gravity is described in «Gas '
+                                   'specific gravity»); viscosity by Lohrenz-Bray-Clark with the '
+                                   '14 components.'),
                                   ('Líquido de hidrocarburos: densidad de la ecuación de estado, '
                                    'de Peneloux o de COSTALD; en este último caso se evalúa sobre '
                                    'la composición de hidrocarburos renormalizada sin agua, con '
                                    'transición cuadrática hacia la densidad de la ecuación de '
                                    'estado para 0.95 &lt; T<sub>r</sub> &lt; 1; gravedad '
-                                   'específica ρ/62.4; viscosidad por Lohrenz-Bray-Clark.',
+                                   'específica ρ/62.3664; viscosidad por Lohrenz-Bray-Clark.',
                                    'Hydrocarbon liquid: equation-of-state, Peneloux or COSTALD '
                                    'density; in the latter case it is evaluated on the water-free '
                                    'renormalized hydrocarbon composition, with a quadratic '
                                    'transition to the equation-of-state density for 0.95 &lt; '
-                                   'T<sub>r</sub> &lt; 1; specific gravity ρ/62.4; viscosity by '
+                                   'T<sub>r</sub> &lt; 1; specific gravity ρ/62.3664; viscosity by '
                                    'Lohrenz-Bray-Clark.'),
                                   ('Fase acuosa: densidad de la ecuación de estado, de Peneloux o '
                                    'de COSTALD sobre la composición completa de 14 componentes '
                                    '(con la densidad de la ecuación de estado si T<sub>r</sub> ≥ '
-                                   '1); gravedad específica ρ/62.4; viscosidad por la correlación '
-                                   'del agua empleada por PVTsim, con Lohrenz-Bray-Clark como '
-                                   'respaldo.',
+                                   '1); gravedad específica ρ/62.3664; viscosidad por la '
+                                   'correlación del agua pura de Meyer y Schmidt, con '
+                                   'Lohrenz-Bray-Clark como respaldo.',
                                    'Aqueous phase: equation-of-state, Peneloux or COSTALD density '
                                    'on the full 14-component composition (with the '
                                    'equation-of-state density if T<sub>r</sub> ≥ 1); specific '
-                                   'gravity ρ/62.4; viscosity by the water correlation used by '
-                                   'PVTsim, with Lohrenz-Bray-Clark as fallback.'),
+                                   'gravity ρ/62.3664; viscosity by the Meyer and Schmidt '
+                                   'pure-water correlation, with Lohrenz-Bray-Clark as fallback.'),
                                   ('Entalpía y entropía de cada fase: contribución de gas ideal '
                                    'más la contribución residual de la ecuación de estado con la '
                                    'regla de mezcla de Huron-Vidal, con da<sub>m</sub>/dT evaluada '
@@ -3041,13 +3155,11 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'donde w<sub>j</sub> es la fracción másica de la fase j, '
                                  'θ<sub>j</sub> su fracción volumétrica, M<sub>j</sub> su peso '
                                  'molecular (lb/lbmol) y ρ<sub>j</sub> su densidad (lb/ft³), '
-                                 'obtenida con el método de densidad seleccionado. La fracción '
-                                 'volumétrica corresponde a la magnitud Volume% de PVTsim.',
+                                 'obtenida con el método de densidad seleccionado.',
                                  'where w<sub>j</sub> is the mass fraction of phase j, '
                                  'θ<sub>j</sub> its volume fraction, M<sub>j</sub> its molecular '
                                  'weight (lb/lbmol) and ρ<sub>j</sub> its density (lb/ft³), '
-                                 'obtained with the selected density method. The volume fraction '
-                                 'corresponds to the PVTsim Volume% quantity.'),
+                                 'obtained with the selected density method.'),
                                 ('h3', 'Propiedades de la mezcla', 'Mixture properties'),
                                 ('p',
                                  'La densidad de la mezcla se calcula con la hipótesis de '
@@ -3067,16 +3179,14 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'S<sub>j</sub> la entropía molar (BTU/(lbmol·°R)) de la fase j. '
                                  'El poder calorífico y el contenido de líquidos (GPM) se calculan '
                                  'sobre la composición de hidrocarburos renormalizada sin agua, '
-                                 'dado que el agua es inerte en la combustión.',
+                                 'dado que el agua es inerte en la combustión (véase el capítulo '
+                                 '«Propiedades del gas»).',
                                  'where H<sub>j</sub> is the molar enthalpy (BTU/lbmol) and '
                                  'S<sub>j</sub> the molar entropy (BTU/(lbmol·°R)) of phase j. The '
                                  'heating value and the liquid content (GPM) are computed on the '
                                  'water-free renormalized hydrocarbon composition, since water is '
-                                 'inert in combustion.'),
+                                 'inert in combustion (see the chapter «Gas properties»).'),
                                 ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
                                 ('p',
                                  'Lohrenz, J., Bray, B.G. y Clark, C.R. (1964). Calculating '
                                  'viscosities of reservoir fluids from their compositions. '
@@ -3128,21 +3238,22 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'liquid from vapor; the label is assigned by a conventional '
                                  'criterion.'),
                                 ('p',
-                                 'ThermoPhase aplica en ese caso el criterio del simulador cuya '
-                                 'base de datos se emplea: el de HYSYS para las variantes PR y SRK '
-                                 'con base HYSYS y el de PVTsim para las variantes PR y SRK con '
-                                 'base PVTsim. La condición de raíz única se verifica con la '
-                                 'composición global, cuando |Z<sub>V</sub> − Z<sub>L</sub>| &lt; '
-                                 '10⁻⁷, y el criterio solo se evalúa si el flash ya convergió a '
-                                 'una fase; nunca modifica un resultado bifásico.',
-                                 'In that case ThermoPhase applies the criterion of the simulator '
-                                 'whose database is used: the HYSYS criterion for the PR and SRK '
-                                 'variants with the HYSYS database and the PVTsim criterion for '
-                                 'the PR and SRK variants with the PVTsim database. The '
-                                 'single-root condition is checked with the overall composition, '
-                                 'when |Z<sub>V</sub> − Z<sub>L</sub>| &lt; 10⁻⁷, and the '
-                                 'criterion is only evaluated if the flash has already converged '
-                                 'to one phase; it never modifies a two-phase result.'),
+                                 'En ese caso el criterio depende del banco de la ecuación activa: '
+                                 'con el banco HYSYS se aplica el criterio de compresibilidad '
+                                 'isotérmica y composición, y con el banco PVTsim el criterio del '
+                                 'punto crítico de la mezcla. La condición de raíz única se '
+                                 'verifica con la composición global, cuando |Z<sub>V</sub> − '
+                                 'Z<sub>L</sub>| &lt; 10⁻⁷, y el criterio solo se evalúa si el '
+                                 'flash ya convergió a una fase; nunca modifica un resultado '
+                                 'bifásico.',
+                                 'In that case the criterion depends on the bank of the active '
+                                 'equation: with the HYSYS bank the isothermal compressibility and '
+                                 'composition criterion is applied, and with the PVTsim bank the '
+                                 'mixture critical point criterion. The single-root condition is '
+                                 'checked with the overall composition, when |Z<sub>V</sub> − '
+                                 'Z<sub>L</sub>| &lt; 10⁻⁷, and the criterion is only evaluated if '
+                                 'the flash has already converged to one phase; it never modifies '
+                                 'a two-phase result.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Venkatarathnam, G. y Oellrich, L.R. (2011). Identification of '
@@ -3155,22 +3266,20 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'volume, and temperature without reference to saturation '
                                  'properties: applications in phase equilibria calculations. '
                                  '<em>Fluid Phase Equilibria</em>, 301(2), 225–233.')]},
-                   {'titulo': ('Criterio de HYSYS: compresibilidad isotérmica y composición',
-                               'HYSYS criterion: isothermal compressibility and composition'),
+                   {'titulo': ('Criterio de compresibilidad isotérmica y composición',
+                               'Isothermal compressibility and composition criterion'),
                     'bloques': [('p',
-                                 'El manual de referencia técnica de HYSYS especifica, para las '
-                                 'ecuaciones cúbicas PR y SRK en la región supercrítica, dos '
-                                 'reglas de asignación de vapor basadas en el factor de '
+                                 'Con el banco HYSYS, la fase de un fluido con una sola raíz real '
+                                 'se asigna mediante dos reglas de vapor basadas en el factor de '
                                  'compresibilidad, en la compresibilidad isotérmica y en la '
                                  'composición de la mezcla. Si ninguna se cumple, se asigna '
                                  'fracción de vapor nula y se emplean las correlaciones de '
                                  'líquido.',
-                                 'The HYSYS technical reference manual specifies, for the PR and '
-                                 'SRK cubic equations in the supercritical region, two vapor '
-                                 'assignment rules based on the compressibility factor, the '
-                                 'isothermal compressibility and the mixture composition. If '
-                                 'neither is satisfied, a zero vapor fraction is assigned and the '
-                                 'liquid correlations are used.'),
+                                 'With the HYSYS bank, the phase of a fluid with a single real '
+                                 'root is assigned through two vapor rules based on the '
+                                 'compressibility factor, the isothermal compressibility and the '
+                                 'mixture composition. If neither is satisfied, a zero vapor '
+                                 'fraction is assigned and the liquid correlations are used.'),
                                 ('p',
                                  'La compresibilidad isotérmica mide la variación relativa del '
                                  'volumen molar con la presión a temperatura constante; su forma '
@@ -3208,7 +3317,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'where a<sub>m</sub> (psia·ft⁶/lbmol²) and b<sub>m</sub> '
                                  '(ft³/lbmol) are the mixture parameters with the quadratic rule '
                                  'and the k<sub>ij</sub> in use.'),
-                                ('h3', 'Reglas del manual', 'Manual rules'),
+                                ('h3', 'Reglas de asignación', 'Assignment rules'),
                                 ('ul',
                                  [('Regla 1: si Z &gt; 0.3 y κ<sub>r</sub> &gt; 0.75, se asigna '
                                    'vapor.',
@@ -3234,13 +3343,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  '(231 K) and heavier components are classified as heavy.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>, sección Supercritical Handling. Aspen '
-                                 'Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>, Supercritical Handling section. Aspen '
-                                 'Technology, Inc.'),
-                                ('p',
                                  'Venkatarathnam, G. y Oellrich, L.R. (2011). Identification of '
                                  'the phase of a fluid using partial derivatives of pressure, '
                                  'volume, and temperature without reference to saturation '
@@ -3253,21 +3355,20 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  '<em>Fluid Phase Equilibria</em>, 301(2), 225–233.')]},
                    {'titulo': ('Criterio A/B de alta presión', 'High-pressure A/B criterion'),
                     'bloques': [('p',
-                                 'A presiones superiores a la cricondenbar el factor Z permanece '
+                                 'A presiones superiores a la cricondenbara el factor Z permanece '
                                  'por encima de 0.75 en un amplio intervalo de temperatura, y la '
                                  'regla 2 asignaría vapor aun a temperaturas bajas en las que el '
-                                 'fluido es un líquido comprimido. HYSYS presenta en esa región '
-                                 'una frontera líquido-vapor vertical en el plano P-T, es decir, '
-                                 'independiente de la presión. ThermoPhase reproduce esa frontera '
-                                 'con la razón de los parámetros adimensionales de la ecuación de '
-                                 'estado:',
+                                 'fluido es un líquido comprimido. En esa región la frontera '
+                                 'líquido-vapor convencional es una línea vertical en el plano '
+                                 'P-T, independiente de la presión, que se define con la razón de '
+                                 'los parámetros adimensionales de la ecuación de estado:',
                                  'At pressures above the cricondenbar the Z factor remains above '
                                  '0.75 over a wide temperature range, and rule 2 would assign '
                                  'vapor even at low temperatures at which the fluid is a '
-                                 'compressed liquid. In that region HYSYS exhibits a vertical '
-                                 'liquid-vapor boundary in the P-T plane, that is, independent of '
-                                 'pressure. ThermoPhase reproduces that boundary with the ratio of '
-                                 'the dimensionless equation-of-state parameters:'),
+                                 'compressed liquid. In that region the conventional liquid-vapor '
+                                 'boundary is a vertical line in the P-T plane, independent of '
+                                 'pressure, which is defined with the ratio of the dimensionless '
+                                 'equation-of-state parameters:'),
                                 ('eq',
                                  '\\frac{A}{B} = \\frac{a_m P/(RT)^2}{b_m P/(RT)} = '
                                  '\\frac{a_m(T)}{b_m\\,R\\,T}'),
@@ -3328,15 +3429,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Soave, G. (1972). Equilibrium constants from a modified '
                                  'Redlich-Kwong equation of state. <em>Chemical Engineering '
                                  'Science</em>, 27(6), 1197–1203.')]},
-                   {'titulo': ('Algoritmo de identificación de HYSYS',
-                               'HYSYS identification algorithm'),
+                   {'titulo': ('Algoritmo de identificación por compresibilidad',
+                               'Compressibility-based identification algorithm'),
                     'bloques': [('p',
-                                 'En las variantes con base HYSYS, los criterios se evalúan en '
-                                 'cascada; en cuanto uno produce una clasificación, los siguientes '
-                                 'no se evalúan:',
-                                 'In the variants with the HYSYS database, the criteria are '
-                                 'evaluated in cascade; as soon as one produces a classification, '
-                                 'the following ones are not evaluated:'),
+                                 'Con el banco HYSYS los criterios se evalúan en cascada; en '
+                                 'cuanto uno produce una clasificación, los siguientes no se '
+                                 'evalúan:',
+                                 'With the HYSYS bank the criteria are evaluated in cascade; as '
+                                 'soon as one produces a classification, the following ones are '
+                                 'not evaluated:'),
                                 ('ul',
                                  [('Compresibilidad isotérmica: si Z &gt; 0.3 y κ<sub>r</sub> &gt; '
                                    '0.75, el fluido es vapor.',
@@ -3368,31 +3469,22 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'the whole temperature range.'),
                                 ('p',
                                  'El algoritmo no utiliza el punto crítico de la mezcla ni '
-                                 'parámetros ajustables: los umbrales 0.3, 0.75 y 230 K provienen '
-                                 'del manual de HYSYS y la razón Ω<sub>a</sub>/Ω<sub>b</sub> de la '
-                                 'ecuación de estado.',
+                                 'parámetros ajustables: los umbrales 0.3, 0.75 y 230 K son '
+                                 'constantes del criterio y la razón Ω<sub>a</sub>/Ω<sub>b</sub> '
+                                 'proviene de la ecuación de estado.',
                                  'The algorithm uses neither the mixture critical point nor '
-                                 'adjustable parameters: the thresholds 0.3, 0.75 and 230 K come '
-                                 'from the HYSYS manual and the Ω<sub>a</sub>/Ω<sub>b</sub> ratio '
-                                 'from the equation of state.'),
-                                ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>, sección Supercritical Handling. Aspen '
-                                 'Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>, Supercritical Handling section. Aspen '
-                                 'Technology, Inc.')]},
-                   {'titulo': ('Criterio de PVTsim', 'PVTsim criterion'),
+                                 'adjustable parameters: the thresholds 0.3, 0.75 and 230 K are '
+                                 'constants of the criterion and the Ω<sub>a</sub>/Ω<sub>b</sub> '
+                                 'ratio comes from the equation of state.')]},
+                   {'titulo': ('Criterio del punto crítico de la mezcla',
+                               'Mixture critical point criterion'),
                     'bloques': [('p',
-                                 'PVTsim identifica la fase de un fluido monofásico comparando la '
-                                 'temperatura con el punto crítico real de la mezcla. En las '
-                                 'variantes con base PVTsim, ThermoPhase aplica este criterio a '
-                                 'los fluidos monofásicos con una sola raíz real:',
-                                 'PVTsim identifies the phase of a single-phase fluid by comparing '
-                                 'the temperature with the true critical point of the mixture. In '
-                                 'the variants with the PVTsim database, ThermoPhase applies this '
-                                 'criterion to single-phase fluids with a single real root:'),
+                                 'Con el banco PVTsim, la fase de un fluido monofásico con una '
+                                 'sola raíz real se identifica comparando la temperatura con el '
+                                 'punto crítico real de la mezcla:',
+                                 'With the PVTsim bank, the phase of a single-phase fluid with a '
+                                 'single real root is identified by comparing the temperature with '
+                                 'the true critical point of the mixture:'),
                                 ('eq',
                                  'T < T_{c,mix} \\;\\Rightarrow\\; \\mathrm{L} \\qquad T \\geq '
                                  'T_{c,mix} \\;\\Rightarrow\\; \\mathrm{V}'),
@@ -3444,9 +3536,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'pseudocritical temperature, is necessary to place the '
                                  'liquid-vapor boundary of methane-rich mixtures correctly.'),
                                 ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
                                 ('p',
                                  'Heidemann, R.A. y Khalil, A.M. (1980). The calculation of '
                                  'critical points. <em>AIChE Journal</em>, 26(5), 769–779.',
@@ -3528,15 +3617,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  [('Una sola fase de hidrocarburos: su composición, renormalizada '
                                    'sin agua, se somete al flash de 13 componentes con la ecuación '
                                    'de estado y los k<sub>ij</sub> de la ventana (análisis de '
-                                   'estabilidad, flash y criterio de HYSYS o de PVTsim según la '
-                                   'variante). Si ese flash devuelve vapor, la fase se etiqueta '
-                                   'como vapor; si devuelve líquido, como líquido; si devuelve dos '
+                                   'estabilidad, flash y criterio de identificación del banco '
+                                   'activo). Si ese flash devuelve vapor, la fase se etiqueta como '
+                                   'vapor; si devuelve líquido, como líquido; si devuelve dos '
                                    'fases, se conserva la etiqueta del cálculo multifásico.',
                                    'A single hydrocarbon phase: its composition, renormalized '
                                    'without water, is subjected to the 13-component flash with the '
                                    'equation of state and k<sub>ij</sub> of the window (stability '
-                                   'analysis, flash and HYSYS or PVTsim criterion according to the '
-                                   'variant). If that flash returns vapor, the phase is labeled '
+                                   'analysis, flash and identification criterion of the active '
+                                   'bank). If that flash returns vapor, the phase is labeled '
                                    'vapor; if it returns liquid, liquid; if it returns two phases, '
                                    'the label of the multiphase calculation is kept.'),
                                   ('Dos fases de hidrocarburos: la de menor densidad es el vapor. '
@@ -3582,9 +3671,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'equal to the sum of both and a Z factor recomputed with the '
                                  'liquid root. The material balance is preserved exactly.'),
                                 ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
                                 ('p',
                                  'Michelsen, M.L. y Mollerup, J.M. (2007). <em>Thermodynamic '
                                  'Models: Fundamentals and Computational Aspects</em>, 2.ª ed. '
@@ -3677,17 +3763,14 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementation in ThermoPhase'),
                                 ('p',
                                  'ThermoPhase traza la envolvente con la ecuación de estado cúbica '
-                                 'activa (Peng-Robinson o Soave-Redlich-Kwong, en las variantes de '
-                                 'HYSYS o de PVTsim) y los coeficientes de interacción binaria '
-                                 'k<sub>ij</sub> vigentes. Para mezclas de hidrocarburos dispone '
-                                 'de dos métodos seleccionables: Michelsen (predeterminado) y '
-                                 'Ziervogel-Poling (alternativo). Una composición de un solo '
-                                 'componente se resuelve como curva de saturación, y una mezcla '
-                                 'con agua activa se resuelve por el método de '
-                                 'Lindeloff-Michelsen.',
+                                 'activa y los coeficientes de interacción binaria k<sub>ij</sub> '
+                                 'vigentes. Para mezclas de hidrocarburos dispone de dos métodos '
+                                 'seleccionables: Michelsen (predeterminado) y Ziervogel-Poling '
+                                 '(alternativo). Una composición de un solo componente se resuelve '
+                                 'como curva de saturación, y una mezcla con agua activa se '
+                                 'resuelve por el método de Lindeloff-Michelsen.',
                                  'ThermoPhase traces the envelope with the active cubic equation '
-                                 'of state (Peng-Robinson or Soave-Redlich-Kwong, in the HYSYS or '
-                                 'PVTsim variants) and the current binary interaction coefficients '
+                                 'of state and the current binary interaction coefficients '
                                  'k<sub>ij</sub>. For hydrocarbon mixtures two selectable methods '
                                  'are available: Michelsen (default) and Ziervogel-Poling '
                                  '(alternative). A single-component composition is solved as a '
@@ -3987,6 +4070,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'about 114° (cosine below −0.40 in the ln T–ln P plane), which '
                                    'correspond to numerical artifacts near the critical point, are '
                                    'removed; the critical point is never removed.'),
+                                  ('Mezclas asimétricas (T<sub>c,max</sub>/T<sub>c,min</sub> &gt; '
+                                   '2.4): filtrado de puntos de burbuja falsos, tope de presión, '
+                                   'corrección de la frontera exterior y suavizado del punto '
+                                   'crítico (véase «Mezclas asimétricas: frontera '
+                                   'líquido-líquido»).',
+                                   'Asymmetric mixtures (T<sub>c,max</sub>/T<sub>c,min</sub> &gt; '
+                                   '2.4): filtering of false bubble points, pressure cap, '
+                                   'outer-boundary correction and critical-point smoothing (see '
+                                   '«Asymmetric mixtures: liquid-liquid boundary»).'),
                                   ('Respaldo: si la estrategia de dos ramas produce menos de '
                                    'cuatro puntos, se traza una única curva continua en ambos '
                                    'sentidos desde un arranque robusto que se busca en ambas ramas '
@@ -3994,7 +4086,27 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'Fallback: if the two-branch strategy produces fewer than four '
                                    'points, a single continuous curve is traced in both directions '
                                    'from a robust start searched for on both branches and at 24 '
-                                   'pressures between 10 and 1500 psia.')]),
+                                   'pressures between 10 and 1500 psia.'),
+                                  ('Densificación: una vez ensamblada la envolvente, los tramos '
+                                   'con puntos consecutivos muy separados (distancia normalizada '
+                                   'en T y en ln P mayor que 0.035) se completan con puntos '
+                                   'calculados por el método de puntos de saturación (barrido de '
+                                   'estabilidad y Newton), fijando la variable que más cambia en '
+                                   'el tramo, con un máximo de 14 puntos por tramo. El punto '
+                                   'contiguo a un hueco se recalcula a su misma presión y se '
+                                   'sustituye si su temperatura difiere más de 3 °F, y una rama '
+                                   'que termina por encima de la presión inicial se prolonga hasta '
+                                   'ella. Los tramos que tocan el punto crítico no se modifican.',
+                                   'Densification: once the envelope is assembled, segments with '
+                                   'widely spaced consecutive points (normalized distance in T and '
+                                   'ln P greater than 0.035) are filled with points computed by '
+                                   'the saturation-point method (stability sweep and Newton), '
+                                   'fixing the variable that changes most in the segment, with a '
+                                   'maximum of 14 points per segment. The point adjacent to a gap '
+                                   'is recomputed at its own pressure and replaced if its '
+                                   'temperature differs by more than 3 °F, and a branch ending '
+                                   'above the initial pressure is extended down to it. Segments '
+                                   'touching the critical point are not modified.')]),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Michelsen, M.L. (1980). Calculation of phase envelopes and '
@@ -4305,6 +4417,125 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Pedersen, K.S., Christensen, P.L. and Shaikh, J.A. (2015). '
                                  '<em>Phase Behavior of Petroleum Reservoir Fluids</em>, 2nd ed. '
                                  'CRC Press.')]},
+                   {'titulo': ('Mezclas asimétricas: frontera líquido-líquido',
+                               'Asymmetric mixtures: liquid-liquid boundary'),
+                    'bloques': [('p',
+                                 'En las mezclas asimétricas (T<sub>c,max</sub>/T<sub>c,min</sub> '
+                                 '&gt; 2.4 entre los componentes presentes), la región bifásica '
+                                 'puede incluir a temperatura baja una zona de dos líquidos. Su '
+                                 'frontera asciende casi verticalmente en el plano P-T hacia '
+                                 'presiones muy altas (pared líquido-líquido), y las ecuaciones de '
+                                 'saturación admiten soluciones situadas dentro de la región '
+                                 'bifásica —puntos de burbuja falsos— que no pertenecen a la '
+                                 'frontera física. Los tratamientos siguientes se aplican solo a '
+                                 'estas mezclas; en las demás la envolvente no se modifica.',
+                                 'In asymmetric mixtures (T<sub>c,max</sub>/T<sub>c,min</sub> &gt; '
+                                 '2.4 among the present components), the two-phase region may '
+                                 'include a two-liquid zone at low temperature. Its boundary rises '
+                                 'almost vertically in the P-T plane toward very high pressures '
+                                 '(liquid-liquid wall), and the saturation equations admit '
+                                 'solutions located inside the two-phase region —false bubble '
+                                 'points— that do not belong to the physical boundary. The '
+                                 'following treatments apply only to these mixtures; for the '
+                                 'others the envelope is not modified.'),
+                                ('ul',
+                                 [('Filtrado de burbujas falsas: cada punto de la rama de burbuja '
+                                   'se verifica con la prueba general de estabilidad (véase '
+                                   '«Separación líquido-líquido en mezclas asimétricas») a 1.03 '
+                                   'veces su presión; si allí la mezcla es inestable, el punto es '
+                                   'interior y se elimina. Al encontrar el primer punto verdadero '
+                                   'se acepta el resto de la rama. Si más de la mitad de la rama '
+                                   'resulta falsa, se descarta y la frontera queda formada por la '
+                                   'rama de alta presión y la rama de rocío.',
+                                   'False-bubble filtering: each point of the bubble branch is '
+                                   'checked with the general stability test (see «Liquid-liquid '
+                                   'splitting in asymmetric mixtures») at 1.03 times its pressure; '
+                                   'if the mixture is unstable there, the point is interior and is '
+                                   'removed. Once the first true point is found, the rest of the '
+                                   'branch is accepted. If more than half of the branch is false, '
+                                   'it is discarded and the boundary is formed by the '
+                                   'high-pressure branch and the dew branch.'),
+                                  ('Rama de alta presión: si la búsqueda de la rama de burbuja de '
+                                   'alta presión con el análisis de estabilidad del flash no la '
+                                   'encuentra, se repite usando la prueba general de estabilidad '
+                                   'como indicador de la región bifásica.',
+                                   'High-pressure branch: if the search for the high-pressure '
+                                   'bubble branch with the flash stability analysis does not find '
+                                   'it, it is repeated using the general stability test as the '
+                                   'indicator of the two-phase region.'),
+                                  ('Tope de presión: la frontera se traza hasta 10 000 psia. Si el '
+                                   'punto crítico localizado queda por encima de ese tope, o no se '
+                                   'encuentra, se aplica el método directo de Heidemann-Khalil; si '
+                                   'este no da un punto crítico sobre la curva, la envolvente se '
+                                   'informa sin punto crítico. En ese caso toda la frontera es de '
+                                   'tipo rocío —la fase incipiente es un líquido rico en el '
+                                   'componente pesado que nunca iguala a la alimentación— y se '
+                                   'presenta como línea de rocío.',
+                                   'Pressure cap: the boundary is traced up to 10 000 psia. If the '
+                                   'located critical point lies above that cap, or is not found, '
+                                   'the direct Heidemann-Khalil method is applied; if it does not '
+                                   'give a critical point on the curve, the envelope is reported '
+                                   'without a critical point. In that case the whole boundary is '
+                                   'of dew type —the incipient phase is a liquid rich in the heavy '
+                                   'component that never equals the feed— and it is presented as a '
+                                   'dew line.'),
+                                  ('Corrección de la frontera exterior: las ecuaciones de '
+                                   'saturación pueden tener más de una solución y la continuación '
+                                   'puede seguir una rama interior. Cada punto con presión mayor '
+                                   'que 0.3 veces la presión de referencia de la envolvente se '
+                                   'verifica con la prueba general de estabilidad a ±0.3 % de su '
+                                   'presión; si la mezcla es inestable a ambos lados, el punto es '
+                                   'interior y se sustituye por el borde exterior, buscado por '
+                                   'bisección hacia presiones mayores a la misma temperatura. En '
+                                   'los tramos casi verticales de la pared la corrección se '
+                                   'realiza en temperatura a presión constante. Los puntos por '
+                                   'encima de 10 100 psia se descartan.',
+                                   'Outer-boundary correction: the saturation equations may have '
+                                   'more than one solution and the continuation may follow an '
+                                   'interior branch. Each point with pressure above 0.3 times the '
+                                   'reference pressure of the envelope is checked with the general '
+                                   'stability test at ±0.3 % of its pressure; if the mixture is '
+                                   'unstable on both sides, the point is interior and is replaced '
+                                   'by the outer boundary, searched by bisection toward higher '
+                                   'pressures at the same temperature. On the nearly vertical '
+                                   'segments of the wall the correction is made in temperature at '
+                                   'constant pressure. Points above 10 100 psia are discarded.'),
+                                  ('Suavizado del punto crítico: si la unión de las ramas presenta '
+                                   'un salto o un zigzag, el tramo |T − T<sub>c</sub>| &lt; 25 °R '
+                                   'se recalcula con puntos de frontera obtenidos por bisección de '
+                                   'estabilidad a temperatura fija (siete por lado, tolerancia '
+                                   '5·10<sup>−4</sup>) y sustituye al tramo original.',
+                                   'Critical-point smoothing: if the junction of the branches '
+                                   'shows a jump or zigzag, the segment |T − T<sub>c</sub>| &lt; '
+                                   '25 °R is recomputed with boundary points obtained by stability '
+                                   'bisection at fixed temperature (seven per side, tolerance '
+                                   '5·10<sup>−4</sup>) and replaces the original segment.')]),
+                                ('p',
+                                 'Cuando la frontera alcanza el tope sobre la pared '
+                                 'líquido-líquido, la cricondenbara no tiene un valor finito y no '
+                                 'se informa. La ecuación de estado describe solo fases fluidas: a '
+                                 'temperaturas inferiores al punto de fusión del componente pesado '
+                                 '(−64 °F para el n-nonano) la frontera calculada corresponde al '
+                                 'modelo de fluidos y no considera la formación de sólidos.',
+                                 'When the boundary reaches the cap on the liquid-liquid wall, the '
+                                 'cricondenbar has no finite value and is not reported. The '
+                                 'equation of state describes fluid phases only: at temperatures '
+                                 'below the melting point of the heavy component (−64 °F for '
+                                 'n-nonane) the computed boundary corresponds to the fluid model '
+                                 'and does not account for solid formation.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'Michelsen, M.L. y Mollerup, J.M. (2007). <em>Thermodynamic '
+                                 'Models: Fundamentals and Computational Aspects</em>, 2.ª ed. '
+                                 'Tie-Line Publications.',
+                                 'Michelsen, M.L. and Mollerup, J.M. (2007). <em>Thermodynamic '
+                                 'Models: Fundamentals and Computational Aspects</em>, 2nd ed. '
+                                 'Tie-Line Publications.'),
+                                ('p',
+                                 'Heidemann, R.A. y Khalil, A.M. (1980). The calculation of '
+                                 'critical points. <em>AIChE Journal</em>, 26(5), 769–779.',
+                                 'Heidemann, R.A. and Khalil, A.M. (1980). The calculation of '
+                                 'critical points. <em>AIChE Journal</em>, 26(5), 769–779.')]},
                    {'titulo': ('Punto crítico de la mezcla', 'Mixture critical point'),
                     'bloques': [('p',
                                  'El punto crítico de una mezcla es el estado en el que las fases '
@@ -4483,21 +4714,22 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'proporciona el punto crítico real de la mezcla allí donde se '
                                  'requiere sin trazar la envolvente, en particular en la '
                                  'identificación de la fase de un fluido monofásico según el '
-                                 'criterio de PVTsim. Su resultado se guarda por ecuación de '
-                                 'estado y composición. Si el método directo no converge se usa el '
-                                 'punto crítico de una envolvente de Michelsen de hasta 400 '
-                                 'puntos, y si tampoco se obtiene, las propiedades pseudocríticas '
-                                 'de Kay.',
+                                 'criterio del punto crítico de la mezcla. Su resultado se guarda '
+                                 'por ecuación de estado y composición. Si el método directo no '
+                                 'converge se usa el punto crítico de una envolvente de Michelsen '
+                                 'de hasta 400 puntos, y si tampoco se obtiene, las propiedades '
+                                 'pseudocríticas de Kay.',
                                  'The critical point drawn and reported in the envelope tab is the '
                                  'one located on the traced envelope (or, with water, the one '
                                  'obtained on the 3-HC line). The direct method provides the true '
                                  'mixture critical point wherever it is needed without tracing the '
                                  'envelope, in particular for the phase identification of a '
-                                 'single-phase fluid according to the PVTsim criterion. Its result '
-                                 'is cached per equation of state and composition. If the direct '
-                                 'method does not converge, the critical point of a Michelsen '
-                                 'envelope of up to 400 points is used, and if that is not '
-                                 "obtained either, Kay's pseudocritical properties."),
+                                 'single-phase fluid according to the mixture critical point '
+                                 'criterion. Its result is cached per equation of state and '
+                                 'composition. If the direct method does not converge, the '
+                                 'critical point of a Michelsen envelope of up to 400 points is '
+                                 "used, and if that is not obtained either, Kay's pseudocritical "
+                                 'properties.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Heidemann, R.A. y Khalil, A.M. (1980). The calculation of '
@@ -4517,10 +4749,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Tie-Line Publications.',
                                  'Michelsen, M.L. and Mollerup, J.M. (2007). <em>Thermodynamic '
                                  'Models: Fundamentals and Computational Aspects</em>, 2nd ed. '
-                                 'Tie-Line Publications.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 'Tie-Line Publications.')]},
                    {'titulo': ('Cricondenbara y cricondenterma', 'Cricondenbar and cricondentherm'),
                     'bloques': [('p',
                                  'La cricondenbara es la presión máxima de la envolvente: por '
@@ -4556,21 +4785,26 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'especiales en las unidades activas. El mismo panel puede '
                                  'mostrar, en su lugar, la temperatura y la presión del punto '
                                  'crítico. Para un componente puro estos puntos no están definidos '
-                                 'y el panel muestra un guion. Con agua activa se calculan sobre '
-                                 'las líneas 3-HC y 2-HC. La cricondenbara fija además el límite '
-                                 'superior de la curva de hidratos superpuesta (1.05 veces su '
-                                 'valor) y participa en la definición del intervalo de presión del '
-                                 'mapa de densidad.',
+                                 'y el panel muestra un guion; tampoco se informa la cricondenbara '
+                                 'cuando la frontera líquido-líquido de una mezcla asimétrica '
+                                 'alcanza el tope de cálculo, porque no tiene un valor finito. Con '
+                                 'agua activa se calculan sobre las líneas 3-HC y 2-HC. La '
+                                 'cricondenbara fija además el límite superior de la curva de '
+                                 'hidratos superpuesta (1.05 veces su valor) y participa en la '
+                                 'definición del intervalo de presión del mapa de densidad.',
                                  'Both values are taken as the pressure and temperature maxima '
                                  'among all computed envelope points, without additional '
                                  'interpolation, and are displayed in the Special Points panel in '
                                  'the active units. The same panel can display, instead, the '
                                  'temperature and pressure of the critical point. For a pure '
                                  'component these points are not defined and the panel shows a '
-                                 'dash. With water enabled they are computed on the 3-HC and 2-HC '
-                                 'lines. The cricondenbar also sets the upper limit of the '
-                                 'overlaid hydrate curve (1.05 times its value) and takes part in '
-                                 'defining the pressure range of the density map.'),
+                                 'dash; nor is the cricondenbar reported when the liquid-liquid '
+                                 'boundary of an asymmetric mixture reaches the calculation cap, '
+                                 'because it has no finite value. With water enabled they are '
+                                 'computed on the 3-HC and 2-HC lines. The cricondenbar also sets '
+                                 'the upper limit of the overlaid hydrate curve (1.05 times its '
+                                 'value) and takes part in defining the pressure range of the '
+                                 'density map.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Pedersen, K.S., Christensen, P.L. y Shaikh, J.A. (2015). '
@@ -4809,18 +5043,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                     'bloques': [('p',
                                  'Cuando el agua está activa, ThermoPhase traza el diagrama de '
                                  'fases de la mezcla hidrocarburo-agua por el método de Lindeloff '
-                                 'y Michelsen (2003), tal como lo hace PVTsim. Todas las líneas se '
-                                 'calculan sobre la composición total, incluida el agua, y con el '
-                                 'mismo modelo termodinámico del flash trifásico: ecuación de '
-                                 'estado cúbica activa con regla de mezcla de Huron-Vidal para los '
-                                 'pares agua-hidrocarburo.',
+                                 'y Michelsen (2003). Todas las líneas se calculan sobre la '
+                                 'composición total, incluida el agua, y con el mismo modelo '
+                                 'termodinámico del flash trifásico: ecuación de estado cúbica '
+                                 'activa con regla de mezcla de Huron-Vidal para los pares '
+                                 'agua-hidrocarburo.',
                                  'When water is enabled, ThermoPhase traces the phase diagram of '
                                  'the hydrocarbon-water mixture by the Lindeloff and Michelsen '
-                                 '(2003) method, as PVTsim does. All lines are computed on the '
-                                 'total composition, water included, and with the same '
-                                 'thermodynamic model as the three-phase flash: active cubic '
-                                 'equation of state with the Huron-Vidal mixing rule for '
-                                 'water-hydrocarbon pairs.'),
+                                 '(2003) method. All lines are computed on the total composition, '
+                                 'water included, and with the same thermodynamic model as the '
+                                 'three-phase flash: active cubic equation of state with the '
+                                 'Huron-Vidal mixing rule for water-hydrocarbon pairs.'),
                                 ('h3', 'Líneas del diagrama', 'Diagram lines'),
                                 ('ul',
                                  [('2-HC (rocío HC): frontera entre la región monofásica y la '
@@ -5090,10 +5323,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Huron, M.-J. and Vidal, J. (1979). New mixing rules in simple '
                                  'equations of state for representing vapour-liquid equilibria of '
                                  'strongly non-ideal mixtures. <em>Fluid Phase Equilibria</em>, '
-                                 '3(4), 255–271.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 '3(4), 255–271.')]},
                    {'titulo': ('Mezcla binaria hidrocarburo + agua',
                                'Binary hydrocarbon + water mixture'),
                     'bloques': [('p',
@@ -5246,12 +5476,14 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('p',
                                  'donde φ<sub>i</sub> se evalúa con cada raíz. Con una sola raíz '
                                  'real, el carácter líquido o vapor se decide con el algoritmo de '
-                                 'identificación de HYSYS (véase «Algoritmo de identificación de '
-                                 'HYSYS»), cualquiera que sea la ecuación de estado activa.',
+                                 'identificación por compresibilidad (véase «Algoritmo de '
+                                 'identificación por compresibilidad»), cualquiera que sea la '
+                                 'ecuación de estado activa.',
                                  'where φ<sub>i</sub> is evaluated with each root. With a single '
                                  'real root, the liquid or vapor character is decided with the '
-                                 'HYSYS identification algorithm (see “HYSYS identification '
-                                 'algorithm”), whatever the active equation of state.'),
+                                 'compressibility-based identification algorithm (see '
+                                 '«Compressibility-based identification algorithm»), whatever the '
+                                 'active equation of state.'),
                                 ('h3', 'Densidad del líquido', 'Liquid density'),
                                 ('p',
                                  'La densidad de los nodos de tipo líquido sigue el método de '
@@ -5330,55 +5562,55 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Equilibria</em>, 8(1), 7–23.',
                                  'Péneloux, A., Rauzy, E. and Fréze, R. (1982). A consistent '
                                  'correction for Redlich-Kwong-Soave volumes. <em>Fluid Phase '
-                                 'Equilibria</em>, 8(1), 7–23.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 'Equilibria</em>, 8(1), 7–23.')]},
                    {'titulo': ('Diagramas presión-entalpía y temperatura-entropía',
                                'Pressure-enthalpy and temperature-entropy diagrams'),
                     'bloques': [('p',
-                                 'En el menú «Gráficos», «Diagrama de la envolvente» permite ver la '
-                                 'envolvente como presión-temperatura (por defecto), '
-                                 'presión-entalpía (P-H) o temperatura-entropía (T-S). La opción se '
-                                 'aplica a las ventanas de Envolvente de fases de la composición '
-                                 'principal y de los fluidos, no a la comparación de envolventes. '
-                                 'No se recalcula la envolvente: en cada punto la fase incipiente '
-                                 'tiene cantidad nula, así que la entalpía y la entropía de la '
-                                 'corriente son las de la fase existente, evaluadas con la ecuación '
-                                 'de estado de la mezcla: raíz líquida en la curva de burbuja y raíz '
-                                 'de vapor en la de rocío (con la corrección de Peneloux en la '
-                                 'entalpía cuando está activa). Para un componente puro la curva de '
-                                 'saturación da dos ramas, líquido y vapor saturados, que se unen en '
-                                 'el punto crítico. El punto marcado y el recorrido se ubican con un '
-                                 'flash en su presión y temperatura, el mismo de Equilibrio de fases, '
-                                 'por lo que un flash PH o PS cae exactamente sobre el diagrama. En el '
-                                 'diagrama P-H una válvula es una línea vertical y un intercambiador '
-                                 'a presión constante una horizontal; en el T-S una compresión o '
-                                 'expansión isentrópica es vertical. En estos diagramas no se '
-                                 'muestran el mapa de densidad, las líneas de isocalidad ni la curva '
-                                 'de hidratos, y no están disponibles con agua: al calcular la envolvente '
-                                 'con agua se ofrece pasar al diagrama presión-temperatura.',
+                                 'En el menú «Gráficos», «Diagrama de la envolvente» permite ver '
+                                 'la envolvente como presión-temperatura (por defecto), '
+                                 'presión-entalpía (P-H) o temperatura-entropía (T-S). La opción '
+                                 'se aplica a las ventanas de Envolvente de fases de la '
+                                 'composición principal y de los fluidos, no a la comparación de '
+                                 'envolventes. No se recalcula la envolvente: en cada punto la '
+                                 'fase incipiente tiene cantidad nula, así que la entalpía y la '
+                                 'entropía de la corriente son las de la fase existente, evaluadas '
+                                 'con la ecuación de estado de la mezcla: raíz líquida en la curva '
+                                 'de burbuja y raíz de vapor en la de rocío (con la corrección de '
+                                 'Peneloux en la entalpía cuando está activa). Para un componente '
+                                 'puro la curva de saturación da dos ramas, líquido y vapor '
+                                 'saturados, que se unen en el punto crítico. El punto marcado y '
+                                 'el recorrido se ubican con un flash en su presión y temperatura, '
+                                 'el mismo de Equilibrio de fases, por lo que un flash PH o PS cae '
+                                 'exactamente sobre el diagrama. En el diagrama P-H una válvula es '
+                                 'una línea vertical y un intercambiador a presión constante una '
+                                 'horizontal; en el T-S una compresión o expansión isentrópica es '
+                                 'vertical. En estos diagramas no se muestran el mapa de densidad, '
+                                 'las líneas de isocalidad ni la curva de hidratos, y no están '
+                                 'disponibles con agua: al calcular la envolvente con agua se '
+                                 'ofrece pasar al diagrama presión-temperatura.',
                                  'In the «Graphs» menu, «Envelope diagram» shows the envelope as '
                                  'pressure-temperature (default), pressure-enthalpy (P-H) or '
                                  'temperature-entropy (T-S). The option applies to the Phase '
-                                 'envelope windows of the main composition and of the fluids, not to '
-                                 'the envelope comparison. The envelope is not recalculated: at each '
-                                 'point the incipient phase has zero amount, so the stream enthalpy '
-                                 'and entropy are those of the existing phase, evaluated with the '
-                                 'mixture equation of state: liquid root on the bubble curve and '
-                                 'vapour root on the dew curve (with the Peneloux enthalpy correction '
-                                 'when active). For a pure component the saturation curve gives two '
-                                 'branches, saturated liquid and vapour, meeting at the critical '
-                                 'point. The marked point and the path are placed with a flash at '
-                                 'their pressure and temperature, the same as in Phase equilibrium, '
-                                 'so a PH or PS flash falls exactly on the diagram. In the P-H '
-                                 'diagram a valve is a vertical line and a constant-pressure '
-                                 'exchanger a horizontal one; in the T-S diagram an isentropic '
-                                 'compression or expansion is vertical. The density map, quality '
-                                 'lines and hydrate curve are not shown in these diagrams, and they '
-                                 'are not available with water: when calculating the envelope with water, '
-                                 'switching to the pressure-temperature diagram is offered.')]},
-                   {'titulo': ('Recorrido de presión y temperatura', 'Pressure and temperature path'),
+                                 'envelope windows of the main composition and of the fluids, not '
+                                 'to the envelope comparison. The envelope is not recalculated: at '
+                                 'each point the incipient phase has zero amount, so the stream '
+                                 'enthalpy and entropy are those of the existing phase, evaluated '
+                                 'with the mixture equation of state: liquid root on the bubble '
+                                 'curve and vapour root on the dew curve (with the Peneloux '
+                                 'enthalpy correction when active). For a pure component the '
+                                 'saturation curve gives two branches, saturated liquid and '
+                                 'vapour, meeting at the critical point. The marked point and the '
+                                 'path are placed with a flash at their pressure and temperature, '
+                                 'the same as in Phase equilibrium, so a PH or PS flash falls '
+                                 'exactly on the diagram. In the P-H diagram a valve is a vertical '
+                                 'line and a constant-pressure exchanger a horizontal one; in the '
+                                 'T-S diagram an isentropic compression or expansion is vertical. '
+                                 'The density map, quality lines and hydrate curve are not shown '
+                                 'in these diagrams, and they are not available with water: when '
+                                 'calculating the envelope with water, switching to the '
+                                 'pressure-temperature diagram is offered.')]},
+                   {'titulo': ('Recorrido de presión y temperatura',
+                               'Pressure and temperature path'),
                     'bloques': [('p',
                                  'El recorrido de presión y temperatura dibuja sobre la envolvente '
                                  'una serie de puntos (P, T) unidos por flechas en el orden '
@@ -5392,239 +5624,53 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'The pressure and temperature path draws on the envelope a series '
                                  'of (P, T) points joined by arrows in the order entered, for '
                                  'example a reservoir depletion followed by the separator. It is '
-                                 'opened from the Graphics menu («Pressure and temperature '
-                                 'path»): the main composition or a fluid from the manager is '
-                                 'chosen and the points are entered in the active units. On '
-                                 'accepting, the envelope of that fluid is opened, recalculated '
-                                 'with its current composition, and the numbered points are '
-                                 'plotted. Leaving the list empty removes the path.')]},
+                                 'opened from the Graphics menu («Pressure and temperature path»): '
+                                 'the main composition or a fluid from the manager is chosen and '
+                                 'the points are entered in the active units. On accepting, the '
+                                 'envelope of that fluid is opened, recalculated with its current '
+                                 'composition, and the numbered points are plotted. Leaving the '
+                                 'list empty removes the path.')]},
                    {'titulo': ('Marcadores y valores de los puntos', 'Markers and point values'),
                     'bloques': [('p',
                                  'En el menú Gráficos, «Mostrar marcadores» muestra u oculta los '
                                  'triángulos de las curvas de la envolvente y de la comparación de '
-                                 'envolventes; sin ellos, las curvas quedan como línea continua. El '
-                                 'recorrido de presión y temperatura y el punto crítico conservan su '
-                                 'marcador. «Mostrar valores en algunos puntos» marca solo algunos '
-                                 'puntos repartidos a lo largo de cada curva de la envolvente y del '
-                                 'análisis de sensibilidad, y escribe junto a cada uno su valor en la '
-                                 'forma «eje y:eje x», sin nombre ni unidad (las unidades son las de '
-                                 'los ejes).',
-                                 'In the Graphics menu, «Show markers» shows or hides the triangles '
-                                 'of the envelope curves and of the envelope comparison; without '
-                                 'them the curves are drawn as a continuous line. The pressure and '
-                                 'temperature path and the critical point keep their marker. «Show '
-                                 'values at some points» marks only a few points spread along each '
-                                 'curve of the envelope and of the sensitivity analysis, and writes '
-                                 'next to each one its value as «y axis:x axis», without name or '
-                                 'unit (the units are those of the axes).')]},
-                   {'titulo': ('Flash de presión y entalpía', 'Pressure-enthalpy flash'),
-                    'bloques': [('p',
-                                 'El selector «Tipo de flash» de la barra superior define, para todo '
-                                 'el programa (composición principal y fluidos), qué variables se '
-                                 'especifican en Equilibrio de fases: presión y temperatura (flash '
-                                 'PT) o presión y entalpía (flash PH). En el flash PH se ingresa la '
-                                 'entalpía molar de la mezcla en lugar de la temperatura, y la '
-                                 'temperatura resultante se muestra como una propiedad más del '
-                                 'resumen. Es el cálculo de una válvula, un choke o una tubería '
-                                 'adiabática, donde la entalpía se conserva (Q = 0 y W = 0 en el '
-                                 'balance de energía con flujo).',
-                                 'The «Flash type» selector in the top bar defines, for the whole '
-                                 'program (main composition and fluids), which variables are '
-                                 'specified in Phase equilibrium: pressure and temperature (PT '
-                                 'flash) or pressure and enthalpy (PH flash). In the PH flash the '
-                                 'molar enthalpy of the mixture is entered instead of the '
-                                 'temperature, and the resulting temperature is shown as one more '
-                                 'property of the summary. It is the calculation of a valve, a choke '
-                                 'or an adiabatic pipe, where enthalpy is conserved (Q = 0 and W = 0 '
-                                 'in the flowing energy balance).'),
+                                 'envolventes; sin ellos, las curvas quedan como línea continua. '
+                                 'El recorrido de presión y temperatura y el punto crítico '
+                                 'conservan su marcador. «Mostrar valores en algunos puntos» marca '
+                                 'solo algunos puntos repartidos a lo largo de cada curva de la '
+                                 'envolvente y del análisis de sensibilidad, y escribe junto a '
+                                 'cada uno su valor en la forma «eje y:eje x», sin nombre ni '
+                                 'unidad (las unidades son las de los ejes).',
+                                 'In the Graphics menu, «Show markers» shows or hides the '
+                                 'triangles of the envelope curves and of the envelope comparison; '
+                                 'without them the curves are drawn as a continuous line. The '
+                                 'pressure and temperature path and the critical point keep their '
+                                 'marker. «Show values at some points» marks only a few points '
+                                 'spread along each curve of the envelope and of the sensitivity '
+                                 'analysis, and writes next to each one its value as «y axis:x '
+                                 'axis», without name or unit (the units are those of the axes).'),
                                 ('p',
-                                 'La temperatura se obtiene resolviendo H(T, P) = H especificada, '
-                                 'donde H es la entalpía de la mezcla del flash PT a esa temperatura '
-                                 '(la misma que muestra Equilibrio de fases: suma de las fases '
-                                 'ponderada por su fracción molar, con la EOS, los kij y el método '
-                                 'de densidad de la corriente). A presión constante H crece con T '
-                                 '(dH/dT = Cp, incluido el calor latente), por lo que la solución es '
-                                 'única: se estima con la pendiente local, se acota un intervalo con '
-                                 'cambio de signo y se resuelve con el método de Brent, robusto '
-                                 'aunque aparezca o desaparezca una fase dentro del intervalo.',
-                                 'The temperature is obtained by solving H(T, P) = specified H, '
-                                 'where H is the mixture enthalpy of the PT flash at that '
-                                 'temperature (the same shown in Phase equilibrium: sum of the '
-                                 'phases weighted by their mole fraction, with the stream EOS, kij '
-                                 'and density method). At constant pressure H increases with T '
-                                 '(dH/dT = Cp, including latent heat), so the solution is unique: it '
-                                 'is estimated with the local slope, an interval with a sign change '
-                                 'is bracketed and solved with Brent\'s method, robust even if a '
-                                 'phase appears or disappears inside the interval.')]},
-                   {'titulo': ('Flash de presión y entropía', 'Pressure-entropy flash'),
-                    'bloques': [('p',
-                                 'Con la opción «Presión y entropía» del selector «Tipo de flash» se '
-                                 'ingresa la entropía molar de la mezcla en lugar de la temperatura. '
-                                 'Es el cálculo de una compresión o expansión ideal: adiabática '
-                                 '(Q = 0) y reversible (sin entropía generada), en la que la entropía '
-                                 'se conserva. Con la entropía de la succión y la presión de descarga '
-                                 'se obtiene la temperatura de descarga isentrópica de un compresor, '
-                                 'o la de salida de un turboexpansor; la máquina real se corrige con '
-                                 'su eficiencia a partir de la entalpía ideal resultante. La '
-                                 'temperatura se obtiene igual que en el flash PH, resolviendo '
-                                 'S(T, P) = S especificada (a presión constante dS/dT = Cp/T > 0, '
-                                 'por lo que la solución es única).',
-                                 'With the «Pressure and entropy» option of the «Flash type» '
-                                 'selector, the molar entropy of the mixture is entered instead of '
-                                 'the temperature. It is the calculation of an ideal compression or '
-                                 'expansion: adiabatic (Q = 0) and reversible (no entropy '
-                                 'generated), in which entropy is conserved. With the suction '
-                                 'entropy and the discharge pressure, the isentropic discharge '
-                                 'temperature of a compressor or the outlet temperature of a '
-                                 'turboexpander is obtained; the real machine is corrected with its '
-                                 'efficiency from the resulting ideal enthalpy. The temperature is '
-                                 'obtained as in the PH flash, by solving S(T, P) = specified S (at '
-                                 'constant pressure dS/dT = Cp/T > 0, so the solution is unique).')]},
-                   {'titulo': ('Flash de presión o temperatura y fracción de vapor',
-                               'Pressure or temperature and vapour fraction flash'),
-                    'bloques': [('p',
-                                 'Con las opciones «Presión y fracción de vapor» (P-β) y «Temperatura '
-                                 'y fracción de vapor» (T-β) del selector «Tipo de flash» se fija la '
-                                 'fracción molar de vapor β y se calcula la temperatura o la presión '
-                                 'a la que la mezcla tiene esa fracción. β se refiere solo a las fases '
-                                 'de hidrocarburo, V/(V + L), sin contar la fase acuosa, igual que en '
-                                 'PVTsim. Con β = 0 se obtiene el punto de burbuja y con β = 1 el de '
-                                 'rocío; si ese punto no existe a la condición dada, se informa. Para '
-                                 'valores intermedios la incógnita se acota entre los puntos de '
-                                 'saturación y se resuelve con el método de Brent: a presión '
-                                 'constante β crece con la temperatura, y a temperatura constante '
-                                 'disminuye con la presión. Entre la cricondenterma y la temperatura '
-                                 'crítica (región retrógrada) una misma β puede darse a dos '
-                                 'presiones; se informa la de menor presión. Sirven para construir '
-                                 'líneas de calidad y para conocer las condiciones de un separador '
-                                 'que deben producir un porcentaje dado de vapor.',
-                                 'With the «Pressure and vapour fraction» (P-β) and «Temperature and '
-                                 'vapour fraction» (T-β) options of the «Flash type» selector, the '
-                                 'molar vapour fraction β is fixed and the temperature or pressure '
-                                 'at which the mixture has that fraction is calculated. β refers only '
-                                 'to the hydrocarbon phases, V/(V + L), excluding the aqueous phase, '
-                                 'as in PVTsim. β = 0 gives the bubble point and β = 1 the dew point; '
-                                 'if that point does not exist at the given condition, it is reported. '
-                                 'For intermediate values the unknown is bracketed between the '
-                                 'saturation points and solved with Brent\'s method: at constant '
-                                 'pressure β increases with temperature, and at constant temperature '
-                                 'it decreases with pressure. Between the cricondentherm and the '
-                                 'critical temperature (retrograde region) the same β may occur at '
-                                 'two pressures; the lower pressure is reported. They are used to '
-                                 'build quality lines and to find the separator conditions that '
-                                 'produce a given percentage of vapour.')]},
-                   {'titulo': ('Operaciones unitarias', 'Unit operations'),
-                    'bloques': [
-                                ('p',
-                                 'El módulo de operaciones unitarias se abre desde «Operaciones unitarias» en el menú «Cálculos». En la ventana de ingreso de datos se elige en listas desplegables la operación (compresor, expansor, enfriador, calentador, bomba, válvula o separador de una etapa), el flujo (lbmol/h, kgmol/h, lb/h, kg/h, MMscfd o Sm³/d), la temperatura (relativa o absoluta, que rige también la temperatura de salida) y la presión de entrada, la especificación de salida propia de cada operación, el modelo (ecuación de estado, densidad y corrección de volumen) y la cromatografía, que puede cargarse desde la composición principal o desde un fluido. El cálculo se hace con la ventana abierta; si las especificaciones no tienen solución se advierte y no se abre la ventana de resultados. Todas las operaciones usan los flashes PT, PH y PS de Equilibrio de fases sobre la corriente completa (con agua, flash trifásico).',
-                                 'The unit operations module is opened from «Unit operations» in the «Calculations» menu. In the data input window the operation is chosen (compressor, expander, cooler, heater, pump, valve or single-stage separator), together with the flow (lbmol/h, kgmol/h, lb/h, kg/h, MMscfd or Sm³/d), the inlet temperature (relative or absolute, which also applies to the outlet temperature) and pressure, the outlet specification of each operation, the model (equation of state, density and volume correction) and the chromatography, which can be loaded from the main composition or from a fluid. The calculation runs with the window open; if the specifications have no solution a warning is shown and the results window is not opened. All operations use the PT, PH and PS flashes of Phase equilibrium on the whole stream (with water, three-phase flash).'),
-                                ('p',
-                                 'Compresor clásico: se especifica el incremento de presión o la presión de salida y la eficiencia isentrópica η. Con un flash PT se obtienen H y S de entrada; un flash PS a la presión de salida da la temperatura y la entalpía isentrópicas; la entalpía real es H₂ = H₁ + (H₂s − H₁)/η y un flash PH da la temperatura de salida. El trabajo es el flujo molar por H₂ − H₁.',
-                                 'Classical compressor: the pressure increase or the outlet pressure and the isentropic efficiency η are specified. A PT flash gives the inlet H and S; a PS flash at the outlet pressure gives the isentropic temperature and enthalpy; the actual enthalpy is H₂ = H₁ + (H₂s − H₁)/η and a PH flash gives the outlet temperature. The work is the molar flow times H₂ − H₁.'),
-                                ('p',
-                                 'Compresor politrópico (método PACE de PVTsim, trayectoria de eficiencia constante que generaliza la compresión politrópica a varias fases): la compresión se divide en 50 tramos de igual ΔP (los mismos que PVTsim); cada tramo es un flash PS seguido de la corrección por η y un flash PH. Además del trabajo se informan el head (trabajo dividido por el caudal másico y g, en ft o m) y los valores mínimos y máximos de las funciones de Schultz X = (T/V)(∂V/∂T)P − 1 e Y = −(P/V)(∂V/∂P)T al final de cada tramo de la trayectoria, con derivadas exactas de la ecuación de estado. Como en PVTsim, la salida puede especificarse como presión y eficiencia, trabajo y eficiencia, head y eficiencia, o presión y temperatura de salida (de donde se obtiene η); las tres últimas se resuelven por iteración sobre la trayectoria completa.',
-                                 'Polytropic compressor (PVTsim PACE method, path of constant efficiency that generalizes polytropic compression to several phases): the compression is divided into 50 steps of equal ΔP (the same as PVTsim); each step is a PS flash followed by the η correction and a PH flash. Besides the work, the head (work divided by the mass flow and g, in ft or m) and the minimum and maximum values of the Schultz functions X = (T/V)(∂V/∂T)P − 1 and Y = −(P/V)(∂V/∂P)T at the end of each step of the path, with exact equation-of-state derivatives, are reported. As in PVTsim, the outlet can be specified as pressure and efficiency, work and efficiency, head and efficiency, or outlet pressure and temperature (from which η is obtained); the last three are solved by iterating on the full path.'),
-                                ('p',
-                                 'Expansor: caída de presión o presión de salida y eficiencia isentrópica; H₂ = H₁ − η(H₁ − H₂s). Bomba: incremento de presión o presión de salida y eficiencia, definida como en PVTsim por η = V̄·ΔP/ΔH, donde el volumen medio bombeado V̄ es el volumen molar de la corriente a la temperatura de entrada y a la presión media (P₁ + P₂)/2 (ecuación de estado, con Peneloux si está activo). El cambio de entalpía es ΔH = V̄·ΔP/η y un flash PH da la temperatura de salida; así se reproducen la entalpía y la temperatura de descarga de PVTsim, también cuando la corriente cambia de fase. No se acepta una corriente de solo gas en la entrada. Enfriador y calentador: cambio de temperatura o temperatura de salida y caída de presión; la capacidad es el calor transferido al fluido por unidad de tiempo (negativa en el enfriador). Válvula: caída de presión o presión de salida a entalpía constante (flash PH). Separador: flash PT a las condiciones de entrada; las fases se informan como corrientes de gas, líquido y agua.',
-                                 'Expander: pressure drop or outlet pressure and isentropic efficiency; H₂ = H₁ − η(H₁ − H₂s). Pump: pressure increase or outlet pressure and efficiency, defined as in PVTsim by η = V̄·ΔP/ΔH, where the mean pumped volume V̄ is the molar volume of the stream at the inlet temperature and the mean pressure (P₁ + P₂)/2 (equation of state, with Peneloux when active). The enthalpy change is ΔH = V̄·ΔP/η and a PH flash gives the outlet temperature; this reproduces the PVTsim discharge enthalpy and temperature, also when the stream changes phase. A gas-only stream is not accepted at the inlet. Cooler and heater: temperature change or outlet temperature and pressure drop; the capacity is the heat transferred to the fluid per unit time (negative for the cooler). Valve: pressure drop or outlet pressure at constant enthalpy (PH flash). Separator: PT flash at the inlet conditions; the phases are reported as gas, liquid and water streams.'),
-                                ('p',
-                                 'La ventana de resultados, de ancho fijo como la de Equilibrio de fases, tiene tres hojas que se eligen en una lista, como las de PVTsim: Resultados (presión, temperatura y flujos molar, másico, volumétrico estándar —MMscfd a 60 °F y 14.696 psia o Sm³/d a 15 °C y 101.325 kPa, como gas ideal— y volumétrico a P y T de cada corriente, y los resultados de la operación; en el separador las corrientes son la alimentación y las salidas N°1 vapor, N°2 líquido y N°3 acuosa), Propiedades (de cada fase, con la entrada y la salida en una misma tabla) y Composición (global y de cada fase en la entrada y en la salida, en fracción o porcentaje molar o másico, o como flujo molar o másico por componente). Se muestran siempre las columnas de vapor y de líquido, y la de fase acuosa si la corriente tiene agua; una fase que no existe queda sombreada. Cada hoja ajusta la ventana a su propio tamaño. Si en el compresor, el expansor o la bomba la mezcla forma más de una fase en la entrada o en la salida, se muestra una advertencia.',
-                                 "The results window, of fixed width like Phase equilibrium, has three sheets chosen from a list, like PVTsim's: Results (pressure, temperature and molar, mass, standard volumetric —MMscfd at 60 °F and 14.696 psia or Sm³/d at 15 °C and 101.325 kPa, as ideal gas— and volumetric flow at P and T of each stream, and the operation results; in the separator the streams are the feed and outlets No. 1 vapour, No. 2 liquid and No. 3 aqueous), Properties (of each phase, with inlet and outlet in one table) and Composition (overall and of each phase at inlet and outlet, as mole or mass fraction or percent, or as component molar or mass flow). The vapour and liquid columns are always shown, plus the aqueous phase column when the stream has water; a phase that does not exist is shaded. Each sheet fits the window to its own size. If the mixture forms more than one phase at the inlet or outlet of the compressor, expander or pump, a warning is shown.")]},
-                   {'titulo': ('Contenido de agua de saturación', 'Saturation water content'),
-                    'bloques': [('p',
-                                 'El contenido de agua de saturación se obtiene agregando a la corriente exactamente el agua '
-                                 'que admite a una presión y temperatura sin formar agua libre: la '
-                                 'fase acuosa queda incipiente, de modo que al bajar la temperatura '
-                                 'a presión constante condensaría agua. Es la opción «Saturate w. '
-                                 'water» de PVTsim. La cantidad se obtiene de un flash multifásico '
-                                 '(Huron-Vidal, con la EOS de la corriente) con un exceso mínimo de '
-                                 'agua libre: el agua disuelta en las fases de hidrocarburo da la '
-                                 'relación agua/hidrocarburo de saturación, que se afina reduciendo '
-                                 'ese exceso. Las proporciones entre hidrocarburos no cambian.',
-                                 'The saturation water content is obtained by adding to the stream exactly the water it can hold '
-                                 'at a given pressure and temperature without forming free water: '
-                                 'the aqueous phase is incipient, so water would condense if the '
-                                 'temperature were lowered at constant pressure. It is the PVTsim '
-                                 '«Saturate w. water» option. The amount is obtained from a '
-                                 'multiphase flash (Huron-Vidal, with the stream EOS) with a minimal '
-                                 'excess of free water: the water dissolved in the hydrocarbon phases '
-                                 'gives the saturation water/hydrocarbon ratio, refined by reducing '
-                                 'that excess. The ratios between hydrocarbons do not change.'),
-                                ('p',
-                                 'Si la composición de entrada ya contiene agua, se satura su parte '
-                                 'de hidrocarburos y el agua ingresada se compara con la de '
-                                 'saturación: la corriente está subsaturada (se informa el agua '
-                                 'faltante), saturada, o con agua libre (se informa el exceso). El '
-                                 'agua faltante o en exceso es la diferencia simple entre el '
-                                 'porcentaje molar de agua de saturación y el ingresado. También se informa el contenido '
-                                 'de agua del gas saturado en lb/MMscf y las fases de hidrocarburo '
-                                 'presentes. La composición saturada puede cargarse en la composición '
-                                 'actual (la composición principal o el fluido analizado) o guardarse como un fluido nuevo; '
-                                 'al cargarla se activa el agua en todo el programa.',
-                                 'If the input composition already contains water, its hydrocarbon '
-                                 'part is saturated and the entered water is compared with the '
-                                 'saturation water: the stream is undersaturated (the missing water '
-                                 'is reported), saturated, or with free water (the excess is '
-                                 'reported). The missing or excess water is the simple difference '
-                                 'between the saturation and the entered water mole percent. The water content of the '
-                                 'saturated gas in lb/MMscf and the hydrocarbon phases present are '
-                                 'also reported. The saturated composition can be loaded into the '
-                                 'current composition (the main composition or the analysed fluid) or saved as a new fluid; '
-                                 'loading it activates water in the whole program.')]},
-                   {'titulo': ('Flash múltiple', 'Multiple flash'),
-                    'bloques': [('p',
-                                 'El flash múltiple repite el cálculo de equilibrio de fases en '
-                                 'una lista de condiciones (P, T) para un mismo fluido. Se abre '
-                                 'desde el menú Herramientas («Flash múltiple») o desde el '
-                                 'Navegador, en Cálculos. En la ventana de entrada se elige la '
-                                 'composición principal o un fluido del gestor, se ingresan las '
-                                 'condiciones de cada corrida en las unidades activas y se marcan '
-                                 'las propiedades a mostrar. Cada punto se resuelve con el mismo '
-                                 'motor que la ventana de Equilibrio de fases (flash bifásico, o '
-                                 'trifásico si el fluido contiene agua), con la EOS, los kij y el '
-                                 'método de densidad del fluido. El resultado es una tabla con el '
-                                 'número de corrida, la presión, la temperatura y las propiedades '
-                                 'elegidas, que puede exportarse a CSV. En el grupo «Puntos de '
-                                 'saturación e hidratos» pueden pedirse, para cada corrida, la '
-                                 'temperatura de rocío, de burbuja y de formación de hidrato a la '
-                                 'presión de la corrida; la presión de rocío, de burbuja y de '
-                                 'formación de hidrato a la temperatura de la corrida; y el margen '
-                                 'frente a hidratos (temperatura de la corrida menos temperatura de '
-                                 'hidrato: positivo fuera de la zona de hidratos). Se calculan con '
-                                 'los mismos métodos que las ventanas de Puntos de saturación y de '
-                                 'Formación de hidratos; la celda queda vacía si el punto no existe.',
-                                 'The multiple flash repeats the phase equilibrium calculation over '
-                                 'a list of (P, T) conditions for one fluid. It is opened from the '
-                                 'Tools menu («Multiple flash») or from the Navigator, under '
-                                 'Calculations. In the input window the main composition or a '
-                                 'fluid from the manager is chosen, the conditions of each run are '
-                                 'entered in the active units and the properties to display are '
-                                 'checked. Each point is solved with the same engine as the Phase '
-                                 'equilibrium window (two-phase flash, or three-phase flash when '
-                                 'the fluid contains water), with the EOS, kij and density method '
-                                 'of the fluid. The result is a table with the run number, '
-                                 'pressure, temperature and the chosen properties, which can be '
-                                 'exported to CSV. The group «Saturation and hydrate points» adds, '
-                                 'for each run, the dew, bubble and hydrate formation temperatures '
-                                 'at the run pressure; the dew, bubble and hydrate formation '
-                                 'pressures at the run temperature; and the hydrate margin (run '
-                                 'temperature minus hydrate temperature: positive outside the '
-                                 'hydrate region). They are computed with the same methods as the '
-                                 'Saturation points and Hydrate formation windows; the cell is left '
-                                 'empty when the point does not exist.')]},
+                                 'Todos los gráficos del programa disponen de un menú contextual, '
+                                 'que se abre con el botón derecho del ratón, con las opciones '
+                                 'Mostrar líneas de cuadrícula, Guardar imagen (PNG, PDF o SVG, a '
+                                 '200 ppp) y Copiar imagen al portapapeles.',
+                                 'All charts in the program have a context menu, opened with the '
+                                 'right mouse button, with the options Show gridlines, Save image '
+                                 '(PNG, PDF or SVG, at 200 dpi) and Copy image to the '
+                                 'clipboard.')]},
                    {'titulo': ('Comparación de envolventes', 'Envelope comparison'),
                     'bloques': [('p',
-                                 'La comparación de envolventes traza en un mismo diagrama P-T '
-                                 'las envolventes de la composición principal y de los fluidos '
-                                 'del gestor de fluidos. Se abre desde el menú Gráficos '
-                                 '(«Comparar envolventes») o desde el gestor de fluidos. Una '
-                                 'ventana de dos listas permite elegir los fluidos; debe '
-                                 'seleccionarse al menos uno.',
+                                 'La comparación de envolventes traza en un mismo diagrama P-T las '
+                                 'envolventes de la composición principal y de los fluidos del '
+                                 'gestor de fluidos. Se abre desde el menú Gráficos («Comparar '
+                                 'envolventes») o desde el gestor de fluidos. Una ventana de dos '
+                                 'listas permite elegir los fluidos; debe seleccionarse al menos '
+                                 'uno.',
                                  'Envelope comparison plots, on the same P-T diagram, the '
-                                 'envelopes of the main composition and of the fluids in the '
-                                 'fluid manager. It is opened from the Graphics menu («Compare '
-                                 'envelopes») or from the fluid manager. A two-list window '
-                                 'is used to choose the fluids; at least one must be selected.'),
+                                 'envelopes of the main composition and of the fluids in the fluid '
+                                 'manager. It is opened from the Graphics menu («Compare '
+                                 'envelopes») or from the fluid manager. A two-list window is used '
+                                 'to choose the fluids; at least one must be selected.'),
                                 ('ul',
                                  [('Cada fluido se calcula con su propia ecuación de estado y sus '
                                    'coeficientes de interacción; la composición principal usa los '
@@ -5652,13 +5698,44 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'Each fluid has its own colour; the curves keep the style of '
                                    'the individual envelope (thin line with triangular markers) '
                                    'and the critical point is marked with a square.'),
-                                  ('El panel lateral muestra el punto crítico, la '
-                                   'cricondentérmica y la cricondenbárica del fluido elegido, y '
-                                   'permite resaltar un fluido: los demás se vuelven '
-                                   'translúcidos.',
+                                  ('El panel lateral muestra el punto crítico, la cricondentérmica '
+                                   'y la cricondenbárica del fluido elegido, y permite resaltar un '
+                                   'fluido: los demás se vuelven translúcidos.',
                                    'The side panel shows the critical point, cricondentherm and '
-                                   'cricondenbar of the selected fluid, and allows one fluid to '
-                                   'be highlighted: the others become translucent.')])]}]},
+                                   'cricondenbar of the selected fluid, and allows one fluid to be '
+                                   'highlighted: the others become translucent.')])]},
+                   {'titulo': ('Historial de envolventes de un pozo', 'Well envelope history'),
+                    'bloques': [('p',
+                                 'El historial de envolventes compara las envolventes de fases de '
+                                 'muestras sucesivas de un mismo pozo o corriente, para seguir la '
+                                 'evolución de su composición en el tiempo. En la ventana de '
+                                 'ingreso se eligen la ecuación de estado y el método de trazado '
+                                 '(Michelsen o Ziervogel-Poling) y se cargan las muestras, cada '
+                                 'una con su composición y su fecha de muestreo; las muestras '
+                                 'agregadas pueden quitarse o volver a cargarse para corregirlas. '
+                                 'La envolvente de cada muestra se calcula con los mismos métodos '
+                                 'que la envolvente individual.',
+                                 'The envelope history compares the phase envelopes of successive '
+                                 'samples from the same well or stream, in order to follow the '
+                                 'evolution of its composition over time. In the input window the '
+                                 'equation of state and the tracing method (Michelsen or '
+                                 'Ziervogel-Poling) are selected and the samples are loaded, each '
+                                 'with its composition and sampling date; added samples can be '
+                                 'removed or reloaded for correction. The envelope of each sample '
+                                 'is computed with the same methods as the individual envelope.'),
+                                ('p',
+                                 'La ventana de resultados muestra las envolventes superpuestas, '
+                                 'con un color por fecha de muestreo, y la evolución en el tiempo '
+                                 'de la cricondenterma, de la cricondenbara y de la fracción molar '
+                                 'del componente elegido en un selector. La vista 3D presenta las '
+                                 'envolventes en el espacio temperatura – fecha de muestreo – '
+                                 'presión.',
+                                 'The results window shows the superimposed envelopes, with one '
+                                 'color per sampling date, and the evolution over time of the '
+                                 'cricondentherm, the cricondenbar and the mole fraction of the '
+                                 'component chosen in a selector. The 3D view presents the '
+                                 'envelopes in the temperature – sampling date – pressure '
+                                 'space.')]}]},
  {'titulo': ('Puntos de saturación', 'Saturation points'),
   'subsecciones': [{'titulo': ('Definición y tipos de cálculo', 'Definition and calculation types'),
                     'bloques': [('p',
@@ -5729,12 +5806,8 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Whitson, C.H. y Brulé, M.R. (2000). <em>Phase Behavior</em>. SPE '
                                  'Monograph Series, vol. 20. Society of Petroleum Engineers.',
                                  'Whitson, C.H. and Brulé, M.R. (2000). <em>Phase Behavior</em>. '
-                                 'SPE Monograph Series, vol. 20. Society of Petroleum Engineers.'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.')]},
+                                 'SPE Monograph Series, vol. 20. Society of Petroleum '
+                                 'Engineers.')]},
                    {'titulo': ('Sistema de ecuaciones y resolución',
                                'Equation system and solution'),
                     'bloques': [('p',
@@ -6014,12 +6087,10 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Analogous situations occur on the bubble branch of oils and on '
                                  'the low-pressure dew tail of rich gases.'),
                                 ('p',
-                                 'ThermoPhase informa la raíz normal según la convención de HYSYS, '
-                                 'que corresponde a la frontera alcanzada desde el lado monofásico '
-                                 'habitual:',
-                                 'ThermoPhase reports the normal root according to the HYSYS '
-                                 'convention, which corresponds to the boundary reached from the '
-                                 'usual single-phase side:'),
+                                 'ThermoPhase informa la raíz normal, que corresponde a la '
+                                 'frontera alcanzada desde el lado monofásico habitual:',
+                                 'ThermoPhase reports the normal root, which corresponds to the '
+                                 'boundary reached from the usual single-phase side:'),
                                 ('ul',
                                  [('Temperatura de rocío: la mayor de las soluciones.',
                                    'Dew-point temperature: the largest of the solutions.'),
@@ -6070,11 +6141,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'for the dew-point pressure and P × 1.01 for the bubble-point '
                                  'pressure), no hydrocarbon two-phase region exists.'),
                                 ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.'),
                                 ('p',
                                  'Whitson, C.H. y Brulé, M.R. (2000). <em>Phase Behavior</em>. SPE '
                                  'Monograph Series, vol. 20. Society of Petroleum Engineers.',
@@ -6236,10 +6302,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Michelsen, M.L. (1982). The isothermal flash problem. Part I. '
                                  'Stability. <em>Fluid Phase Equilibria</em>, 9(1), 1–19.',
                                  'Michelsen, M.L. (1982). The isothermal flash problem. Part I. '
-                                 'Stability. <em>Fluid Phase Equilibria</em>, 9(1), 1–19.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 'Stability. <em>Fluid Phase Equilibria</em>, 9(1), 1–19.')]},
                    {'titulo': ('Propiedades reportadas en el punto de saturación',
                                'Properties reported at the saturation point'),
                     'bloques': [('p',
@@ -6266,19 +6329,22 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'button; the first six are shown by default:'),
                                 ('ul',
                                  [('Peso molecular, factor de compresibilidad, densidad másica y '
-                                   'gravedad específica.',
+                                   'gravedad específica; gravedad específica real para la fase '
+                                   'vapor.',
                                    'Molecular weight, compressibility factor, mass density and '
-                                   'specific gravity.'),
+                                   'specific gravity; real specific gravity for the vapor phase.'),
                                   ('Entalpía molar y entropía molar, con la contribución residual '
                                    'de la misma ecuación de estado.',
                                    'Molar enthalpy and molar entropy, with the residual '
                                    'contribution of the same equation of state.'),
                                   ('Viscosidad por el método de Lohrenz-Bray-Clark (cP).',
                                    'Viscosity by the Lohrenz-Bray-Clark method (cP).'),
-                                  ('Poder calorífico superior e inferior, másicos (BTU/lb) y '
-                                   'volumétricos (BTU/ft³), según GPSA.',
-                                   'Higher and lower heating values, mass-based (BTU/lb) and '
-                                   'volumetric (BTU/ft³), according to GPSA.'),
+                                  ('Poder calorífico superior e inferior en las bases descritas en '
+                                   '«Poder calorífico: definiciones y bases»; las bases real y '
+                                   'húmeda se informan solo para la fase vapor.',
+                                   'Gross and net heating value on the bases described in «Heating '
+                                   'value: definitions and bases»; the real and wet bases are '
+                                   'reported for the vapor phase only.'),
                                   ('GPM C3+ (gal/1000 ft³), solo para la fase vapor.',
                                    'GPM C3+ (gal/1000 ft³), for the vapor phase only.')]),
                                 ('p',
@@ -6318,15 +6384,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'densidad, la gravedad específica y el factor de compresibilidad '
                                  'de la mezcla son los del vapor, y en un punto de burbuja los del '
                                  'líquido. El peso molecular y los poderes caloríficos de la '
-                                 'mezcla se calculan con la composición global; la entalpía, la '
-                                 'entropía y la viscosidad no se informan para la mezcla.',
+                                 'mezcla en base ideal seca y másica seca se calculan con la '
+                                 'composición global; la entalpía, la entropía y la viscosidad no '
+                                 'se informan para la mezcla.',
                                  'The Mixture column coincides with the saturated phase, because '
                                  'the incipient phase has zero fraction: at a dew point the '
                                  'density, specific gravity and compressibility factor of the '
                                  'mixture are those of the vapor, and at a bubble point those of '
-                                 'the liquid. The molecular weight and heating values of the '
-                                 'mixture are computed with the overall composition; enthalpy, '
-                                 'entropy and viscosity are not reported for the mixture.'),
+                                 'the liquid. The molecular weight and the ideal dry and mass dry '
+                                 'heating values of the mixture are computed with the overall '
+                                 'composition; enthalpy, entropy and viscosity are not reported '
+                                 'for the mixture.'),
                                 ('p',
                                  'Con agua activa, las propiedades de cada fase se calculan con el '
                                  'mismo procedimiento del flash trifásico (factores de '
@@ -6383,12 +6451,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
                                  'Data Book</em>, 10.ª ed. GPSA.',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
-                                 'Data Book</em>, 10th ed. GPSA.'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.')]}]},
+                                 'Data Book</em>, 10th ed. GPSA.')]}]},
  {'titulo': ('Propiedades volumétricas', 'Volumetric properties'),
   'subsecciones': [{'titulo': ('Densidad y factor de compresibilidad por la ecuación de estado',
                                'Density and compressibility factor from the equation of state'),
@@ -6398,17 +6461,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'la medición de inventarios. Una vez resuelto el equilibrio de '
                                  'fases, ThermoPhase obtiene el factor de compresibilidad de cada '
                                  'fase como la raíz correspondiente de la ecuación cúbica de '
-                                 'estado activa (Peng-Robinson o Soave-Redlich-Kwong, con los '
-                                 'juegos de parámetros de HYSYS o de PVTsim): la raíz mayor para '
-                                 'la fase vapor y la raíz menor para la fase líquida.',
+                                 'estado activa: la raíz mayor para la fase vapor y la raíz menor '
+                                 'para la fase líquida.',
                                  'The density of each phase is required for sizing pipes and '
                                  'vessels, for pressure-drop calculations and for inventory '
                                  'measurement. Once phase equilibrium is solved, ThermoPhase '
                                  'obtains the compressibility factor of each phase as the '
-                                 'corresponding root of the active cubic equation of state '
-                                 '(Peng-Robinson or Soave-Redlich-Kwong, with either the HYSYS or '
-                                 'the PVTsim parameter sets): the largest root for the vapor phase '
-                                 'and the smallest root for the liquid phase.'),
+                                 'corresponding root of the active cubic equation of state: the '
+                                 'largest root for the vapor phase and the smallest root for the '
+                                 'liquid phase.'),
                                 ('p',
                                  'El volumen molar de la fase se obtiene de la definición del '
                                  'factor de compresibilidad:',
@@ -6435,17 +6496,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('p',
                                  'donde ρ es la densidad másica (lb/ft³), M el peso molecular de '
                                  'la fase (lb/lbmol) y f<sub>ρ</sub> el factor de convención de '
-                                 'unidades, igual a 1 − 3.35·10<sup>−5</sup> con los juegos de '
-                                 'parámetros de PVTsim y a 1 con los de HYSYS (véase «Convención '
-                                 'de unidades de PVTsim»). El factor afecta a la densidad de todas '
-                                 'las fases calculadas con la ecuación de estado, incluida la '
-                                 'corrección de Peneloux, y se descuenta al reconstruir el factor '
-                                 'de compresibilidad a partir de la densidad, por ejemplo en el '
+                                 'unidades, igual a 1 − 3.35·10<sup>−5</sup> con el banco PVTsim y '
+                                 'a 1 con el banco HYSYS (véase «Convención de unidades del banco '
+                                 'PVTsim»). El factor afecta a la densidad de todas las fases '
+                                 'calculadas con la ecuación de estado, incluida la corrección de '
+                                 'Peneloux, y se descuenta al reconstruir el factor de '
+                                 'compresibilidad a partir de la densidad, por ejemplo en el '
                                  'cálculo de la viscosidad.',
                                  'where ρ is the mass density (lb/ft³), M the phase molecular '
                                  'weight (lb/lbmol), and f<sub>ρ</sub> the unit-convention factor, '
-                                 'equal to 1 − 3.35·10<sup>−5</sup> with the PVTsim parameter sets '
-                                 'and to 1 with the HYSYS sets (see “PVTsim unit convention”). The '
+                                 'equal to 1 − 3.35·10<sup>−5</sup> with the PVTsim bank and to 1 '
+                                 'with the HYSYS bank (see «PVTsim bank unit convention»). The '
                                  'factor applies to the density of every phase computed from the '
                                  'equation of state, including the Peneloux correction, and is '
                                  'removed when the compressibility factor is reconstructed from '
@@ -6493,10 +6554,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Science</em>, 27(6), 1197–1203.',
                                  'Soave, G. (1972). Equilibrium constants from a modified '
                                  'Redlich-Kwong equation of state. <em>Chemical Engineering '
-                                 'Science</em>, 27(6), 1197–1203.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 'Science</em>, 27(6), 1197–1203.')]},
                    {'titulo': ('Métodos de densidad de líquido', 'Liquid density methods'),
                     'bloques': [('p',
                                  'Las ecuaciones cúbicas reproducen con buena exactitud el volumen '
@@ -6525,10 +6583,10 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'vapor phase is evaluated with the equation of state.'),
                                   ('Peneloux: el volumen de la ecuación de estado de todas las '
                                    'fases (vapor, líquido y fase acuosa) se traslada con el '
-                                   'parámetro de Peneloux de PVTsim.',
+                                   'parámetro de Peneloux del banco PVTsim.',
                                    'Peneloux: the equation-of-state volume of all phases (vapor, '
-                                   'liquid and aqueous phase) is shifted with the PVTsim Peneloux '
-                                   'parameter.')]),
+                                   'liquid and aqueous phase) is shifted with the Peneloux '
+                                   'parameter of the PVTsim bank.')]),
                                 ('h3', 'Selección en la interfaz', 'Interface selection'),
                                 ('p',
                                  'La interfaz dispone de dos selectores: el método de densidad '
@@ -6564,11 +6622,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'same with all three methods.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.'),
-                                ('p',
                                  'Pedersen, K.S., Christensen, P.L. y Shaikh, J.A. (2015). '
                                  '<em>Phase Behavior of Petroleum Reservoir Fluids</em>, 2.ª ed. '
                                  'CRC Press.',
@@ -6583,16 +6636,16 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Hankinson y Thomson, predice el volumen del líquido saturado a '
                                  'partir de la temperatura reducida y de dos parámetros '
                                  'característicos de cada componente: el volumen característico V* '
-                                 'y un factor acéntrico. Es el método de densidad de líquido que '
-                                 'emplea HYSYS para sistemas con temperatura pseudorreducida menor '
-                                 'que la unidad.',
+                                 'y un factor acéntrico. Es un método de amplio uso en la '
+                                 'industria del gas para líquidos con temperatura pseudorreducida '
+                                 'menor que la unidad.',
                                  'The COSTALD (Corresponding States Liquid Density) method, '
                                  'formulated by Hankinson and Thomson, predicts the saturated '
                                  'liquid volume from the reduced temperature and two '
                                  'characteristic parameters of each component: the characteristic '
-                                 'volume V* and an acentric factor. It is the liquid density '
-                                 'method used by HYSYS for systems whose pseudo-reduced '
-                                 'temperature is below unity.'),
+                                 'volume V* and an acentric factor. It is a widely used method in '
+                                 'the gas industry for liquids whose pseudo-reduced temperature is '
+                                 'below unity.'),
                                 ('p',
                                  'El cálculo se organiza en cuatro etapas: parámetros de mezcla, '
                                  'volumen del líquido saturado, presión de saturación de la mezcla '
@@ -6630,10 +6683,10 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('p',
                                  'donde ω<sub>m</sub> es el factor acéntrico de la mezcla y '
                                  'ω<sub>SRK,i</sub> el factor acéntrico SRK del componente i, que '
-                                 'HYSYS emplea como factor acéntrico de COSTALD.',
+                                 'se emplea como factor acéntrico de COSTALD.',
                                  'where ω<sub>m</sub> is the mixture acentric factor and '
                                  'ω<sub>SRK,i</sub> the SRK acentric factor of component i, which '
-                                 'HYSYS uses as the COSTALD acentric factor.'),
+                                 'is used as the COSTALD acentric factor.'),
                                 ('eq',
                                  'Z_{cm} = 0.291 - 0.080\\,\\omega_m \\qquad P_{cm} = '
                                  '\\frac{Z_{cm}\\,R\\,T_{cm}}{V^*_m}'),
@@ -6682,19 +6735,19 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementation in ThermoPhase'),
                                 ('p',
                                  'Los volúmenes característicos V* de los trece componentes son '
-                                 'los de la base de datos de HYSYS (Characteristic Volume). La '
-                                 'regla de mezcla usa las temperaturas críticas del banco de HYSYS '
-                                 'y los factores acéntricos SRK con independencia de la ecuación '
-                                 'de estado activa; el peso molecular de la fase es el del juego '
-                                 'de parámetros activo. Para T<sub>r</sub> ≥ 1 el volumen saturado '
-                                 'no se evalúa y la densidad se toma de la ecuación de estado.',
+                                 'los del banco HYSYS. La regla de mezcla usa las temperaturas '
+                                 'críticas PR y los factores acéntricos SRK de ese banco con '
+                                 'independencia de la ecuación de estado activa; el peso molecular '
+                                 'de la fase es el del banco de la ecuación activa. Para '
+                                 'T<sub>r</sub> ≥ 1 el volumen saturado no se evalúa y la densidad '
+                                 'se toma de la ecuación de estado.',
                                  'The characteristic volumes V* of the thirteen components are '
-                                 'those of the HYSYS database (Characteristic Volume). The mixing '
-                                 'rule uses the critical temperatures of the HYSYS database and '
-                                 'the SRK acentric factors regardless of the active equation of '
-                                 'state; the phase molecular weight is that of the active '
-                                 'parameter set. For T<sub>r</sub> ≥ 1 the saturated volume is not '
-                                 'evaluated and the density is taken from the equation of state.'),
+                                 'those of the HYSYS bank. The mixing rule uses the PR critical '
+                                 'temperatures and the SRK acentric factors of that bank '
+                                 'regardless of the active equation of state; the phase molecular '
+                                 'weight is that of the bank of the active equation. For '
+                                 'T<sub>r</sub> ≥ 1 the saturated volume is not evaluated and the '
+                                 'density is taken from the equation of state.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Hankinson, R.W. y Thomson, G.H. (1979). A new correlation for '
@@ -6717,15 +6770,13 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'trabajo, que actúa como presión de referencia del líquido '
                                  'saturado. ThermoPhase emplea como presión de saturación la '
                                  'presión de burbuja de la mezcla calculada con la ecuación de '
-                                 'estado activa, que es la referencia que emplea HYSYS al disponer '
-                                 'de la ecuación de estado completa.',
+                                 'estado activa.',
                                  'The pressure correction of the COSTALD volume requires the '
                                  'saturation pressure of the liquid mixture at the working '
                                  'temperature, which acts as the reference pressure of the '
                                  'saturated liquid. ThermoPhase uses as saturation pressure the '
                                  'bubble-point pressure of the mixture computed with the active '
-                                 'equation of state, which is the reference HYSYS uses when the '
-                                 'full equation of state is available.'),
+                                 'equation of state.'),
                                 ('h3',
                                  'Presión de burbuja por la ecuación de estado',
                                  'Equation-of-state bubble pressure'),
@@ -6825,17 +6876,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'El volumen COSTALD corresponde al líquido saturado. A presiones '
                                  'mayores que la de saturación el líquido se comprime y su volumen '
                                  'disminuye. ThermoPhase aplica la corrección de líquido '
-                                 'comprimido de Chueh y Prausnitz, que es la que HYSYS asocia al '
-                                 'método COSTALD para líquidos subenfriados. La corrección integra '
-                                 'la compresibilidad isotérmica del líquido saturado con un '
-                                 'exponente n = 9:',
+                                 'comprimido de Chueh y Prausnitz para líquidos subenfriados. La '
+                                 'corrección integra la compresibilidad isotérmica del líquido '
+                                 'saturado con un exponente n = 9:',
                                  'The COSTALD volume corresponds to the saturated liquid. At '
                                  'pressures above the saturation pressure the liquid is compressed '
                                  'and its volume decreases. ThermoPhase applies the '
-                                 'Chueh-Prausnitz compressed-liquid correction, which is the one '
-                                 'HYSYS associates with the COSTALD method for subcooled liquids. '
-                                 'The correction integrates the isothermal compressibility of the '
-                                 'saturated liquid with an exponent n = 9:'),
+                                 'Chueh-Prausnitz compressed-liquid correction for subcooled '
+                                 'liquids. The correction integrates the isothermal '
+                                 'compressibility of the saturated liquid with an exponent n = 9:'),
                                 ('eq',
                                  'V = V_s\\left[1 + 9\\,\\kappa_s\\left(P - '
                                  'P_s\\right)\\right]^{-1/9}'),
@@ -6909,12 +6958,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Journal</em>, 15(3), 471–472.',
                                  'Chueh, P.L. and Prausnitz, J.M. (1969). A generalized '
                                  'correlation for the compressibilities of normal liquids. '
-                                 '<em>AIChE Journal</em>, 15(3), 471–472.'),
-                                ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.')]},
+                                 '<em>AIChE Journal</em>, 15(3), 471–472.')]},
                    {'titulo': ('Banda de transición y régimen supercrítico',
                                'Transition band and supercritical regime'),
                     'bloques': [('p',
@@ -6924,16 +6968,14 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'solo hasta T<sub>r</sub> = 0.98. Para obtener una densidad '
                                  'continua al pasar del líquido al fluido supercrítico, '
                                  'ThermoPhase distingue tres regímenes según T<sub>r</sub> = '
-                                 'T/T<sub>cm</sub>, de manera análoga a la opción de densidad de '
-                                 'líquido suavizada (Smooth Liquid Density) de HYSYS.',
+                                 'T/T<sub>cm</sub>:',
                                  'The COSTALD reduced-volume functions lose validity as the '
                                  'pseudo-reduced temperature approaches unity, and the '
                                  'Chueh-Prausnitz compressibility correlation is valid only up to '
                                  'T<sub>r</sub> = 0.98. To obtain a continuous density across the '
                                  'transition from liquid to supercritical fluid, ThermoPhase '
                                  'distinguishes three regimes according to T<sub>r</sub> = '
-                                 'T/T<sub>cm</sub>, analogous to the HYSYS Smooth Liquid Density '
-                                 'option.'),
+                                 'T/T<sub>cm</sub>:'),
                                 ('ul',
                                  [('T<sub>r</sub> ≤ 0.95: COSTALD con corrección de líquido '
                                    'comprimido.',
@@ -7018,11 +7060,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'depends on the transition band.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.'),
-                                ('p',
                                  'Hankinson, R.W. y Thomson, G.H. (1979). A new correlation for '
                                  'saturated densities of liquids and their mixtures. <em>AIChE '
                                  'Journal</em>, 25(4), 653–663.',
@@ -7069,15 +7106,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'La fase acuosa se evalúa sobre su composición completa de '
                                  'catorce componentes (agua más hidrocarburos, CO₂ y N₂ '
                                  'disueltos), de modo que los gases disueltos intervienen en la '
-                                 'densidad. Para el agua se adoptan los valores por defecto de '
-                                 'HYSYS: volumen característico igual al volumen crítico y factor '
+                                 'densidad. Para el agua se adoptan los valores siguientes: '
+                                 'volumen característico igual al volumen crítico y factor '
                                  'acéntrico COSTALD igual al factor acéntrico SRK:',
                                  'The aqueous phase is evaluated on its full fourteen-component '
                                  'composition (water plus dissolved hydrocarbons, CO₂ and N₂), so '
-                                 'that dissolved gases contribute to the density. For water, the '
-                                 'HYSYS default values are adopted: characteristic volume equal to '
-                                 'the critical volume, and COSTALD acentric factor equal to the '
-                                 'SRK acentric factor:'),
+                                 'that dissolved gases contribute to the density. For water the '
+                                 'following values are adopted: characteristic volume equal to the '
+                                 'critical volume, and COSTALD acentric factor equal to the SRK '
+                                 'acentric factor:'),
                                 ('eq',
                                  'V^*_{H_2O} = V_{c,H_2O} = 55.9\\ \\mathrm{cm^3/mol} = 0.8954\\ '
                                  '\\mathrm{ft^3/lbmol} \\qquad \\omega_{H_2O} = 0.344'),
@@ -7107,11 +7144,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'in this mode is the equation-of-state root.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.'),
-                                ('p',
                                  'Hankinson, R.W. y Thomson, G.H. (1979). A new correlation for '
                                  'saturated densities of liquids and their mixtures. <em>AIChE '
                                  'Journal</em>, 25(4), 653–663.',
@@ -7122,15 +7154,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                     'bloques': [('p',
                                  'La corrección de volumen de Peneloux (traslado de volumen) '
                                  'mejora la densidad de líquido predicha por la ecuación de estado '
-                                 'cúbica sin alterar el equilibrio de fases. ThermoPhase adopta la '
-                                 'formulación de PVTsim (SRK/PR con corrección de volumen), en la '
-                                 'que el volumen molar se desplaza una cantidad que depende de la '
+                                 'cúbica sin alterar el equilibrio de fases. ThermoPhase emplea la '
+                                 'formulación SRK/PR con corrección de volumen, en la que el '
+                                 'volumen molar se desplaza una cantidad que depende de la '
                                  'composición:',
                                  'The Peneloux volume correction (volume shift) improves the '
                                  'liquid density predicted by the cubic equation of state without '
-                                 'altering phase equilibrium. ThermoPhase adopts the PVTsim '
-                                 'formulation (SRK/PR with volume correction), in which the molar '
-                                 'volume is shifted by a composition-dependent amount:'),
+                                 'altering phase equilibrium. ThermoPhase uses the SRK/PR '
+                                 'formulation with volume correction, in which the molar volume is '
+                                 'shifted by a composition-dependent amount:'),
                                 ('eq', 'V = \\tilde{V} - c \\qquad c = \\sum_i x_i\\,c_i'),
                                 ('p',
                                  'donde V es el volumen trasladado (ft³/lbmol), Ṽ el volumen de la '
@@ -7141,23 +7173,22 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'c<sub>i</sub> that of component i (ft³/lbmol).'),
                                 ('h3', 'Parámetros de traslado', 'Shift parameters'),
                                 ('p',
-                                 "Se usa el término independiente de la temperatura c' de la base "
-                                 "de datos de PVTsim, almacenado en forma reducida c'/R (K/atm) y "
-                                 'distinto para PR y para SRK; el término dependiente de la '
-                                 'temperatura no interviene. La columna PR o SRK se elige según la '
-                                 'ecuación de estado activa, tanto con los parámetros de HYSYS '
-                                 'como con los de PVTsim. La base incluye los valores de N₂, CO₂, '
-                                 'metano a n-nonano y agua. Para un componente sin valor en la base '
-                                 'se aplicaría la correlación que PVTsim documenta para componentes '
-                                 'orgánicos definidos:',
-                                 "The temperature-independent term c' from the PVTsim database is "
-                                 "used, stored in reduced form c'/R (K/atm) and different for PR "
-                                 'and SRK; the temperature-dependent term is not used. The PR or '
-                                 'SRK column is selected according to the active equation of '
-                                 'state, with both the HYSYS and the PVTsim parameter sets. The '
-                                 'database contains values for N₂, CO₂, methane through n-nonane '
-                                 'and water. For a component without a database value the correlation '
-                                 'documented by PVTsim for defined organic components would be applied:'),
+                                 "Se usa el término independiente de la temperatura c' del banco "
+                                 "PVTsim, almacenado en forma reducida c'/R (K/atm) y distinto "
+                                 'para PR y para SRK; el término dependiente de la temperatura no '
+                                 'interviene. La columna PR o SRK se elige según la familia de la '
+                                 'ecuación de estado activa, con cualquiera de los dos bancos. El '
+                                 'banco incluye los valores de N₂, CO₂, metano a n-nonano y agua. '
+                                 'Para un componente sin valor tabulado se aplica la correlación '
+                                 'de Peneloux para componentes orgánicos definidos:',
+                                 "The temperature-independent term c' of the PVTsim bank is used, "
+                                 "stored in reduced form c'/R (K/atm) and different for PR and "
+                                 'SRK; the temperature-dependent term is not used. The PR or SRK '
+                                 'column is selected according to the family of the active '
+                                 'equation of state, with either bank. The bank contains values '
+                                 'for N₂, CO₂, methane through n-nonane and water. For a component '
+                                 'without a tabulated value the Peneloux correlation for defined '
+                                 'organic components is applied:'),
                                 ('eq', 'Z_{RA,i} = 0.29056 - 0.08775\\,\\omega_i'),
                                 ('eq',
                                  '\\mathrm{SRK:}\\quad c_i = '
@@ -7171,20 +7202,20 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'donde Z<sub>RA,i</sub> es el factor de compresibilidad de '
                                  'Rackett del componente i, y T<sub>c,i</sub> (K), P<sub>c,i</sub> '
                                  '(atm) y ω<sub>i</sub> sus propiedades críticas y factor '
-                                 'acéntrico de la base de PVTsim.',
+                                 'acéntrico del banco PVTsim.',
                                  'where Z<sub>RA,i</sub> is the Rackett compressibility factor of '
                                  'component i, and T<sub>c,i</sub> (K), P<sub>c,i</sub> (atm) and '
                                  'ω<sub>i</sub> its critical properties and acentric factor from '
-                                 'the PVTsim database.'),
+                                 'the PVTsim bank.'),
                                 ('p',
                                  'El valor reducido se convierte a unidades de campo con la '
-                                 'constante de los gases expresada en ft³·atm/(lbmol·K), usando '
-                                 '14.696 psia/atm como PVTsim, de modo que el término P·c/(R·T) '
-                                 'coincide con el de PVTsim:',
+                                 'constante de los gases expresada en ft³·atm/(lbmol·K) y 14.696 '
+                                 'psia/atm, la misma convención de la presión crítica efectiva '
+                                 '(véase «Convención de unidades del banco PVTsim»):',
                                  'The reduced value is converted to field units with the gas '
-                                 'constant expressed in ft³·atm/(lbmol·K), using 14.696 psia/atm '
-                                 'as PVTsim does, so that the term P·c/(R·T) matches that of '
-                                 'PVTsim:'),
+                                 'constant expressed in ft³·atm/(lbmol·K) and 14.696 psia/atm, the '
+                                 'same convention as the effective critical pressure (see «PVTsim '
+                                 'bank unit convention»):'),
                                 ('eq',
                                  "c_i = \\left(\\frac{c'}{R}\\right)_i \\frac{10.7316 \\cdot "
                                  '1.8}{14.696}'),
@@ -7222,16 +7253,17 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                 ('p',
                                  'donde Z<sub>EOS</sub> es la raíz de la ecuación de estado de la '
                                  'fase, ρ la densidad trasladada (lb/ft³) y f<sub>ρ</sub> el '
-                                 'factor de convención de unidades de PVTsim. Con un parámetro de '
-                                 'traslado independiente de la temperatura la energía interna no '
-                                 'cambia; la entalpía se desplaza en el producto de la presión por '
-                                 'el parámetro de traslado y la entropía no se modifica:',
+                                 'factor de convención de unidades del banco PVTsim. Con un '
+                                 'parámetro de traslado independiente de la temperatura la energía '
+                                 'interna no cambia; la entalpía se desplaza en el producto de la '
+                                 'presión por el parámetro de traslado y la entropía no se '
+                                 'modifica:',
                                  'where Z<sub>EOS</sub> is the equation-of-state root of the '
                                  'phase, ρ the shifted density (lb/ft³) and f<sub>ρ</sub> the '
-                                 'PVTsim unit-convention factor. With a temperature-independent '
-                                 'shift parameter the internal energy is unchanged; the enthalpy '
-                                 'is shifted by the product of pressure and shift parameter, and '
-                                 'the entropy is unchanged:'),
+                                 'unit-convention factor of the PVTsim bank. With a '
+                                 'temperature-independent shift parameter the internal energy is '
+                                 'unchanged; the enthalpy is shifted by the product of pressure '
+                                 'and shift parameter, and the entropy is unchanged:'),
                                 ('eq', 'H = H_{EOS} - P\\,c \\qquad S = S_{EOS}'),
                                 ('p',
                                  'donde H y S son la entalpía (BTU/lbmol) y la entropía '
@@ -7244,20 +7276,20 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('p',
-                                 'El traslado se aplica a todas las fases presentes, como en '
-                                 'PVTsim: vapor, líquido de hidrocarburos y, en el flash '
-                                 'trifásico, la fase acuosa, cada una con su composición completa '
-                                 '(incluida el agua disuelta). En la fase vapor el efecto es '
-                                 'pequeño porque el volumen molar es grande frente a c, pero no es '
-                                 'nulo. Si el volumen trasladado resulta no positivo se conserva '
-                                 'el volumen de la ecuación de estado.',
-                                 'The translation is applied to all phases present, as in PVTsim: '
-                                 'vapor, hydrocarbon liquid and, in the three-phase flash, the '
-                                 'aqueous phase, each with its full composition (including '
-                                 'dissolved water). In the vapor phase the effect is small because '
-                                 'the molar volume is large compared with c, but it is not zero. '
-                                 'If the shifted volume is not positive, the equation-of-state '
-                                 'volume is retained.'),
+                                 'El traslado se aplica a todas las fases presentes: vapor, '
+                                 'líquido de hidrocarburos y, en el flash trifásico, la fase '
+                                 'acuosa, cada una con su composición completa (incluida el agua '
+                                 'disuelta). En la fase vapor el efecto es pequeño porque el '
+                                 'volumen molar es grande frente a c, pero no es nulo. Si el '
+                                 'volumen trasladado resulta no positivo se conserva el volumen de '
+                                 'la ecuación de estado.',
+                                 'The translation is applied to all phases present: vapor, '
+                                 'hydrocarbon liquid and, in the three-phase flash, the aqueous '
+                                 'phase, each with its full composition (including dissolved '
+                                 'water). In the vapor phase the effect is small because the molar '
+                                 'volume is large compared with c, but it is not zero. If the '
+                                 'shifted volume is not positive, the equation-of-state volume is '
+                                 'retained.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Péneloux, A., Rauzy, E. y Fréze, R. (1982). A consistent '
@@ -7266,11 +7298,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Péneloux, A., Rauzy, E. and Fréze, R. (1982). A consistent '
                                  'correction for Redlich-Kwong-Soave volumes. <em>Fluid Phase '
                                  'Equilibria</em>, 8(1), 7–23.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, secciones SRK with '
-                                 'Volume Correction y PR with Volume Correction. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, SRK with Volume '
-                                 'Correction and PR with Volume Correction sections. Calsep A/S.'),
                                 ('p',
                                  'Pedersen, K.S., Christensen, P.L. y Shaikh, J.A. (2015). '
                                  '<em>Phase Behavior of Petroleum Reservoir Fluids</em>, 2.ª ed. '
@@ -7314,10 +7341,10 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'density is that of the phase.'),
                                 ('h3', 'Fracción volumétrica de fase', 'Phase volume fraction'),
                                 ('p',
-                                 'La fracción volumétrica corresponde al porcentaje volumétrico de '
-                                 'fase que reporta PVTsim:',
-                                 'The volume fraction corresponds to the phase volume percentage '
-                                 'reported by PVTsim:'),
+                                 'La fracción volumétrica de una fase es su volumen respecto del '
+                                 'volumen total de la corriente:',
+                                 'The volume fraction of a phase is its volume relative to the '
+                                 'total volume of the stream:'),
                                 ('eq',
                                  '\\theta_k = \\frac{\\beta_k M_k / \\rho_k}{\\sum_j \\beta_j M_j '
                                  '/ \\rho_j}'),
@@ -7331,11 +7358,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'β<sub>k</sub>M<sub>k</sub>/ρ<sub>k</sub> its volume per mole of '
                                  'feed (ft³/lbmol). The volume fraction depends on the selected '
                                  'density method, because COSTALD and Peneloux modify the volume '
-                                 'of the condensed phases.'),
-                                ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 'of the condensed phases.')]},
                    {'titulo': ('Gravedad específica y peso molecular',
                                'Specific gravity and molecular weight'),
                     'bloques': [('p',
@@ -7354,40 +7377,53 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'en esa fase, z<sub>i</sub> la fracción molar global y '
                                  'M<sub>i</sub> el peso molecular del componente. Los pesos '
                                  'moleculares de los componentes son los del juego de parámetros '
-                                 'activo (base de HYSYS o base de PVTsim). En el flash bifásico el '
+                                 'activo (banco de la ecuación activa). En el flash bifásico el '
                                  'vapor es siempre la fase de menor peso molecular (véase '
                                  '«Identificación en sistemas bifásicos»).',
                                  'where M<sub>k</sub> is the molecular weight of phase k '
                                  '(lb/lbmol), x<sub>i,k</sub> the mole fraction of component i in '
                                  'that phase, z<sub>i</sub> the overall mole fraction and '
                                  'M<sub>i</sub> the component molecular weight. Component '
-                                 'molecular weights are those of the active parameter set (HYSYS '
-                                 'or PVTsim database). In the two-phase flash the vapor is always '
+                                 'molecular weights are those of the active parameter set (bank of '
+                                 'the active equation). In the two-phase flash the vapor is always '
                                  'the phase of lower molecular weight (see “Identification in '
                                  'two-phase systems”).'),
                                 ('h3', 'Gravedad específica', 'Specific gravity'),
                                 ('eq',
                                  'SG_{V} = \\frac{M_V}{28.9625} \\qquad SG_{L} = '
-                                 '\\frac{\\rho_L}{62.4}'),
+                                 '\\frac{\\rho_L}{62.3664}'),
                                 ('p',
-                                 'donde SG<sub>V</sub> es la gravedad específica del gas referida '
-                                 'al aire (peso molecular 28.9625) y SG<sub>L</sub> la gravedad '
-                                 'específica de un líquido referida al agua, con ρ<sub>L</sub> en '
-                                 'lb/ft³ y 62.4 lb/ft³ como densidad del agua. La gravedad '
-                                 'específica de las fases líquidas y de la fase acuosa se calcula '
-                                 'con la densidad del método seleccionado.',
-                                 'where SG<sub>V</sub> is the gas specific gravity relative to air '
-                                 '(molecular weight 28.9625) and SG<sub>L</sub> the specific '
-                                 'gravity of a liquid relative to water, with ρ<sub>L</sub> in '
-                                 'lb/ft³ and 62.4 lb/ft³ as the water density. The specific '
-                                 'gravity of the liquid phases and of the aqueous phase is '
-                                 'computed with the density of the selected method.'),
+                                 'donde SG<sub>V</sub> es la gravedad específica ideal del gas '
+                                 'referida al aire (peso molecular 28.9625) y SG<sub>L</sub> la '
+                                 'gravedad específica de un líquido referida al agua, con '
+                                 'ρ<sub>L</sub> en lb/ft³ y 62.3664 lb/ft³ (agua a 60 °F) como '
+                                 'densidad del agua. La gravedad específica de las fases líquidas '
+                                 'y de la fase acuosa se calcula con la densidad del método '
+                                 'seleccionado. La gravedad específica real del gas, que tiene en '
+                                 'cuenta la compresibilidad del gas y del aire a condiciones '
+                                 'estándar, se describe en «Gravedad específica del gas».',
+                                 'where SG<sub>V</sub> is the ideal gas specific gravity relative '
+                                 'to air (molecular weight 28.9625) and SG<sub>L</sub> the '
+                                 'specific gravity of a liquid relative to water, with '
+                                 'ρ<sub>L</sub> in lb/ft³ and 62.3664 lb/ft³ (water at 60 °F) as '
+                                 'the water density. The specific gravity of the liquid phases and '
+                                 'of the aqueous phase is computed with the density of the '
+                                 'selected method. The real gas specific gravity, which accounts '
+                                 'for the compressibility of gas and air at standard conditions, '
+                                 'is described in «Gas specific gravity».'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
                                  'Data Book</em>, 10.ª ed. GPSA.',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
-                                 'Data Book</em>, 10th ed. GPSA.')]},
+                                 'Data Book</em>, 10th ed. GPSA.'),
+                                ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.')]},
                    {'titulo': ('Factores volumétricos y gas en solución',
                                'Formation volume factors and solution gas'),
                     'bloques': [('p',
@@ -7396,8 +7432,8 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'petróleo (B<sub>o</sub>) y del agua (B<sub>w</sub>), y la '
                                  'relación gas en solución del petróleo (R<sub>s</sub>) y del agua '
                                  '(R<sub>sw</sub>). Cada factor se reporta en la columna de su '
-                                 'fase y solo cuando esa fase existe. Las condiciones estándar '
-                                 'son 60 °F (519.67 °R) y 14.696 psia.',
+                                 'fase y solo cuando esa fase existe. Las condiciones estándar son '
+                                 '60 °F (519.67 °R) y 14.696 psia.',
                                  'The phase-equilibrium results summary includes the formation '
                                  'volume factors of gas (B<sub>g</sub>), oil (B<sub>o</sub>) and '
                                  'water (B<sub>w</sub>), and the solution gas-oil ratio '
@@ -7407,31 +7443,32 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  '14.696 psia.'),
                                 ('h3', 'Factor volumétrico del gas', 'Gas formation volume factor'),
                                 ('eq',
-                                 'B_g = \\frac{Z_V\\,T}{P}\\,\\frac{P_{sc}}{T_{sc}} '
-                                 '\\qquad [\\mathrm{ft^3/scf}]'),
+                                 'B_g = \\frac{Z_V\\,T}{P}\\,\\frac{P_{sc}}{T_{sc}} \\qquad '
+                                 '[\\mathrm{ft^3/scf}]'),
                                 ('p',
                                  'donde Z<sub>V</sub> es el factor de compresibilidad de la fase '
                                  'vapor reportado (con el traslado de Peneloux si está activo), T '
                                  'y P las condiciones del flash y T<sub>sc</sub>, P<sub>sc</sub> '
                                  'las condiciones estándar. El volumen estándar del gas es el de '
                                  'gas ideal, 379.48 scf/lbmol.',
-                                 'where Z<sub>V</sub> is the reported vapor compressibility '
-                                 'factor (with the Peneloux shift when active), T and P the flash '
+                                 'where Z<sub>V</sub> is the reported vapor compressibility factor '
+                                 '(with the Peneloux shift when active), T and P the flash '
                                  'conditions and T<sub>sc</sub>, P<sub>sc</sub> the standard '
                                  'conditions. The standard gas volume is the ideal-gas volume, '
                                  '379.48 scf/lbmol.'),
-                                ('h3', 'Factor volumétrico del petróleo y R<sub>s</sub>',
+                                ('h3',
+                                 'Factor volumétrico del petróleo y R<sub>s</sub>',
                                  'Oil formation volume factor and R<sub>s</sub>'),
                                 ('p',
                                  'La fase líquida de hidrocarburos a (P, T) se lleva a condiciones '
                                  'estándar con un flash de una etapa (sin el agua disuelta). Por '
                                  'mol de líquido a (P, T):',
                                  'The hydrocarbon liquid phase at (P, T) is taken to standard '
-                                 'conditions with a single-stage flash (dissolved water '
-                                 'excluded). Per mole of liquid at (P, T):'),
+                                 'conditions with a single-stage flash (dissolved water excluded). '
+                                 'Per mole of liquid at (P, T):'),
                                 ('eq',
-                                 'V_o = \\frac{M_L}{\\rho_L} \\qquad V_{STO} = f_{HC}\\,'
-                                 '\\beta_{L,sc}\\,\\frac{M_{L,sc}}{\\rho_{L,sc}}'),
+                                 'V_o = \\frac{M_L}{\\rho_L} \\qquad V_{STO} = '
+                                 'f_{HC}\\,\\beta_{L,sc}\\,\\frac{M_{L,sc}}{\\rho_{L,sc}}'),
                                 ('eq',
                                  'B_o = \\frac{V_o}{V_{STO}} \\qquad R_s = '
                                  '\\frac{f_{HC}\\,\\beta_{V,sc}\\,379.48}{V_{STO}/5.614583}'),
@@ -7442,12 +7479,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'del líquido, β<sub>L,sc</sub> y β<sub>V,sc</sub> las fracciones '
                                  'de líquido y vapor del flash a condiciones estándar y '
                                  'V<sub>STO</sub> el volumen del petróleo de tanque (ft³). '
-                                 'B<sub>o</sub> resulta en bbl/STB y R<sub>s</sub> en scf/STB. '
-                                 'Por encima del punto de burbuja el líquido es toda la mezcla: '
+                                 'B<sub>o</sub> resulta en bbl/STB y R<sub>s</sub> en scf/STB. Por '
+                                 'encima del punto de burbuja el líquido es toda la mezcla: '
                                  'R<sub>s</sub> es constante y B<sub>o</sub> crece al bajar la '
                                  'presión por expansión del líquido. B<sub>o</sub> es máximo en el '
                                  'punto de burbuja y disminuye por debajo de él, a medida que se '
-                                 'libera gas.',
+                                 'libera gas. El flash a condiciones estándar usa la ecuación de '
+                                 'estado, los k<sub>ij</sub> y el método de densidad del cálculo '
+                                 'principal; si a esas condiciones el líquido se vaporiza por '
+                                 'completo, B<sub>o</sub> y R<sub>s</sub> no se informan.',
                                  'where M<sub>L</sub> and ρ<sub>L</sub> are the molecular weight '
                                  'and density of the liquid at (P, T) with the selected density '
                                  'method, f<sub>HC</sub> the hydrocarbon mole fraction of the '
@@ -7458,17 +7498,23 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'point the liquid is the whole mixture: R<sub>s</sub> is constant '
                                  'and B<sub>o</sub> increases as pressure falls because the liquid '
                                  'expands. B<sub>o</sub> is maximum at the bubble point and '
-                                 'decreases below it as gas is liberated.'),
-                                ('h3', 'Factor volumétrico del agua y R<sub>sw</sub>',
+                                 'decreases below it as gas is liberated. The standard-conditions '
+                                 'flash uses the equation of state, the k<sub>ij</sub> and the '
+                                 'density method of the main calculation; if the liquid vaporizes '
+                                 'completely at those conditions, B<sub>o</sub> and R<sub>s</sub> '
+                                 'are not reported.'),
+                                ('h3',
+                                 'Factor volumétrico del agua y R<sub>sw</sub>',
                                  'Water formation volume factor and R<sub>sw</sub>'),
                                 ('p',
                                  'La fase acuosa a (P, T) se lleva a condiciones estándar con un '
                                  'flash trifásico de su composición (Huron-Vidal). R<sub>sw</sub> '
                                  'es el gas liberado por barril de agua a condiciones estándar. '
                                  'Los volúmenes de agua se calculan con la densidad del agua pura '
-                                 'de IAPWS-IF97 (región 1), porque las ecuaciones cúbicas y COSTALD '
-                                 'sobrestiman la expansión térmica del agua. El volumen del gas '
-                                 'disuelto no se incluye, como en las correlaciones de McCain:',
+                                 'de IAPWS-IF97 (región 1), porque las ecuaciones cúbicas y '
+                                 'COSTALD sobrestiman la expansión térmica del agua. El volumen '
+                                 'del gas disuelto no se incluye, como en las correlaciones de '
+                                 'McCain:',
                                  'The aqueous phase at (P, T) is taken to standard conditions with '
                                  'a three-phase flash of its composition (Huron-Vidal). '
                                  'R<sub>sw</sub> is the gas liberated per barrel of water at '
@@ -7478,9 +7524,10 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'water. The dissolved-gas volume is not included, as in the '
                                  'McCain correlations:'),
                                 ('eq',
-                                 'B_w = \\frac{w_{H_2O}\\,/\\,\\rho_w(P,T)}{\\beta_{W,sc}'
-                                 '\\,w_{H_2O,sc}\\,/\\,\\rho_w(P_{sc},T_{sc})} \\qquad '
-                                 'R_{sw} = \\frac{\\beta_{V,sc}\\,379.48}{V_{w,sc}/5.614583}'),
+                                 'B_w = '
+                                 '\\frac{w_{H_2O}\\,/\\,\\rho_w(P,T)}{\\beta_{W,sc}\\,w_{H_2O,sc}\\,/\\,\\rho_w(P_{sc},T_{sc})} '
+                                 '\\qquad R_{sw} = '
+                                 '\\frac{\\beta_{V,sc}\\,379.48}{V_{w,sc}/5.614583}'),
                                 ('p',
                                  'donde w<sub>H₂O</sub> es la fracción molar de agua de la fase '
                                  'acuosa, β<sub>W,sc</sub> y β<sub>V,sc</sub> las fracciones de '
@@ -7494,10 +7541,10 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'phase, β<sub>W,sc</sub> and β<sub>V,sc</sub> the aqueous and '
                                  'vapor fractions at standard conditions, ρ<sub>w</sub> the '
                                  'IAPWS-IF97 density and V<sub>w,sc</sub> the water volume at '
-                                 'standard conditions (ft³). Below 32 °F region 1 is '
-                                 'extrapolated to subcooled liquid water, reproducing IAPWS-95 '
-                                 'down to −22 °F. Outside −22 °F to 662 °F the density of the '
-                                 'selected method is used.'),
+                                 'standard conditions (ft³). Below 32 °F region 1 is extrapolated '
+                                 'to subcooled liquid water, reproducing IAPWS-95 down to −22 °F. '
+                                 'Outside −22 °F to 662 °F the density of the selected method is '
+                                 'used.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'McCain, W. D. (1990). <em>The Properties of Petroleum '
@@ -7529,14 +7576,12 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'and for the stream from composition, temperature, pressure and '
                                  'the equation-of-state compressibility factor.'),
                                 ('p',
-                                 'El cálculo sigue el método que documenta PVTsim: cada propiedad '
-                                 'se descompone en una contribución de gas ideal, que depende de '
-                                 'la temperatura, la presión y la composición, y una contribución '
-                                 'residual (desviación respecto al gas ideal) que se obtiene de la '
-                                 'ecuación de estado activa:',
-                                 'The calculation follows the method documented by PVTsim: each '
-                                 'property is split into an ideal-gas contribution, which depends '
-                                 'on temperature, pressure and composition, and a residual '
+                                 'Cada propiedad se descompone en una contribución de gas ideal, '
+                                 'que depende de la temperatura, la presión y la composición, y '
+                                 'una contribución residual (desviación respecto del gas ideal) '
+                                 'que se obtiene de la ecuación de estado activa:',
+                                 'Each property is split into an ideal-gas contribution, which '
+                                 'depends on temperature, pressure and composition, and a residual '
                                  'contribution (departure from the ideal gas) obtained from the '
                                  'active equation of state:'),
                                 ('eq',
@@ -7560,27 +7605,20 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('p',
-                                 'El mismo esquema se aplica a las cuatro variantes de la ecuación '
-                                 'de estado (PR y SRK con parámetros de HYSYS o de PVTsim). La '
-                                 'constante de los gases de la parte térmica es la de PVTsim, R = '
-                                 '0.08206 L·atm/(mol·K) = 8.3147295 J/(mol·K) = 1.98594 '
-                                 'BTU/(lbmol·°R); las contribuciones residuales se evalúan en '
-                                 'forma adimensional con R = 10.7316 psia·ft³/(lbmol·°R) y se '
-                                 'multiplican por esa constante, de modo que en el resultado '
-                                 'interviene una sola constante de los gases.',
-                                 'The same scheme is applied to the four equation-of-state '
-                                 'variants (PR and SRK with HYSYS or PVTsim parameters). The gas '
-                                 'constant of the thermal part is that of PVTsim, R = 0.08206 '
-                                 'L·atm/(mol·K) = 8.3147295 J/(mol·K) = 1.98594 BTU/(lbmol·°R); '
-                                 'the residual contributions are evaluated in dimensionless form '
-                                 'with R = 10.7316 psia·ft³/(lbmol·°R) and multiplied by that '
-                                 'constant, so that a single gas constant enters the result.'),
+                                 'El mismo esquema se aplica a las cuatro ecuaciones de estado. La '
+                                 'constante de los gases de la parte térmica es R = 8.3147295 '
+                                 'J/(mol·K) = 0.08206 L·atm/(mol·K) = 1.98594 BTU/(lbmol·°R); las '
+                                 'contribuciones residuales se evalúan en forma adimensional con R '
+                                 '= 10.7316 psia·ft³/(lbmol·°R) y se multiplican por esa '
+                                 'constante, de modo que en el resultado interviene una sola '
+                                 'constante de los gases.',
+                                 'The same scheme is applied to the four equations of state. The '
+                                 'gas constant of the thermal part is R = 8.3147295 J/(mol·K) = '
+                                 '0.08206 L·atm/(mol·K) = 1.98594 BTU/(lbmol·°R); the residual '
+                                 'contributions are evaluated in dimensionless form with R = '
+                                 '10.7316 psia·ft³/(lbmol·°R) and multiplied by that constant, so '
+                                 'that a single gas constant enters the result.'),
                                 ('h3', 'Referencias', 'References'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, sección Thermal '
-                                 'and Volumetric Properties. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, Thermal and '
-                                 'Volumetric Properties section. Calsep A/S.'),
                                 ('p',
                                  'Michelsen, M.L. y Mollerup, J.M. (2007). <em>Thermodynamic '
                                  'Models: Fundamentals and Computational Aspects</em>, 2.ª ed. '
@@ -7591,11 +7629,9 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                    {'titulo': ('Contribución de gas ideal', 'Ideal-gas contribution'),
                     'bloques': [('p',
                                  'La capacidad calorífica de gas ideal de cada componente se '
-                                 'representa con un polinomio de tercer grado en la temperatura, '
-                                 'que es la forma que emplea PVTsim:',
+                                 'representa con un polinomio de tercer grado en la temperatura:',
                                  'The ideal-gas heat capacity of each component is represented by '
-                                 'a third-degree polynomial in temperature, the form used by '
-                                 'PVTsim:'),
+                                 'a third-degree polynomial in temperature:'),
                                 ('eq',
                                  'C^{\\mathrm{ig}}_{p,i}(T) = C_{1,i} + C_{2,i}\\,T + '
                                  'C_{3,i}\\,T^2 + C_{4,i}\\,T^3'),
@@ -7606,45 +7642,43 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'where C<sub>p,i</sub><sup>ig</sup> is the ideal-gas heat '
                                  'capacity (J/(mol·K)), T the temperature (K) and C<sub>1,i</sub> '
                                  'to C<sub>4,i</sub> the coefficients of component i.'),
-                                ('h3',
-                                 'Coeficientes de cada juego de parámetros',
-                                 'Coefficients of each parameter set'),
+                                ('h3', 'Coeficientes de cada banco', 'Coefficients of each bank'),
                                 ('ul',
-                                 [('Juegos de HYSYS (PR y SRK): coeficientes de Reid, Prausnitz y '
+                                 [('Banco HYSYS (PR y SRK): coeficientes de Reid, Prausnitz y '
                                    'Sherwood (1977) para los trece componentes.',
-                                   'HYSYS sets (PR and SRK): Reid, Prausnitz and Sherwood (1977) '
+                                   'HYSYS bank (PR and SRK): Reid, Prausnitz and Sherwood (1977) '
                                    'coefficients for the thirteen components.'),
-                                  ('Juegos de PVTsim (PR y SRK): coeficientes '
-                                   'C<sub>p</sub><sup>ig</sup>/R de la base de datos de PVTsim, '
-                                   'multiplicados por R = 8.3147295 J/(mol·K).',
-                                   'PVTsim sets (PR and SRK): C<sub>p</sub><sup>ig</sup>/R '
-                                   'coefficients from the PVTsim database, multiplied by R = '
-                                   '8.3147295 J/(mol·K).'),
-                                  ('Agua: con los juegos de HYSYS, polinomio de Reid, Prausnitz y '
+                                  ('Banco PVTsim (PR y SRK): coeficientes '
+                                   'C<sub>p</sub><sup>ig</sup>/R del banco, multiplicados por R = '
+                                   '8.3147295 J/(mol·K).',
+                                   'PVTsim bank (PR and SRK): C<sub>p</sub><sup>ig</sup>/R '
+                                   'coefficients of the bank, multiplied by R = 8.3147295 '
+                                   'J/(mol·K).'),
+                                  ('Agua: con el banco HYSYS, polinomio de Reid, Prausnitz y '
                                    'Sherwood (C<sub>1</sub> = 32.24, C<sub>2</sub> = '
                                    '1.924·10<sup>−3</sup>, C<sub>3</sub> = 1.055·10<sup>−5</sup>, '
-                                   'C<sub>4</sub> = −3.596·10<sup>−9</sup>); con los juegos de '
-                                   'PVTsim, coeficientes C<sub>p</sub><sup>ig</sup>/R de la base '
-                                   'de PVTsim (3.8776448, 2.2935554·10<sup>−4</sup>, '
-                                   '1.2693854·10<sup>−6</sup>, −4.3252765·10<sup>−10</sup>).',
-                                   'Water: with the HYSYS sets, the Reid, Prausnitz and Sherwood '
+                                   'C<sub>4</sub> = −3.596·10<sup>−9</sup>); con el banco PVTsim, '
+                                   'coeficientes C<sub>p</sub><sup>ig</sup>/R (3.8776448, '
+                                   '2.2935554·10<sup>−4</sup>, 1.2693854·10<sup>−6</sup>, '
+                                   '−4.3252765·10<sup>−10</sup>).',
+                                   'Water: with the HYSYS bank, the Reid, Prausnitz and Sherwood '
                                    'polynomial (C<sub>1</sub> = 32.24, C<sub>2</sub> = '
                                    '1.924·10<sup>−3</sup>, C<sub>3</sub> = 1.055·10<sup>−5</sup>, '
-                                   'C<sub>4</sub> = −3.596·10<sup>−9</sup>); with the PVTsim sets, '
-                                   'the C<sub>p</sub><sup>ig</sup>/R coefficients from the PVTsim '
-                                   'database (3.8776448, 2.2935554·10<sup>−4</sup>, '
-                                   '1.2693854·10<sup>−6</sup>, −4.3252765·10<sup>−10</sup>).')]),
+                                   'C<sub>4</sub> = −3.596·10<sup>−9</sup>); with the PVTsim bank, '
+                                   'the C<sub>p</sub><sup>ig</sup>/R coefficients (3.8776448, '
+                                   '2.2935554·10<sup>−4</sup>, 1.2693854·10<sup>−6</sup>, '
+                                   '−4.3252765·10<sup>−10</sup>).')]),
                                 ('h3', 'Estado de referencia', 'Reference state'),
                                 ('p',
-                                 'Con los cuatro juegos de parámetros el estado de referencia es '
-                                 'el de PVTsim: entalpía y entropía nulas para cada componente '
-                                 'puro como gas ideal a T<sub>0</sub> = 273.15 K (32 °F) y '
-                                 'P<sub>0</sub> = 1 atm = 14.696 psia. Las integrales del '
-                                 'polinomio se evalúan analíticamente:',
-                                 'With all four parameter sets the reference state is that of '
-                                 'PVTsim: zero enthalpy and entropy for each pure component as an '
-                                 'ideal gas at T<sub>0</sub> = 273.15 K (32 °F) and P<sub>0</sub> '
-                                 '= 1 atm = 14.696 psia. The polynomial integrals are evaluated '
+                                 'Con las cuatro ecuaciones de estado el estado de referencia es '
+                                 'el gas ideal de cada componente puro a T<sub>0</sub> = 273.15 K '
+                                 '(32 °F) y P<sub>0</sub> = 1 atm = 14.696 psia, con entalpía y '
+                                 'entropía nulas. Las integrales del polinomio se evalúan '
+                                 'analíticamente:',
+                                 'With the four equations of state the reference state is the '
+                                 'ideal gas of each pure component at T<sub>0</sub> = 273.15 K (32 '
+                                 '°F) and P<sub>0</sub> = 1 atm = 14.696 psia, with zero enthalpy '
+                                 'and entropy. The polynomial integrals are evaluated '
                                  'analytically:'),
                                 ('eq',
                                  'H^{\\mathrm{ig}}_i(T) = \\int_{T_0}^{T} '
@@ -7668,41 +7702,41 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'entropy to the working pressure and belongs to the ideal '
                                  'contribution.'),
                                 ('p',
-                                 'Como el estado de referencia no incluye entalpías de formación, '
-                                 'los valores absolutos de entalpía y entropía son comparables con '
-                                 'los de PVTsim; frente a HYSYS, que usa otra referencia, son '
-                                 'comparables las diferencias entre estados.',
-                                 'Because the reference state does not include enthalpies of '
-                                 'formation, absolute enthalpy and entropy values are comparable '
-                                 'with those of PVTsim; relative to HYSYS, which uses a different '
-                                 'reference, differences between states are comparable.'),
+                                 'El estado de referencia no incluye entalpías de formación. Los '
+                                 'valores absolutos de entalpía y entropía dependen de la '
+                                 'referencia adoptada; al comparar con resultados obtenidos con '
+                                 'otra referencia deben compararse diferencias entre estados (por '
+                                 'ejemplo, el ΔH de un proceso), que no dependen de ella.',
+                                 'The reference state does not include enthalpies of formation. '
+                                 'Absolute enthalpy and entropy values depend on the adopted '
+                                 'reference; when comparing with results obtained with another '
+                                 'reference, differences between states (for example, the ΔH of a '
+                                 'process), which do not depend on it, should be compared.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Reid, R.C., Prausnitz, J.M. y Sherwood, T.K. (1977). <em>The '
                                  'Properties of Gases and Liquids</em>, 3.ª ed. McGraw-Hill.',
                                  'Reid, R.C., Prausnitz, J.M. and Sherwood, T.K. (1977). <em>The '
-                                 'Properties of Gases and Liquids</em>, 3rd ed. McGraw-Hill.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, sección Thermal '
-                                 'and Volumetric Properties. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, Thermal and '
-                                 'Volumetric Properties section. Calsep A/S.')]},
+                                 'Properties of Gases and Liquids</em>, 3rd ed. McGraw-Hill.')]},
                    {'titulo': ('Contribución residual por la ecuación de estado',
                                'Residual contribution from the equation of state'),
                     'bloques': [('p',
                                  'La contribución residual recoge el efecto de las fuerzas '
-                                 'intermoleculares a la presión de trabajo. PVTsim la define a '
-                                 'partir de la derivada de los coeficientes de fugacidad respecto '
-                                 'a la temperatura; ThermoPhase emplea las formas cerradas '
-                                 'equivalentes, válidas para PR y SRK con las constantes '
+                                 'intermoleculares a la presión de trabajo. Se define a partir de '
+                                 'la derivada de los coeficientes de fugacidad respecto de la '
+                                 'temperatura, H<sup>res</sup> = −RT²Σx<sub>i</sub>(∂ln '
+                                 'φ<sub>i</sub>/∂T)<sub>P</sub>; ThermoPhase emplea las formas '
+                                 'cerradas equivalentes, válidas para PR y SRK con las constantes '
                                  'δ<sub>1</sub> y δ<sub>2</sub> de la forma general de la ecuación '
                                  'cúbica (véase «Forma general de las ecuaciones cúbicas»):',
                                  'The residual contribution accounts for intermolecular forces at '
-                                 'the working pressure. PVTsim defines it through the temperature '
-                                 'derivative of the fugacity coefficients; ThermoPhase uses the '
-                                 'equivalent closed forms, valid for PR and SRK with the '
-                                 'δ<sub>1</sub> and δ<sub>2</sub> constants of the general form of '
-                                 'the cubic equation (see “General form of the cubic equations”):'),
+                                 'the working pressure. It is defined through the temperature '
+                                 'derivative of the fugacity coefficients, H<sup>res</sup> = '
+                                 '−RT²Σx<sub>i</sub>(∂ln φ<sub>i</sub>/∂T)<sub>P</sub>; '
+                                 'ThermoPhase uses the equivalent closed forms, valid for PR and '
+                                 'SRK with the δ<sub>1</sub> and δ<sub>2</sub> constants of the '
+                                 'general form of the cubic equation (see «General form of the '
+                                 'cubic equations»):'),
                                 ('eq',
                                  '\\frac{H^{\\mathrm{res}}}{R\\,T} = Z - 1 + '
                                  '\\frac{T\\,\\frac{da_m}{dT} - a_m}{(\\delta_1 - \\delta_2)\\,b_m '
@@ -7862,11 +7896,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'composition and the corresponding root.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, sección Thermal '
-                                 'and Volumetric Properties. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, Thermal and '
-                                 'Volumetric Properties section. Calsep A/S.'),
-                                ('p',
                                  'Péneloux, A., Rauzy, E. y Fréze, R. (1982). A consistent '
                                  'correction for Redlich-Kwong-Soave volumes. <em>Fluid Phase '
                                  'Equilibria</em>, 8(1), 7–23.',
@@ -7883,15 +7912,14 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'disueltos en la fase acuosa intervienen en el resultado. La '
                                  'contribución residual se evalúa con la misma regla de mezcla de '
                                  'Huron-Vidal y los mismos parámetros que empleó el flash '
-                                 'trifásico, que es el procedimiento de PVTsim.',
+                                 'trifásico.',
                                  'In the three-phase flash, the enthalpy and entropy of the three '
                                  'phases (vapor, hydrocarbon liquid and aqueous phase) are '
                                  'computed over the fourteen components of each phase, so that '
                                  'water dissolved in the hydrocarbon phases and gases dissolved in '
                                  'the aqueous phase contribute to the result. The residual '
                                  'contribution is evaluated with the same Huron-Vidal mixing rule '
-                                 'and the same parameters used by the three-phase flash, which is '
-                                 'the PVTsim procedure.'),
+                                 'and the same parameters used by the three-phase flash.'),
                                 ('h3',
                                  'Derivada numérica del parámetro atractivo',
                                  'Numerical derivative of the attractive parameter'),
@@ -7924,32 +7952,31 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Ideal contribution of water'),
                                 ('p',
                                  'La contribución ideal de los trece componentes no acuosos es la '
-                                 'del juego de parámetros activo; la del agua se integra con su '
-                                 'propio polinomio de capacidad calorífica (Reid, Prausnitz y '
-                                 'Sherwood con los juegos de HYSYS; base de PVTsim con los juegos '
-                                 'de PVTsim), con el mismo estado de referencia de 273.15 K y 1 '
-                                 'atm. El término de mezcla ideal abarca los catorce componentes.',
+                                 'del banco activo; la del agua se integra con su propio polinomio '
+                                 'de capacidad calorífica (Reid, Prausnitz y Sherwood con el banco '
+                                 'HYSYS; coeficientes propios con el banco PVTsim), con el mismo '
+                                 'estado de referencia de 273.15 K y 1 atm. El término de mezcla '
+                                 'ideal abarca los catorce componentes.',
                                  'The ideal contribution of the thirteen non-aqueous components is '
-                                 'that of the active parameter set; that of water is integrated '
-                                 'with its own heat-capacity polynomial (Reid, Prausnitz and '
-                                 'Sherwood with the HYSYS sets; PVTsim database with the PVTsim '
-                                 'sets), with the same 273.15 K and 1 atm reference state. The '
-                                 'ideal mixing term covers all fourteen components.'),
+                                 'that of the active bank; that of water is integrated with its '
+                                 'own heat-capacity polynomial (Reid, Prausnitz and Sherwood with '
+                                 'the HYSYS bank; its own coefficients with the PVTsim bank), with '
+                                 'the same 273.15 K and 1 atm reference state. The ideal mixing '
+                                 'term covers all fourteen components.'),
                                 ('h3',
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('p',
                                  'Cuando la corrección de Peneloux está activa, a la entalpía de '
                                  'cada fase se suma −P·c<sub>k</sub> con el parámetro de traslado '
-                                 'de su composición completa, incluido el parámetro del agua de la '
-                                 'base de PVTsim. La entalpía y la entropía de la corriente son '
-                                 'las sumas ponderadas por las fracciones molares de las tres '
-                                 'fases.',
+                                 'de su composición completa, incluido el parámetro del agua. La '
+                                 'entalpía y la entropía de la corriente son las sumas ponderadas '
+                                 'por las fracciones molares de las tres fases.',
                                  'When the Peneloux correction is active, −P·c<sub>k</sub> is '
                                  'added to the enthalpy of each phase with the shift parameter of '
-                                 'its full composition, including the water parameter from the '
-                                 'PVTsim database. The stream enthalpy and entropy are the sums '
-                                 'weighted by the mole fractions of the three phases.'),
+                                 'its full composition, including the water parameter. The stream '
+                                 'enthalpy and entropy are the sums weighted by the mole fractions '
+                                 'of the three phases.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Huron, M.-J. y Vidal, J. (1979). New mixing rules in simple '
@@ -7959,12 +7986,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Huron, M.-J. and Vidal, J. (1979). New mixing rules in simple '
                                  'equations of state for representing vapour-liquid equilibria of '
                                  'strongly non-ideal mixtures. <em>Fluid Phase Equilibria</em>, '
-                                 '3(4), 255–271.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, sección Thermal '
-                                 'and Volumetric Properties. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, Thermal and '
-                                 'Volumetric Properties section. Calsep A/S.')]}]},
+                                 '3(4), 255–271.')]}]},
  {'titulo': ('Viscosidad', 'Viscosity'),
   'subsecciones': [{'titulo': ('Método de Lohrenz-Bray-Clark', 'Lohrenz-Bray-Clark method'),
                     'bloques': [('p',
@@ -7972,15 +7994,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'dimensionamiento de líneas de flujo, en el cálculo de caídas de '
                                  'presión y en la simulación de procesos de transporte. '
                                  'ThermoPhase calcula la viscosidad de las fases de hidrocarburos '
-                                 'por el método de Lohrenz, Bray y Clark (LBC) en la formulación '
-                                 'que documenta PVTsim, que expresa la viscosidad de gas y de '
-                                 'líquido con una sola correlación en la densidad reducida.',
+                                 'por el método de Lohrenz, Bray y Clark (LBC), que expresa la '
+                                 'viscosidad de gas y de líquido con una sola correlación en la '
+                                 'densidad reducida.',
                                  'The dynamic viscosity of each phase is required for flowline '
                                  'sizing, pressure-drop calculations and transport-process '
                                  'simulation. ThermoPhase computes the viscosity of the '
-                                 'hydrocarbon phases with the Lohrenz-Bray-Clark (LBC) method in '
-                                 'the formulation documented by PVTsim, which expresses gas and '
-                                 'liquid viscosity with a single correlation in reduced density.'),
+                                 'hydrocarbon phases with the Lohrenz-Bray-Clark (LBC) method, '
+                                 'which expresses gas and liquid viscosity with a single '
+                                 'correlation in reduced density.'),
                                 ('p',
                                  'El método descompone la viscosidad de la fase en la viscosidad '
                                  'del gas diluido a baja presión, que depende de la temperatura y '
@@ -8021,12 +8043,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  '<em>Journal of Petroleum Technology</em>, 16(10), 1171–1176.',
                                  'Lohrenz, J., Bray, B.G. and Clark, C.R. (1964). Calculating '
                                  'viscosities of reservoir fluids from their compositions. '
-                                 '<em>Journal of Petroleum Technology</em>, 16(10), 1171–1176.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, sección Transport '
-                                 'Properties. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, Transport '
-                                 'Properties section. Calsep A/S.')]},
+                                 '<em>Journal of Petroleum Technology</em>, 16(10), 1171–1176.')]},
                    {'titulo': ('Viscosidad de gas diluido', 'Dilute-gas viscosity'),
                     'bloques': [('p',
                                  'La viscosidad de gas diluido de cada componente se obtiene de la '
@@ -8048,17 +8065,15 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'T<sub>c,i</sub> la temperatura crítica (K), P<sub>c,i</sub> la '
                                  'presión crítica (atm) y M<sub>i</sub> el peso molecular. En el '
                                  'intervalo T<sub>r,i</sub> ≤ 1.5 ThermoPhase emplea el '
-                                 'coeficiente 35·10<sup>−5</sup>, con el que se reproducen los '
-                                 'resultados de PVTsim, en lugar del valor 34·10<sup>−5</sup> de '
-                                 'la publicación original y de la documentación de PVTsim.',
+                                 'coeficiente 35·10<sup>−5</sup> (34·10<sup>−5</sup> en la '
+                                 'publicación original de Stiel y Thodos).',
                                  'where η*<sub>i</sub> is the dilute-gas viscosity of component i '
                                  '(cP), ξ<sub>i</sub> its reducing parameter, T<sub>c,i</sub> the '
                                  'critical temperature (K), P<sub>c,i</sub> the critical pressure '
                                  '(atm) and M<sub>i</sub> the molecular weight. In the range '
                                  'T<sub>r,i</sub> ≤ 1.5 ThermoPhase uses the coefficient '
-                                 '35·10<sup>−5</sup>, which reproduces the PVTsim results, instead '
-                                 'of the value 34·10<sup>−5</sup> given in the original '
-                                 'publication and in the PVTsim documentation.'),
+                                 '35·10<sup>−5</sup> (34·10<sup>−5</sup> in the original Stiel and '
+                                 'Thodos publication).'),
                                 ('h3',
                                  'Regla de mezcla de Herning y Zipperer',
                                  'Herning-Zipperer mixing rule'),
@@ -8141,13 +8156,13 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('p',
-                                 'La densidad reducida se evalúa en las unidades internas de '
-                                 'PVTsim, con los volúmenes críticos en forma reducida '
+                                 'La densidad reducida se evalúa con la presión en atm y la '
+                                 'temperatura en K, con los volúmenes críticos en forma reducida '
                                  'V<sub>c</sub>/R (K/atm), de modo que la constante de los gases '
                                  'se cancela:',
-                                 'The reduced density is evaluated in PVTsim internal units, with '
-                                 'the critical volumes in reduced form V<sub>c</sub>/R (K/atm), so '
-                                 'that the gas constant cancels:'),
+                                 'The reduced density is evaluated with pressure in atm and '
+                                 'temperature in K, with the critical volumes in reduced form '
+                                 'V<sub>c</sub>/R (K/atm), so that the gas constant cancels:'),
                                 ('eq',
                                  '\\rho_r = \\frac{P/14.696}{Z\\,T_K}\\sum_i '
                                  'x_i\\left(\\frac{V_c}{R}\\right)_i \\qquad Z = '
@@ -8161,22 +8176,26 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'the compressibility factor equivalent to the phase density, '
                                  'reconstructed with the unit-convention factor f<sub>ρ</sub>.'),
                                 ('ul',
-                                 [('Juegos de PVTsim: T<sub>c</sub>, P<sub>c</sub> (convertida a '
-                                   'atm con 14.69595 psia/atm), M y V<sub>c</sub>/R de la base de '
-                                   'datos de PVTsim, incluida el agua (V<sub>c</sub>/R = '
-                                   '0.68242735 K/atm).',
-                                   'PVTsim sets: T<sub>c</sub>, P<sub>c</sub> (converted to atm '
-                                   'with 14.69595 psia/atm), M and V<sub>c</sub>/R from the PVTsim '
-                                   'database, including water (V<sub>c</sub>/R = 0.68242735 '
-                                   'K/atm).'),
-                                  ('Juegos de HYSYS: T<sub>c</sub>, P<sub>c</sub> (convertida con '
-                                   '14.696 psia/atm) y M del banco de HYSYS, y volúmenes críticos '
-                                   'de literatura (Reid, Prausnitz y Sherwood; 55.9 cm³/mol para '
-                                   'el agua) reducidos con R = 82.06 cm³·atm/(mol·K).',
-                                   'HYSYS sets: T<sub>c</sub>, P<sub>c</sub> (converted with '
-                                   '14.696 psia/atm) and M from the HYSYS database, and literature '
-                                   'critical volumes (Reid, Prausnitz and Sherwood; 55.9 cm³/mol '
-                                   'for water) reduced with R = 82.06 cm³·atm/(mol·K).')]),
+                                 [('Banco PVTsim: T<sub>c</sub>, P<sub>c</sub> (convertida a atm '
+                                   'con 14.69595 psia/atm), M y V<sub>c</sub>/R del banco, '
+                                   'incluida el agua (V<sub>c</sub>/R = 0.68242735 K/atm).',
+                                   'PVTsim bank: T<sub>c</sub>, P<sub>c</sub> (converted to atm '
+                                   'with 14.69595 psia/atm), M and V<sub>c</sub>/R of the bank, '
+                                   'including water (V<sub>c</sub>/R = 0.68242735 K/atm).'),
+                                  ('Banco HYSYS: T<sub>c</sub>, P<sub>c</sub> (convertida con '
+                                   '14.696 psia/atm) y M del banco, y volúmenes críticos de '
+                                   'literatura (Reid, Prausnitz y Sherwood; 55.9 cm³/mol para el '
+                                   'agua) reducidos con R = 82.06 cm³·atm/(mol·K).',
+                                   'HYSYS bank: T<sub>c</sub>, P<sub>c</sub> (converted with '
+                                   '14.696 psia/atm) and M of the bank, and literature critical '
+                                   'volumes (Reid, Prausnitz and Sherwood; 55.9 cm³/mol for water) '
+                                   'reduced with R = 82.06 cm³·atm/(mol·K).'),
+                                  ('Las propiedades críticas y el peso molecular son los de la '
+                                   'ecuación activa, incluidas las modificaciones hechas en la '
+                                   'hoja de componente.',
+                                   'Critical properties and molecular weight are those of the '
+                                   'active equation, including any modifications made in the '
+                                   'component sheet.')]),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Lohrenz, J., Bray, B.G. y Clark, C.R. (1964). Calculating '
@@ -8222,17 +8241,13 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'estado con el método EOS, la densidad COSTALD (o la combinación '
                                  'de la banda de transición) con el método COSTALD, y la densidad '
                                  'trasladada con la corrección de Peneloux. Por ello la viscosidad '
-                                 'de las fases líquidas depende del método de densidad elegido; '
-                                 'con el método EOS coincide con la formulación de PVTsim, que '
-                                 'evalúa LBC con la densidad de su ecuación de estado.',
+                                 'de las fases líquidas depende del método de densidad elegido.',
                                  'The reduced density is evaluated with the phase density reported '
                                  'by the selected density method: the equation-of-state density '
                                  'with the EOS method, the COSTALD density (or the transition-band '
                                  'blend) with the COSTALD method, and the shifted density with the '
                                  'Peneloux correction. Hence the viscosity of the liquid phases '
-                                 'depends on the chosen density method; with the EOS method it '
-                                 'matches the PVTsim formulation, which evaluates LBC with its '
-                                 'equation-of-state density.'),
+                                 'depends on the chosen density method.'),
                                 ('p',
                                  'En el flash trifásico, la viscosidad de las fases vapor y '
                                  'líquido de hidrocarburos se calcula con la misma formulación '
@@ -8275,21 +8290,20 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                     'bloques': [('p',
                                  'El método LBC fue desarrollado para hidrocarburos y no '
                                  'representa adecuadamente la viscosidad del agua líquida. Para la '
-                                 'fase acuosa del flash trifásico, ThermoPhase emplea la '
-                                 'correlación de viscosidad del agua pura que documenta PVTsim '
-                                 '(Water Phase Properties), basada en Meyer et al. (1967) y '
-                                 'Schmidt (1969), que divide el plano temperatura-presión en '
-                                 'cuatro regiones. La correlación se evalúa con la temperatura en '
-                                 'K, la presión en MN/m² y la densidad de la fase acuosa en g/cm³, '
-                                 'obtenida con el método de densidad seleccionado.',
+                                 'fase acuosa del flash trifásico, ThermoPhase emplea una '
+                                 'correlación de viscosidad del agua pura basada en Meyer y '
+                                 'colaboradores (1967) y Schmidt (1969), que divide el plano '
+                                 'temperatura-presión en cuatro regiones. La correlación se evalúa '
+                                 'con la temperatura en K, la presión en MN/m² y la densidad de la '
+                                 'fase acuosa en g/cm³, obtenida con el método de densidad '
+                                 'seleccionado.',
                                  'The LBC method was developed for hydrocarbons and does not '
                                  'adequately represent the viscosity of liquid water. For the '
-                                 'aqueous phase of the three-phase flash, ThermoPhase uses the '
-                                 'pure-water viscosity correlation documented by PVTsim (Water '
-                                 'Phase Properties), based on Meyer et al. (1967) and Schmidt '
-                                 '(1969), which divides the temperature-pressure plane into four '
-                                 'regions. The correlation is evaluated with temperature in K, '
-                                 'pressure in MN/m² and the aqueous-phase density in g/cm³, '
+                                 'aqueous phase of the three-phase flash, ThermoPhase uses a '
+                                 'pure-water viscosity correlation based on Meyer et al. (1967) '
+                                 'and Schmidt (1969), which divides the temperature-pressure plane '
+                                 'into four regions. The correlation is evaluated with temperature '
+                                 'in K, pressure in MN/m² and the aqueous-phase density in g/cm³, '
                                  'obtained with the selected density method.'),
                                 ('h3', 'Región de agua líquida', 'Liquid-water region'),
                                 ('p',
@@ -8321,7 +8335,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  '\\sum_{j=3}^{7} D_j\\,T^{\\,j-2}'),
                                 ('p',
                                  'donde P<sub>sat</sub> está en MN/m², T en K y D<sub>1</sub> a '
-                                 'D<sub>7</sub> son las constantes del manual de PVTsim '
+                                 'D<sub>7</sub> son las constantes de la correlación '
                                  '(D<sub>1</sub> = 2.9304370, D<sub>2</sub> = −2309.5789, '
                                  'D<sub>3</sub> = 3.4522497·10<sup>−2</sup>, D<sub>4</sub> = '
                                  '−1.3621289·10<sup>−4</sup>, D<sub>5</sub> = '
@@ -8329,9 +8343,9 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  '−2.4709162·10<sup>−10</sup>, D<sub>7</sub> = '
                                  '9.5937646·10<sup>−14</sup>).',
                                  'where P<sub>sat</sub> is in MN/m², T in K and D<sub>1</sub> to '
-                                 'D<sub>7</sub> are the PVTsim manual constants (D<sub>1</sub> = '
-                                 '2.9304370, D<sub>2</sub> = −2309.5789, D<sub>3</sub> = '
-                                 '3.4522497·10<sup>−2</sup>, D<sub>4</sub> = '
+                                 'D<sub>7</sub> are the constants of the correlation '
+                                 '(D<sub>1</sub> = 2.9304370, D<sub>2</sub> = −2309.5789, '
+                                 'D<sub>3</sub> = 3.4522497·10<sup>−2</sup>, D<sub>4</sub> = '
                                  '−1.3621289·10<sup>−4</sup>, D<sub>5</sub> = '
                                  '2.5878044·10<sup>−7</sup>, D<sub>6</sub> = '
                                  '−2.4709162·10<sup>−10</sup>, D<sub>7</sub> = '
@@ -8421,12 +8435,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Schmidt, E. (1969). <em>Properties of Water and Steam in '
                                  'SI-Units</em>. Springer-Verlag.',
                                  'Schmidt, E. (1969). <em>Properties of Water and Steam in '
-                                 'SI-Units</em>. Springer-Verlag.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, sección Water '
-                                 'Phase Properties. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>, Water Phase '
-                                 'Properties section. Calsep A/S.')]}]},
+                                 'SI-Units</em>. Springer-Verlag.')]}]},
  {'titulo': ('Propiedades del gas', 'Gas properties'),
   'subsecciones': [{'titulo': ('Poder calorífico: definiciones y bases',
                                'Heating value: definitions and bases'),
@@ -8436,63 +8445,103 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'productos llevados a la temperatura inicial de los reactivos. Es '
                                  'la propiedad que fija el valor comercial del gas natural y la '
                                  'que se contrasta con las especificaciones de venta y de '
-                                 'transporte por gasoducto. ThermoPhase reporta el poder '
-                                 'calorífico de la fase vapor, de la fase líquida de hidrocarburos '
-                                 'y de la mezcla global en cada punto calculado (Equilibrio de '
-                                 'fases, Puntos de saturación y Formación de hidratos).',
+                                 'transporte. ThermoPhase lo informa en Equilibrio de fases, '
+                                 'Puntos de saturación, Formación de hidratos, el flash múltiple y '
+                                 'el reporte.',
                                  'The heating value of a gas is the energy released by the '
                                  'complete combustion of a unit of gas with air, with the products '
                                  'brought back to the initial temperature of the reactants. It is '
                                  'the property that sets the commercial value of natural gas and '
-                                 'that is checked against sales and pipeline specifications. '
-                                 'ThermoPhase reports the heating value of the vapor phase, the '
-                                 'hydrocarbon liquid phase, and the overall mixture at every '
-                                 'calculated point (Phase Equilibrium, Saturation Points, and '
-                                 'Hydrate Formation).'),
+                                 'the one checked against sales and transport specifications. '
+                                 'ThermoPhase reports it in Phase equilibrium, Saturation points, '
+                                 'Hydrate formation, the multiple flash and the report.'),
                                 ('p',
-                                 'Se reportan dos definiciones. El poder calorífico superior o '
-                                 'bruto (HHV, <em>higher heating value</em>) supone que el agua '
-                                 'formada en la combustión condensa a líquido, de modo que se '
-                                 'recupera su calor latente de vaporización. El poder calorífico '
-                                 'inferior o neto (LHV, <em>lower heating value</em>) supone que '
-                                 'esa agua permanece como vapor. La diferencia entre ambos es el '
-                                 'calor latente del agua producida.',
-                                 'Two definitions are reported. The gross or higher heating value '
-                                 '(HHV) assumes that the water formed by combustion condenses to '
-                                 'liquid, so its latent heat of vaporization is recovered. The net '
-                                 'or lower heating value (LHV) assumes that this water remains as '
-                                 'vapor. The difference between the two is the latent heat of the '
-                                 'water produced.'),
+                                 'Un valor de poder calorífico queda definido por tres elecciones '
+                                 'independientes:',
+                                 'A heating value is defined by three independent choices:'),
+                                ('ul',
+                                 [('Superior o inferior. El poder calorífico superior o bruto '
+                                   '(HHV) supone que el agua formada en la combustión condensa y '
+                                   'entrega su calor latente; el inferior o neto (LHV) supone que '
+                                   'esa agua sale como vapor. La diferencia entre ambos es el '
+                                   'calor latente del agua formada.',
+                                   'Gross or net. The gross or higher heating value (HHV) assumes '
+                                   'that the water formed in combustion condenses and releases its '
+                                   'latent heat; the net or lower heating value (LHV) assumes that '
+                                   'this water leaves as vapor. The difference between them is the '
+                                   'latent heat of the water formed.'),
+                                  ('Ideal o real. La base ideal refiere el valor a un pie cúbico '
+                                   'de gas ideal a 60 °F y 14.696 psia; la base real, a un pie '
+                                   'cúbico del gas real en esas condiciones, que contiene 1/Z '
+                                   'veces los moles de un pie cúbico ideal.',
+                                   'Ideal or real. The ideal basis refers the value to one cubic '
+                                   'foot of ideal gas at 60 °F and 14.696 psia; the real basis, to '
+                                   'one cubic foot of the real gas at those conditions, which '
+                                   'contains 1/Z times the moles of an ideal cubic foot.'),
+                                  ('Seca o húmeda. La base seca corresponde al gas sin vapor de '
+                                   'agua; la base húmeda, al gas saturado con vapor de agua a 60 '
+                                   '°F y 14.696 psia. El agua que el gas contiene antes de la '
+                                   'combustión no aporta calor y diluye el gas.',
+                                   'Dry or wet. The dry basis corresponds to gas without water '
+                                   'vapor; the wet basis, to gas saturated with water vapor at 60 '
+                                   '°F and 14.696 psia. The water contained in the gas before '
+                                   'combustion releases no heat and dilutes the gas.')]),
                                 ('p',
-                                 'Cada definición se expresa en dos bases: la base volumétrica, en '
-                                 'BTU por pie cúbico de gas ideal a las condiciones estándar de 60 '
-                                 '°F y 14.696 psia, que es la convención de las tablas GPSA y de '
-                                 'HYSYS, y la base másica, en BTU por libra. La interfaz convierte '
-                                 'ambos valores al sistema de unidades activo.',
-                                 'Each definition is expressed on two bases: the volumetric basis, '
-                                 'in BTU per cubic foot of ideal gas at the standard conditions of '
-                                 '60 °F and 14.696 psia, which is the convention of the GPSA '
-                                 'tables and of HYSYS, and the mass basis, in BTU per pound. The '
-                                 'interface converts both values to the active unit system.'),
+                                 'Resultan ocho combinaciones volumétricas y cuatro másicas, ya '
+                                 'que en base másica no existe la distinción entre gas ideal y '
+                                 'real: el volumen no interviene. ThermoPhase presenta las doce:',
+                                 'This gives eight volumetric and four mass combinations, since on '
+                                 'a mass basis there is no distinction between ideal and real gas: '
+                                 'volume does not enter. ThermoPhase presents all twelve:'),
+                                ('ul',
+                                 [('Volumétricas (BTU/ft³): HHV y LHV en base ideal seca, ideal '
+                                   'húmeda, real seca y real húmeda.',
+                                   'Volumetric (BTU/ft³): HHV and LHV on ideal dry, ideal wet, '
+                                   'real dry and real wet bases.'),
+                                  ('Másicas (BTU/lb): HHV y LHV en base seca y húmeda.',
+                                   'Mass (BTU/lb): HHV and LHV on dry and wet bases.')]),
+                                ('h3',
+                                 'Fases en que se informa',
+                                 'Phases for which it is reported'),
+                                ('p',
+                                 'Las bases ideal seca (volumétrica) y másica seca se informan '
+                                 'para la fase vapor, la fase líquida y la mezcla. El valor '
+                                 'volumétrico de un líquido o de una mezcla bifásica es el de su '
+                                 'composición vaporizada a gas ideal en condiciones estándar, y el '
+                                 'valor másico es el calor por unidad de masa de cualquier fluido. '
+                                 'Las bases real y húmeda describen el gas en condiciones estándar '
+                                 '—su factor de compresibilidad y su saturación con vapor de agua— '
+                                 'y se informan solo para la fase vapor; en el líquido y en la '
+                                 'mezcla quedan vacías. Cuando el fluido es todo gas, la columna '
+                                 'de la fase vapor contiene las doce combinaciones.',
+                                 'The ideal dry (volumetric) and mass dry bases are reported for '
+                                 'the vapor phase, the liquid phase and the mixture. The '
+                                 'volumetric value of a liquid or a two-phase mixture is that of '
+                                 'its composition vaporized to ideal gas at standard conditions, '
+                                 'and the mass value is the heat per unit mass of any fluid. The '
+                                 'real and wet bases describe the gas at standard conditions —its '
+                                 'compressibility factor and its saturation with water vapor— and '
+                                 'are reported for the vapor phase only; for the liquid and the '
+                                 'mixture they are left blank. When the fluid is entirely gas, the '
+                                 'vapor-phase column contains the twelve combinations.'),
                                 ('h3', 'Composición de cálculo', 'Calculation composition'),
                                 ('p',
-                                 'El poder calorífico se calcula sobre la composición de '
-                                 'hidrocarburos de cada fase, con el agua excluida. Cuando la '
-                                 'mezcla contiene agua, las fracciones molares de los trece '
-                                 'componentes restantes (N<sub>2</sub>, CO<sub>2</sub> y '
-                                 'C<sub>1</sub> a C<sub>9</sub>) se renormalizan a la unidad antes '
-                                 'de aplicar la regla de mezcla, y el peso molecular de la fase se '
-                                 'evalúa sobre esa misma composición renormalizada. El valor '
-                                 'reportado corresponde, por tanto, a la corriente de '
-                                 'hidrocarburos en base seca.',
-                                 'The heating value is calculated on the hydrocarbon composition '
-                                 'of each phase, with water excluded. When the mixture contains '
-                                 'water, the mole fractions of the remaining thirteen components '
-                                 '(N<sub>2</sub>, CO<sub>2</sub>, and C<sub>1</sub> through '
-                                 'C<sub>9</sub>) are renormalized to unity before the mixing rule '
-                                 'is applied, and the phase molecular weight is evaluated on the '
-                                 'same renormalized composition. The reported value therefore '
-                                 'corresponds to the hydrocarbon stream on a dry basis.'),
+                                 'Todas las bases parten de la composición de hidrocarburos de la '
+                                 'fase, con el agua excluida. Cuando la mezcla contiene agua, las '
+                                 'fracciones molares de los trece componentes restantes '
+                                 '(N<sub>2</sub>, CO<sub>2</sub> y C<sub>1</sub> a C<sub>9</sub>) '
+                                 'se renormalizan a la unidad antes de aplicar la regla de mezcla, '
+                                 'y el peso molecular de la fase se evalúa sobre esa misma '
+                                 'composición. La base húmeda agrega después, sobre esa '
+                                 'composición, la saturación estándar con vapor de agua.',
+                                 'All bases start from the hydrocarbon composition of the phase, '
+                                 'with water excluded. When the mixture contains water, the mole '
+                                 'fractions of the remaining thirteen components (N<sub>2</sub>, '
+                                 'CO<sub>2</sub> and C<sub>1</sub> to C<sub>9</sub>) are '
+                                 'renormalized to unity before the mixing rule is applied, and the '
+                                 'phase molecular weight is evaluated on that same composition. '
+                                 'The wet basis then adds, on that composition, the standard '
+                                 'saturation with water vapor.'),
                                 ('eq',
                                  '\\tilde{z}_i = \\frac{z_i}{\\sum_{j \\neq \\mathrm{H_2O}} z_j}'),
                                 ('p',
@@ -8506,107 +8555,220 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'z̃<sub>i</sub> is the water-free mole fraction.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.'),
+                                ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.'),
+                                ('p',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
                                  'Data Book</em>, 10.ª ed. GPSA.',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
-                                 'Data Book</em>, 10th ed. GPSA.'),
-                                ('p',
-                                 'Campbell, J.M. (1992). <em>Gas Conditioning and Processing</em>, '
-                                 'vol. 1. Campbell Petroleum Series.',
-                                 'Campbell, J.M. (1992). <em>Gas Conditioning and Processing</em>, '
-                                 'vol. 1. Campbell Petroleum Series.')]},
-                   {'titulo': ('Poder calorífico volumétrico', 'Volumetric heating value'),
+                                 'Data Book</em>, 10th ed. GPSA.')]},
+                   {'titulo': ('Poder calorífico en base ideal', 'Ideal-basis heating value'),
                     'bloques': [('p',
-                                 'El poder calorífico volumétrico de una fase se obtiene como el '
+                                 'El poder calorífico volumétrico en base ideal seca es el '
                                  'promedio molar de los valores caloríficos de los componentes '
-                                 'puros, según el procedimiento del GPSA Engineering Data Book:',
-                                 'The volumetric heating value of a phase is obtained as the molar '
-                                 'average of the pure-component heating values, following the '
-                                 'procedure of the GPSA Engineering Data Book:'),
-                                ('eq', 'HV = \\sum_{i=1}^{N} \\tilde{z}_i \\, HV_i'),
+                                 'puros en base gas ideal:',
+                                 'The volumetric heating value on the ideal dry basis is the molar '
+                                 'average of the ideal-gas heating values of the pure components:'),
+                                ('eq', 'HV^{id} = \\sum_{i=1}^{N} \\tilde{z}_i \\, HV_i'),
                                 ('p',
-                                 'donde HV es el poder calorífico volumétrico de la fase (superior '
-                                 'o inferior), en BTU/ft³ de gas ideal, HV<sub>i</sub> es el valor '
-                                 'calorífico volumétrico del componente puro i en base gas ideal a '
-                                 '60 °F y 14.696 psia, en BTU/ft³, y N es el número de componentes '
-                                 'de hidrocarburo. La ponderación molar es exacta en base gas '
-                                 'ideal porque todos los componentes ocupan el mismo volumen molar '
-                                 'a las condiciones estándar.',
-                                 'where HV is the volumetric heating value of the phase (higher or '
-                                 'lower), in BTU/ft³ of ideal gas, HV<sub>i</sub> is the ideal-gas '
-                                 'volumetric heating value of pure component i at 60 °F and 14.696 '
-                                 'psia, in BTU/ft³, and N is the number of hydrocarbon components. '
-                                 'Molar weighting is exact on the ideal-gas basis because all '
-                                 'components occupy the same molar volume at standard conditions.'),
+                                 'donde HV<sup>id</sup> es el poder calorífico de la fase '
+                                 '(superior o inferior) en BTU/ft³ de gas ideal, HV<sub>i</sub> el '
+                                 'valor calorífico del componente puro i en base gas ideal a 60 °F '
+                                 'y 14.696 psia (BTU/ft³) y N el número de componentes de '
+                                 'hidrocarburo. La ponderación molar es exacta en base gas ideal '
+                                 'porque todos los componentes ocupan el mismo volumen molar en '
+                                 'condiciones estándar.',
+                                 'where HV<sup>id</sup> is the heating value of the phase (gross '
+                                 'or net) in BTU/ft³ of ideal gas, HV<sub>i</sub> the ideal-gas '
+                                 'heating value of pure component i at 60 °F and 14.696 psia '
+                                 '(BTU/ft³) and N the number of hydrocarbon components. Molar '
+                                 'weighting is exact on the ideal-gas basis because all components '
+                                 'occupy the same molar volume at standard conditions.'),
                                 ('p',
-                                 'El poder calorífico volumétrico se expresa siempre en base gas '
-                                 'ideal, también para la fase líquida: el valor reportado para el '
-                                 'líquido es el que tendría su composición vaporizada a gas ideal '
-                                 'en condiciones estándar, de acuerdo con la convención de las '
-                                 'tablas GPSA y de HYSYS.',
-                                 'The volumetric heating value is always expressed on an ideal-gas '
-                                 'basis, including for the liquid phase: the value reported for '
-                                 'the liquid is the one its composition would have if vaporized to '
-                                 'ideal gas at standard conditions, in accordance with the '
-                                 'convention of the GPSA tables and HYSYS.'),
-                                ('h3',
-                                 'Implementación en ThermoPhase',
-                                 'Implementation in ThermoPhase'),
+                                 'En base húmeda el gas se considera saturado con vapor de agua a '
+                                 '60 °F y a la presión base; la fracción molar de agua es el '
+                                 'cociente entre la presión de vapor del agua y la presión base:',
+                                 'On the wet basis the gas is considered saturated with water '
+                                 'vapor at 60 °F and the base pressure; the water mole fraction is '
+                                 'the ratio of the water vapor pressure to the base pressure:'),
+                                ('eq',
+                                 'x_w = \\frac{P_w^{sat}(60\\,^{\\circ}\\mathrm{F})}{P_b} = '
+                                 '\\frac{0.25636}{14.696} = 0.017444 \\qquad HV^{id}_{hum} = (1 - '
+                                 'x_w)\\,HV^{id}'),
                                 ('p',
-                                 'Los valores por componente corresponden a la tabla de '
-                                 'propiedades físicas GPSA-87 (valor calorífico a 60 °F, gas ideal '
-                                 'a 14.696 psia). Los valores inferior / superior en BTU/ft³ son '
-                                 'los siguientes:',
-                                 'The component values are those of the GPSA-87 physical property '
-                                 'table (heating value at 60 °F, ideal gas at 14.696 psia). The '
-                                 'lower / higher values in BTU/ft³ are as follows:'),
+                                 'donde x<sub>w</sub> es la fracción molar de agua del gas '
+                                 'saturado, P<sub>w</sub><sup>sat</sup> la presión de vapor del '
+                                 'agua a 60 °F (psia) y P<sub>b</sub> = 14.696 psia la presión '
+                                 'base. El vapor de agua no aporta calor de combustión.',
+                                 'where x<sub>w</sub> is the water mole fraction of the saturated '
+                                 'gas, P<sub>w</sub><sup>sat</sup> the water vapor pressure at 60 '
+                                 '°F (psia) and P<sub>b</sub> = 14.696 psia the base pressure. '
+                                 'Water vapor contributes no heat of combustion.'),
+                                ('h3', 'Valores por componente', 'Component values'),
+                                ('p',
+                                 'Los valores caloríficos de los componentes puros son los de GPA '
+                                 '2145 (60 °F, gas ideal a 14.696 psia). Inferior / superior, en '
+                                 'BTU/ft³:',
+                                 'The heating values of the pure components are those of GPA 2145 '
+                                 '(60 °F, ideal gas at 14.696 psia). Net / gross, in BTU/ft³:'),
                                 ('ul',
-                                 [('Metano 909.4 / 1010.0; etano 1618.7 / 1769.6; propano 2314.9 / '
+                                 [('Metano 909.4 / 1010.0; etano 1618.7 / 1769.7; propano 2314.9 / '
                                    '2516.1.',
-                                   'Methane 909.4 / 1010.0; ethane 1618.7 / 1769.6; propane 2314.9 '
+                                   'Methane 909.4 / 1010.0; ethane 1618.7 / 1769.7; propane 2314.9 '
                                    '/ 2516.1.'),
                                   ('Isobutano 3000.4 / 3251.9; n-butano 3010.8 / 3262.3; '
                                    'isopentano 3699.0 / 4000.9; n-pentano 3706.9 / 4008.9.',
                                    'Isobutane 3000.4 / 3251.9; n-butane 3010.8 / 3262.3; '
                                    'isopentane 3699.0 / 4000.9; n-pentane 3706.9 / 4008.9.'),
-                                  ('C<sub>6</sub> (n-hexano) 4403.8 / 4755.9; C<sub>7</sub> '
-                                   '(n-heptano) 5100.0 / 5502.5; C<sub>8</sub> (n-octano) 5796.1 / '
-                                   '6248.9; C<sub>9</sub> (n-nonano) 6493.2 / 6996.5.',
-                                   'C<sub>6</sub> (n-hexane) 4403.8 / 4755.9; C<sub>7</sub> '
-                                   '(n-heptane) 5100.0 / 5502.5; C<sub>8</sub> (n-octane) 5796.1 / '
-                                   '6248.9; C<sub>9</sub> (n-nonane) 6493.2 / 6996.5.'),
+                                  ('n-Hexano 4403.8 / 4755.9; n-heptano 5100.0 / 5502.5; n-octano '
+                                   '5796.1 / 6248.9; n-nonano 6493.2 / 6996.5.',
+                                   'n-Hexane 4403.8 / 4755.9; n-heptane 5100.0 / 5502.5; n-octane '
+                                   '5796.1 / 6248.9; n-nonane 6493.2 / 6996.5.'),
                                   ('N<sub>2</sub> y CO<sub>2</sub>: 0, por no ser combustibles; '
                                    'actúan como diluyentes que reducen el poder calorífico en '
                                    'proporción a su fracción molar.',
-                                   'N<sub>2</sub> and CO<sub>2</sub>: 0, since they are not '
+                                   'N<sub>2</sub> and CO<sub>2</sub>: 0, as they are not '
                                    'combustible; they act as diluents that reduce the heating '
                                    'value in proportion to their mole fraction.')]),
                                 ('p',
-                                 'Antes de aplicar la regla de mezcla, la composición se normaliza '
-                                 'a suma unitaria. Si la fase no existe en el punto calculado, su '
-                                 'poder calorífico no se reporta.',
-                                 'Before the mixing rule is applied, the composition is normalized '
-                                 'to unit sum. If the phase does not exist at the calculated '
-                                 'point, its heating value is not reported.'),
+                                 'Para cada componente C<sub>m</sub>H<sub>n</sub> la diferencia '
+                                 'entre el valor superior y el inferior es el calor latente del '
+                                 'agua formada, 50.31 BTU por pie³ estándar de vapor de agua: '
+                                 'HV<sub>i</sub><sup>sup</sup> − HV<sub>i</sub><sup>inf</sup> = '
+                                 '50.31·n/2. Antes de aplicar la regla de mezcla la composición se '
+                                 'normaliza a suma unitaria; si la fase no existe en el punto '
+                                 'calculado, su poder calorífico no se informa. En una composición '
+                                 'con fracción C6+, ésta se representa como n-hexano.',
+                                 'For each component C<sub>m</sub>H<sub>n</sub> the difference '
+                                 'between the gross and the net value is the latent heat of the '
+                                 'water formed, 50.31 BTU per standard ft³ of water vapor: '
+                                 'HV<sub>i</sub><sup>gross</sup> − HV<sub>i</sub><sup>net</sup> = '
+                                 '50.31·n/2. Before the mixing rule is applied the composition is '
+                                 'normalized to unit sum; if the phase does not exist at the '
+                                 'calculated point, its heating value is not reported. In a '
+                                 'composition with a C6+ fraction, that fraction is represented as '
+                                 'n-hexane.'),
                                 ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.'),
+                                ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.'),
                                 ('p',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
                                  'Data Book</em>, 10.ª ed. GPSA.',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
-                                 'Data Book</em>, 10th ed. GPSA.'),
+                                 'Data Book</em>, 10th ed. GPSA.')]},
+                   {'titulo': ('Poder calorífico en base real', 'Real-basis heating value'),
+                    'bloques': [('p',
+                                 'Un pie cúbico de gas real a 60 °F y 14.696 psia contiene 1/Z '
+                                 'veces los moles de un pie cúbico de gas ideal. El poder '
+                                 'calorífico en base real se obtiene dividiendo el valor ideal por '
+                                 'el factor de compresibilidad del gas en esas condiciones:',
+                                 'One cubic foot of real gas at 60 °F and 14.696 psia contains 1/Z '
+                                 'times the moles of one cubic foot of ideal gas. The real-basis '
+                                 'heating value is obtained by dividing the ideal value by the '
+                                 'compressibility factor of the gas at those conditions:'),
+                                ('eq',
+                                 'HV^{real} = \\frac{HV^{id}}{Z} \\qquad HV^{real}_{hum} = '
+                                 '\\frac{(1 - x_w)\\,HV^{id}}{Z_{sat}}'),
                                 ('p',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.',
-                                 'AspenTech. <em>Aspen HYSYS Properties and Methods Technical '
-                                 'Reference</em>. Aspen Technology, Inc.')]},
+                                 'donde Z es el factor de compresibilidad del gas seco y '
+                                 'Z<sub>sat</sub> el del gas saturado con vapor de agua, ambos a '
+                                 'las condiciones base. Ambos se calculan con el método de '
+                                 'factores de sumatoria de GPA 2172, adecuado para gases con Z '
+                                 'próximo a la unidad:',
+                                 'where Z is the compressibility factor of the dry gas and '
+                                 'Z<sub>sat</sub> that of the gas saturated with water vapor, both '
+                                 'at base conditions. Both are computed with the GPA 2172 '
+                                 'summation-factor method, suited to gases with Z close to unity:'),
+                                ('eq',
+                                 'Z = 1 - P_b\\left(\\sum_i \\tilde{z}_i\\sqrt{b_i}\\right)^{2} '
+                                 '\\qquad Z_{sat} = 1 - P_b\\left[(1 - x_w)\\sum_i '
+                                 '\\tilde{z}_i\\sqrt{b_i} + x_w\\sqrt{b_w}\\right]^{2}'),
+                                ('p',
+                                 'donde √b<sub>i</sub> es el factor de sumatoria del componente i '
+                                 '(psia<sup>−1/2</sup>), √b<sub>w</sub> el del agua y '
+                                 'P<sub>b</sub> = 14.696 psia. Los factores empleados son:',
+                                 'where √b<sub>i</sub> is the summation factor of component i '
+                                 '(psia<sup>−1/2</sup>), √b<sub>w</sub> that of water and '
+                                 'P<sub>b</sub> = 14.696 psia. The factors used are:'),
+                                ('ul',
+                                 [('N<sub>2</sub> 0.0044; CO<sub>2</sub> 0.0197; metano 0.0116; '
+                                   'etano 0.0239; propano 0.0344.',
+                                   'N<sub>2</sub> 0.0044; CO<sub>2</sub> 0.0197; methane 0.0116; '
+                                   'ethane 0.0239; propane 0.0344.'),
+                                  ('Isobutano 0.0458; n-butano 0.0478; isopentano 0.0581; '
+                                   'n-pentano 0.0631.',
+                                   'Isobutane 0.0458; n-butane 0.0478; isopentane 0.0581; '
+                                   'n-pentane 0.0631.'),
+                                  ('n-Hexano 0.0802; n-heptano 0.0944; n-octano 0.1137; n-nonano '
+                                   '0.1331.',
+                                   'n-Hexane 0.0802; n-heptane 0.0944; n-octane 0.1137; n-nonane '
+                                   '0.1331.'),
+                                  ('Agua 0.0623; aire 0.0050.', 'Water 0.0623; air 0.0050.')]),
+                                ('p',
+                                 'El factor de compresibilidad se refiere a las condiciones base y '
+                                 'no a las de operación, por lo que no depende de la ecuación de '
+                                 'estado activa. Para un gas natural típico Z está entre 0.994 y '
+                                 '0.998, y el valor real resulta entre 0.2 % y 0.6 % mayor que el '
+                                 'ideal; la base húmeda resulta del orden de 1.3 % menor que la '
+                                 'seca.',
+                                 'The compressibility factor refers to base conditions and not to '
+                                 'operating conditions, so it does not depend on the active '
+                                 'equation of state. For a typical natural gas Z lies between '
+                                 '0.994 and 0.998, and the real value is 0.2 % to 0.6 % higher '
+                                 'than the ideal one; the wet basis is about 1.3 % lower than the '
+                                 'dry basis.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.'),
+                                ('p',
+                                 'ASTM International. <em>ASTM D3588: Standard Practice for '
+                                 'Calculating Heat Value, Compressibility Factor, and Relative '
+                                 'Density of Gaseous Fuels</em>. ASTM.',
+                                 'ASTM International. <em>ASTM D3588: Standard Practice for '
+                                 'Calculating Heat Value, Compressibility Factor, and Relative '
+                                 'Density of Gaseous Fuels</em>. ASTM.')]},
                    {'titulo': ('Poder calorífico en base másica', 'Mass-basis heating value'),
                     'bloques': [('p',
-                                 'El poder calorífico másico se obtiene del volumétrico pasando '
-                                 'por la base molar. Para ello se multiplica por el volumen molar '
-                                 'del gas ideal a las condiciones estándar:',
-                                 'The mass-basis heating value is obtained from the volumetric '
-                                 'value through the molar basis. For this, it is multiplied by the '
-                                 'ideal-gas molar volume at standard conditions:'),
+                                 'El poder calorífico másico se obtiene del volumétrico ideal '
+                                 'pasando por la base molar, con el volumen molar del gas ideal en '
+                                 'condiciones estándar:',
+                                 'The mass heating value is obtained from the ideal volumetric '
+                                 'value through the molar basis, with the ideal-gas molar volume '
+                                 'at standard conditions:'),
                                 ('eq',
                                  'V_{std} = \\frac{R\\,T_{std}}{P_{std}} = \\frac{10.7316 \\times '
                                  '519.67}{14.696} \\approx 379.48 \\ \\mathrm{ft^3/lbmol}'),
@@ -8617,32 +8779,118 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'where R = 10.7316 psia·ft³/(lbmol·°R) is the universal gas '
                                  'constant, T<sub>std</sub> = 519.67 °R (60 °F), and '
                                  'P<sub>std</sub> = 14.696 psia.'),
-                                ('eq', 'HV_{m} = \\frac{HV \\cdot V_{std}}{M}'),
+                                ('eq',
+                                 'HV_{m} = \\frac{HV^{id}\\,V_{std}}{M} \\qquad HV_{m,hum} = '
+                                 '\\frac{(1 - x_w)\\,HV^{id}\\,V_{std}}{(1 - x_w)\\,M + '
+                                 'x_w\\,M_w}'),
                                 ('p',
-                                 'donde HV<sub>m</sub> es el poder calorífico másico, en BTU/lb, '
-                                 'el producto HV·V<sub>std</sub> es el poder calorífico molar, en '
-                                 'BTU/lbmol, y M es el peso molecular de la fase, en lb/lbmol.',
-                                 'where HV<sub>m</sub> is the mass-basis heating value, in BTU/lb, '
-                                 'the product HV·V<sub>std</sub> is the molar heating value, in '
-                                 'BTU/lbmol, and M is the phase molecular weight, in lb/lbmol.'),
+                                 'donde HV<sub>m</sub> es el poder calorífico másico en base seca '
+                                 '(BTU/lb), HV<sub>m,hum</sub> el másico en base húmeda, el '
+                                 'producto HV<sup>id</sup>·V<sub>std</sub> el poder calorífico '
+                                 'molar (BTU/lbmol), M el peso molecular de la fase libre de agua '
+                                 '(lb/lbmol), x<sub>w</sub> la fracción de agua del gas saturado y '
+                                 'M<sub>w</sub> = 18.0153 lb/lbmol. En base húmeda la masa de '
+                                 'referencia incluye el vapor de agua del gas saturado. El valor '
+                                 'másico no distingue entre gas ideal y real porque en él no '
+                                 'interviene el volumen del gas.',
+                                 'where HV<sub>m</sub> is the dry-basis mass heating value '
+                                 '(BTU/lb), HV<sub>m,hum</sub> the wet-basis mass value, the '
+                                 'product HV<sup>id</sup>·V<sub>std</sub> the molar heating value '
+                                 '(BTU/lbmol), M the water-free molecular weight of the phase '
+                                 '(lb/lbmol), x<sub>w</sub> the water fraction of the saturated '
+                                 'gas and M<sub>w</sub> = 18.0153 lb/lbmol. On the wet basis the '
+                                 'reference mass includes the water vapor of the saturated gas. '
+                                 'The mass value does not distinguish between ideal and real gas '
+                                 'because the gas volume does not enter it.'),
                                 ('eq', 'M = \\sum_{i=1}^{N} \\tilde{z}_i \\, M_i'),
                                 ('p',
-                                 'donde M<sub>i</sub> es el peso molecular del componente i, en '
-                                 'lb/lbmol. El peso molecular se evalúa sobre la composición de '
-                                 'hidrocarburos libre de agua, coherente con el cálculo del poder '
-                                 'calorífico volumétrico, de modo que el agua disuelta en la fase '
-                                 'no diluye el valor másico.',
-                                 'where M<sub>i</sub> is the molecular weight of component i, in '
-                                 'lb/lbmol. The molecular weight is evaluated on the water-free '
-                                 'hydrocarbon composition, consistent with the volumetric heating '
-                                 'value calculation, so the water dissolved in the phase does not '
-                                 'dilute the mass-basis value.'),
+                                 'donde M<sub>i</sub> es el peso molecular del componente i en el '
+                                 'banco de la ecuación activa (lb/lbmol), evaluado sobre la '
+                                 'composición de hidrocarburos libre de agua de la fase.',
+                                 'where M<sub>i</sub> is the molecular weight of component i in '
+                                 'the bank of the active equation (lb/lbmol), evaluated on the '
+                                 'water-free hydrocarbon composition of the phase.'),
                                 ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.'),
                                 ('p',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
                                  'Data Book</em>, 10.ª ed. GPSA.',
                                  'Gas Processors Suppliers Association (1987). <em>Engineering '
                                  'Data Book</em>, 10th ed. GPSA.')]},
+                   {'titulo': ('Gravedad específica del gas', 'Gas specific gravity'),
+                    'bloques': [('p',
+                                 'La gravedad específica (densidad relativa) de un gas es el '
+                                 'cociente entre su densidad y la del aire seco a las mismas '
+                                 'condiciones base, 60 °F y 14.696 psia. ThermoPhase informa dos '
+                                 'valores:',
+                                 'The specific gravity (relative density) of a gas is the ratio of '
+                                 'its density to that of dry air at the same base conditions, 60 '
+                                 '°F and 14.696 psia. ThermoPhase reports two values:'),
+                                ('eq',
+                                 'G^{id} = \\frac{M}{M_{aire}} = \\frac{M}{28.9625} \\qquad '
+                                 'G^{real} = G^{id}\\,\\frac{Z_{aire}}{Z} \\qquad Z_{aire} = 1 - '
+                                 'P_b\\,b_{aire} = 0.99963'),
+                                ('p',
+                                 'donde G<sup>id</sup> es la gravedad específica ideal, M el peso '
+                                 'molecular del gas (lb/lbmol), M<sub>aire</sub> = 28.9625 el del '
+                                 'aire, G<sup>real</sup> la gravedad específica real, Z el factor '
+                                 'de compresibilidad del gas a condiciones base (véase «Poder '
+                                 'calorífico en base real») y Z<sub>aire</sub> el del aire, con '
+                                 '√b<sub>aire</sub> = 0.0050.',
+                                 'where G<sup>id</sup> is the ideal specific gravity, M the '
+                                 'molecular weight of the gas (lb/lbmol), M<sub>aire</sub> = '
+                                 '28.9625 that of air, G<sup>real</sup> the real specific gravity, '
+                                 'Z the compressibility factor of the gas at base conditions (see '
+                                 '«Real-basis heating value») and Z<sub>aire</sub> that of air, '
+                                 'with √b<sub>aire</sub> = 0.0050.'),
+                                ('p',
+                                 'La gravedad específica ideal supone que el gas y el aire se '
+                                 'comportan como gases ideales, de modo que volúmenes iguales '
+                                 'contienen el mismo número de moles. En condiciones base el gas '
+                                 'natural se aparta del comportamiento ideal más que el aire (Z '
+                                 'del orden de 0.996 frente a 0.9996), por lo que un pie cúbico de '
+                                 'gas real contiene algo más de masa y la gravedad específica real '
+                                 'es mayor que la ideal.',
+                                 'The ideal specific gravity assumes that gas and air behave as '
+                                 'ideal gases, so that equal volumes contain the same number of '
+                                 'moles. At base conditions natural gas departs from ideal '
+                                 'behavior more than air (Z of about 0.996 versus 0.9996), so one '
+                                 'cubic foot of real gas contains slightly more mass and the real '
+                                 'specific gravity is higher than the ideal one.'),
+                                ('p',
+                                 'La gravedad específica ideal es la que se presenta en la fila '
+                                 'Gravedad específica de la fase vapor; la real se presenta en la '
+                                 'fila Gravedad específica real (gas), solo para la fase vapor, y '
+                                 'se calcula sobre la composición del gas libre de agua.',
+                                 'The ideal specific gravity is the one shown in the Specific '
+                                 'gravity row of the vapor phase; the real one is shown in the '
+                                 'Real specific gravity (gas) row, for the vapor phase only, and '
+                                 'is computed on the water-free gas composition.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2172: Calculation '
+                                 'of Gross Heating Value, Relative Density, Compressibility and '
+                                 'Theoretical Hydrocarbon Liquid Content for Natural Gas Mixtures '
+                                 'for Custody Transfer</em>. GPA.'),
+                                ('p',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.',
+                                 'Gas Processors Association. <em>GPA Standard 2145: Table of '
+                                 'Physical Properties for Hydrocarbons and Other Compounds of '
+                                 'Interest to the Natural Gas Industry</em>. GPA.')]},
                    {'titulo': ('Contenido de licuables (GPM C3+)', 'Liquefiable content (GPM C3+)'),
                     'bloques': [('p',
                                  'El GPM (<em>gallons per thousand cubic feet</em>) mide el '
@@ -8675,19 +8923,18 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('p',
-                                 'Los factores G<sub>i</sub> son los de la tabla GPSA-87 (columna '
-                                 'gal/lbmol): propano 10.433, isobutano 12.386, n-butano 11.937, '
+                                 'Los factores G<sub>i</sub> (gal/lbmol, líquido a 60 °F) son los '
+                                 'de GPA 2145: propano 10.433, isobutano 12.386, n-butano 11.937, '
                                  'isopentano 13.853, n-pentano 13.712, n-hexano 15.571, n-heptano '
                                  '17.464, n-octano 19.381 y n-nonano 21.311. Metano, etano, '
                                  'N<sub>2</sub> y CO<sub>2</sub> tienen factor nulo, puesto que no '
                                  'se recuperan como líquido en el procesamiento convencional.',
-                                 'The G<sub>i</sub> factors are those of the GPSA-87 table '
-                                 '(gal/lbmol column): propane 10.433, isobutane 12.386, n-butane '
-                                 '11.937, isopentane 13.853, n-pentane 13.712, n-hexane 15.571, '
-                                 'n-heptane 17.464, n-octane 19.381, and n-nonane 21.311. Methane, '
-                                 'ethane, N<sub>2</sub>, and CO<sub>2</sub> have a zero factor, '
-                                 'since they are not recovered as liquid in conventional '
-                                 'processing.'),
+                                 'The G<sub>i</sub> factors (gal/lbmol, liquid at 60 °F) are those '
+                                 'of GPA 2145: propane 10.433, isobutane 12.386, n-butane 11.937, '
+                                 'isopentane 13.853, n-pentane 13.712, n-hexane 15.571, n-heptane '
+                                 '17.464, n-octane 19.381, and n-nonane 21.311. Methane, ethane, '
+                                 'N<sub>2</sub>, and CO<sub>2</sub> have a zero factor, since they '
+                                 'are not recovered as liquid in conventional processing.'),
                                 ('p',
                                  'El GPM se reporta para la fase gas, que es la corriente de la '
                                  'que se extraen los licuables. En las pestañas Puntos de '
@@ -8750,19 +8997,19 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'M<sub>H₂O</sub>·10<sup>6</sup>/V<sub>std</sub> is approximately '
                                  '47,473 lb/MMscf per unit mole fraction.'),
                                 ('p',
-                                 'El volumen estándar es de gas ideal, como en el GPSA y en HYSYS; '
-                                 'por ello no depende de la composición, que interviene solo a '
-                                 'través de y<sub>H₂O</sub>. La base es la de gas húmedo: el vapor '
-                                 'de agua se cuenta dentro de los pies cúbicos estándar del gas. '
-                                 'En base de gas seco el valor se dividiría además por (1 − '
+                                 'El volumen estándar es de gas ideal, como en el GPSA; por ello '
+                                 'no depende de la composición, que interviene solo a través de '
+                                 'y<sub>H₂O</sub>. La base es la de gas húmedo: el vapor de agua '
+                                 'se cuenta dentro de los pies cúbicos estándar del gas. En base '
+                                 'de gas seco el valor se dividiría además por (1 − '
                                  'y<sub>H₂O</sub>), una diferencia inferior al 0.3 % en el '
                                  'intervalo usual de operación. Cuando el cálculo se realiza sin '
                                  'agua, el contenido de agua del gas es nulo.',
-                                 'The standard volume is an ideal-gas volume, as in GPSA and '
-                                 'HYSYS; it therefore does not depend on composition, which enters '
-                                 'only through y<sub>H₂O</sub>. The basis is wet gas: the water '
-                                 'vapor is counted within the standard cubic feet of gas. On a '
-                                 'dry-gas basis the value would additionally be divided by (1 − '
+                                 'The standard volume is an ideal-gas volume, as in GPSA; it '
+                                 'therefore does not depend on composition, which enters only '
+                                 'through y<sub>H₂O</sub>. The basis is wet gas: the water vapor '
+                                 'is counted within the standard cubic feet of gas. On a dry-gas '
+                                 'basis the value would additionally be divided by (1 − '
                                  'y<sub>H₂O</sub>), a difference below 0.3 % in the usual '
                                  'operating range. When the calculation is performed without '
                                  'water, the gas water content is zero.'),
@@ -8899,15 +9146,13 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'presión dada o la presión de formación a una temperatura dada, y '
                                  'la curva de formación completa para trazarla sobre la envolvente '
                                  'de fases. El modelo es el de van der Waals-Platteeuw en la forma '
-                                 'de Munck y colaboradores, con los parámetros y el procedimiento '
-                                 'que documenta PVTsim. Se consideran tres estructuras '
+                                 'de Munck y colaboradores. Se consideran tres estructuras '
                                  'cristalinas:',
                                  'ThermoPhase calculates the hydrate formation temperature at a '
                                  'given pressure or the formation pressure at a given temperature, '
                                  'and the complete formation curve for plotting on the phase '
                                  'envelope. The model is that of van der Waals-Platteeuw in the '
-                                 'form of Munck et al., with the parameters and procedure '
-                                 'documented by PVTsim. Three crystal structures are considered:'),
+                                 'form of Munck et al. Three crystal structures are considered:'),
                                 ('ul',
                                  [('Estructura I (sI): 46 moléculas de agua por celda unitaria, '
                                    'con 2 cavidades pequeñas y 6 grandes; ν<sub>pequeña</sub> = '
@@ -8970,10 +9215,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Madsen, J., Pedersen, K.S. and Michelsen, M.L. (2000). Modeling '
                                  'of structure H hydrates using a Langmuir adsorption model. '
                                  '<em>Industrial &amp; Engineering Chemistry Research</em>, 39(4), '
-                                 '1111–1114.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 '1111–1114.')]},
                    {'titulo': ('Modelo de van der Waals y Platteeuw',
                                'Van der Waals and Platteeuw model'),
                     'bloques': [('p',
@@ -9125,29 +9367,27 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('p',
-                                 'Los parámetros A y B son los de la base de datos de PVTsim, que '
-                                 'los ajusta a datos experimentales de formación de hidratos por '
-                                 'separado para cada familia de ecuaciones de estado, ya que las '
-                                 'fugacidades de cada ecuación difieren ligeramente. ThermoPhase '
-                                 'dispone de un juego para Peng-Robinson y otro para '
-                                 'Soave-Redlich-Kwong, que cubren las estructuras I, II y H. A '
-                                 'modo de ejemplo, para el metano en la cavidad pequeña de la '
-                                 'estructura I los parámetros (A, B) son (839.70 K/atm, −881.1 K) '
-                                 'con Peng-Robinson y (0.04855 K/atm, 1594 K) con '
-                                 'Soave-Redlich-Kwong, y para el iC<sub>5</sub> en la cavidad '
-                                 'grande de la estructura H son (4304 K/atm, 1639 K) y (16 612 '
-                                 'K/atm, 1699 K), respectivamente.',
-                                 'Parameters A and B are those of the PVTsim database, which fits '
-                                 'them to experimental hydrate formation data separately for each '
-                                 'equation of state family, since the fugacities of each equation '
-                                 'differ slightly. ThermoPhase holds one set for Peng-Robinson and '
-                                 'another for Soave-Redlich-Kwong, covering structures I, II, and '
-                                 'H. As an example, for methane in the small cavity of structure I '
-                                 'the parameters (A, B) are (839.70 K/atm, −881.1 K) with '
-                                 'Peng-Robinson and (0.04855 K/atm, 1594 K) with '
-                                 'Soave-Redlich-Kwong, and for iC<sub>5</sub> in the large cavity '
-                                 'of structure H they are (4304 K/atm, 1639 K) and (16,612 K/atm, '
-                                 '1699 K), respectively.'),
+                                 'Los parámetros A y B están ajustados a datos experimentales de '
+                                 'formación de hidratos por separado para cada familia de '
+                                 'ecuaciones de estado, ya que las fugacidades de cada ecuación '
+                                 'difieren ligeramente. ThermoPhase dispone de un juego para '
+                                 'Peng-Robinson y otro para Soave-Redlich-Kwong, que cubren las '
+                                 'estructuras I, II y H. A modo de ejemplo, para el metano en la '
+                                 'cavidad pequeña de la estructura I los parámetros (A, B) son '
+                                 '(839.70 K/atm, −881.1 K) con Peng-Robinson y (0.04855 K/atm, '
+                                 '1594 K) con Soave-Redlich-Kwong, y para el iC<sub>5</sub> en la '
+                                 'cavidad grande de la estructura H son (4304 K/atm, 1639 K) y (16 '
+                                 '612 K/atm, 1699 K), respectivamente.',
+                                 'Parameters A and B are fitted to experimental hydrate formation '
+                                 'data separately for each equation-of-state family, since the '
+                                 'fugacities of each equation differ slightly. ThermoPhase holds '
+                                 'one set for Peng-Robinson and another for Soave-Redlich-Kwong, '
+                                 'covering structures I, II and H. As an example, for methane in '
+                                 'the small cavity of structure I the parameters (A, B) are '
+                                 '(839.70 K/atm, −881.1 K) with Peng-Robinson and (0.04855 K/atm, '
+                                 '1594 K) with Soave-Redlich-Kwong, and for iC<sub>5</sub> in the '
+                                 'large cavity of structure H they are (4304 K/atm, 1639 K) and '
+                                 '(16 612 K/atm, 1699 K), respectively.'),
                                 ('p',
                                  'Las fugacidades internas en psia se convierten a atm (1 atm = '
                                  '14.696 psia) y la temperatura en °R se convierte a K '
@@ -9173,10 +9413,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Madsen, J., Pedersen, K.S. and Michelsen, M.L. (2000). Modeling '
                                  'of structure H hydrates using a Langmuir adsorption model. '
                                  '<em>Industrial &amp; Engineering Chemistry Research</em>, 39(4), '
-                                 '1111–1114.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 '1111–1114.')]},
                    {'titulo': ('Término de referencia del agua', 'Water reference term'),
                     'bloques': [('p',
                                  'La diferencia de potencial químico entre la red vacía y el agua '
@@ -9237,12 +9474,12 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Implementación en ThermoPhase',
                                  'Implementation in ThermoPhase'),
                                 ('p',
-                                 'Se emplean las constantes de Erickson (1983) tal como las '
-                                 'publica PVTsim, iguales para todas las ecuaciones de estado, con '
-                                 'R = 0.08206 × 101.325 = 8.3147 J/(mol·K):',
-                                 'The Erickson (1983) constants are used as published by PVTsim, '
-                                 'identical for all equations of state, with R = 0.08206 × 101.325 '
-                                 '= 8.3147 J/(mol·K):'),
+                                 'Se emplean las constantes de Erickson (1983), iguales para todas '
+                                 'las ecuaciones de estado, con R = 0.08206 × 101.325 = 8.3147 '
+                                 'J/(mol·K):',
+                                 'The Erickson (1983) constants are used, identical for all '
+                                 'equations of state, with R = 0.08206 × 101.325 = 8.3147 '
+                                 'J/(mol·K):'),
                                 ('ul',
                                  [('Estructura I: Δμ<sup>0</sup> = 1264 J/mol; Δh<sup>0</sup> = '
                                    '−4858 J/mol (líquido) y 1151 J/mol (hielo); ΔV = 4.6 cm³/mol '
@@ -9289,24 +9526,19 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Engineering Science</em>, 43(10), 2661–2672.',
                                  'Munck, J., Skjold-Jørgensen, S. and Rasmussen, P. (1988). '
                                  'Computations of the formation of gas hydrates. <em>Chemical '
-                                 'Engineering Science</em>, 43(10), 2661–2672.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.')]},
+                                 'Engineering Science</em>, 43(10), 2661–2672.')]},
                    {'titulo': ('Fugacidades y actividad del agua', 'Fugacities and water activity'),
                     'bloques': [('p',
                                  'El término de Langmuir requiere la fugacidad de cada formador y '
                                  'el criterio de formación requiere la actividad del agua. '
                                  'ThermoPhase obtiene ambas magnitudes de un flash trifásico sobre '
                                  'la composición total con agua, resuelto con la ecuación de '
-                                 'estado activa y la regla de mezcla de Huron-Vidal, siguiendo el '
-                                 'procedimiento de flash de hidratos P/T de PVTsim.',
+                                 'estado activa y la regla de mezcla de Huron-Vidal.',
                                  'The Langmuir term requires the fugacity of each former, and the '
                                  'formation criterion requires the water activity. ThermoPhase '
                                  'obtains both quantities from a three-phase flash on the total '
                                  'composition with water, solved with the active equation of state '
-                                 'and the Huron-Vidal mixing rule, following the PVTsim P/T '
-                                 'hydrate flash procedure.'),
+                                 'and the Huron-Vidal mixing rule.'),
                                 ('eq',
                                  'f_k = \\frac{\\sum_{p} \\beta_p \\, x_{k,p} \\, \\phi_{k,p} \\, '
                                  'P}{\\sum_{p} \\beta_p}, \\quad p \\in \\{V,\\,L\\}'),
@@ -9399,10 +9631,10 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'presión del punto: se determina el agua disuelta en las fases de '
                                  'hidrocarburo en equilibrio con una fase acuosa y se añade un '
                                  'exceso del 5 % como agua libre, el mínimo que asegura la '
-                                 'presencia de la fase acuosa. Esta es la condición de gas '
-                                 'saturado con agua que suponen PVTsim y HYSYS, en la que la curva '
-                                 'ya no depende de la cantidad de agua. La saturación se repite en '
-                                 'la solución y el punto se refina con la nueva composición.',
+                                 'presencia de la fase acuosa. Es la condición de gas saturado con '
+                                 'agua, en la que la curva ya no depende de la cantidad de agua. '
+                                 'La saturación se repite en la solución y el punto se refina con '
+                                 'la nueva composición.',
                                  'With water active in the composition, the calculation uses the '
                                  'total composition as specified, so it reflects the effect of an '
                                  'undersaturated gas. Without active water, the hydrocarbon '
@@ -9411,21 +9643,20 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'hydrocarbon phases in equilibrium with an aqueous phase is '
                                  'determined, and a 5 % excess is added as free water, the minimum '
                                  'that ensures the presence of the aqueous phase. This is the '
-                                 'water-saturated gas condition assumed by PVTsim and HYSYS, in '
-                                 'which the curve no longer depends on the amount of water. '
-                                 'Saturation is repeated at the solution, and the point is refined '
-                                 'with the new composition.'),
+                                 'water-saturated gas condition, in which the curve no longer '
+                                 'depends on the amount of water. Saturation is repeated at the '
+                                 'solution, and the point is refined with the new composition.'),
                                 ('p',
                                  'El modelo es compatible con las cuatro ecuaciones de estado del '
-                                 'programa. Con las variantes de HYSYS se utilizan los parámetros '
-                                 'de Langmuir de la contraparte de PVTsim de la misma familia '
-                                 '(Peng-Robinson o Soave-Redlich-Kwong), con las fugacidades '
-                                 'calculadas por la ecuación de estado de HYSYS seleccionada.',
+                                 'programa. Las constantes de Langmuir se eligen según la familia '
+                                 'de la ecuación (Peng-Robinson o Soave-Redlich-Kwong) y se '
+                                 'aplican con las fugacidades de la ecuación de estado '
+                                 'seleccionada, cualquiera que sea su banco de parámetros.',
                                  'The model is compatible with the four equations of state of the '
-                                 'program. With the HYSYS variants, the Langmuir parameters of the '
-                                 'PVTsim counterpart of the same family (Peng-Robinson or '
-                                 'Soave-Redlich-Kwong) are used, with the fugacities calculated by '
-                                 'the selected HYSYS equation of state.'),
+                                 'program. The Langmuir constants are selected according to the '
+                                 'family of the equation (Peng-Robinson or Soave-Redlich-Kwong) '
+                                 'and are applied with the fugacities of the selected equation of '
+                                 'state, whatever its parameter bank.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Michelsen, M.L. (1991). Calculation of hydrate fugacities. '
@@ -9441,9 +9672,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'equations of state for representing vapour-liquid equilibria of '
                                  'strongly non-ideal mixtures. <em>Fluid Phase Equilibria</em>, '
                                  '3(4), 255–271.'),
-                                ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
                                 ('p',
                                  'Michelsen, M.L. y Mollerup, J.M. (2007). <em>Thermodynamic '
                                  'Models: Fundamentals and Computational Aspects</em>, 2.ª ed. '
@@ -9567,9 +9795,6 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Computations of the formation of gas hydrates. <em>Chemical '
                                  'Engineering Science</em>, 43(10), 2661–2672.'),
                                 ('p',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.',
-                                 'Calsep. <em>PVTsim Method Documentation</em>. Calsep A/S.'),
-                                ('p',
                                  'Pedersen, K.S., Christensen, P.L. y Shaikh, J.A. (2015). '
                                  '<em>Phase Behavior of Petroleum Reservoir Fluids</em>, 2.ª ed. '
                                  'CRC Press.',
@@ -9581,6 +9806,330 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Natural Gases</em>, 3.ª ed. CRC Press.',
                                  'Sloan, E.D. and Koh, C.A. (2008). <em>Clathrate Hydrates of '
                                  'Natural Gases</em>, 3rd ed. CRC Press.')]}]},
+ {'titulo': ('Flash especificados y cálculos de proceso',
+             'Specified flashes and process calculations'),
+  'subsecciones': [{'titulo': ('Flash de presión y entalpía', 'Pressure-enthalpy flash'),
+                    'bloques': [('p',
+                                 'El selector «Tipo de flash» de la barra superior define, para '
+                                 'todo el programa (composición principal y fluidos), qué '
+                                 'variables se especifican en Equilibrio de fases: presión y '
+                                 'temperatura (flash PT) o presión y entalpía (flash PH). En el '
+                                 'flash PH se ingresa la entalpía molar de la mezcla en lugar de '
+                                 'la temperatura, y la temperatura resultante se muestra como una '
+                                 'propiedad más del resumen. Es el cálculo de una válvula, un '
+                                 'choke o una tubería adiabática, donde la entalpía se conserva (Q '
+                                 '= 0 y W = 0 en el balance de energía con flujo).',
+                                 'The «Flash type» selector in the top bar defines, for the whole '
+                                 'program (main composition and fluids), which variables are '
+                                 'specified in Phase equilibrium: pressure and temperature (PT '
+                                 'flash) or pressure and enthalpy (PH flash). In the PH flash the '
+                                 'molar enthalpy of the mixture is entered instead of the '
+                                 'temperature, and the resulting temperature is shown as one more '
+                                 'property of the summary. It is the calculation of a valve, a '
+                                 'choke or an adiabatic pipe, where enthalpy is conserved (Q = 0 '
+                                 'and W = 0 in the flowing energy balance).'),
+                                ('p',
+                                 'La temperatura se obtiene resolviendo H(T, P) = H especificada, '
+                                 'donde H es la entalpía de la mezcla del flash PT a esa '
+                                 'temperatura (la misma que muestra Equilibrio de fases: suma de '
+                                 'las fases ponderada por su fracción molar, con la EOS, los kij y '
+                                 'el método de densidad de la corriente). A presión constante H '
+                                 'crece con T (dH/dT = Cp, incluido el calor latente), por lo que '
+                                 'la solución es única: se estima con la pendiente local, se acota '
+                                 'un intervalo con cambio de signo y se resuelve con el método de '
+                                 'Brent, robusto aunque aparezca o desaparezca una fase dentro del '
+                                 'intervalo.',
+                                 'The temperature is obtained by solving H(T, P) = specified H, '
+                                 'where H is the mixture enthalpy of the PT flash at that '
+                                 'temperature (the same shown in Phase equilibrium: sum of the '
+                                 'phases weighted by their mole fraction, with the stream EOS, kij '
+                                 'and density method). At constant pressure H increases with T '
+                                 '(dH/dT = Cp, including latent heat), so the solution is unique: '
+                                 'it is estimated with the local slope, an interval with a sign '
+                                 "change is bracketed and solved with Brent's method, robust even "
+                                 'if a phase appears or disappears inside the interval.')]},
+                   {'titulo': ('Flash de presión y entropía', 'Pressure-entropy flash'),
+                    'bloques': [('p',
+                                 'Con la opción «Presión y entropía» del selector «Tipo de flash» '
+                                 'se ingresa la entropía molar de la mezcla en lugar de la '
+                                 'temperatura. Es el cálculo de una compresión o expansión ideal: '
+                                 'adiabática (Q = 0) y reversible (sin entropía generada), en la '
+                                 'que la entropía se conserva. Con la entropía de la succión y la '
+                                 'presión de descarga se obtiene la temperatura de descarga '
+                                 'isentrópica de un compresor, o la de salida de un turboexpansor; '
+                                 'la máquina real se corrige con su eficiencia a partir de la '
+                                 'entalpía ideal resultante. La temperatura se obtiene igual que '
+                                 'en el flash PH, resolviendo S(T, P) = S especificada (a presión '
+                                 'constante dS/dT = Cp/T > 0, por lo que la solución es única).',
+                                 'With the «Pressure and entropy» option of the «Flash type» '
+                                 'selector, the molar entropy of the mixture is entered instead of '
+                                 'the temperature. It is the calculation of an ideal compression '
+                                 'or expansion: adiabatic (Q = 0) and reversible (no entropy '
+                                 'generated), in which entropy is conserved. With the suction '
+                                 'entropy and the discharge pressure, the isentropic discharge '
+                                 'temperature of a compressor or the outlet temperature of a '
+                                 'turboexpander is obtained; the real machine is corrected with '
+                                 'its efficiency from the resulting ideal enthalpy. The '
+                                 'temperature is obtained as in the PH flash, by solving S(T, P) = '
+                                 'specified S (at constant pressure dS/dT = Cp/T > 0, so the '
+                                 'solution is unique).')]},
+                   {'titulo': ('Flash de presión o temperatura y fracción de vapor',
+                               'Pressure or temperature and vapour fraction flash'),
+                    'bloques': [('p',
+                                 'Con las opciones «Presión y fracción de vapor» (P-β) y '
+                                 '«Temperatura y fracción de vapor» (T-β) del selector «Tipo de '
+                                 'flash» se fija la fracción molar de vapor β y se calcula la '
+                                 'temperatura o la presión a la que la mezcla tiene esa fracción. '
+                                 'β se refiere solo a las fases de hidrocarburo, V/(V + L), sin '
+                                 'contar la fase acuosa. Con β = 0 se obtiene el punto de burbuja '
+                                 'y con β = 1 el de rocío; si ese punto no existe a la condición '
+                                 'dada, se informa. Para valores intermedios la incógnita se acota '
+                                 'entre los puntos de saturación y se resuelve con el método de '
+                                 'Brent: a presión constante β crece con la temperatura, y a '
+                                 'temperatura constante disminuye con la presión. Entre la '
+                                 'cricondenterma y la temperatura crítica (región retrógrada) una '
+                                 'misma β puede darse a dos presiones; se informa la de menor '
+                                 'presión. Sirven para construir líneas de calidad y para conocer '
+                                 'las condiciones de un separador que deben producir un porcentaje '
+                                 'dado de vapor.',
+                                 'With the «Pressure and vapour fraction» (P-β) and «Temperature '
+                                 'and vapour fraction» (T-β) options of the «Flash type» selector, '
+                                 'the molar vapour fraction β is fixed and the temperature or '
+                                 'pressure at which the mixture has that fraction is calculated. β '
+                                 'refers only to the hydrocarbon phases, V/(V + L), excluding the '
+                                 'aqueous phase. β = 0 gives the bubble point and β = 1 the dew '
+                                 'point; if that point does not exist at the given condition, it '
+                                 'is reported. For intermediate values the unknown is bracketed '
+                                 "between the saturation points and solved with Brent's method: at "
+                                 'constant pressure β increases with temperature, and at constant '
+                                 'temperature it decreases with pressure. Between the '
+                                 'cricondentherm and the critical temperature (retrograde region) '
+                                 'the same β may occur at two pressures; the lower pressure is '
+                                 'reported. They are used to build quality lines and to find the '
+                                 'separator conditions that produce a given percentage of '
+                                 'vapour.')]},
+                   {'titulo': ('Operaciones unitarias', 'Unit operations'),
+                    'bloques': [('p',
+                                 'El módulo de operaciones unitarias se abre desde «Operaciones '
+                                 'unitarias» en el menú «Cálculos». En la ventana de ingreso de '
+                                 'datos se elige en listas desplegables la operación (compresor, '
+                                 'expansor, enfriador, calentador, bomba, válvula o separador de '
+                                 'una etapa), el flujo (lbmol/h, kgmol/h, lb/h, kg/h, MMscfd o '
+                                 'Sm³/d), la temperatura (relativa o absoluta, que rige también la '
+                                 'temperatura de salida) y la presión de entrada, la '
+                                 'especificación de salida propia de cada operación, el modelo '
+                                 '(ecuación de estado, densidad y corrección de volumen) y la '
+                                 'cromatografía, que puede cargarse desde la composición principal '
+                                 'o desde un fluido. El cálculo se hace con la ventana abierta; si '
+                                 'las especificaciones no tienen solución se advierte y no se abre '
+                                 'la ventana de resultados. Todas las operaciones usan los flashes '
+                                 'PT, PH y PS de Equilibrio de fases sobre la corriente completa '
+                                 '(con agua, flash trifásico).',
+                                 'The unit operations module is opened from «Unit operations» in '
+                                 'the «Calculations» menu. In the data input window the operation '
+                                 'is chosen (compressor, expander, cooler, heater, pump, valve or '
+                                 'single-stage separator), together with the flow (lbmol/h, '
+                                 'kgmol/h, lb/h, kg/h, MMscfd or Sm³/d), the inlet temperature '
+                                 '(relative or absolute, which also applies to the outlet '
+                                 'temperature) and pressure, the outlet specification of each '
+                                 'operation, the model (equation of state, density and volume '
+                                 'correction) and the chromatography, which can be loaded from the '
+                                 'main composition or from a fluid. The calculation runs with the '
+                                 'window open; if the specifications have no solution a warning is '
+                                 'shown and the results window is not opened. All operations use '
+                                 'the PT, PH and PS flashes of Phase equilibrium on the whole '
+                                 'stream (with water, three-phase flash).'),
+                                ('p',
+                                 'Compresor clásico: se especifica el incremento de presión o la '
+                                 'presión de salida y la eficiencia isentrópica η. Con un flash PT '
+                                 'se obtienen H y S de entrada; un flash PS a la presión de salida '
+                                 'da la temperatura y la entalpía isentrópicas; la entalpía real '
+                                 'es H₂ = H₁ + (H₂s − H₁)/η y un flash PH da la temperatura de '
+                                 'salida. El trabajo es el flujo molar por H₂ − H₁.',
+                                 'Classical compressor: the pressure increase or the outlet '
+                                 'pressure and the isentropic efficiency η are specified. A PT '
+                                 'flash gives the inlet H and S; a PS flash at the outlet pressure '
+                                 'gives the isentropic temperature and enthalpy; the actual '
+                                 'enthalpy is H₂ = H₁ + (H₂s − H₁)/η and a PH flash gives the '
+                                 'outlet temperature. The work is the molar flow times H₂ − H₁.'),
+                                ('p',
+                                 'Compresor politrópico (método PACE, trayectoria de eficiencia '
+                                 'constante que generaliza la compresión politrópica a varias '
+                                 'fases): la compresión se divide en 50 tramos de igual ΔP; cada '
+                                 'tramo es un flash PS seguido de la corrección por η y un flash '
+                                 'PH. Además del trabajo se informan el head (trabajo dividido por '
+                                 'el caudal másico y g, en ft o m) y los valores mínimos y máximos '
+                                 'de las funciones de Schultz X = (T/V)(∂V/∂T)P − 1 e Y = '
+                                 '−(P/V)(∂V/∂P)T al final de cada tramo de la trayectoria, con '
+                                 'derivadas exactas de la ecuación de estado. La salida puede '
+                                 'especificarse como presión y eficiencia, trabajo y eficiencia, '
+                                 'head y eficiencia, o presión y temperatura de salida (de donde '
+                                 'se obtiene η); las tres últimas se resuelven por iteración sobre '
+                                 'la trayectoria completa.',
+                                 'Polytropic compressor (PACE method, path of constant efficiency '
+                                 'that generalizes polytropic compression to several phases): the '
+                                 'compression is divided into 50 steps of equal ΔP; each step is a '
+                                 'PS flash followed by the η correction and a PH flash. Besides '
+                                 'the work, the head (work divided by the mass flow and g, in ft '
+                                 'or m) and the minimum and maximum values of the Schultz '
+                                 'functions X = (T/V)(∂V/∂T)P − 1 and Y = −(P/V)(∂V/∂P)T at the '
+                                 'end of each step of the path, with exact equation-of-state '
+                                 'derivatives, are reported. The outlet can be specified as '
+                                 'pressure and efficiency, work and efficiency, head and '
+                                 'efficiency, or outlet pressure and temperature (from which η is '
+                                 'obtained); the last three are solved by iterating on the full '
+                                 'path.'),
+                                ('p',
+                                 'Expansor: caída de presión o presión de salida y eficiencia '
+                                 'isentrópica; H₂ = H₁ − η(H₁ − H₂s). Bomba: incremento de presión '
+                                 'o presión de salida y eficiencia, definida por η = V̄·ΔP/ΔH, '
+                                 'donde el volumen medio bombeado V̄ es el volumen molar de la '
+                                 'corriente a la temperatura de entrada y a la presión media (P₁ + '
+                                 'P₂)/2 (ecuación de estado, con Peneloux si está activo). El '
+                                 'cambio de entalpía es ΔH = V̄·ΔP/η y un flash PH da la '
+                                 'temperatura de salida; el planteamiento es válido también cuando '
+                                 'la corriente cambia de fase. No se acepta una corriente de solo '
+                                 'gas en la entrada. Enfriador y calentador: cambio de temperatura '
+                                 'o temperatura de salida y caída de presión; la capacidad es el '
+                                 'calor transferido al fluido por unidad de tiempo (negativa en el '
+                                 'enfriador). Válvula: caída de presión o presión de salida a '
+                                 'entalpía constante (flash PH). Separador: flash PT a las '
+                                 'condiciones de entrada; las fases se informan como corrientes de '
+                                 'gas, líquido y agua.',
+                                 'Expander: pressure drop or outlet pressure and isentropic '
+                                 'efficiency; H₂ = H₁ − η(H₁ − H₂s). Pump: pressure increase or '
+                                 'outlet pressure and efficiency, defined by η = V̄·ΔP/ΔH, where '
+                                 'the mean pumped volume V̄ is the molar volume of the stream at '
+                                 'the inlet temperature and the mean pressure (P₁ + P₂)/2 '
+                                 '(equation of state, with Peneloux when active). The enthalpy '
+                                 'change is ΔH = V̄·ΔP/η and a PH flash gives the outlet '
+                                 'temperature; the formulation also holds when the stream changes '
+                                 'phase. A gas-only stream is not accepted at the inlet. Cooler '
+                                 'and heater: temperature change or outlet temperature and '
+                                 'pressure drop; the capacity is the heat transferred to the fluid '
+                                 'per unit time (negative for the cooler). Valve: pressure drop or '
+                                 'outlet pressure at constant enthalpy (PH flash). Separator: PT '
+                                 'flash at the inlet conditions; the phases are reported as gas, '
+                                 'liquid and water streams.'),
+                                ('p',
+                                 'La ventana de resultados, de ancho fijo como la de Equilibrio de '
+                                 'fases, tiene tres hojas que se eligen en una lista: Resultados '
+                                 '(presión, temperatura y flujos molar, másico, volumétrico '
+                                 'estándar —MMscfd a 60 °F y 14.696 psia o Sm³/d a 15 °C y 101.325 '
+                                 'kPa, como gas ideal— y volumétrico a P y T de cada corriente, y '
+                                 'los resultados de la operación; en el separador las corrientes '
+                                 'son la alimentación y las salidas N°1 vapor, N°2 líquido y N°3 '
+                                 'acuosa), Propiedades (de cada fase, con la entrada y la salida '
+                                 'en una misma tabla) y Composición (global y de cada fase en la '
+                                 'entrada y en la salida, en fracción o porcentaje molar o másico, '
+                                 'o como flujo molar o másico por componente). Se muestran siempre '
+                                 'las columnas de vapor y de líquido, y la de fase acuosa si la '
+                                 'corriente tiene agua; una fase que no existe queda sombreada. '
+                                 'Cada hoja ajusta la ventana a su propio tamaño. Si en el '
+                                 'compresor, el expansor o la bomba la mezcla forma más de una '
+                                 'fase en la entrada o en la salida, se muestra una advertencia.',
+                                 'The results window, of fixed width like Phase equilibrium, has '
+                                 'three sheets chosen from a list: Results (pressure, temperature '
+                                 'and molar, mass, standard volumetric —MMscfd at 60 °F and 14.696 '
+                                 'psia or Sm³/d at 15 °C and 101.325 kPa, as ideal gas— and '
+                                 'volumetric flow at P and T of each stream, and the operation '
+                                 'results; in the separator the streams are the feed and outlets '
+                                 'No. 1 vapour, No. 2 liquid and No. 3 aqueous), Properties (of '
+                                 'each phase, with inlet and outlet in one table) and Composition '
+                                 '(overall and of each phase at inlet and outlet, as mole or mass '
+                                 'fraction or percent, or as component molar or mass flow). The '
+                                 'vapour and liquid columns are always shown, plus the aqueous '
+                                 'phase column when the stream has water; a phase that does not '
+                                 'exist is shaded. Each sheet fits the window to its own size. If '
+                                 'the mixture forms more than one phase at the inlet or outlet of '
+                                 'the compressor, expander or pump, a warning is shown.')]},
+                   {'titulo': ('Flash múltiple', 'Multiple flash'),
+                    'bloques': [('p',
+                                 'El flash múltiple repite el cálculo de equilibrio de fases en '
+                                 'una lista de condiciones (P, T) para un mismo fluido. Se abre '
+                                 'desde el menú Herramientas («Flash múltiple») o desde el '
+                                 'Navegador, en Cálculos. En la ventana de entrada se elige la '
+                                 'composición principal o un fluido del gestor, se ingresan las '
+                                 'condiciones de cada corrida en las unidades activas y se marcan '
+                                 'las propiedades a mostrar. Cada punto se resuelve con el mismo '
+                                 'motor que la ventana de Equilibrio de fases (flash bifásico, o '
+                                 'trifásico si el fluido contiene agua), con la EOS, los kij y el '
+                                 'método de densidad del fluido. El resultado es una tabla con el '
+                                 'número de corrida, la presión, la temperatura y las propiedades '
+                                 'elegidas, que puede exportarse a CSV. En el grupo «Puntos de '
+                                 'saturación e hidratos» pueden pedirse, para cada corrida, la '
+                                 'temperatura de rocío, de burbuja y de formación de hidrato a la '
+                                 'presión de la corrida; la presión de rocío, de burbuja y de '
+                                 'formación de hidrato a la temperatura de la corrida; y el margen '
+                                 'frente a hidratos (temperatura de la corrida menos temperatura '
+                                 'de hidrato: positivo fuera de la zona de hidratos). Se calculan '
+                                 'con los mismos métodos que las ventanas de Puntos de saturación '
+                                 'y de Formación de hidratos; la celda queda vacía si el punto no '
+                                 'existe.',
+                                 'The multiple flash repeats the phase equilibrium calculation '
+                                 'over a list of (P, T) conditions for one fluid. It is opened '
+                                 'from the Tools menu («Multiple flash») or from the Navigator, '
+                                 'under Calculations. In the input window the main composition or '
+                                 'a fluid from the manager is chosen, the conditions of each run '
+                                 'are entered in the active units and the properties to display '
+                                 'are checked. Each point is solved with the same engine as the '
+                                 'Phase equilibrium window (two-phase flash, or three-phase flash '
+                                 'when the fluid contains water), with the EOS, kij and density '
+                                 'method of the fluid. The result is a table with the run number, '
+                                 'pressure, temperature and the chosen properties, which can be '
+                                 'exported to CSV. The group «Saturation and hydrate points» adds, '
+                                 'for each run, the dew, bubble and hydrate formation temperatures '
+                                 'at the run pressure; the dew, bubble and hydrate formation '
+                                 'pressures at the run temperature; and the hydrate margin (run '
+                                 'temperature minus hydrate temperature: positive outside the '
+                                 'hydrate region). They are computed with the same methods as the '
+                                 'Saturation points and Hydrate formation windows; the cell is '
+                                 'left empty when the point does not exist.')]},
+                   {'titulo': ('Contenido de agua de saturación', 'Saturation water content'),
+                    'bloques': [('p',
+                                 'El contenido de agua de saturación se obtiene agregando a la '
+                                 'corriente exactamente el agua que admite a una presión y '
+                                 'temperatura sin formar agua libre: la fase acuosa queda '
+                                 'incipiente, de modo que al bajar la temperatura a presión '
+                                 'constante condensaría agua. La cantidad se obtiene de un flash '
+                                 'multifásico (Huron-Vidal, con la EOS de la corriente) con un '
+                                 'exceso mínimo de agua libre: el agua disuelta en las fases de '
+                                 'hidrocarburo da la relación agua/hidrocarburo de saturación, que '
+                                 'se afina reduciendo ese exceso. Las proporciones entre '
+                                 'hidrocarburos no cambian.',
+                                 'The saturation water content is obtained by adding to the stream '
+                                 'exactly the water it can hold at a given pressure and '
+                                 'temperature without forming free water: the aqueous phase is '
+                                 'incipient, so water would condense if the temperature were '
+                                 'lowered at constant pressure. The amount is obtained from a '
+                                 'multiphase flash (Huron-Vidal, with the stream EOS) with a '
+                                 'minimal excess of free water: the water dissolved in the '
+                                 'hydrocarbon phases gives the saturation water/hydrocarbon ratio, '
+                                 'refined by reducing that excess. The ratios between hydrocarbons '
+                                 'do not change.'),
+                                ('p',
+                                 'Si la composición de entrada ya contiene agua, se satura su '
+                                 'parte de hidrocarburos y el agua ingresada se compara con la de '
+                                 'saturación: la corriente está subsaturada (se informa el agua '
+                                 'faltante), saturada, o con agua libre (se informa el exceso). El '
+                                 'agua faltante o en exceso es la diferencia simple entre el '
+                                 'porcentaje molar de agua de saturación y el ingresado. También '
+                                 'se informa el contenido de agua del gas saturado en lb/MMscf y '
+                                 'las fases de hidrocarburo presentes. La composición saturada '
+                                 'puede cargarse en la composición actual (la composición '
+                                 'principal o el fluido analizado) o guardarse como un fluido '
+                                 'nuevo; al cargarla se activa el agua en todo el programa.',
+                                 'If the input composition already contains water, its hydrocarbon '
+                                 'part is saturated and the entered water is compared with the '
+                                 'saturation water: the stream is undersaturated (the missing '
+                                 'water is reported), saturated, or with free water (the excess is '
+                                 'reported). The missing or excess water is the simple difference '
+                                 'between the saturation and the entered water mole percent. The '
+                                 'water content of the saturated gas in lb/MMscf and the '
+                                 'hydrocarbon phases present are also reported. The saturated '
+                                 'composition can be loaded into the current composition (the main '
+                                 'composition or the analysed fluid) or saved as a new fluid; '
+                                 'loading it activates water in the whole program.')]}]},
  {'titulo': ('Análisis de sensibilidad', 'Sensitivity analysis'),
   'subsecciones': [{'titulo': ('Descripción del análisis', 'Description of the analysis'),
                     'bloques': [('p',
@@ -9772,4 +10321,31 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'present, the capacity equals the content; without it, the '
                                  'capacity is obtained from the flash of the saturated gas. The '
                                  'second flash is executed only when the plotted property is the '
-                                 'water capacity.')]}]}]
+                                 'water capacity.')]},
+                   {'titulo': ('Vista tridimensional', 'Three-dimensional view'),
+                    'bloques': [('p',
+                                 'El comando Mostrar vista 3D presenta el resultado del último '
+                                 'análisis en el espacio temperatura – presión – propiedad. Cada '
+                                 'curva calculada (isóbara o isoterma) se dibuja como una línea '
+                                 'tridimensional en su presión o temperatura constante y, cuando '
+                                 'hay dos o más curvas, una superficie translúcida une la familia, '
+                                 'lo que permite apreciar de una vez la variación de la propiedad '
+                                 'en las dos variables.',
+                                 'The Show 3D view command presents the result of the last '
+                                 'analysis in temperature – pressure – property space. Each '
+                                 'computed curve (isobar or isotherm) is drawn as a '
+                                 'three-dimensional line at its constant pressure or temperature '
+                                 'and, when there are two or more curves, a translucent surface '
+                                 'joins the family, so that the variation of the property in both '
+                                 'variables can be seen at once.'),
+                                ('p',
+                                 'Los ejes se expresan en las unidades activas y los puntos sin '
+                                 'valor (fase ausente o cálculo no convergido) interrumpen las '
+                                 'líneas y la superficie, del mismo modo que en el gráfico '
+                                 'bidimensional. La vista se actualiza con cada nuevo cálculo y '
+                                 'puede girarse con el ratón.',
+                                 'The axes are expressed in the active units and points without a '
+                                 'value (absent phase or non-converged calculation) interrupt the '
+                                 'lines and the surface, as in the two-dimensional chart. The view '
+                                 'is updated with each new calculation and can be rotated with the '
+                                 'mouse.')]}]}]

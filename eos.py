@@ -8,6 +8,9 @@ import copy
 import math
 
 R_GAS = 10.7316
+# Densidad del agua a 60 °F y 14.696 psia (GPA 2145: 8.33718 lb/gal), referencia
+# de la gravedad específica de líquidos (antes se usaba 62.4 lb/ft³).
+RHO_AGUA_60F = 62.3664
 
 COMPONENTES = ["N₂","CO₂","C1","C2","C3","iC4","nC4","iC5","nC5","nC6","nC7","nC8","nC9"]
 NOMBRES = [
@@ -1694,7 +1697,7 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
         else:
             # Método EOS explícitamente pedido
             rho_l = rho_l_EOS
-        sg_l=rho_l/62.4  # SG líquido respecto al agua
+        sg_l=rho_l/RHO_AGUA_60F  # SG respecto al agua a 60 °F
 
     den_m = V*PM_v+L*PM_l if (V*PM_v+L*PM_l)>0 else 1
     Vm = V*PM_v/den_m if V>0 else 0.0

@@ -56,12 +56,21 @@ _PROP_SAT = [
     ('entalpia',   'Entalpia molar',            'H',    2, 'H_v',   'H_l',   'H'),
     ('entropia',   'Entropia molar',            'S',    4, 'S_v',   'S_l',   'S'),
     ('viscosidad', 'Viscosidad',                'visc', 5, 'mu_v',  'mu_l',  None),
-    # Poder calorífico (GPSA-87). Se calcula desde la composición de cada fase
+    # Poder calorífico (GPA 2145/2172). Se calcula desde la composición de cada fase
     # (marcador 'PCAL:<clave>'); no proviene del dict 'props'.
-    ('hhv_mas',    'HHV masico [BTU/lb]',       None,   1, 'PCAL:hhv_mas', 'PCAL:hhv_mas', None),
-    ('lhv_mas',    'LHV masico [BTU/lb]',       None,   1, 'PCAL:lhv_mas', 'PCAL:lhv_mas', None),
-    ('hhv_vol',    'HHV volumetrico [BTU/pie3]',None,   1, 'PCAL:hhv_vol', 'PCAL:hhv_vol', None),
-    ('lhv_vol',    'LHV volumetrico [BTU/pie3]',None,   1, 'PCAL:lhv_vol', 'PCAL:lhv_vol', None),
+    ('hhv_vol'     , 'HHV ideal base seca [BTU/pie3]', None, 1, 'PCAL:hhv_vol', 'PCAL:hhv_vol', None),
+    ('hhv_vol_hum' , 'HHV ideal base humeda [BTU/pie3]', None, 1, 'PCAL:hhv_vol_hum', 'PCAL:-', None),
+    ('hhv_real'    , 'HHV real base seca [BTU/pie3]', None, 1, 'PCAL:hhv_real', 'PCAL:-', None),
+    ('hhv_hum'     , 'HHV real base humeda [BTU/pie3]', None, 1, 'PCAL:hhv_hum', 'PCAL:-', None),
+    ('lhv_vol'     , 'LHV ideal base seca [BTU/pie3]', None, 1, 'PCAL:lhv_vol', 'PCAL:lhv_vol', None),
+    ('lhv_vol_hum' , 'LHV ideal base humeda [BTU/pie3]', None, 1, 'PCAL:lhv_vol_hum', 'PCAL:-', None),
+    ('lhv_real'    , 'LHV real base seca [BTU/pie3]', None, 1, 'PCAL:lhv_real', 'PCAL:-', None),
+    ('lhv_real_hum', 'LHV real base humeda [BTU/pie3]', None, 1, 'PCAL:lhv_real_hum', 'PCAL:-', None),
+    ('hhv_mas'     , 'HHV masico base seca [BTU/lb]', None, 1, 'PCAL:hhv_mas', 'PCAL:hhv_mas', None),
+    ('hhv_mas_hum' , 'HHV masico base humeda [BTU/lb]', None, 1, 'PCAL:hhv_mas_hum', 'PCAL:-', None),
+    ('lhv_mas'     , 'LHV masico base seca [BTU/lb]', None, 1, 'PCAL:lhv_mas', 'PCAL:lhv_mas', None),
+    ('lhv_mas_hum' , 'LHV masico base humeda [BTU/lb]', None, 1, 'PCAL:lhv_mas_hum', 'PCAL:-', None),
+    ('sg_real',    'Gravedad especifica real (gas)', None, 4, 'PCAL:sg_real',  'PCAL:-',        None),
     # GPM C3+ solo en fase vapor (marcador GPM:vapor); líquido vacío.
     ('gpm',        'GPM C3+ [gal/1000pie3]',    None,   4, 'GPM:v', 'GPM:none', None),
 ]
@@ -871,7 +880,7 @@ class TabSaturacion(QWidget):
             c13=list(c[:NC]); s_=sum(c13)
             return [v/s_ for v in c13] if s_ > 0 else c13
         y13=_hc(y); x13=_hc(x); z13=_hc(z)
-        def _pm13(c): return sum(c[i]*_eng.PM[i] for i in range(NC))
+        def _pm13(c): return sum(c[i]*_eng.crit_props(_eng.get_eos())[3][i] for i in range(NC))
         _pc_v = _pc.poder_calorifico_fase(y13, _pm13(y13) if agua_res else p.get('PM_v'))
         _pc_l = _pc.poder_calorifico_fase(x13, _pm13(x13) if agua_res else p.get('PM_l'))
         _pc_z = _pc.poder_calorifico_fase(z13, None) if sz > 0 else {}
@@ -905,7 +914,7 @@ class TabSaturacion(QWidget):
             if key == 'densidad':  return _conv_prop(conv, _rho_z)
             if key == 'sg':        return _sg_z
             if key == 'z':         return _z_z
-            if key in ('hhv_mas','lhv_mas','hhv_vol','lhv_vol'):
+            if _pc.clave_liq_mezcla(key):
                 return _pc_z.get(key)
             if key == 'gpm':       return _gpm_z
             return None   # entalpía, entropía, viscosidad: sin valor de mezcla

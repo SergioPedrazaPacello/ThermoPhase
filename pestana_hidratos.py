@@ -625,7 +625,7 @@ class TabHidratos(QWidget):
         def _hc(c):
             c13 = list(c[:NC]); s_ = sum(c13)
             return [v/s_ for v in c13] if s_ > 0 else c13
-        def _pm13(c): return sum(c[i]*_eng.PM[i] for i in range(NC))
+        def _pm13(c): return sum(c[i]*_eng.crit_props(_eng.get_eos())[3][i] for i in range(NC))
         y13 = _hc(y); x13 = _hc(x); z13 = _hc(z)
         _pc_v = (_pc.poder_calorifico_fase(y13, _pm13(y13) if agua_res else p.get('PM_v'))
                  if hay_vap else {})
@@ -670,7 +670,7 @@ class TabHidratos(QWidget):
                 return None
             if key == 'pm':        return _conv_prop(conv, _pm_z)
             if key == 'densidad':  return _conv_prop(conv, _rho_z) if _rho_z else None
-            if key in ('hhv_mas','lhv_mas','hhv_vol','lhv_vol'):
+            if _pc.clave_liq_mezcla(key):
                 v = _pc_z.get(key); return v if _es_valido(v) else None
             if key == 'gpm':       return _gpm_z if _es_valido(_gpm_z) else None
             return None   # z, sg, entalpía, entropía, viscosidad: sin mezcla
