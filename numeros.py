@@ -8,9 +8,9 @@ como separador de miles.  Se ignoran espacios y el signo "%".
 
 También incluye SpinNum, un QDoubleSpinBox que acepta la coma decimal.
 """
-from PyQt6.QtWidgets import QDoubleSpinBox
-from PyQt6.QtGui import QValidator
-from PyQt6.QtCore import QLocale
+from PyQt6.QtWidgets import QLineEdit
+from PyQt6.QtGui import QValidator, QRegularExpressionValidator, QPalette, QColor
+from PyQt6.QtCore import QLocale, Qt, pyqtSignal, QRegularExpression
 
 
 def normalizar_texto(txt):
@@ -65,49 +65,93 @@ def composicion_a_fracciones(valores, umbral=1.5):
     return list(valores), False
 
 
-class SpinNum(QDoubleSpinBox):
-    """QDoubleSpinBox que acepta punto o coma como separador decimal."""
+class SpinNum(QLineEdit):
+    """Campo numérico (sustituye al QDoubleSpinBox).
+
+    En algunos equipos con Windows (escalado de pantalla, estilo «windows11»)
+    el QDoubleSpinBox reducía su editor interno a una franja de pocos píxeles
+    y el número no se veía.  Este campo es un QLineEdit simple con la misma
+    interfaz que usaba el programa: setRange, setDecimals, setSpecialValueText,
+    setButtonSymbols, value, setValue y la señal valueChanged(float).
+    Acepta punto o coma como separador decimal.  El «valor especial» (el
+    mínimo, con texto especial definido) se muestra como campo vacío."""
+
+    valueChanged = pyqtSignal(float)
 
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
-        self.setLocale(QLocale(QLocale.Language.C))      # muestra con punto
-        # Estilo Fusion por widget (como los combos): el estilo nativo de
-        # Windows 11 («windows11», Qt 6.7+) no respeta la hoja de estilo de
-        # los QDoubleSpinBox y deja el texto invisible.  Con Fusion el QSS se
-        # aplica igual en todas las versiones de Windows.
-        try:
-            from PyQt6.QtWidgets import QStyleFactory
-            from PyQt6.QtGui import QPalette, QColor
-            from PyQt6.QtCore import Qt
-            self._estilo = QStyleFactory.create("Fusion")
-            if self._estilo is not None:
-                self.setStyle(self._estilo)
-            pal = self.palette()
-            for grp in (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive,
-                        QPalette.ColorGroup.Disabled):
-                pal.setColor(grp, QPalette.ColorRole.Base, QColor("#FFFFFF"))
-                pal.setColor(grp, QPalette.ColorRole.Text, QColor("#000000"))
-            self.setPalette(pal)
-            self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            le = self.lineEdit()
-            if le is not None:
-                le.setTextMargins(0, 0, 0, 0)
-        except Exception:
-            pass
+        self._min = 0.0; self._max = 99.99; self._dec = 2
+        self._esp = None                  # texto del valor especial
+        self._v = 0.0
+        self.setValidator(QRegularExpressionValidator(
+            QRegularExpression(r'^-?\d*([.,]\d*)?$'), self))
+        self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.setTextMargins(2, 0, 2, 0)
+        pal = self.palette()
+        for grp in (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive,
+                    QPalette.ColorGroup.Disabled):
+            pal.setColor(grp, QPalette.ColorRole.Base, QColor("#FFFFFF"))
+            pal.setColor(grp, QPalette.ColorRole.Text, QColor("#000000"))
+        self.setPalette(pal)
+        self.textEdited.connect(self._on_editado)
+        self.editingFinished.connect(self._mostrar)
+        self._mostrar()
 
-    def validate(self, text, pos):
-        t = text.replace(',', '.')
-        estado, _t, _p = super().validate(t, pos)
-        return estado, text, pos
+    # ── interfaz compatible con QDoubleSpinBox ──────────────────────────
+    def setRange(self, lo, hi):
+        self._min, self._max = float(lo), float(hi)
+        self._v = min(max(self._v, self._min), self._max)
+        self._mostrar()
 
-    def valueFromText(self, text):
-        t = text
-        if self.prefix() and t.startswith(self.prefix()):
-            t = t[len(self.prefix()):]
-        if self.suffix() and t.endswith(self.suffix()):
-            t = t[:-len(self.suffix())]
-        v = a_float(t)
-        return self.value() if v is None else v
+    def setMinimum(self, lo): self.setRange(lo, self._max)
+    def setMaximum(self, hi): self.setRange(self._min, hi)
+    def minimum(self): return self._min
+    def maximum(self): return self._max
 
-    def fixup(self, text):
-        return text.replace(',', '.')
+    def setDecimals(self, d):
+        self._dec = int(d); self._mostrar()
+
+    def decimals(self): return self._dec
+
+    def setSpecialValueText(self, t):
+        self._esp = t; self._mostrar()
+
+    def setButtonSymbols(self, *_a):
+        pass
+
+    def setStyleSheet(self, qss):
+        super().setStyleSheet(qss.replace('QDoubleSpinBox', 'QLineEdit'))
+
+    def value(self):
+        return self._v
+
+    def setValue(self, v):
+        v = round(min(max(float(v), self._min), self._max), self._dec)
+        cambio = v != self._v
+        self._v = v
+        self._mostrar()
+        if cambio:
+            self.valueChanged.emit(v)
+
+    # ── internos ────────────────────────────────────────────────────────
+    def _es_especial(self):
+        return self._esp is not None and self._v == self._min
+
+    def _mostrar(self):
+        txt = "" if self._es_especial() else f"{self._v:.{self._dec}f}"
+        if self.text() != txt:
+            self.setText(txt)
+        if not self.hasFocus():
+            self.setCursorPosition(0)
+
+    def _on_editado(self, txt):
+        v = a_float(txt)
+        if v is None:
+            if txt.strip() in ("", "-"):
+                v = self._min                     # campo vacío = valor especial
+            else:
+                return
+        v = min(max(v, self._min), self._max)
+        if v != self._v:
+            self._v = v
+            self.valueChanged.emit(v)
