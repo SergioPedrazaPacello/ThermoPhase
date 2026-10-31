@@ -71,6 +71,7 @@ _PROP_SAT = [
     ('lhv_mas'     , 'LHV masico base seca [BTU/lb]', None, 1, 'PCAL:lhv_mas', 'PCAL:lhv_mas', None),
     ('lhv_mas_hum' , 'LHV masico base humeda [BTU/lb]', None, 1, 'PCAL:lhv_mas_hum', 'PCAL:-', None),
     ('sg_real',    'Gravedad especifica real (gas)', None, 4, 'PCAL:sg_real',  'PCAL:-',        None),
+    ('boe',        'BOE [BOE/MMscf - BOE/STB]', None,   3, 'PCAL:boe_gas', 'PCAL:boe_liq', None),
     # GPM C3+ solo en fase vapor (marcador GPM:vapor); líquido vacío.
     ('gpm',        'GPM C3+ [gal/1000pie3]',    None,   4, 'GPM:v', 'GPM:none', None),
 ]
@@ -883,6 +884,11 @@ class TabSaturacion(QWidget):
         def _pm13(c): return sum(c[i]*_eng.crit_props(_eng.get_eos())[3][i] for i in range(NC))
         _pc_v = _pc.poder_calorifico_fase(y13, _pm13(y13) if agua_res else p.get('PM_v'))
         _pc_l = _pc.poder_calorifico_fase(x13, _pm13(x13) if agua_res else p.get('PM_l'))
+        _pc_v.update(_pc.boe(_pc_v))
+        if 'boe' in self._props_sel:
+            try: _kb = self.get_kij()
+            except Exception: _kb = None
+            _pc_l['boe_liq'] = _pc.boe_liquido_std(x13, _eng.get_eos(), _kb if not agua_res else None, 'COSTALD')
         _pc_z = _pc.poder_calorifico_fase(z13, None) if sz > 0 else {}
         _gpm_v = _pc.gpm_c3(y13)
         _gpm_z = _pc.gpm_c3(z13) if sz > 0 else None

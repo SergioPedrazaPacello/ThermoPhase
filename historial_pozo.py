@@ -68,7 +68,12 @@ GRUPOS = [("Pentanos y más pesados [C5+]", 7), ("Heptanos y más pesados [C7+]"
 # ════════════════════════════════════════════════════════════════════════
 def envolvente(z, kij, metodo):
     """Envolvente con el método pedido → (burbuja, rocío, crítico).  Puntos
-    (P psia, T °R)."""
+    (P psia, T °R).  Un componente puro devuelve su curva de presión de vapor
+    como única rama (sin rocío), igual que la ventana de Envolvente."""
+    from envolvente import es_puro, curva_pura
+    if es_puro(z):
+        rp = curva_pura(z, kij)
+        return list(rp.get('curva') or rp.get('burbuja') or []), [], rp.get('critico')
     if metodo == 'michelsen':
         try:
             from envolvente_michelsen import construir_envolvente
@@ -112,8 +117,15 @@ class HistWorker(QThread):
                 if not pts:
                     raise RuntimeError(_i18n.t("No se pudo trazar la envolvente de la "
                                                "muestra del") + f" {_fecha_txt(m['fecha'])}.")
-                ct = max(pts, key=lambda q: q[1])      # cricondentérmica
-                cb = max(pts, key=lambda q: q[0])      # cricondenbárica
+                from envolvente import es_puro as _es_puro
+                if _es_puro(z):
+                    # Componente puro: sin región bifásica, no hay
+                    # cricondentérmica ni cricondenbárica (la curva termina
+                    # en el punto crítico).
+                    ct = cb = None
+                else:
+                    ct = max(pts, key=lambda q: q[1])      # cricondentérmica
+                    cb = max(pts, key=lambda q: q[0])      # cricondenbárica
                 res.append(dict(fecha=m['fecha'], z=z, burbuja=burb, rocio=rocio,
                                 critico=crit, cricondenterma=ct, cricondenbara=cb))
             self.done.emit(res)
@@ -664,9 +676,16 @@ class TabHistorial(QWidget):
             if r['critico'] is not None:
                 ax.plot([_u.t_desde_R(r['critico'][1])], [_u.p_desde_psia(r['critico'][0])],
                         '^', color=col, ms=MS_2D, mec='#000000', mew=0.3)
-            p, t = r['cricondenterma']
-            ax.plot([_u.t_desde_R(t)], [_u.p_desde_psia(p)], 's', color=col, ms=MS_2D,
-                    mec='#000000', mew=0.3)
+            # Cricondentérmica (cuadrado) y cricondenbárica (círculo), con los
+            # mismos marcadores que sus gráficos de tendencia.
+            if r['cricondenterma'] is not None:
+                p, t = r['cricondenterma']
+                ax.plot([_u.t_desde_R(t)], [_u.p_desde_psia(p)], 's', color=col, ms=MS_2D,
+                        mec='#000000', mew=0.3)
+            if r['cricondenbara'] is not None:
+                p, t = r['cricondenbara']
+                ax.plot([_u.t_desde_R(t)], [_u.p_desde_psia(p)], 'o', color=col, ms=MS_2D,
+                        mec='#000000', mew=0.3)
         ax.set_xlabel(f"{_i18n.t('Temperatura')} ({_u.u('T')})", fontsize=10)
         ax.set_ylabel(f"{_i18n.t('Presion')} ({_u.u('P')})", fontsize=10)
         if self.res:
@@ -694,8 +713,10 @@ class TabHistorial(QWidget):
         canvas.draw_idle()
 
     def _dibujar_tendencias(self):
-        ct = [_u.t_desde_R(r['cricondenterma'][1]) for r in self.res]
-        cb = [_u.p_desde_psia(r['cricondenbara'][0]) for r in self.res]
+        ct = [_u.t_desde_R(r['cricondenterma'][1]) if r['cricondenterma'] is not None
+              else np.nan for r in self.res]
+        cb = [_u.p_desde_psia(r['cricondenbara'][0]) if r['cricondenbara'] is not None
+              else np.nan for r in self.res]
         self._tendencia(self.ax_ct, self.c_ct, ct,
                         f"{_i18n.t('Cricondentérmica')} ({_u.u('T')})", 's', '#555555')
         self._tendencia(self.ax_cb, self.c_cb, cb,

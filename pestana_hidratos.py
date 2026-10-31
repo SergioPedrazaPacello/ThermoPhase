@@ -631,6 +631,11 @@ class TabHidratos(QWidget):
                  if hay_vap else {})
         _pc_l = (_pc.poder_calorifico_fase(x13, _pm13(x13) if agua_res else p.get('PM_l'))
                  if hay_liq else {})
+        if _pc_v: _pc_v.update(_pc.boe(_pc_v))
+        if _pc_l and 'boe' in self._props_sel:
+            try: _kb = self.get_kij()
+            except Exception: _kb = None
+            _pc_l['boe_liq'] = _pc.boe_liquido_std(x13, _eng.get_eos(), _kb if not agua_res else None, 'COSTALD')
         _pc_z = _pc.poder_calorifico_fase(z13, None) if sz > 0 else {}
         _gpm_v = _pc.gpm_c3(y13) if hay_vap else None
         _gpm_z = _pc.gpm_c3(z13) if (sz > 0 and not agua_res) else None

@@ -330,6 +330,8 @@ def _tabla_propiedades_fase(props, z, y, x, hay_vap, hay_liq, W, pW=None,
     def _pm13(c): return sum(c[i]*_eng.crit_props(_eng.get_eos())[3][i] for i in range(NC))
     _pc_v = _pc.poder_calorifico_fase(y13, _pm13(y13) if agua else p.get('PM_v')) if hay_vap else {}
     _pc_l = _pc.poder_calorifico_fase(x13, _pm13(x13) if agua else p.get('PM_l')) if hay_liq else {}
+    if _pc_v: _pc_v.update(_pc.boe(_pc_v))
+    if _pc_l: _pc_l['boe_liq'] = _pc.boe_liquido_std(x13, _eng.get_eos(), None, 'COSTALD')
     _pc_z = _pc.poder_calorifico_fase(z13, None) if sz > 0 else {}
     _gpm_v = _pc.gpm_c3(y13) if hay_vap else None
     _gpm_z = _pc.gpm_c3(z13) if (sz > 0 and not agua) else None
@@ -551,6 +553,12 @@ def _filas_resumen_equilibrio(sel, mezcla, fases, hay, comp, pm_fases, E):
             vf = [(pcs[k+1].get(key) if (k+1 < len(pcs) and pcs[k+1]
                                          and (k == 0 or (k == 1 and not solo_gas))) else None)
                   for k in range(len(fases))]
+        elif key == 'boe':
+            vm = None
+            b_v = _pc.boe(pcs[1]).get('boe_gas') if len(pcs) > 1 and pcs[1] else None
+            b_l = (_pc.boe_liquido_std(comp13[2], _eng.get_eos())
+                   if len(comp13) > 2 and comp13[2] and len(hay) > 1 and hay[1] else None)
+            vf = [b_v if k == 0 else (b_l if k == 1 else None) for k in range(len(fases))]
         elif key == 'sg_real':
             vm = None
             vf = [(pcs[1].get('sg_real') if (len(pcs) > 1 and pcs[1] and k == 0) else None)

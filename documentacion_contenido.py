@@ -8891,6 +8891,93 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Gas Processors Association. <em>GPA Standard 2145: Table of '
                                  'Physical Properties for Hydrocarbons and Other Compounds of '
                                  'Interest to the Natural Gas Industry</em>. GPA.')]},
+                   {'titulo': ('Barril de petróleo equivalente (BOE)',
+                               'Barrel of oil equivalent (BOE)'),
+                    'bloques': [('p',
+                                 'El barril de petróleo equivalente (BOE) expresa el contenido '
+                                 'energético de una corriente en barriles de crudo de referencia, '
+                                 'lo que permite sumar gas y líquidos en una misma unidad para '
+                                 'informar producción y reservas. ThermoPhase emplea la definición '
+                                 'energética: 1 BOE equivale a 5.8·10<sup>6</sup> BTU, el poder '
+                                 'calorífico superior de un barril de crudo de referencia.',
+                                 'The barrel of oil equivalent (BOE) expresses the energy content '
+                                 'of a stream in barrels of reference crude oil, so that gas and '
+                                 'liquids can be added in a single unit for production and '
+                                 'reserves reporting. ThermoPhase uses the energy definition: 1 '
+                                 'BOE equals 5.8·10<sup>6</sup> BTU, the gross heating value of '
+                                 'one barrel of reference crude oil.'),
+                                ('eq',
+                                 '\\mathrm{BOE}_{gas} = \\frac{HV^{real}\\cdot 10^{6}}{5.8\\times '
+                                 '10^{6}} \\qquad \\mathrm{BOE}_{liq} = '
+                                 '\\frac{HV^{id}(x_{STO})\\,V_{std}\\,5.614583}{V_{STO}\\,5.8\\times '
+                                 '10^{6}}'),
+                                ('p',
+                                 'donde BOE<sub>gas</sub> está en BOE por millón de pies cúbicos '
+                                 'estándar (BOE/MMscf) y HV<sup>real</sup> es el poder calorífico '
+                                 'superior en base real seca del gas (BTU/scf); el volumen de gas '
+                                 'en scf ya está referido a 60 °F y 14.696 psia con toda su '
+                                 'composición en fase gas. BOE<sub>liq</sub> está en BOE por '
+                                 'barril de tanque (BOE/STB): la fase líquida se lleva a 60 °F y '
+                                 '14.696 psia con un flash de una etapa, el mismo del factor '
+                                 'B<sub>o</sub>; x<sub>STO</sub> es la composición del líquido de '
+                                 'tanque, HV<sup>id</sup>(x<sub>STO</sub>) su poder calorífico '
+                                 'superior ideal seco (BTU/scf), V<sub>std</sub> = 379.48 '
+                                 'scf/lbmol, V<sub>STO</sub> = M/ρ su volumen molar a condiciones '
+                                 'estándar con el método de densidad seleccionado (ft³/lbmol) y '
+                                 '5.614583 los pies cúbicos de un barril (42 galones). El gas que '
+                                 'el líquido libera en el tanque forma parte del gas producido '
+                                 '(R<sub>s</sub>) y no se incluye en el BOE del líquido; la '
+                                 'energía total se conserva porque el poder calorífico molar es '
+                                 'aditivo.',
+                                 'where BOE<sub>gas</sub> is in BOE per million standard cubic '
+                                 'feet (BOE/MMscf) and HV<sup>real</sup> is the real dry gross '
+                                 'heating value of the gas (BTU/scf); the gas volume in scf is '
+                                 'already referred to 60 °F and 14.696 psia with its whole '
+                                 'composition in the gas phase. BOE<sub>liq</sub> is in BOE per '
+                                 'stock-tank barrel (BOE/STB): the liquid phase is taken to 60 °F '
+                                 'and 14.696 psia with a single-stage flash, the same as for the '
+                                 'B<sub>o</sub> factor; x<sub>STO</sub> is the stock-tank liquid '
+                                 'composition, HV<sup>id</sup>(x<sub>STO</sub>) its ideal dry '
+                                 'gross heating value (BTU/scf), V<sub>std</sub> = 379.48 '
+                                 'scf/lbmol, V<sub>STO</sub> = M/ρ its molar volume at standard '
+                                 'conditions with the selected density method (ft³/lbmol) and '
+                                 '5.614583 the cubic feet in one barrel (42 gallons). The gas '
+                                 'released by the liquid in the tank belongs to the produced gas '
+                                 '(R<sub>s</sub>) and is not included in the liquid BOE; total '
+                                 'energy is conserved because the molar heating value is '
+                                 'additive.'),
+                                ('p',
+                                 'Ambos valores se presentan en una sola fila, BOE [BOE/MMscf - '
+                                 'BOE/STB]: el del gas en la columna de la fase vapor y el del '
+                                 'líquido en la columna de la fase líquida. No se informa para la '
+                                 'mezcla, que no tiene una unidad de volumen común, ni para la '
+                                 'fase acuosa, que no es combustible, y el del líquido queda vacío '
+                                 'si a condiciones estándar no queda líquido. Como referencia, un '
+                                 'gas de 1000 BTU/scf equivale a 172.4 BOE/MMscf; la regla '
+                                 'volumétrica de 6000 scf por barril, habitual en informes de '
+                                 'reservas, corresponde a un gas de 966.7 BTU/scf y no depende de '
+                                 'la composición.',
+                                 'Both values are shown in a single row, BOE [BOE/MMscf - '
+                                 'BOE/STB]: the gas value in the vapor-phase column and the liquid '
+                                 'value in the liquid-phase column. It is not reported for the '
+                                 'mixture, which has no common volume unit, nor for the aqueous '
+                                 'phase, which is not combustible, and the liquid value is left '
+                                 'blank if no liquid remains at standard conditions. As a '
+                                 'reference, a 1000 BTU/scf gas is equivalent to 172.4 BOE/MMscf; '
+                                 'the volumetric rule of 6000 scf per barrel, common in reserves '
+                                 'reports, corresponds to a 966.7 BTU/scf gas and does not depend '
+                                 'on composition.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'United States Code, Title 26, §45K(d)(5): definición de '
+                                 'barrel-of-oil equivalent (5.8 millones de BTU).',
+                                 'United States Code, Title 26, §45K(d)(5): definition of '
+                                 'barrel-of-oil equivalent (5.8 million BTU).'),
+                                ('p',
+                                 'Society of Petroleum Engineers. <em>PetroWiki</em>, «Glossary: '
+                                 'Barrel equivalent». SPE.',
+                                 'Society of Petroleum Engineers. <em>PetroWiki</em>, “Glossary: '
+                                 'Barrel equivalent”. SPE.')]},
                    {'titulo': ('Contenido de licuables (GPM C3+)', 'Liquefiable content (GPM C3+)'),
                     'bloques': [('p',
                                  'El GPM (<em>gallons per thousand cubic feet</em>) mide el '

@@ -295,3 +295,61 @@ CLAVES_SOLO_GAS = ('hhv_vol_hum', 'hhv_real', 'hhv_hum',
 def clave_liq_mezcla(key):
     """True si la clave de poder calorífico se muestra en líquido y mezcla."""
     return key in CLAVES_PCAL and key not in CLAVES_SOLO_GAS
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  BOE — barril de petróleo equivalente (base energética)
+# ══════════════════════════════════════════════════════════════════════════
+# 1 BOE = 5.8·10⁶ BTU (poder calorífico superior de un barril de crudo de
+# referencia; definición del IRS, 26 USC §45K(d)(5), y de la EIA).
+#   Gas     : BOE/MMscf = HHV_real,seca [BTU/scf] · 10⁶ / 5.8·10⁶
+#   Líquido : BOE/bbl   = HHV_másico,seco [BTU/lb] · ρ_L [lb/ft³] · 5.614583 / 5.8·10⁶
+BTU_POR_BOE = 5.8e6
+FT3_POR_BBL = 5.614583
+
+
+def boe(pc, rho_liq=None):
+    """BOE del gas [BOE/MMscf] a partir del dict de poder calorífico de la fase."""
+    out = {'boe_gas': None}
+    if pc and pc.get('hhv_real') is not None:
+        out['boe_gas'] = pc['hhv_real']*1.0e6/BTU_POR_BOE
+    return out
+
+
+def boe_liquido_std(x, eos, kij=None, metodo='EOS'):
+    """BOE del líquido por barril de tanque [BOE/STB].
+
+    La fase líquida x (13 o 14 comp.; el agua se descarta) se lleva a 60 °F y
+    14.696 psia con un flash de una etapa —el mismo del factor Bo—; el gas que
+    se libera pertenece al gas producido (R_s) y no se cuenta aquí.  Con el
+    líquido de tanque (composición x_STO, peso molecular y densidad a
+    condiciones estándar con el método de densidad indicado):
+        BOE/STB = HHV_molar(x_STO) · 5.614583 / (V_STO · 5.8·10⁶)
+    con HHV_molar = HHV_ideal,seca · 379.48 [BTU/lbmol] y V_STO = M/ρ [ft³/lbmol].
+    Devuelve None si a condiciones estándar no queda líquido."""
+    import eos as _e
+    if x is None:
+        return None
+    xa = np.asarray(x, dtype=float)[:_e.NC]
+    if xa.sum() <= 0:
+        return None
+    xa = list(xa/xa.sum())
+    prev = _e.get_eos()
+    try:
+        _e.set_eos(eos)
+        k = kij if kij is not None else _e.kij_base(eos)
+        r = _e.calcular(xa, 519.67, 14.696, k, metodo_densidad=metodo)
+    except Exception:
+        return None
+    finally:
+        _e.set_eos(prev)
+    bL = r.get('L') or 0.0
+    if bL <= 1e-9 or not r.get('rho_l') or not r.get('PM_l'):
+        return None
+    if bL >= 1 - 1e-9 and (r.get('ZL') or 0.0) > 0.3:      # en realidad es gas
+        return None
+    _l, hhv = _vc_volumetrico(r['x'])
+    if hhv is None:
+        return None
+    v_sto = r['PM_l']/r['rho_l']                            # ft³/lbmol
+    return hhv*VM_IDEAL*FT3_POR_BBL/(v_sto*BTU_POR_BOE)

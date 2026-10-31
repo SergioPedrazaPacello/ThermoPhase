@@ -362,6 +362,7 @@ PROP_RESUMEN = [
     ('hhv_mas_hum', 'HHV masico base humeda [BTU/lb]',   None, 1, True),
     ('lhv_mas',     'LHV masico base seca [BTU/lb]',     None, 1, True),
     ('lhv_mas_hum', 'LHV masico base humeda [BTU/lb]',   None, 1, True),
+    ('boe',         'BOE [BOE/MMscf - BOE/STB]',    None,   3, False),
     ('gpm',         'GPM C3+ [gal/1000pie3]',      None,   4, False),
     ('agua_cont',   'Contenido de agua [lb/MMscf]', None,  3, False),
     ('agua_cap',    'Capacidad de agua [lb/MMscf]', None,  3, False),
@@ -1518,6 +1519,9 @@ class TabEquilibrio(QWidget):
         PMz_hc = float(sum(z13[i]*_PMe[i] for i in range(NC)))
         pcv = _pc.poder_calorifico_fase(y13, PMv_hc) if y13 else {}
         pcl = _pc.poder_calorifico_fase(x13, PMl_hc) if x13 else {}
+        if pcv: pcv.update(_pc.boe(pcv))
+        boe_l = (_pc.boe_liquido_std(x, eos_code, kij, getattr(self, '_metodo_densidad_actual', 'EOS'))
+                 if (hayL and x is not None and 'boe' in self._props_sel) else None)
         pcz = _pc.poder_calorifico_fase(z13, PMz_hc)
         gpm_v = _pc.gpm_c3(y13) if y13 else None
         def pcf(dd, k, hay=True, dg=1):
@@ -1574,6 +1578,7 @@ class TabEquilibrio(QWidget):
                    if _pc.clave_liq_mezcla(k) else ("", pcf(pcv,k,hayV), "", ""))
                for k in _pc.CLAVES_PCAL},
             'sg_real':     ("",             pcf(pcv,'sg_real',hayV,4), "", ""),
+            'boe':         ("",             pcf(pcv,'boe_gas',hayV,3), pcf({'b':boe_l},'b',hayL,3), ""),
             'gpm':         ("",             pcf({'g':gpm_v},'g',hayV,4) if gpm_v is not None else "", "", ""),
             'agua_cont':   ("",             cf(agua_cont, hayV, 3), "", ""),
             'agua_cap':    ("",             cf(agua_cap, hayV, 3), "", ""),
@@ -1913,6 +1918,13 @@ class TabEquilibrio(QWidget):
         z_glob = r.get('z')
         pcv = _pc.poder_calorifico_fase(y, r.get('PM_v')) if y is not None else {}
         pcl = _pc.poder_calorifico_fase(x, r.get('PM_l')) if x is not None else {}
+        if pcv: pcv.update(_pc.boe(pcv))
+        boe_l = None
+        if liq_ok and x is not None and 'boe' in self._props_sel:
+            _ctx = getattr(self, '_hs_ctx', None)
+            boe_l = _pc.boe_liquido_std(x, _ctx[4] if _ctx else _eng.get_eos(),
+                                        _ctx[3] if _ctx else None,
+                                        getattr(self, '_metodo_densidad_actual', 'EOS'))
         pcz = _pc.poder_calorifico_fase(z_glob, r.get('PM_z')) if z_glob else {}
         gpm_v = _pc.gpm_c3(y) if y is not None else None
         def pcf(d, key, ok=True, dg=1):
@@ -1945,6 +1957,7 @@ class TabEquilibrio(QWidget):
                    if _pc.clave_liq_mezcla(k) else ("", pcf(pcv,k,vap_ok), ""))
                for k in _pc.CLAVES_PCAL},
             'sg_real':     ("",                 pcf(pcv,'sg_real',vap_ok,4), ""),
+            'boe':         ("",                 pcf(pcv,'boe_gas',vap_ok,3), pcf({'b':boe_l},'b',liq_ok,3)),
             'gpm':         ("",                 gpmf(gpm_v, vap_ok),        ""),
             'agua_cont':   ("",          cv(0.0, vap_ok, 3), ""),
             'agua_cap':    ("",          cv(self._capacidad_seca(r), vap_ok, 3), ""),
