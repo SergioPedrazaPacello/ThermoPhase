@@ -10130,6 +10130,260 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'exist is shaded. Each sheet fits the window to its own size. If '
                                  'the mixture forms more than one phase at the inlet or outlet of '
                                  'the compressor, expander or pump, a warning is shown.')]},
+                   {'titulo': ('Medidor de orificio (AGA 3)', 'Orifice meter (AGA 3)'),
+                    'bloques': [('p',
+                                 'El módulo Medidor de orificio, que se abre desde «Medidor de '
+                                 'orificio (AGA 3)» en el menú «Cálculos», calcula la medición de '
+                                 'gas natural con una placa de orificio concéntrica de cantos '
+                                 'vivos y tomas bridadas según AGA Report No. 3, Parte 1 (API '
+                                 'MPMS, capítulo 14.3.1). Se resuelve una de tres incógnitas: el '
+                                 'caudal a partir del diámetro del orificio y la presión '
+                                 'diferencial, la presión diferencial que produce un caudal dado o '
+                                 'el diámetro del orificio necesario para un caudal y una presión '
+                                 'diferencial dados. La ventana de ingreso reúne a la izquierda '
+                                 'los datos del medidor, las condiciones de flujo y el modelo, y a '
+                                 'la derecha la cromatografía del gas, que puede cargarse desde la '
+                                 'composición principal o desde un fluido.',
+                                 'The Orifice meter module, opened from «Orifice meter (AGA 3)» in '
+                                 'the «Calculations» menu, computes natural gas measurement with a '
+                                 'concentric, square-edged orifice plate and flange taps according '
+                                 'to AGA Report No. 3, Part 1 (API MPMS chapter 14.3.1). One of '
+                                 'three unknowns is solved: the flow rate from the orifice bore '
+                                 'and the differential pressure, the differential pressure '
+                                 'produced by a given flow rate, or the orifice bore required for '
+                                 'a given flow rate and differential pressure. The input window '
+                                 'gathers the meter data, flowing conditions and model on the left '
+                                 'and the gas chromatography on the right, which can be loaded '
+                                 'from the main composition or from a fluid.'),
+                                ('h3', 'Datos de entrada', 'Input data'),
+                                ('ul',
+                                 [('Medidor: diámetro del orificio y diámetro interno del tubo '
+                                   'medidos a la temperatura de referencia (68 °F por defecto) y '
+                                   'material de cada uno (acero inoxidable 304/316, 304 o 316, '
+                                   'Monel 400 o acero al carbono), que fija el coeficiente de '
+                                   'dilatación lineal.',
+                                   'Meter: orifice bore and meter tube internal diameter measured '
+                                   'at the reference temperature (68 °F by default) and the '
+                                   'material of each (304/316, 304 or 316 stainless steel, Monel '
+                                   '400 or carbon steel), which sets the linear expansion '
+                                   'coefficient.'),
+                                  ('Condiciones de flujo: presión estática absoluta o manométrica '
+                                   '(con la presión atmosférica del lugar), ubicación de la toma '
+                                   'estática (aguas arriba o aguas abajo), presión diferencial '
+                                   '(inH₂O a 60 °F, psi, kPa, mbar o mmH₂O) y temperatura de '
+                                   'flujo.',
+                                   'Flowing conditions: absolute or gauge static pressure (with '
+                                   'the local atmospheric pressure), static tap location (upstream '
+                                   'or downstream), differential pressure (inH₂O at 60 °F, psi, '
+                                   'kPa, mbar or mmH₂O) and flowing temperature.'),
+                                  ('Modelo: método del factor de compresibilidad (AGA 8 DETAIL, '
+                                   'ecuación de estado o Z manual en condiciones de flujo y base), '
+                                   'ecuación del factor de expansión, exponente isentrópico (1.3 '
+                                   'fijo o calculado con AGA 8), viscosidad (0.010268 cP fija o '
+                                   'calculada con la correlación LBC) y condiciones base de '
+                                   'presión y temperatura.',
+                                   'Model: compressibility factor method (AGA 8 DETAIL, equation '
+                                   'of state or manual Z at flowing and base conditions), '
+                                   'expansion factor equation, isentropic exponent (fixed 1.3 or '
+                                   'computed with AGA 8), viscosity (fixed 0.010268 cP or computed '
+                                   'with the LBC correlation) and base pressure and '
+                                   'temperature.')]),
+                                ('h3', 'Ecuación de caudal', 'Flow equation'),
+                                ('p',
+                                 'El caudal másico se obtiene de la ecuación del orificio en '
+                                 'unidades coherentes:',
+                                 'The mass flow rate is obtained from the orifice equation in '
+                                 'consistent units:'),
+                                ('eq',
+                                 'q_m = '
+                                 '\\frac{\\pi}{4}\\,C_d\\,E_v\\,Y\\,d^{2}\\sqrt{2\\,\\rho_{1}\\,\\Delta '
+                                 'P},\\qquad E_v = \\frac{1}{\\sqrt{1-\\beta^{4}}},\\qquad \\beta '
+                                 '= \\frac{d}{D}'),
+                                ('p',
+                                 'donde d y D son los diámetros del orificio y del tubo a la '
+                                 'temperatura de flujo y ρ₁ es la densidad del gas a la presión de '
+                                 'la toma aguas arriba. Si la presión estática se mide aguas '
+                                 'abajo, P₁ = P₂ + ΔP; el resultado es idéntico al de la '
+                                 'formulación con Y₂ y ρ₂ de la norma, ya que Y₂√ρ₂ = Y₁√ρ₁. Los '
+                                 'diámetros se corrigen por dilatación térmica:',
+                                 'where d and D are the orifice and tube diameters at flowing '
+                                 'temperature and ρ₁ is the gas density at the upstream tap '
+                                 'pressure. When the static pressure is measured downstream, P₁ = '
+                                 'P₂ + ΔP; the result is identical to the standard formulation '
+                                 'with Y₂ and ρ₂, since Y₂√ρ₂ = Y₁√ρ₁. The diameters are corrected '
+                                 'for thermal expansion:'),
+                                ('eq',
+                                 'd = d_r\\left[1+\\alpha_1\\,(T_f-T_r)\\right],\\qquad D = '
+                                 'D_r\\left[1+\\alpha_2\\,(T_f-T_r)\\right]'),
+                                ('p',
+                                 'con α = 9.25 × 10⁻⁶ /°F para acero inoxidable 304/316, 9.61 × '
+                                 '10⁻⁶ para 304, 8.89 × 10⁻⁶ para 316, 7.95 × 10⁻⁶ para Monel 400 '
+                                 'y 6.20 × 10⁻⁶ para acero al carbono.',
+                                 'with α = 9.25 × 10⁻⁶ /°F for 304/316 stainless steel, 9.61 × '
+                                 '10⁻⁶ for 304, 8.89 × 10⁻⁶ for 316, 7.95 × 10⁻⁶ for Monel 400 and '
+                                 '6.20 × 10⁻⁶ for carbon steel.'),
+                                ('h3', 'Coeficiente de descarga', 'Discharge coefficient'),
+                                ('p',
+                                 'Se usa la ecuación de Reader-Harris/Gallagher para tomas '
+                                 'bridadas, función de β, del número de Reynolds del tubo Re_D = '
+                                 '4q_m/(πμD) y del diámetro del tubo en pulgadas:',
+                                 'The Reader-Harris/Gallagher equation for flange taps is used, a '
+                                 'function of β, of the pipe Reynolds number Re_D = 4q_m/(πμD) and '
+                                 'of the tube diameter in inches:'),
+                                ('eq',
+                                 'C_d = C_i + '
+                                 '0.000511\\left(\\frac{10^{6}\\beta}{Re_D}\\right)^{0.7} + '
+                                 '\\left(0.0210+0.0049A\\right)\\beta^{4}\\left(\\frac{10^{6}}{Re_D}\\right)^{0.35}'),
+                                ('eq', 'C_i = C_{i,CT} + T_{up} + T_{dn}'),
+                                ('eq',
+                                 'C_{i,CT} = '
+                                 '0.5961+0.0291\\beta^{2}-0.2290\\beta^{8}+0.003(1-\\beta)M_1'),
+                                ('eq',
+                                 'T_{up} = '
+                                 '\\left(0.0433+0.0712e^{-8.5L_1}-0.1145e^{-6.0L_1}\\right)(1-0.23A)\\frac{\\beta^{4}}{1-\\beta^{4}}'),
+                                ('eq',
+                                 'T_{dn} = '
+                                 '-0.0116\\left(M_2-0.52M_2^{1.3}\\right)\\beta^{1.1}(1-0.14A)'),
+                                ('eq',
+                                 'A = \\left(\\frac{19000\\,\\beta}{Re_D}\\right)^{0.8},\\quad L_1 '
+                                 '= L_2 = \\frac{1}{D_{in}},\\quad M_1 = '
+                                 '\\max(2.8-D_{in},\\,0),\\quad M_2 = \\frac{2L_2}{1-\\beta}'),
+                                ('p',
+                                 'Como Re_D depende del caudal, C_d y q_m se resuelven por '
+                                 'sustitución sucesiva partiendo de C_d = 0.6 hasta que el cambio '
+                                 'de C_d es menor que 10⁻¹².',
+                                 'Since Re_D depends on the flow rate, C_d and q_m are solved by '
+                                 'successive substitution starting from C_d = 0.6 until the change '
+                                 'in C_d is below 10⁻¹².'),
+                                ('h3', 'Factor de expansión', 'Expansion factor'),
+                                ('p',
+                                 'Se ofrecen dos ecuaciones, ambas referidas a la toma aguas '
+                                 'arriba con x₁ = ΔP/P₁ y el exponente isentrópico κ: la de AGA 3 '
+                                 '(1992) y la de ISO 5167-2 (2003), más exacta cuando la relación '
+                                 'ΔP/P es alta.',
+                                 'Two equations are offered, both referred to the upstream tap '
+                                 'with x₁ = ΔP/P₁ and the isentropic exponent κ: that of AGA 3 '
+                                 '(1992) and that of ISO 5167-2 (2003), more accurate when the '
+                                 'ΔP/P ratio is high.'),
+                                ('eq',
+                                 'Y_{1992} = '
+                                 '1-\\left(0.41+0.35\\beta^{4}\\right)\\frac{x_1}{\\kappa}'),
+                                ('eq',
+                                 'Y_{ISO} = '
+                                 '1-\\left(0.351+0.256\\beta^{4}+0.93\\beta^{8}\\right)\\left[1-(1-x_1)^{1/\\kappa}\\right]'),
+                                ('h3',
+                                 'Densidad y factor de compresibilidad',
+                                 'Density and compressibility factor'),
+                                ('p',
+                                 'La densidad en condiciones de flujo y en condiciones base se '
+                                 'calcula por defecto con la ecuación de estado AGA 8 Parte 1 '
+                                 '(2017), caracterización DETAIL, que es el método de referencia '
+                                 'para la medición fiscal de gas natural (incertidumbre de 0.1 % '
+                                 'en Z dentro de su intervalo normal). La implementación es una '
+                                 'traducción directa del código de referencia del NIST y reproduce '
+                                 'sus valores de prueba con 15 cifras significativas. Los '
+                                 'componentes de ThermoPhase se asignan a los 21 de AGA 8 (N₂, '
+                                 'CO₂, C1 a nC9 y agua); el exponente isentrópico de AGA 8 se '
+                                 'obtiene de la velocidad del sonido, κ = W²M/(ZRT). Como '
+                                 'alternativa puede usarse la ecuación de estado cúbica '
+                                 'seleccionada (sin traslación de volumen) o un Z manual. La '
+                                 'densidad relativa real se calcula con el Z del aire a las '
+                                 'condiciones base obtenido también con AGA 8.',
+                                 'The density at flowing and base conditions is computed by '
+                                 'default with the AGA 8 Part 1 (2017) equation of state, DETAIL '
+                                 'characterization, which is the reference method for custody '
+                                 'transfer measurement of natural gas (0.1 % uncertainty in Z '
+                                 'within its normal range). The implementation is a direct '
+                                 'translation of the NIST reference code and reproduces its test '
+                                 'values to 15 significant figures. ThermoPhase components are '
+                                 'mapped to the 21 of AGA 8 (N₂, CO₂, C1 to nC9 and water); the '
+                                 'AGA 8 isentropic exponent is obtained from the speed of sound, κ '
+                                 '= W²M/(ZRT). Alternatively the selected cubic equation of state '
+                                 '(without volume translation) or a manual Z can be used. The real '
+                                 'relative density uses the air Z at base conditions, also from '
+                                 'AGA 8.'),
+                                ('eq',
+                                 '\\rho = \\frac{P\\,M}{Z\\,R\\,T},\\qquad Q_b = '
+                                 '\\frac{q_m}{\\rho_b},\\qquad Q_f = \\frac{q_m}{\\rho_1}'),
+                                ('h3', 'Modelo simplificado', 'Simplified model'),
+                                ('p',
+                                 'Junto al cálculo completo se presenta, en una segunda columna, '
+                                 'la ecuación básica del orificio de ASME MFC-3M con C_d = 0.6, Y '
+                                 '= 1 y sin corrección térmica, supuestos habituales de las '
+                                 'calculadoras de dimensionamiento de placas. La columna '
+                                 'Diferencia (%) indica cuánto se aparta el modelo simplificado '
+                                 'del cálculo AGA 3 en caudal, presión diferencial o diámetro, '
+                                 'según la incógnita.',
+                                 'Alongside the full calculation, a second column shows the basic '
+                                 'ASME MFC-3M orifice equation with C_d = 0.6, Y = 1 and no '
+                                 'thermal correction, the usual assumptions of plate-sizing '
+                                 'calculators. The Difference (%) column shows how far the '
+                                 'simplified model departs from the AGA 3 calculation in flow '
+                                 'rate, differential pressure or bore diameter, depending on the '
+                                 'unknown.'),
+                                ('h3',
+                                 'Resultados y límites de aplicación',
+                                 'Results and limits of application'),
+                                ('p',
+                                 'Se informan los caudales másico, a condiciones base (MMscfd o '
+                                 'Sm³/d a las condiciones base ingresadas) y a condiciones de '
+                                 'flujo, el caudal de energía con el poder calorífico superior '
+                                 'másico GPA 2172, la presión diferencial, los diámetros a la '
+                                 'temperatura de referencia y de flujo, β, C_d, E_v, Y, Re_D, x₁ y '
+                                 'las propiedades del gas (presiones aguas arriba y aguas abajo, '
+                                 'densidades y Z en flujo y en base, masa molar, densidades '
+                                 'relativas real e ideal, κ y viscosidad). Se advierte cuando β '
+                                 'está fuera de 0.10 – 0.75, Re_D es menor que 4000, el tubo es '
+                                 'menor que 2 in, el orificio es menor que 0.45 in, x₁ supera 0.2 '
+                                 'o la ecuación de estado predice líquido en condiciones de flujo, '
+                                 'ya que la norma exige gas en una sola fase.',
+                                 'The mass flow rate, flow rate at base conditions (MMscfd or '
+                                 'Sm³/d at the entered base conditions) and at flowing conditions '
+                                 'are reported, together with the energy flow rate from the GPA '
+                                 '2172 mass gross heating value, the differential pressure, the '
+                                 'diameters at reference and flowing temperature, β, C_d, E_v, Y, '
+                                 'Re_D, x₁ and the gas properties (upstream and downstream '
+                                 'pressures, densities and Z at flowing and base conditions, molar '
+                                 'mass, real and ideal relative densities, κ and viscosity). A '
+                                 'warning is shown when β is outside 0.10 – 0.75, Re_D is below '
+                                 '4000, the tube is smaller than 2 in, the bore is smaller than '
+                                 '0.45 in, x₁ exceeds 0.2 or the equation of state predicts liquid '
+                                 'at flowing conditions, since the standard requires single-phase '
+                                 'gas.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'American Gas Association. <em>AGA Report No. 3, Orifice Metering '
+                                 'of Natural Gas and Other Related Hydrocarbon Fluids — Part 1: '
+                                 'General Equations and Uncertainty Guidelines</em> (API MPMS '
+                                 '14.3.1).',
+                                 'American Gas Association. <em>AGA Report No. 3, Orifice Metering '
+                                 'of Natural Gas and Other Related Hydrocarbon Fluids — Part 1: '
+                                 'General Equations and Uncertainty Guidelines</em> (API MPMS '
+                                 '14.3.1).'),
+                                ('p',
+                                 'American Gas Association. <em>AGA Report No. 8, Part 1: '
+                                 'Thermodynamic Properties of Natural Gas and Related Gases — '
+                                 'DETAIL and GROSS Equations of State</em>, 2017.',
+                                 'American Gas Association. <em>AGA Report No. 8, Part 1: '
+                                 'Thermodynamic Properties of Natural Gas and Related Gases — '
+                                 'DETAIL and GROSS Equations of State</em>, 2017.'),
+                                ('p',
+                                 'Lemmon, E. W.; Bell, I. H. <em>AGA8 reference '
+                                 'implementation</em> (DETAIL y GERG-2008). NIST, repositorio '
+                                 'usnistgov/AGA8.',
+                                 'Lemmon, E. W.; Bell, I. H. <em>AGA8 reference '
+                                 'implementation</em> (DETAIL and GERG-2008). NIST, usnistgov/AGA8 '
+                                 'repository.'),
+                                ('p',
+                                 'ISO 5167-2:2003. <em>Measurement of fluid flow by means of '
+                                 'pressure differential devices — Part 2: Orifice plates</em>.',
+                                 'ISO 5167-2:2003. <em>Measurement of fluid flow by means of '
+                                 'pressure differential devices — Part 2: Orifice plates</em>.'),
+                                ('p',
+                                 'ASME MFC-3M-1989. <em>Measurement of Fluid Flow in Pipes Using '
+                                 'Orifice, Nozzle, and Venturi</em>.',
+                                 'ASME MFC-3M-1989. <em>Measurement of Fluid Flow in Pipes Using '
+                                 'Orifice, Nozzle, and Venturi</em>.')]},
                    {'titulo': ('Flash múltiple', 'Multiple flash'),
                     'bloques': [('p',
                                  'El flash múltiple repite el cálculo de equilibrio de fases en '

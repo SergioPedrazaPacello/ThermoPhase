@@ -2866,6 +2866,7 @@ class MainWindow(QMainWindow):
         m_calc.addAction(_act("Análisis de sensibilidad", self._abrir_sensibilidad))
         m_calc.addAction(_act("Flash múltiple", self._abrir_flash_multiple))
         m_calc.addAction(_act("Operaciones unitarias", self._abrir_operaciones_unitarias))
+        m_calc.addAction(_act("Medidor de orificio (AGA 3)", self._abrir_orificio))
         m_calc.addAction(_act("Historial de pozo", self._abrir_historial))
 
         m_graf = menubar.addMenu("&Gráficos")
@@ -4470,6 +4471,51 @@ class MainWindow(QMainWindow):
             sw._pie.setText(f"  {self._nombre_eos(dlg.resultado['ctx_eos'])} EOS"
                             if dlg.resultado.get('ctx_eos') else
                             f"  {dlg.entrada.get('eos_nombre', '')}")
+        self._mostrar_subventana(sw)
+
+    def _abrir_orificio(self):
+        """Módulo Medidor de orificio (AGA 3): ventana de ingreso de datos
+        propia y, si el cálculo da resultado, ventana de resultados."""
+        import pestana_orificio as _por
+        PRIN = self._CLAVE_PRINCIPAL
+        fuentes = [(PRIN, _i18n.t("Composición principal"))] + \
+                  [(f['nombre'], f['nombre']) for f in self.fluidos]
+        def _registrar(t):
+            try:
+                self.gestor_edicion.registrar(t)
+            except Exception:
+                pass
+        h = dict(estilo_combo=_aplicar_estilo_combo, eos_items=EOS_ITEMS,
+                 eos_code=_eos_code, eos_idx=_eos_idx, kij_base=_eng.kij_base,
+                 registrar=_registrar)
+        dlg = _por.DialogoOrificio(self, fuentes, self._datos_fluido,
+                                   list(self._comp_activos),
+                                   getattr(self, '_ori_ultimo', None), h)
+        if not dlg.exec() or dlg.resultado is None:
+            return
+        self._ori_ultimo = dlg.entrada
+        self._mostrar_orificio(dlg)
+
+    def _mostrar_orificio(self, dlg):
+        """Ventana de resultados del medidor de orificio (AGA 3)."""
+        import pestana_orificio as _por
+        clave = 'orificio_aga3'
+        sw = self._subventanas.get(clave)
+        if sw is None:
+            widget = _por.TabOrificio(on_nuevo=self._abrir_orificio)
+            if not hasattr(self, '_tam_sub'):
+                h_ = self.tab_eq.sizeHint()
+                self._tam_sub = (h_.width() + 26, h_.height() + 12)
+            sw = self._montar_subventana(clave, widget, "Medidor de orificio (AGA 3)",
+                                         tam=self._tam_sub, pie_texto="")
+            widget.on_tamano = lambda w_, h_, s_=sw: s_.setFixedSize(w_, h_ + 20)
+            widget.set_ancho(self._tam_sub[0])
+        sw._widget.mostrar(dlg.resultado, dlg.entrada)
+        if getattr(sw, '_pie', None) is not None:
+            zm = dlg.resultado.get('z_metodo')
+            txt = {'AGA8': "AGA 8 DETAIL", 'MANUAL': _i18n.t("Z manual")}.get(
+                zm, f"{dlg.entrada.get('eos_nombre', '')} EOS")
+            sw._pie.setText(f"  {txt}")
         self._mostrar_subventana(sw)
 
     def _on_nav_calculo(self, clave):
