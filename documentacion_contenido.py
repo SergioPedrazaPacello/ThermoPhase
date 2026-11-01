@@ -10198,8 +10198,28 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    '3 allows for natural gas.')]),
                                 ('h3', 'Modos de cálculo', 'Calculation modes'),
                                 ('p',
-                                 'La lista «Modo de cálculo» elige la magnitud a calcular (por '
-                                 'ahora, el caudal) y la lista «Cálculo de caudal» elige entre dos '
+                                 'La lista «Modo de cálculo» elige la incógnita: Caudal, Presión '
+                                 'diferencial o Diámetro del orificio. En los dos últimos modos se '
+                                 'ingresa el «Caudal especificado» (MMscfd, MCF/d, scf/h, E3M3/d, '
+                                 'Sm³/d, Sm³/h, kg/h o lb/h, a las condiciones base) y queda '
+                                 'deshabilitado el dato que se calcula; la ecuación de caudal se '
+                                 'resuelve numéricamente para la presión diferencial que produce '
+                                 'ese caudal con el orificio dado, o para el diámetro del orificio '
+                                 'que lo produce con la presión diferencial dada. El resultado se '
+                                 'muestra con su propia lista de unidades y, en el modo diámetro, '
+                                 'junto con la relación β a la temperatura de flujo.',
+                                 'The «Calculation mode» list chooses the unknown: Flow rate, '
+                                 'Differential pressure or Orifice diameter. In the last two modes '
+                                 'the «Specified flow rate» is entered (MMscfd, MCF/d, scf/h, '
+                                 'E3M3/d, Sm³/d, Sm³/h, kg/h or lb/h, at base conditions) and the '
+                                 'input being computed is disabled; the flow equation is solved '
+                                 'numerically for the differential pressure that produces that '
+                                 'flow rate with the given bore, or for the bore that produces it '
+                                 'with the given differential pressure. The result is shown with '
+                                 'its own unit list and, in diameter mode, together with the β '
+                                 'ratio at flowing temperature.'),
+                                ('p',
+                                 'Para el caudal, la lista «Cálculo de caudal» elige entre dos '
                                  'modos. En Punto único se calcula el caudal para un juego de '
                                  'presión estática, presión diferencial y temperatura. En Serie de '
                                  'tiempo esos tres campos quedan deshabilitados (solo se eligen '
@@ -10210,8 +10230,7 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'la ventana del medidor, y al calcular se completa la columna de '
                                  'caudal fila por fila con los datos fijos del medidor (diámetros, '
                                  'materiales, condiciones base, factor Z y cromatografía).',
-                                 'The «Calculation mode» list chooses the quantity to compute (for '
-                                 'now, the flow rate) and the «Flow rate calculation» list chooses '
+                                 'For the flow rate, the «Flow rate calculation» list chooses '
                                  'between two modes. In Single point the flow rate is computed for '
                                  'one set of static pressure, differential pressure and '
                                  'temperature. In Time series those three fields are disabled '

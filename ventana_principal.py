@@ -4497,8 +4497,9 @@ class MainWindow(QMainWindow):
             sw = self._montar_subventana(clave, widget, "Medidor de orificio (AGA 3)",
                                          tam=(sz.width() + 2, sz.height() + 22),
                                          pie_texto=_i18n.t("Medición de orificio"))
+            # mismo cálculo que el tamaño inicial (+20 px del pie de la ventana)
             widget.on_tamano = lambda hint, s_=sw: s_.setFixedSize(hint.width() + 2,
-                                                                  hint.height() + 22)
+                                                                  hint.height() + 22 + 20)
         else:
             sw._widget.actualizar(fuentes, list(self._comp_activos))
         self._mostrar_subventana(sw)

@@ -58,6 +58,12 @@ U_Q = [("MMscfd", lambda qm, qb: qb/M_FT3*86400.0/1e6),
        ("Sm³/h", lambda qm, qb: qb*3600.0),
        ("kg/h", lambda qm, qb: qm*3600.0),
        ("lb/h", lambda qm, qb: qm*3600.0/LB_KG)]
+# Caudal especificado → (nombre, factor a SI, tipo): 'std' m³/s a condiciones base, 'mas' kg/s
+U_QIN = [("MMscfd", 1e6*M_FT3/86400.0, 'std'), ("MCF/d", 1e3*M_FT3/86400.0, 'std'),
+         ("scf/h", M_FT3/3600.0, 'std'), ("E3M3/d", 1e3/86400.0, 'std'),
+         ("Sm³/d", 1.0/86400.0, 'std'), ("Sm³/h", 1.0/3600.0, 'std'),
+         ("kg/h", 1.0/3600.0, 'mas'), ("lb/h", LB_KG/3600.0, 'mas')]
+INCOGNITAS = ['Q', 'dP', 'd']
 Y_METODOS = [('ISO', "AGA 3 (2012) / ISO 5167-2"), ('1992', "AGA 3 (1992)")]
 
 
@@ -131,10 +137,11 @@ class VentanaOrificio(QWidget):
         gm = QGridLayout(); gm.setSpacing(4)
         # Qué se calcula (por ahora solo el caudal; luego presión diferencial
         # y diámetro del orificio) y, para el caudal, punto único o serie.
-        self.c_calc = self._combo(["Caudal"])
+        self.c_calc = self._combo(["Caudal", "Presión diferencial", "Diámetro del orificio"])
         gm.addWidget(self._etq("Modo de cálculo:"), 0, 0); gm.addWidget(self.c_calc, 0, 1)
         self.c_modo = self._combo(["Punto único", "Serie de tiempo"])
-        gm.addWidget(self._etq("Cálculo de caudal:"), 1, 0); gm.addWidget(self.c_modo, 1, 1)
+        self.l_modo = self._etq("Cálculo de caudal:")
+        gm.addWidget(self.l_modo, 1, 0); gm.addWidget(self.c_modo, 1, 1)
         c1.addLayout(gm)
         c1.addSpacing(4)
         c1.addWidget(self._lbl_txt("Flujo básico:"))
@@ -151,6 +158,11 @@ class VentanaOrificio(QWidget):
         r = self._fila(g, r, "Diámetro del tubo:", self.f_D)
         self.c_toma = self._combo(["Aguas arriba", "Aguas abajo"])
         r = self._fila_w(g, r, "Toma de presión estática:", self.c_toma)
+        # Caudal especificado (modos presión diferencial y diámetro del orificio)
+        self.f_Qin = CampoUnidad(self, [(n, (lambda v, f=f: v*f), (lambda x, f=f: x/f))
+                                        for n, f, _t in U_QIN], 0 if F else 3)
+        self.l_Qin = self._etq("Caudal especificado:")
+        g.addWidget(self.l_Qin, r, 0); g.addLayout(self.f_Qin.layout(), r, 1); r += 1
         c1.addLayout(g)
 
         c1.addSpacing(4)
@@ -222,11 +234,24 @@ class VentanaOrificio(QWidget):
                                f' font-size:{po.FS}pt; padding:0px 4px;')
         self.c_Qu = QComboBox(); self.c_Qu.setFixedSize(W_U, 22); h['estilo_combo'](self.c_Qu)
         self.c_Qu.addItems([n for n, _f in U_Q]); self.c_Qu.setCurrentIndex(0 if F else 3)
-        self.l_Q.setFixedWidth(150)
-        hq = QHBoxLayout(); hq.setSpacing(4); hq.addWidget(self.l_Q); hq.addWidget(self.c_Qu)
+        self.c_dPu = QComboBox(); self.c_dPu.setFixedSize(W_U, 22); h['estilo_combo'](self.c_dPu)
+        self.c_dPu.addItems([n for n, *_r in U_DP]); self.c_dPu.setCurrentIndex(0 if F else 1)
+        self.c_du = QComboBox(); self.c_du.setFixedSize(W_U, 22); h['estilo_combo'](self.c_du)
+        self.c_du.addItems([n for n, *_r in U_L]); self.c_du.setCurrentIndex(0 if F else 1)
+        self.l_Q.setFixedWidth(130)
+        hq = QHBoxLayout(); hq.setSpacing(4); hq.addWidget(self.l_Q)
+        for c_ in (self.c_Qu, self.c_dPu, self.c_du):
+            hq.addWidget(c_)
+        # Relación de diámetros β (modo diámetro del orificio)
+        self.l_beta_t = self._etq("Relación β:"); self.l_beta_t.setMinimumWidth(0)
+        self.l_beta = QLabel(""); self.l_beta.setFixedSize(130, 22)
+        self.l_beta.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         lq = self._etq("Caudal:"); lq.setMinimumWidth(0)
         self.l_caudal = lq
         gr.addWidget(lq, 0, 0); gr.addLayout(hq, 0, 1)
+        self.l_beta.setStyleSheet(self.l_Q.styleSheet())
+        hb = QHBoxLayout(); hb.setSpacing(4); hb.addWidget(self.l_beta); hb.addStretch(1)
+        gr.addWidget(self.l_beta_t, 1, 0); gr.addLayout(hb, 1, 1)
         c2.addLayout(gr)
         self.lbl_aviso = QLabel(""); self.lbl_aviso.setWordWrap(True)
         self.lbl_aviso.setStyleSheet(f'font-family:"{po.FONT_F}";font-size:{po.FS}pt;'
@@ -241,6 +266,9 @@ class VentanaOrificio(QWidget):
         self.b_norm.clicked.connect(self._normalizar)
         self.b_ok.clicked.connect(self.calcular)
         self.c_Qu.currentIndexChanged.connect(lambda _i: self._mostrar())
+        self.c_dPu.currentIndexChanged.connect(lambda _i: self._mostrar())
+        self.c_du.currentIndexChanged.connect(lambda _i: self._mostrar())
+        self.c_calc.currentIndexChanged.connect(lambda _i: self._on_calc())
         self.c_z.currentIndexChanged.connect(lambda _i: self._visibles())
         self.c_modo.currentIndexChanged.connect(lambda _i: self._visibles())
         self.serie = None
@@ -295,16 +323,34 @@ class VentanaOrificio(QWidget):
     def _on_h2o(self, i):
         _INH2O[0] = H2O_REF[i][1]
 
+    def incognita(self):
+        return INCOGNITAS[self.c_calc.currentIndex()]
+
     def es_serie(self):
-        return self.c_modo.currentIndex() == 1
+        return self.incognita() == 'Q' and self.c_modo.currentIndex() == 1
+
+    def _on_calc(self):
+        self.res = None; self.l_Q.setText(""); self.l_beta.setText("")
+        self.lbl_aviso.setVisible(False)
+        self._visibles()
 
     def _visibles(self):
         _INH2O[0] = H2O_REF[self.c_h2o.currentIndex()][1]
         serie = self.es_serie()
+        inc = self.incognita()
+        self.l_modo.setVisible(inc == 'Q'); self.c_modo.setVisible(inc == 'Q')
         for f in (self.f_P, self.f_dP, self.f_T):
             f.e.setEnabled(not serie)        # en serie, solo se elige la unidad
-        for w in (self.l_resultado, self.l_caudal, self.l_Q, self.c_Qu):
+        self.f_dP.e.setEnabled(not serie and inc != 'dP')
+        self.f_d.e.setEnabled(inc != 'd')
+        self.l_Qin.setVisible(inc != 'Q'); self.f_Qin.set_visible(inc != 'Q')
+        for w in (self.l_resultado, self.l_caudal, self.l_Q):
             w.setVisible(not serie)
+        self.c_Qu.setVisible(not serie and inc == 'Q')
+        self.c_dPu.setVisible(inc == 'dP'); self.c_du.setVisible(inc == 'd')
+        self.l_beta_t.setVisible(inc == 'd'); self.l_beta.setVisible(inc == 'd')
+        self.l_caudal.setText(_i18n.t({'Q': "Caudal:", 'dP': "Presión diferencial:",
+                                       'd': "Diámetro del orificio:"}[inc]))
         if serie:
             self.lbl_aviso.setVisible(False)
         self.b_ok.setText(_i18n.t("Abrir serie" if serie else "Calcular"))
@@ -322,7 +368,10 @@ class VentanaOrificio(QWidget):
     def _ajustar(self):
         self.layout().invalidate(); self.layout().activate()
         if self.on_tamano is not None:
-            self.on_tamano(self.sizeHint())
+            # después de que Qt aplique la visibilidad de las filas
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: (self.layout().activate(),
+                                          self.on_tamano(self.sizeHint())))
 
     # ── cromatografía (componentes activos de ThermoPhase) ─────────────
     def _construir_tabla(self, activos):
@@ -333,7 +382,7 @@ class VentanaOrificio(QWidget):
             self.cont_tc.removeWidget(self.tc); self.tc.deleteLater()
         self.act = [i for i in sorted(set(activos)) if i <= NC]
         tc = self.tc = po._tabla(len(self.act) + 2, 2)
-        tc.setColumnWidth(0, 210); tc.setColumnWidth(1, 110)
+        tc.setColumnWidth(0, 250); tc.setColumnWidth(1, 110)
         tc.setItem(0, 0, po._cell(_i18n.t("Componente"), bg=po.GRAY_LBL, align=Qt.AlignmentFlag.AlignCenter))
         tc.setItem(0, 1, po._cell(_i18n.t("Composición"), bg=po.GRAY_LBL, align=Qt.AlignmentFlag.AlignCenter))
         for r, i in enumerate(self.act, 1):
@@ -346,7 +395,7 @@ class VentanaOrificio(QWidget):
         for r in range(self.rs + 1):
             tc.setRowHeight(r, po.ROW_H)
         po._ajustar(tc)
-        self.cont_tc.addWidget(tc, 0, Qt.AlignmentFlag.AlignRight)
+        self.cont_tc.addWidget(tc, 0, Qt.AlignmentFlag.AlignLeft)
         try:
             self.h['registrar'](tc)
         except Exception:
@@ -437,15 +486,16 @@ class VentanaOrificio(QWidget):
         else:
             x = [0.0]*22
         D = req(self.f_D, "Ingrese el diámetro del tubo.")
-        d = req(self.f_d, "Ingrese el diámetro del orificio.")
-        if d >= D:
+        inc = 'Q' if serie else self.incognita()
+        d = req(self.f_d, "Ingrese el diámetro del orificio.") if inc != 'd' else None
+        if d is not None and d >= D:
             raise ValueError("El diámetro del orificio debe ser menor que el del tubo.")
         P = req(self.f_P, "Ingrese la presión estática.", pos=False)
         if self.f_P.nombre().endswith('g') and not serie:
             P += req(self.f_Patm, "Ingrese la presión atmosférica.", pos=False)
         if P <= 0:
             raise ValueError("La presión absoluta debe ser mayor que cero.")
-        dP = req(self.f_dP, "Ingrese la presión diferencial.")
+        dP = req(self.f_dP, "Ingrese la presión diferencial.") if inc != 'dP' else None
         T = req(self.f_T, "Ingrese la temperatura de flujo.")
         Pb = req(self.f_Pb, "Ingrese las condiciones base.")
         Tb = req(self.f_Tb, "Ingrese las condiciones base.")
@@ -455,7 +505,7 @@ class VentanaOrificio(QWidget):
         # Valores fijos admitidos por AGA 3 para gas natural
         k = ag.K_DEFECTO                 # exponente isentrópico 1.3
         mu = ag.MU_DEFECTO*1e3           # viscosidad 0.010268 cP
-        spec = dict(op='orificio', x=x, calcular='Q', d_ref=d, D_ref=D,
+        spec = dict(op='orificio', x=x, calcular=inc, d_ref=d, D_ref=D,
                     alfa_d=ag.ALFA_F[mats[self.c_mat_d.currentIndex()]]*1.8,
                     alfa_D=ag.ALFA_F[mats[self.c_mat_D.currentIndex()]]*1.8,
                     T_ref_d=Trd, T_ref_D=TrD, T_f=T, P_f=P,
@@ -469,6 +519,9 @@ class VentanaOrificio(QWidget):
             if spec['x'][18] > 1e-12:
                 raise ValueError("La opción ecuación de estado no admite agua en la cromatografía; "
                                  "use AGA 8.")
+        if inc != 'Q':
+            v = req(self.f_Qin, "Ingrese el caudal especificado.")
+            spec['flujo_obj'] = (v, U_QIN[self.f_Qin.c.currentIndex()][2])
         if man:
             for key, e, msg in (('Zf_man', self.e_Zf, "Ingrese el factor Z en condiciones de flujo."),
                                 ('Zb_man', self.e_Zb, "Ingrese el factor Z en condiciones base."),
@@ -514,7 +567,14 @@ class VentanaOrificio(QWidget):
         if self.res is None:
             return
         q = self.res['aga3']
-        v = U_Q[self.c_Qu.currentIndex()][1](q['qm'], q['Qb'])
+        inc = self.res.get('calcular', 'Q')
+        if inc == 'dP':
+            v = U_DP[self.c_dPu.currentIndex()][2](q['dP'])
+        elif inc == 'd':
+            v = U_L[self.c_du.currentIndex()][2](q['d_ref'])
+            self.l_beta.setText(f"{q['beta']:.5f}")
+        else:
+            v = U_Q[self.c_Qu.currentIndex()][1](q['qm'], q['Qb'])
         self.l_Q.setText(_num(v, 8))
         av = [_i18n.t("Advertencia:") + " " + _i18n.t(a) for a in self.res.get('avisos') or []]
         self.lbl_aviso.setText("\n".join(av)); self.lbl_aviso.setVisible(bool(av))

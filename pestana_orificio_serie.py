@@ -32,7 +32,7 @@ INTERVALOS = [("s", 1.0), ("min", 60.0), ("h", 3600.0)]
 VOLUMEN = {"MMscfd": ("MMscf", 86400.0), "MCF/d": ("MCF", 86400.0), "scf/h": ("scf", 3600.0),
            "E3M3/d": ("E3M3", 86400.0), "Sm³/d": ("Sm³", 86400.0), "Sm³/h": ("Sm³", 3600.0),
            "kg/h": ("kg", 3600.0), "lb/h": ("lb", 3600.0)}
-GRAY_PLOT_BG = "#F0F0F0"
+from pestana_propiedades import GRAY_PLOT_BG   # fondo de gráfico común
 from pestana_propiedades import CURVA_LW      # grosor de curva común a los gráficos
 FILAS_INI = 1
 
@@ -126,7 +126,8 @@ class VentanaSerie(QDialog):
             t.setColumnWidth(c, w)
         t.verticalHeader().setFixedWidth(42)
         t.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        t.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        t.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        t.horizontalHeader().setStretchLastSection(True)   # la barra, si aparece, no corta columnas
         t.setFixedWidth(sum((118, 104, 104, 104, 112)) + 42 + 20)
         t.setFixedHeight(560)
         c1.addWidget(t, 1)
@@ -140,7 +141,9 @@ class VentanaSerie(QDialog):
         for b in (self.b_pegar, self.b_limpiar, self.b_calc, self.b_graf, self.b_resumen, self.b_csv):
             b.setFixedHeight(26); b.setStyleSheet(po.BTN_QSS)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
-        fb.addWidget(self.b_pegar); fb.addWidget(self.b_limpiar); fb.addStretch(1)
+        for b in (self.b_limpiar, self.b_calc, self.b_graf, self.b_resumen, self.b_csv):
+            b.setFixedWidth(86)                 # mismo ancho (salvo «Pegar desde Excel»)
+        fb.addWidget(self.b_pegar); fb.addStretch(1); fb.addWidget(self.b_limpiar)
         fb.addWidget(self.b_calc); fb.addWidget(self.b_graf); fb.addWidget(self.b_resumen)
         fb.addWidget(self.b_csv)
         c1.addLayout(fb)
@@ -428,6 +431,8 @@ class VentanaGrafico(QDialog):
         lc = QVBoxLayout(caja); lc.setContentsMargins(6, 6, 6, 6)
         self.fig = Figure(figsize=(1, 1)); self.fig.patch.set_facecolor(GRAY_PLOT_BG)
         self.canvas = FigureCanvas(self.fig); self.canvas.setMinimumSize(760, 460)
+        import graficos_menu as _gm
+        _gm.instalar(self.canvas, redibujar=self.dibujar)   # cuadrícula, guardar y copiar
         lc.addWidget(self.canvas)
         root.addWidget(caja, 1)
 
