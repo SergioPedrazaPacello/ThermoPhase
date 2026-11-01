@@ -32,15 +32,16 @@ _AIRE[2], _AIRE[16], _AIRE[21], _AIRE[3] = 0.78102, 0.20946, 0.00916, 0.00036
 IN_M = 0.0254
 PSI_PA = 6894.757293168
 INH2O_PA = PSI_PA/27.707     # pulgada de agua a 60 °F (AGA 3: 1 psi = 27.707 inH2O)
+INH2O_4C_PA = 249.08891      # pulgada de agua a 4 °C (39.2 °F), convención convencional
 MU_DEFECTO = 0.010268e-3     # Pa·s (0.010268 cP, valor admitido por AGA 3)
 K_DEFECTO = 1.3
 
-# Coeficientes de dilatación lineal (1/°F) — AGA 3 Parte 1
+# Coeficientes de dilatación lineal (1/°F) — AGA 3 Parte 1 (2012)
 MATERIALES = [
     ('ss', "Acero inoxidable 304/316", 9.25e-6),
     ('ss304', "Acero inoxidable 304", 9.61e-6),
     ('ss316', "Acero inoxidable 316", 8.89e-6),
-    ('monel', "Monel 400", 7.95e-6),
+    ('monel', "Monel 400", 7.72e-6),
     ('cs', "Acero al carbono", 6.20e-6),
 ]
 ALFA_F = {k: a for k, _n, a in MATERIALES}
@@ -51,13 +52,49 @@ class SinSolucionAGA3(ValueError):
 
 
 # ── Densidad del gas ────────────────────────────────────────────────────
-def _x_aga8(z):
-    return a8.desde_thermophase(z)
-
-
-def _props_aga8(z, T, P):
-    p = a8.propiedades(T, P/1000.0, _x_aga8(z))
+def _props_aga8(x, T, P):
+    """x: composición AGA 8 (22 posiciones, índice 0 sin uso)."""
+    p = a8.propiedades(T, P/1000.0, x)
     return dict(rho=p['rho'], Z=p['Z'], M=p['M'], kappa=p['kappa'])
+
+
+# Índice AGA 8 → índice ThermoPhase (N2, CO2, C1, …, nC9)
+_INV_TP = {k: i for i, k in enumerate(a8.MAPA_TP[:13])}
+
+
+def z_thermophase(x):
+    """Composición de 13 componentes de ThermoPhase desde el vector AGA 8;
+    None si el gas contiene agua u otros componentes ajenos a ThermoPhase."""
+    if any(x[k] > 1e-12 for k in range(1, 22) if k not in _INV_TP):
+        return None
+    z = [0.0]*13
+    for k, i in _INV_TP.items():
+        z[i] = x[k]
+    s = sum(z)
+    return [v/s for v in z] if s > 0 else None
+
+
+# Poder calorífico superior ideal (Btu/ft³ a 60 °F y 14.696 psia, GPA 2145)
+# de los componentes AGA 8 que no tiene ThermoPhase (el agua, base seca: 0)
+_HHV_EXTRA = {14: 7742.9, 15: 324.2, 17: 320.5, 19: 637.1}
+
+
+def hhv_masico(x):
+    """Poder calorífico superior másico (Btu/lb) del gas seco."""
+    import poder_calorifico as pc
+    num = 0.0; xs = 0.0
+    for k in range(1, 22):
+        if k == 18 or x[k] <= 0:
+            continue
+        if k in _INV_TP:
+            hv = pc.HHV_VOL[_INV_TP[k]]
+        else:
+            hv = _HHV_EXTRA.get(k, 0.0)
+        num += x[k]*hv; xs += x[k]
+    if xs <= 0:
+        return None
+    M = sum(x[k]*a8.MMi[k] for k in range(1, 22) if k != 18)/xs
+    return (num/xs)*pc.VM_IDEAL/M
 
 
 def _props_eos(z, T, P, eos, kij):
@@ -82,11 +119,15 @@ def _props_eos(z, T, P, eos, kij):
     return dict(rho=rho, Z=Z, M=M, V=V, mu=(float(mu)*1e-3 if mu else None))
 
 
-def fraccion_vapor(z, T, P, eos, kij):
-    """Fracción de vapor del flash PT con la ecuación de estado (sin agua);
-    None si no se puede evaluar."""
+def fraccion_vapor(x, T, P, eos='PR'):
+    """Fracción de vapor del flash PT con la ecuación de estado (gas sin
+    agua ni componentes ajenos a ThermoPhase); None si no se evalúa."""
+    z = z_thermophase(x)
+    if z is None:
+        return None
     try:
-        return _props_eos(z, T, P, eos, kij)['V']
+        import eos as eng
+        return _props_eos(z, T, P, eos, eng.kij_base(eos))['V']
     except Exception:
         return None
 
@@ -122,16 +163,17 @@ def factor_expansion(beta, x1, k, metodo='1992'):
 # ── Motor ────────────────────────────────────────────────────────────────
 class Medidor:
     """Cálculo de un medidor de orificio.  spec (SI):
-       z (14), d_ref, D_ref, alfa_d, alfa_D (1/K), T_ref, T_f, P_f (Pa abs en
-       la toma), toma ('arriba'|'abajo'), dP, Pb, Tb, z_metodo ('AGA8'|'EOS'|
-       'MANUAL'), eos, kij, Zf_man, Zb_man, y_metodo ('1992'|'ISO'),
-       k_metodo ('FIJO'|'AGA8'), k_val, mu_metodo ('FIJO'|'EOS'), mu_val."""
+       x (22, AGA 8), d_ref, D_ref, alfa_d, alfa_D (1/K), T_ref_d, T_ref_D,
+       T_f, P_f (Pa abs en la toma), toma ('arriba'|'abajo'), dP, Pb, Tb,
+       z_metodo ('AGA8'|'MANUAL'), Zf_man, Zb_man, G_man (gravedad específica
+       ideal), y_metodo ('1992'|'ISO'), k_metodo ('FIJO'|'AGA8'), k_val, mu_val."""
 
     def __init__(self, spec):
         self.s = spec
         self._cache = {}
-        z = spec['z']
-        self.M_aga8 = a8.masa_molar(_x_aga8(z))
+        x = spec['x']
+        self.M_aga8 = (spec['G_man']*M_AIRE if spec['z_metodo'] == 'MANUAL'
+                       else a8.masa_molar(x))
         sb = self._densidad(spec['Tb'], spec['Pb'], base=True)
         self.base = sb
         Zair = z_aire_base(spec['Tb'], spec['Pb'])
@@ -144,43 +186,39 @@ class Medidor:
         key = (round(T, 6), round(P, 3), base)
         if key in self._cache:
             return self._cache[key]
-        s = self.s; m = s['z_metodo']
-        if m == 'EOS':
-            p = _props_eos(s['z'], T, P, s['eos'], s['kij'])
+        s = self.s
+        if s['z_metodo'] == 'MANUAL':
+            Z = s['Zb_man'] if base else s['Zf_man']
+            M = self.M_aga8
+            p = dict(Z=Z, M=M, rho=P*M/1000.0/(Z*R_SI*T), kappa=None)
+        elif s['z_metodo'] == 'EOS':
+            z = z_thermophase(s['x'])
+            if z is None:
+                raise SinSolucionAGA3("La ecuación de estado no admite agua ni componentes ajenos "
+                                      "a ThermoPhase; use AGA 8.")
+            p = _props_eos(z, T, P, s['eos'], s['kij'])
             p['kappa'] = None
         else:
-            p = _props_aga8(s['z'], T, P)
-            if m == 'MANUAL':
-                Z = s['Zb_man'] if base else s['Zf_man']
-                p['Z'] = Z
-                p['rho'] = P*p['M']/1000.0/(Z*R_SI*T)
+            p = _props_aga8(s['x'], T, P)
         self._cache[key] = p
         return p
 
     def _kappa(self, T, P):
         s = self.s
-        if s.get('k_metodo') == 'AGA8':
-            return _props_aga8(s['z'], T, P)['kappa']
+        if s.get('k_metodo') == 'AGA8' and s['z_metodo'] != 'MANUAL':
+            return _props_aga8(s['x'], T, P)['kappa']
         return s.get('k_val') or K_DEFECTO
 
     def _mu(self, T, P):
-        s = self.s
-        if s.get('mu_metodo') == 'EOS':
-            try:
-                mu = _props_eos(s['z'], T, P, s['eos'], s['kij'])['mu']
-                if mu:
-                    return mu
-            except Exception:
-                pass
-        return s.get('mu_val') or MU_DEFECTO
+        return self.s.get('mu_val') or MU_DEFECTO
 
     def evaluar(self, d_ref, dP, modelo):
         """Resultados del medidor para un diámetro de orificio y una ΔP."""
         s = self.s
         Tf = s['T_f']
         if modelo == 'aga3':
-            d = d_ref*(1.0 + s['alfa_d']*(Tf - s['T_ref']))
-            D = s['D_ref']*(1.0 + s['alfa_D']*(Tf - s['T_ref']))
+            d = d_ref*(1.0 + s['alfa_d']*(Tf - s['T_ref_d']))
+            D = s['D_ref']*(1.0 + s['alfa_D']*(Tf - s['T_ref_D']))
         else:
             d = d_ref; D = s['D_ref']
         beta = d/D
@@ -303,22 +341,19 @@ def calcular(spec):
         raise SinSolucionAGA3(res.get('error_aga3') or "Sin solución")
     s = spec
     ref = res['aga3'] or res['simple']
-    V = None
-    if not (s['z'][13] if len(s['z']) > 13 else 0):
-        V = fraccion_vapor(s['z'], s['T_f'], ref['P1'], s['eos'], s['kij'])
+    V = (fraccion_vapor(s['x'], s['T_f'], ref['P1'], s.get('eos', 'PR'))
+         if s['z_metodo'] != 'MANUAL' else None)
     adv = avisos(res['aga3'], s) if res.get('aga3') else []
     if V is not None and V < 1.0 - 1e-6:
         adv.insert(0, "El gas no es monofásico en condiciones de flujo (la ecuación de "
                       "estado predice líquido); AGA 3 exige gas en una sola fase.")
     # Poder calorífico superior másico (GPA 2172) del gas seco
     hhv_mas = None
-    try:
-        import poder_calorifico as pc
-        import eos as eng
-        z13 = list(s['z'][:eng.NC])
-        hhv_mas = pc.poder_calorifico_fase(z13).get('hhv_mas')     # BTU/lb
-    except Exception:
-        pass
+    if s['z_metodo'] != 'MANUAL':
+        try:
+            hhv_mas = hhv_masico(s['x'])                             # Btu/lb
+        except Exception:
+            pass
     res.update(op='orificio', base=m.base, M=m.M_aga8, Gr=m.Gr, Gi=m.Gi,
                Z_aire=m.Z_aire, avisos=adv, V_flujo=V, hhv_mas=hhv_mas,
                calcular=s.get('calcular', 'Q'), z_metodo=s['z_metodo'],
