@@ -118,6 +118,8 @@ class GestorEdicion(QObject):
                     if tipo == QEvent.Type.ShortcutOverride:
                         ev.accept()          # la tabla recibe la tecla
                         return False
+                    if accion in ('pegar', 'borrar') and obj.property('pegado_propio'):
+                        return False         # la tabla tiene su propio pegado/borrado
                     self.registrar(obj)
                     self._ultimo = obj
                     getattr(self, accion)()

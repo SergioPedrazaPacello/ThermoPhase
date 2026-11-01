@@ -33,7 +33,8 @@ VOLUMEN = {"MMscfd": ("MMscf", 86400.0), "MCF/d": ("MCF", 86400.0), "scf/h": ("s
            "E3M3/d": ("E3M3", 86400.0), "Sm³/d": ("Sm³", 86400.0), "Sm³/h": ("Sm³", 3600.0),
            "kg/h": ("kg", 3600.0), "lb/h": ("lb", 3600.0)}
 GRAY_PLOT_BG = "#F0F0F0"
-FILAS_INI = 60
+from pestana_propiedades import CURVA_LW      # grosor de curva común a los gráficos
+FILAS_INI = 1
 
 
 def _f(t):
@@ -98,16 +99,25 @@ class VentanaSerie(QDialog):
         t.verticalHeader().setDefaultSectionSize(20)
         hqss = (f'QHeaderView::section {{ background:{po.GRAY_LBL}; color:#000000;'
                 f' font-family:"{po.FONT_F}"; font-size:{po.FS}pt; font-weight:normal;'
-                f' border:1px solid {po.BORDER}; padding:2px 4px; }}')
+                f' border:none; border-right:1px solid {po.BORDER};'
+                f' border-bottom:1px solid {po.BORDER}; padding:2px 4px; }}')
         for hd in (t.horizontalHeader(), t.verticalHeader()):
             hd.setStyleSheet(hqss)
             hd.setHighlightSections(False)          # sin negrita al seleccionar
             f_ = hd.font(); f_.setBold(False); hd.setFont(f_)
         t.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
         t.setCornerButtonEnabled(False)
+        # Rejilla plana de 1 px (como las demás tablas del programa)
+        t.setShowGrid(False)
+        from pestana_saturacion import GridDelegate
+        t.setItemDelegate(GridDelegate(po.BORDER, t))
         t.setStyleSheet(f'QTableWidget {{ background:{po.WHITE}; font-family:"{po.FONT_F}";'
-                        f' font-size:{po.FS}pt; gridline-color:#B0B0B0;'
-                        f' selection-background-color:{po.SEL_BG}; selection-color:#000000; }}')
+                        f' font-size:{po.FS}pt; border:none; border-top:1px solid {po.BORDER};'
+                        f' border-left:1px solid {po.BORDER};'
+                        f' selection-background-color:{po.SEL_BG}; selection-color:#000000; }}'
+                        f'QTableCornerButton::section {{ background:{po.GRAY_LBL}; border:none;'
+                        f' border-right:1px solid {po.BORDER}; border-bottom:1px solid {po.BORDER}; }}')
+        t.setProperty('pegado_propio', True)     # Ctrl+V y Supr los maneja esta tabla
         t.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         for c, w in enumerate((118, 104, 104, 104, 112)):
             t.setColumnWidth(c, w)
@@ -189,6 +199,10 @@ class VentanaSerie(QDialog):
         t.blockSignals(False)
 
     def _on_item(self, it):
+        # Al escribir en la última fila se habilita una fila nueva debajo
+        if it.column() in (1, 2, 3) and it.text().strip() and it.row() == self.tbl.rowCount() - 1:
+            self._filas(self.tbl.rowCount() + 1)
+            self._render()
         if it.column() in (1, 2, 3) and self.Q:
             self.Q = []                     # datos cambiados: el caudal queda pendiente
             self._render()
@@ -427,8 +441,7 @@ class VentanaGrafico(QDialog):
         ax.set_ylabel(f"{_i18n.t('Caudal')} [{un}]", fontsize=9)
         ax.set_xlabel(_i18n.t("Hora"), fontsize=9)
         if xs:
-            ax.plot(xs, ys, color='#1F4E9A', linewidth=1.3,
-                    marker='o' if len(xs) <= 60 else None, markersize=3)
+            ax.plot(xs, ys, color='#1F4E9A', linewidth=CURVA_LW)
             span = (xs[-1] - xs[0]).total_seconds() if len(xs) > 1 else 0
             if span > 86400:
                 ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
