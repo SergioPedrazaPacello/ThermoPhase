@@ -63,7 +63,9 @@ class _Tabla(QTableWidget):
 
 class VentanaSerie(QDialog):
     def __init__(self, orificio):
-        super().__init__(orificio, Qt.WindowType.Window)
+        super().__init__(orificio, Qt.WindowType.Window | Qt.WindowType.WindowTitleHint
+                         | Qt.WindowType.WindowCloseButtonHint
+                         | Qt.WindowType.MSWindowsFixedSizeDialogHint)
         self.ori = orificio
         self.Q = []                 # (qm, Qb) por fila o None
         self.setWindowTitle(_i18n.t("Serie de tiempo — Medidor de orificio"))
@@ -97,7 +99,8 @@ class VentanaSerie(QDialog):
 
         t = self.tbl = _Tabla(self)
         t.verticalHeader().setDefaultSectionSize(20)
-        hqss = (f'QHeaderView::section {{ background:{po.GRAY_LBL}; color:#000000;'
+        hqss = (f'QHeaderView {{ background:{po.WHITE}; border:none; }}'
+                f'QHeaderView::section {{ background:{po.GRAY_LBL}; color:#000000;'
                 f' font-family:"{po.FONT_F}"; font-size:{po.FS}pt; font-weight:normal;'
                 f' border:none; border-right:1px solid {po.BORDER};'
                 f' border-bottom:1px solid {po.BORDER}; padding:2px 4px; }}')
@@ -125,7 +128,7 @@ class VentanaSerie(QDialog):
         t.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         t.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         t.setFixedWidth(sum((118, 104, 104, 104, 112)) + 42 + 20)
-        t.setMinimumHeight(380)
+        t.setFixedHeight(560)
         c1.addWidget(t, 1)
         fb = QHBoxLayout(); fb.setSpacing(6)
         self.b_pegar = QPushButton(_i18n.t("Pegar desde Excel"))
@@ -158,7 +161,7 @@ class VentanaSerie(QDialog):
         self._filas(FILAS_INI)
         self.actualizar_encabezados()
         self._render()
-        self.resize(self.sizeHint().width(), 720)
+        self.adjustSize(); self.setFixedSize(self.sizeHint())     # tamaño fijo
 
     # ── helpers ─────────────────────────────────────────────────────────
     def _etq(self, t):
