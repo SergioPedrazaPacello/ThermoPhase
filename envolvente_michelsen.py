@@ -1691,6 +1691,34 @@ def construir_envolvente(z, kij=None, progress_cb=None,
             pass
         finally:
             _DENSIFICANDO = False
+    # ── Tramos desconectados en mezclas asimétricas ─────────────────────────
+    # Si la curva de rocío (la que contiene la cricondentérmica) y la pared
+    # líquido-líquido quedaron unidas sólo por un salto grande de temperatura
+    # (sin puntos calculados entre ellas), ese «puente» y el crítico ubicado
+    # en él no son físicos: se conserva sólo el tramo trazado de rocío.  Es el
+    # caso de gases muy livianos con cola pesada (p. ej. 93 % C1 con C8–C9),
+    # cuya pared L-L aparece a temperaturas criogénicas sin unirse al rocío.
+    if _ASIM and len(envolvente) >= 8:
+        try:
+            Ts_e = [t for _, t in envolvente]
+            spanT = max(Ts_e) - min(Ts_e)
+            cortes = [i for i in range(1, len(envolvente))
+                      if abs(envolvente[i][1] - envolvente[i-1][1]) > 0.20*spanT]
+            if spanT > 0 and cortes:
+                lim = [0] + cortes + [len(envolvente)]
+                tramos = [envolvente[lim[k]:lim[k+1]] for k in range(len(lim)-1)]
+                i_tmax = max(range(len(envolvente)), key=lambda i: envolvente[i][1])
+                k_sel = next(k for k in range(len(tramos)) if lim[k] <= i_tmax < lim[k+1])
+                sel = tramos[k_sel]
+                if len(sel) >= 8:
+                    if crit is not None and not any(abs(p-crit[0]) < 1e-9 and abs(t-crit[1]) < 1e-9
+                                                    for p, t in sel):
+                        crit = None
+                    envolvente = sel
+                    if crit is None:
+                        sin_critico = True
+        except Exception:
+            pass
     # Pared líquido-líquido: la frontera sube sin límite (se cortó en el techo);
     # no hay una cricondenbárica finita.
     pared_ll = bool(_ASIM and envolvente and max(p for p, _ in envolvente) > 9000.0)
@@ -1906,7 +1934,12 @@ def _densificar(z, kij, envolvente, crit, P_ini=14.7, umbral=0.035, max_ins=14):
                 continue
             P, T = env[k]
             r = sat('T_' + lado(k), P)
-            if r is not None and abs(r[1] - T) > 3.0 and abs(np.log(r[0]/P)) < 1e-3:
+            # A una misma presión puede haber DOS temperaturas de rocío (rama
+            # retrógrada y rama de baja T, a ambos lados de la cricondenbárica).
+            # El recálculo sólo corrige un punto desplazado; si la T nueva cae
+            # lejos (otra rama), se conserva el punto trazado.
+            if r is not None and 3.0 < abs(r[1] - T) < 0.15*spanT \
+                    and abs(np.log(r[0]/P)) < 1e-3:
                 env[k] = (P, r[1])
 
     # ── 1) huecos: insertar puntos intermedios ──────────────────────────────
