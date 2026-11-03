@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
 )
 import matplotlib
 matplotlib.use('QtAgg')
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QEvent
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QEvent, QTimer
 from PyQt6.QtGui import QColor, QBrush, QFont, QIcon, QAction, QActionGroup, QKeySequence, QPen
 
 from eos import (
@@ -2790,7 +2790,32 @@ class _Ventana(QWidget):
         ev.ignore()
         self.hide()
 
+    def showEvent(self, ev):
+        # Si se vuelve a mostrar (navegador, menú, pestaña), quitar su
+        # pestaña de la barra de ventanas minimizadas.
+        p = self.parent()
+        if (not ev.spontaneous() and p is not None
+                and hasattr(p, '_quitar_minimizada')):
+            p._quitar_minimizada(self)
+        super().showEvent(ev)
+
+    def _a_pestana(self):
+        p = self.parent()
+        if p is None or p.isMinimized() or not self.isMinimized():
+            return
+        self.hide()
+        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+        p._agregar_minimizada(self)
+
     def changeEvent(self, ev):
+        # Minimizar: en vez de ir a la barra de tareas de Windows, la ventana
+        # se oculta y queda como pestaña bajo la barra de selectores.
+        try:
+            if (ev.type() == QEvent.Type.WindowStateChange and self.isMinimized()
+                    and hasattr(self.parent(), '_agregar_minimizada')):
+                QTimer.singleShot(0, self._a_pestana)
+        except Exception:
+            pass
         # Recordar la última ventana de envolvente activa (para «Vista
         # ampliada» del menú Gráficos).
         try:
@@ -3189,6 +3214,7 @@ class MainWindow(QMainWindow):
             base = es_tit.split(" - ")[0]
             resto = es_tit[len(base):]
             sw.setWindowTitle(_i18n._traducir_texto(base) + resto)
+        self._refrescar_minimizadas()
         # Pie de pagina EOS y status
         self._refrescar_pies()
         self._lbl_info.setText(f"{_eos_nombre(self._eos_main_code())} EOS")
@@ -3573,7 +3599,35 @@ class MainWindow(QMainWindow):
             'QSplitter { background:#D4D4D4; }'
             'QSplitter::handle { background:#7F7F7F; }')
         split.addWidget(self.nav)
-        split.addWidget(self.area)
+        # Área de trabajo con la barra de ventanas minimizadas encima.
+        self._barra_min = QTabBar()
+        self._barra_min.setDrawBase(False)
+        self._barra_min.setExpanding(False)
+        self._barra_min.setUsesScrollButtons(True)
+        self._barra_min.setElideMode(Qt.TextElideMode.ElideNone)
+        self._barra_min.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._barra_min.setStyleSheet(
+            f'QTabBar {{ background:#D4D4D4; font-family:"{FONT_F}"; font-size:10pt; }}'
+            f'QTabBar::tab {{ background:#F0F0F0; color:{TEXT};'
+            f' border:1px solid #A8A8A8; border-radius:3px;'
+            f' padding:3px 14px; margin:3px 2px 3px 4px; }}'
+            f'QTabBar::tab:selected {{ background:#F0F0F0; }}'
+            f'QTabBar::tab:hover {{ background:#FFFFFF; border-color:#7F7F7F; }}')
+        self._barra_min.tabBarClicked.connect(self._restaurar_minimizada)
+        self._barra_min.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._barra_min.customContextMenuRequested.connect(self._menu_minimizadas)
+        self._wins_min = []
+        cont_area = QWidget()
+        va = QVBoxLayout(cont_area)
+        va.setContentsMargins(0, 0, 0, 0); va.setSpacing(0)
+        fila_min = QWidget(); fila_min.setStyleSheet('background:#D4D4D4;')
+        hm = QHBoxLayout(fila_min); hm.setContentsMargins(0, 0, 0, 0); hm.setSpacing(0)
+        hm.addWidget(self._barra_min); hm.addStretch(1)
+        self._fila_min = fila_min
+        fila_min.hide()
+        va.addWidget(fila_min)
+        va.addWidget(self.area, 1)
+        split.addWidget(cont_area)
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
         split.setChildrenCollapsible(False)
@@ -3724,6 +3778,47 @@ class MainWindow(QMainWindow):
                 iPrev = cmbd.findText(prev)
                 if iPrev >= 0:
                     self._sync_combo(cmbd, iPrev)
+
+    # ── Ventanas minimizadas como pestañas ───────────────────
+    def _agregar_minimizada(self, win):
+        if win in self._wins_min:
+            return
+        self._wins_min.append(win)
+        self._barra_min.addTab(win.windowTitle())
+        self._fila_min.show()
+
+    def _quitar_minimizada(self, win):
+        if win not in self._wins_min:
+            return
+        i = self._wins_min.index(win)
+        self._wins_min.pop(i)
+        self._barra_min.removeTab(i)
+        if not self._wins_min:
+            self._fila_min.hide()
+
+    def _restaurar_minimizada(self, i):
+        if 0 <= i < len(self._wins_min):
+            win = self._wins_min[i]
+            self._quitar_minimizada(win)
+            win.show(); win.raise_(); win.activateWindow()
+
+    def _refrescar_minimizadas(self):
+        for i, win in enumerate(getattr(self, '_wins_min', [])):
+            self._barra_min.setTabText(i, win.windowTitle())
+
+    def _menu_minimizadas(self, pos):
+        from PyQt6.QtWidgets import QMenu
+        m = QMenu(self)
+        a_rest = m.addAction(_i18n.t("Restaurar todas"))
+        a_cerr = m.addAction(_i18n.t("Cerrar todas"))
+        act = m.exec(self._barra_min.mapToGlobal(pos))
+        wins = list(self._wins_min)
+        if act is a_rest:
+            for w in wins:
+                self._quitar_minimizada(w); w.show(); w.raise_()
+        elif act is a_cerr:
+            for w in wins:
+                self._quitar_minimizada(w)
 
     def _on_viscosidad(self, idx):
         """Método de viscosidad de las fases de hidrocarburo para todo el
