@@ -552,12 +552,12 @@ def propiedades_punto(T, P, x, y, kij=None, metodo_densidad='COSTALD'):
     except Exception:
         out['H_v'] = out['S_v'] = out['H_l'] = out['S_l'] = None
 
-    # Viscosidad molar de cada fase (cP) por Lohrenz-Bray-Clark, la MISMA
-    # correlacion ya validada que usa el equilibrio de fases.
+    # Viscosidad de cada fase (cP) con el método activo (LBC o CSP), el
+    # MISMO que usa el equilibrio de fases.
     try:
-        from eos import viscosidad_LBC as _visc
-        out['mu_v'] = _visc(y, T, out.get('rho_v'), PM_v)
-        out['mu_l'] = _visc(x, T, out.get('rho_l'), PM_l)
+        from eos import viscosidad_fase as _visc
+        out['mu_v'] = _visc(y, T, out.get('rho_v'), PM_v, P, fase='V')
+        out['mu_l'] = _visc(x, T, out.get('rho_l'), PM_l, P, fase='L')
     except Exception:
         out['mu_v'] = out['mu_l'] = None
 
@@ -812,7 +812,7 @@ def _cerrar_con_michelsen(burb, rocio, z, kij):
         from envolvente_michelsen import construir_envolvente
         # Paso grueso: solo necesitamos el arco del ápice para rellenar,
         # no el detalle fino. Esto acelera bastante el relleno.
-        r = construir_envolvente(list(z), kij, paso_max=0.15)
+        r = construir_envolvente(list(z), kij, paso_max=0.15, auditar=False)
         env = r.get('envolvente', [])
         if not env:
             return _cerrar_por_interseccion(burb, rocio)

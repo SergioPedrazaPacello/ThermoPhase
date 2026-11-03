@@ -1215,7 +1215,90 @@ def _filtrar_burbuja_falsa(z, pts):
 
 # ── Punto de entrada principal ───────────────────────────────────────────────
 def construir_envolvente(z, kij=None, progress_cb=None,
-                         P_ini=14.7, max_pts=2000, paso_max=0.10):
+                         P_ini=14.7, max_pts=2000, paso_max=0.10, auditar=True):
+    """Envolvente por continuación de Michelsen, VERIFICADA.
+
+    El resultado de la continuación se audita con pruebas de estabilidad
+    independientes (envolvente_auditoria).  Si la auditoría detecta defectos
+    (tramos falsos, ramas faltantes, picos), la frontera se reconstruye por
+    barrido de estabilidad; si no, se devuelve tal cual (sin costo extra más
+    que la auditoría)."""
+    r = _construir_envolvente_cont(z, kij, progress_cb, P_ini, max_pts, paso_max)
+    if not auditar or _DENSIFICANDO:
+        return r
+    return _rellenar(_verificar(r, z, kij, P_ini), z, kij, P_ini)
+
+
+def _rellenar(r, z, kij, P_ini):
+    """Sustituye rectas largas que reemplazan una rama real (p. ej. del
+    crítico a un quiebre) por la rama hallada con barrido local de
+    estabilidad.  Se adopta sólo si la auditoría no empeora."""
+    try:
+        import envolvente_auditoria as _au
+        env = r.get('envolvente') or []
+        k = kij if kij is not None else copy.deepcopy(KIJ_DEFAULT)
+        zz = list(np.array(z, dtype=float)/float(np.sum(z)))
+        nueva, n = _au.rellenar_cuerdas(zz, k, env, r.get('critico'), P_ini=P_ini)
+        # el recorte de colas metaestables puede dejar un tramo largo nuevo:
+        # se repite el relleno sobre el resultado (pocas pasadas)
+        for _ in range(2):
+            if not n:
+                break
+            nueva, m_ = _au.rellenar_cuerdas(zz, k, nueva, r.get('critico'), P_ini=P_ini)
+            if not m_:
+                break
+            n += m_
+        nueva, n2 = _au.recortar_lazos(zz, k, nueva)
+        nueva, n3 = _au.prolongar_extremos(zz, k, nueva, P_ini=P_ini)
+        n += n2 + n3
+        if n:
+            _o, m_o = _au.auditar(zz, k, env, r.get('critico'), P_ini=P_ini)
+            _n, m_n = _au.auditar(zz, k, nueva, r.get('critico'), P_ini=P_ini)
+            if _au.puntaje(m_n) <= _au.puntaje(m_o):
+                r = dict(r); r['envolvente'] = nueva; r['cuerdas_rellenadas'] = n
+    except Exception:
+        pass
+    return r
+
+
+def _verificar(r, z, kij, P_ini):
+    try:
+        import envolvente_auditoria as _au
+        k = kij if kij is not None else copy.deepcopy(KIJ_DEFAULT)
+        zz = list(np.array(z, dtype=float)/float(np.sum(z)))
+        ok, _mot = _au.auditar(zz, k, r.get('envolvente') or [], r.get('critico'),
+                               P_ini=P_ini)
+        if not ok:
+            rr = _au.reconstruir(zz, k, r.get('envolvente'), P_ini=P_ini)
+            if rr is not None and len(rr['envolvente']) >= 8:
+                # se adopta sólo si es mejor que la original, auditando ambas
+                # en el mismo rango de temperatura (evita perder ramas)
+                To = [t for _, t in r.get('envolvente') or []]
+                Tr = [t for _, t in rr['envolvente']]
+                rng = (min(To + Tr), max(To + Tr))
+                _ok2, mot_r = _au.auditar(zz, k, rr['envolvente'], rr.get('critico'),
+                                          P_ini=P_ini, T_rango=rng)
+                _ok3, mot_o = _au.auditar(zz, k, r.get('envolvente') or [], r.get('critico'),
+                                          P_ini=P_ini, T_rango=rng)
+                env_o = r.get('envolvente') or []
+                f_p, idx = _au.perdidas(zz, k, env_o, rr['envolvente'], P_ini=P_ini,
+                                        detalle=True)
+                if idx:
+                    inj = _au.injertar_cola(env_o, rr['envolvente'], idx)
+                    if inj is not None:
+                        f2 = _au.perdidas(zz, k, env_o, inj, P_ini=P_ini)
+                        if f2 <= f_p:
+                            rr['envolvente'] = inj; f_p = f2
+                if _au.puntaje(mot_r) < _au.puntaje(mot_o) and f_p < 0.05:
+                    rr['auditoria'] = _mot
+                    return rr
+    except Exception:
+        pass
+    return r
+
+
+def _construir_envolvente_cont(z, kij=None, progress_cb=None,
+                               P_ini=14.7, max_pts=2000, paso_max=0.10):
     """
     Construye la envolvente completa por continuación de Michelsen en UNA SOLA
     VUELTA CONTINUA (Opción A).

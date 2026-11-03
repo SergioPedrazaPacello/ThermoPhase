@@ -49,6 +49,7 @@ _SELECTORES = [
                                            "Peng-Robinson (PVTsim)", "SRK (PVTsim)"]),
     ("densidad",   "Densidad:",           ["COSTALD", "EOS"]),
     ("volumen",    "Corrección de volumen:", ["Ninguna", "Peneloux"]),
+    ("viscosidad", "Viscosidad:",         ["LBC", "Estados correspondientes"]),
     ("flash",      "Tipo de flash:",      ["Presión y temperatura", "Presión y entalpía", "Presión y entropía",
                "Presión y fracción de vapor", "Temperatura y fracción de vapor"]),
     ("envolvente", "Método envolvente:",  ["Michelsen", "Ziervogel-Poling"]),
@@ -195,7 +196,7 @@ def construir_ribbon(acciones=None):
         return l
 
     _ICONO = {"eos": "eos", "densidad": "densidad",
-              "volumen": "volumen",
+              "volumen": "volumen", "viscosidad": "densidad",
               "envolvente": "envolvente", "unidades": "unidades"}
     combos = {}
     grupos = []

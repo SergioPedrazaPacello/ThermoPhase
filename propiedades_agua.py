@@ -349,9 +349,18 @@ def _lbc_params14(eos):
     return (Tc/1.8, Pc/14.696, PM, Vc)
 
 
-def visc_LBC14(comp, T_R, P, rho_masa, PM_fase, eos):
-    """μ-LBC (cP) de una fase de 14 componentes, formulación de PVTsim."""
+def visc_LBC14(comp, T_R, P, rho_masa, PM_fase, eos, fase=None):
+    """μ (cP) de una fase HC de 14 componentes con el método activo:
+    estados correspondientes (CSP) o LBC (formulación de PVTsim)."""
     import eos as _e
+    if _e.get_metodo_viscosidad() == 'CSP':
+        try:
+            import viscosidad_csp as _csp
+            mu = _csp.viscosidad_fase(list(comp), T_R, P, eos, fase)
+            if mu is not None and mu > 0:
+                return mu
+        except Exception:
+            pass
     if rho_masa is None or rho_masa <= 0 or not PM_fase:
         return None
     Tc, Pc, M, Vc = _lbc_params14(eos)
@@ -409,7 +418,7 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
         if metodo_densidad == 'Peneloux':
             ZVr, rho_v, dHv = _peneloux(y, ZV, PMv, T, P, eos)
         sg_v = PMv/28.9625
-        mu_v = visc_LBC14(list(y), T, P, rho_v, PMv, eos)
+        mu_v = visc_LBC14(list(y), T, P, rho_v, PMv, eos, 'V')
         try:
             Hv, Sv = HS_fase14(y, T, P, ZV, eos)
         except Exception:
@@ -447,7 +456,7 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
             except Exception:
                 rho_l = rho_l_eos
         sg_l = rho_l/_eos_rho_w() if rho_l else None
-        mu_l = visc_LBC14(list(x), T, P, rho_l, PMl, eos)
+        mu_l = visc_LBC14(list(x), T, P, rho_l, PMl, eos, 'L')
         try:
             Hl, Sl = HS_fase14(x, T, P, ZL, eos)
         except Exception:
@@ -471,15 +480,13 @@ def propiedades_fases(rt, T, P, eos, kij=None, metodo_densidad='EOS'):
         if metodo_densidad == 'COSTALD':
             rho_w = _rho_costald14(list(w), PMw, T, Tc14, rho_w_eos)
         sg_w = rho_w/_eos_rho_w() if rho_w else None
-        # Viscosidad de la fase acuosa por la correlación de AGUA de PVTsim
-        # (Meyer/Schmidt), no por LBC (que es de hidrocarburos). Se evalúa con
-        # la densidad de la fase (lb/ft³) y (T,P); en el rango de agua líquida
-        # (T>0°C) reproduce la viscosidad del agua de PVTsim.
+        # Viscosidad de la fase acuosa: correlación del AGUA PURA a (T, P),
+        # independiente de la EOS y de los gases disueltos (como PVTsim, que
+        # reporta la misma viscosidad acuosa con PR y SRK y con o sin gas).
         mu_w = None
         try:
             import agua_pura as _apure
-            T_K = T/1.8; P_MN = P*0.00689476
-            mu_w = _apure.viscosidad_cP(T_K, P_MN, (rho_w or 0.0)/62.427960576)
+            mu_w = _apure.viscosidad_agua_cP(T, P)
         except Exception:
             mu_w = None
         if mu_w is None or mu_w <= 0:

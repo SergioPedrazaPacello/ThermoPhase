@@ -1703,10 +1703,10 @@ def flash_muskat(z,T,P,Ki_init,kij,tol=1e-16,max_iter=1000,metodo_densidad='EOS'
     Vm = V*PM_v/den_m if V>0 else 0.0
     Lm = L*PM_l/den_m if L>0 else 0.0
 
-    # Viscosidad de cada fase por Lohrenz-Bray-Clark (cP).  Se evalúa con la
-    # densidad másica de la fase en unidades internas (lb/ft³) y su PM.
-    mu_v = viscosidad_LBC(y, T, rho_v, PM_v, P) if (V > 0 and rho_v) else None
-    mu_l = viscosidad_LBC(x, T, rho_l, PM_l, P) if (L > 0 and rho_l) else None
+    # Viscosidad de cada fase (cP) con el método activo (LBC o CSP).  LBC se
+    # evalúa con la densidad másica de la fase (lb/ft³) y su PM.
+    mu_v = viscosidad_fase(y, T, rho_v, PM_v, P, fase='V') if (V > 0 and rho_v) else None
+    mu_l = viscosidad_fase(x, T, rho_l, PM_l, P, fase='L') if (L > 0 and rho_l) else None
 
     return {
         "V":V,"L":L,"Vm":Vm,"Lm":Lm,
@@ -1868,6 +1868,39 @@ def _visc_gas_diluido_i(i, T_R):
     if Tr_i <= 1.5:
         return _ST_C_BAJA * (Tr_i**0.94) / xi_i
     return 17.78e-5 * (4.58*Tr_i - 1.67)**(5.0/8.0) / xi_i
+
+
+# ── Método de viscosidad de las fases de hidrocarburo ──────────────────────
+#   'LBC' : Lohrenz-Bray-Clark (función de la densidad de la fase).
+#   'CSP' : estados correspondientes de Pedersen (referencia metano), método
+#           por defecto de PVTsim; depende de (T, P, composición).
+# La fase acuosa usa siempre la correlación del agua pura (agua_pura).
+METODOS_VISCOSIDAD = ('LBC', 'CSP')
+_METODO_VISC = 'LBC'
+
+
+def set_metodo_viscosidad(nombre):
+    global _METODO_VISC
+    n = str(nombre).upper()
+    _METODO_VISC = 'CSP' if n.startswith('CSP') or n.startswith('ESTADOS') \
+        or n.startswith('CORRESP') else 'LBC'
+
+
+def get_metodo_viscosidad():
+    return _METODO_VISC
+
+
+def viscosidad_fase(comp, T_R, rho_masa_lbft3, PM_fase, P=None, eos=None, fase=None):
+    """Viscosidad (cP) de una fase con el método activo (LBC o CSP)."""
+    if _METODO_VISC == 'CSP' and P is not None:
+        try:
+            import viscosidad_csp as _csp
+            mu = _csp.viscosidad_fase(comp, T_R, P, eos, fase)
+            if mu is not None and mu > 0:
+                return mu
+        except Exception:
+            pass
+    return viscosidad_LBC(comp, T_R, rho_masa_lbft3, PM_fase, P, eos)
 
 
 def viscosidad_LBC(comp, T_R, rho_masa_lbft3, PM_fase, P=None, eos=None):

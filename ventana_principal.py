@@ -350,6 +350,15 @@ PROP_RESUMEN = [
     ('entalpia',    'Entalpia molar',              'H',    2, True),
     ('entropia',    'Entropia molar',              'S',    4, True),
     ('viscosidad',  'Viscosidad',                  'visc', 5, False),
+    ('vol_molar',   'Volumen molar',               'V',    4, True),
+    ('cp',          'Capacidad calorifica Cp',     'S',    4, True),
+    ('cv',          'Capacidad calorifica Cv',     'S',    4, True),
+    ('kappa',       'Relacion Cp/Cv',              None,   4, True),
+    ('jt',          'Coeficiente Joule-Thomson',   'JT',   5, False),
+    ('vel_sonido',  'Velocidad del sonido',        'u',    2, False),
+    ('cond_term',   'Conductividad termica',       'k',    5, False),
+    ('tension',     'Tension superficial gas-liquido', 'st', 4, False),
+    ('tension_agua','Tension interfacial con el agua', 'st', 4, False),
     ('hhv_vol',     'HHV ideal base seca [BTU/pie3]',    None, 1, True),
     ('hhv_vol_hum', 'HHV ideal base humeda [BTU/pie3]',  None, 1, True),
     ('hhv_real',    'HHV real base seca [BTU/pie3]',     None, 1, True),
@@ -373,6 +382,23 @@ PROP_RESUMEN = [
 ]
 PROP_DEFAULT = ['frac_molar', 'frac_masica', 'sg', 'densidad', 'z', 'pm']
 _PROP_DEF = {d[0]: d for d in PROP_RESUMEN}
+CLAVES_EXTRA = ('vol_molar', 'cp', 'cv', 'kappa', 'jt', 'vel_sonido',
+                'cond_term', 'tension', 'tension_agua')
+
+
+def _valores_extra(ex, fases, fmt):
+    """Textos (mezcla, fase1, fase2, ...) de las propiedades adicionales del
+    flash.  ex: salida de propiedades_extra; fases: claves de fase en orden."""
+    import unidades as _u
+    out = {}
+    for k in CLAVES_EXTRA:
+        c = _u.conv_extra(k) or (lambda v: v)
+        dec = _PROP_DEF[k][3]
+        def t(v):
+            return fmt(c(v), dec) if v is not None else ""
+        mix = t((ex.get('mezcla') or {}).get(k)) if _PROP_DEF[k][4] else ""
+        out[k] = (mix,) + tuple(t((ex.get(f) or {}).get(k)) for f in fases)
+    return out
 
 # ── Worker ────────────────────────────────────────────────────
 class Worker(QThread):
@@ -1587,6 +1613,20 @@ class TabEquilibrio(QWidget):
             'bw':          ("",             "", "", cf(fvol['bw'], hayW, 4)),
             'rs':          ("",             "", cf(fvol['rs'], hayL, 2), cf(fvol['rsw'], hayW, 2)),
         }
+        # Propiedades adicionales (Cp, Cv, JT, sonido, conductividad, tensiones)
+        self._extra_trifasico = None
+        if set(CLAVES_EXTRA) & set(self._props_sel):
+            try:
+                import propiedades_extra as _px
+                pen = getattr(self, '_metodo_densidad_actual', 'EOS') == 'Peneloux'
+                ex = _px.trifasico(rt, {'V': pV, 'L': pL, 'W': pW}, self.get_T(),
+                                   self.get_P(), eos_code, peneloux=pen)
+                self._extra_trifasico = ex
+                valores.update(_valores_extra(
+                    ex, ('V', 'L', 'W'),
+                    lambda v, d: (f"{v:.{d}f}" if v is not None else "")))
+            except Exception:
+                pass
         # Resultado numérico (unidades internas) para el reporte PDF y para
         # guardar/restaurar la simulación.
         def _lst(c):
@@ -1600,6 +1640,8 @@ class TabEquilibrio(QWidget):
                    'PM': _lst(rt.get('PM'))},
             'eos': eos_code,
             'props': {'V': _q(pV), 'L': _q(pL), 'W': _q(pW)},
+            'extra': ({f: _q(d) for f, d in self._extra_trifasico.items()}
+                      if getattr(self, '_extra_trifasico', None) else None),
             'frac_masica': [fmV, fmL, fmW], 'frac_vol': [fvV, fvL, fvW],
             'rho_z': rho_mix, 'PM_z': PM_mix, 'H_z': H_mix, 'S_z': S_mix,
             'agua_cont': agua_cont, 'agua_cap': agua_cap,
@@ -1966,6 +2008,20 @@ class TabEquilibrio(QWidget):
             'bw':          ("",          "", ""),
             'rs':          ("",          "", cv(fv['rs'], liq_ok, 2)),
         }
+        # Propiedades adicionales (Cp, Cv, JT, sonido, conductividad, tensión)
+        if set(CLAVES_EXTRA) & set(self._props_sel):
+            try:
+                import propiedades_extra as _px
+                _ctx = getattr(self, '_hs_ctx', None)
+                _eos = _ctx[4] if _ctx else _eng.get_eos()
+                _kij = _ctx[3] if _ctx else None
+                ex = _px.bifasico(r, self.get_T(), self.get_P(), _eos, _kij)
+                r['extra'] = ex
+                vx = _valores_extra(ex, ('V', 'L'), f)
+                vx['tension_agua'] = ("", "", "")
+                valores.update(vx)
+            except Exception:
+                pass
         self._rebuild_resumen(valores)
 
         # ── Composiciones ─────────────────────────────────────
@@ -3232,6 +3288,7 @@ class MainWindow(QMainWindow):
             'kij_user':   copy.deepcopy(kij_user),
             'kij_fuente': kij_fuente,
             'modo_flash': getattr(self, '_modo_flash', 'PT'),
+            'viscosidad': __import__('eos').get_metodo_viscosidad(),
             'diagrama_envolvente': getattr(self, '_diag_env', 'PT'),
             'eos_activa': _eng.get_eos(),
             'fluidos':    copy.deepcopy(self.fluidos),
@@ -3280,6 +3337,11 @@ class MainWindow(QMainWindow):
         if cmbf is not None:
             cmbf.setCurrentIndex({'PH': 1, 'PS': 2, 'PB': 3, 'TB': 4}.get(
                 doc.get('modo_flash'), 0))
+        # 2b'. Método de viscosidad
+        cmbvis = self.selectores.get('viscosidad')
+        if cmbvis is not None:
+            cmbvis.setCurrentIndex(1 if doc.get('viscosidad') == 'CSP' else 0)
+            self._on_viscosidad(cmbvis.currentIndex())
         # 2c. Diagrama de la envolvente
         self._set_diagrama_env(doc.get('diagrama_envolvente') or 'PT')
 
@@ -3556,6 +3618,9 @@ class MainWindow(QMainWindow):
         sel = self.selectores
         if sel.get('volumen') is not None:
             sel['volumen'].setCurrentIndex(0)
+        if sel.get('viscosidad') is not None:
+            sel['viscosidad'].setCurrentIndex(0)
+            self._on_viscosidad(0)
         i_pr = EOS_CODES.index('PR_PVT')
         sel['eos'].setCurrentIndex(i_pr)
         if self.tab_eq.cmb_eos.currentIndex() != i_pr:
@@ -3618,6 +3683,11 @@ class MainWindow(QMainWindow):
             self.tab_env.cmb_metodo.currentIndexChanged.connect(
                 lambda i: self._sync_combo(cmbe, i))
 
+        # ── Método de viscosidad (todo el programa) ──────────
+        cmbvis = self.selectores.get('viscosidad')
+        if cmbvis is not None:
+            cmbvis.currentIndexChanged.connect(self._on_viscosidad)
+
         # ── Tipo de flash (todo el programa) ─────────────────
         self._modo_flash = 'PT'
         cmbf = self.selectores.get('flash')
@@ -3654,6 +3724,13 @@ class MainWindow(QMainWindow):
                 iPrev = cmbd.findText(prev)
                 if iPrev >= 0:
                     self._sync_combo(cmbd, iPrev)
+
+    def _on_viscosidad(self, idx):
+        """Método de viscosidad de las fases de hidrocarburo para todo el
+        programa: LBC (Lohrenz-Bray-Clark) o estados correspondientes (CSP,
+        Pedersen).  Se aplica en el próximo cálculo."""
+        import eos as _eng
+        _eng.set_metodo_viscosidad('CSP' if idx == 1 else 'LBC')
 
     def _on_tipo_flash(self, idx):
         """Tipo de flash de Equilibrio de fases para todo el programa:

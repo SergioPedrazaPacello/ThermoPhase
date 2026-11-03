@@ -542,6 +542,9 @@ def _filas_resumen_equilibrio(sel, mezcla, fases, hay, comp, pm_fases, E):
     comp13 = [_hc(c) for c in comp]
     pcs = [(_pc.poder_calorifico_fase(c, None) if c else {}) for c in comp13]
     conv = {'densidad': _u.dens_desde, 'entalpia': _u.H_desde, 'entropia': _u.S_desde}
+    for _k in ('vol_molar', 'cp', 'cv', 'jt', 'vel_sonido', 'cond_term', 'tension',
+               'tension_agua'):
+        conv[_k] = _u.conv_extra(_k)
     filas = []
     for key, base, mag, dec, tiene_mix in PROP_RESUMEN:
         if sel is not None and key not in sel:
@@ -618,9 +621,11 @@ def _hoja_equilibrio_agua(story, res3, ent, W, E, sel=None):
             f['bo'] = fvl.get('bo'); f['rs'] = fvl.get('rs')
         else:
             f['bw'] = fvl.get('bw'); f['rs'] = fvl.get('rsw')
+        f.update(((res3.get('extra') or {}).get('VLW'[k])) or {})
         fases.append(f)
     mezcla = {'densidad': res3.get('rho_z'), 'pm': res3.get('PM_z'),
               'entalpia': res3.get('H_z'), 'entropia': res3.get('S_z')}
+    mezcla.update((res3.get('extra') or {}).get('mezcla') or {})
     z_ = list(ent.get('composicion') or [])
     resumen = [[lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
                 hdr(_i18n.t("Fase Liquida")), hdr(_i18n.t("Fase Acuosa"))]]
@@ -811,6 +816,9 @@ def generar_pdf(estado, path):
                 ]
                 mezcla2 = {'densidad': rho_z_int, 'pm': PM_z,
                            'entalpia': res.get('H_stream'), 'entropia': res.get('S_stream')}
+                _ex = res.get('extra') or {}
+                fases2[0].update(_ex.get('V') or {}); fases2[1].update(_ex.get('L') or {})
+                mezcla2.update(_ex.get('mezcla') or {})
                 resumen = [[lab(""), hdr(_i18n.t("Composicion General")), hdr(_i18n.t("Fase Vapor")),
                             hdr(_i18n.t("Fase Liquida"))]]
                 resumen += _filas_resumen_equilibrio(

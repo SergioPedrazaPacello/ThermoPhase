@@ -21,11 +21,14 @@ _NOMBRE_INV = {v: k for k, v in NOMBRE_SISTEMA.items()}
 # Unidades por magnitud y sistema
 U = {
     'FIELD':  {'P': 'psia', 'T': '°F', 'dens': 'lb/ft³',
-               'H': 'Btu/lbmol', 'S': 'Btu/lbmol·°F', 'V': 'ft³/lbmol', 'visc': 'cP'},
+               'H': 'Btu/lbmol', 'S': 'Btu/lbmol·°F', 'V': 'ft³/lbmol', 'visc': 'cP',
+               'JT': '°F/psi', 'u': 'ft/s', 'k': 'Btu/h·ft·°F', 'st': 'dyn/cm'},
     'SI':     {'P': 'kPa',  'T': '°C', 'dens': 'kg/m³',
-               'H': 'kJ/kgmol', 'S': 'kJ/kgmol·°C', 'V': 'm³/kgmol', 'visc': 'cP'},
+               'H': 'kJ/kgmol', 'S': 'kJ/kgmol·°C', 'V': 'm³/kgmol', 'visc': 'cP',
+               'JT': '°C/kPa', 'u': 'm/s', 'k': 'W/m·K', 'st': 'mN/m'},
     'METRIC': {'P': 'bar',  'T': '°C', 'dens': 'kg/m³',
-               'H': 'kcal/kgmol', 'S': 'kcal/kgmol·°C', 'V': 'm³/kgmol', 'visc': 'cP'},
+               'H': 'kcal/kgmol', 'S': 'kcal/kgmol·°C', 'V': 'm³/kgmol', 'visc': 'cP',
+               'JT': '°C/bar', 'u': 'm/s', 'k': 'kcal/h·m·°C', 'st': 'mN/m'},
 }
 
 # ── Factores de conversion desde la unidad interna FIELD ─────────────
@@ -116,3 +119,21 @@ def dens_desde(v, sis=None):   return v * _DENS_FACTOR[sis or _SISTEMA]
 def H_desde(v, sis=None):      return v * _H_FACTOR[sis or _SISTEMA]
 def S_desde(v, sis=None):      return v * _S_FACTOR[sis or _SISTEMA]
 def V_desde(v, sis=None):      return v * _V_FACTOR[sis or _SISTEMA]
+# Coeficiente de Joule-Thomson: interno °F/psi
+_JT_FACTOR = {'FIELD': 1.0, 'SI': 1.0/(1.8*6.8947572932), 'METRIC': 1.0/(1.8*0.0689475729)}
+def JT_desde(v, sis=None):     return v * _JT_FACTOR[sis or _SISTEMA]
+# Velocidad del sonido: interna ft/s
+def u_desde(v, sis=None):      return v * (1.0 if (sis or _SISTEMA) == 'FIELD' else 0.3048)
+# Conductividad térmica: interna Btu/(h·ft·°F)
+_K_FACTOR = {'FIELD': 1.0, 'SI': 1.0/0.5777893, 'METRIC': 0.859845/0.5777893}
+def k_desde(v, sis=None):      return v * _K_FACTOR[sis or _SISTEMA]
+# Tensión superficial: dyn/cm = mN/m en todos los sistemas
+def st_desde(v, sis=None):     return v
+
+
+def conv_extra(clave):
+    """Función de conversión (interna → sistema activo) de las propiedades
+    adicionales del flash, por clave de resumen."""
+    return {'vol_molar': V_desde, 'cp': S_desde, 'cv': S_desde,
+            'jt': JT_desde, 'vel_sonido': u_desde, 'cond_term': k_desde,
+            'tension': st_desde, 'tension_agua': st_desde}.get(clave)

@@ -3104,35 +3104,35 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'la corrección de Peneloux si está seleccionada; gravedad '
                                    'específica ideal M/28.9625 (la gravedad específica real se '
                                    'describe en «Gravedad específica del gas»); viscosidad por '
-                                   'Lohrenz-Bray-Clark con los 14 componentes.',
+                                   'el método seleccionado (LBC o estados correspondientes) con '
+                                   'los 14 componentes.',
                                    'Vapor: equation-of-state density ρ = PM/(ZRT), or with the '
                                    'Peneloux correction if selected; ideal specific gravity '
                                    'M/28.9625 (the real specific gravity is described in «Gas '
-                                   'specific gravity»); viscosity by Lohrenz-Bray-Clark with the '
-                                   '14 components.'),
+                                   'specific gravity»); viscosity by the selected method (LBC or '
+                                   'corresponding states) with the 14 components.'),
                                   ('Líquido de hidrocarburos: densidad de la ecuación de estado, '
                                    'de Peneloux o de COSTALD; en este último caso se evalúa sobre '
                                    'la composición de hidrocarburos renormalizada sin agua, con '
                                    'transición cuadrática hacia la densidad de la ecuación de '
                                    'estado para 0.95 &lt; T<sub>r</sub> &lt; 1; gravedad '
-                                   'específica ρ/62.3664; viscosidad por Lohrenz-Bray-Clark.',
+                                   'específica ρ/62.3664; viscosidad por el método seleccionado.',
                                    'Hydrocarbon liquid: equation-of-state, Peneloux or COSTALD '
                                    'density; in the latter case it is evaluated on the water-free '
                                    'renormalized hydrocarbon composition, with a quadratic '
                                    'transition to the equation-of-state density for 0.95 &lt; '
                                    'T<sub>r</sub> &lt; 1; specific gravity ρ/62.3664; viscosity by '
-                                   'Lohrenz-Bray-Clark.'),
+                                   'the selected method.'),
                                   ('Fase acuosa: densidad de la ecuación de estado, de Peneloux o '
                                    'de COSTALD sobre la composición completa de 14 componentes '
                                    '(con la densidad de la ecuación de estado si T<sub>r</sub> ≥ '
-                                   '1); gravedad específica ρ/62.3664; viscosidad por la '
-                                   'correlación del agua pura de Meyer y Schmidt, con '
-                                   'Lohrenz-Bray-Clark como respaldo.',
+                                   '1); gravedad específica ρ/62.3664; viscosidad del agua pura '
+                                   '(IAPS 1985 con la densidad de Keyes).',
                                    'Aqueous phase: equation-of-state, Peneloux or COSTALD density '
                                    'on the full 14-component composition (with the '
                                    'equation-of-state density if T<sub>r</sub> ≥ 1); specific '
-                                   'gravity ρ/62.3664; viscosity by the Meyer and Schmidt '
-                                   'pure-water correlation, with Lohrenz-Bray-Clark as fallback.'),
+                                   'gravity ρ/62.3664; pure-water viscosity (IAPS 1985 with the '
+                                   'Keyes density).'),
                                   ('Entalpía y entropía de cada fase: contribución de gas ideal '
                                    'más la contribución residual de la ecuación de estado con la '
                                    'regla de mezcla de Huron-Vidal, con da<sub>m</sub>/dT evaluada '
@@ -4536,6 +4536,120 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'critical points. <em>AIChE Journal</em>, 26(5), 769–779.',
                                  'Heidemann, R.A. and Khalil, A.M. (1980). The calculation of '
                                  'critical points. <em>AIChE Journal</em>, 26(5), 769–779.')]},
+                   {'titulo': ('Verificación y reconstrucción de la envolvente',
+                               'Envelope verification and reconstruction'),
+                    'bloques': [('p',
+                                 'La continuación de Michelsen puede, en mezclas difíciles, saltar '
+                                 'entre ramas, unir tramos con conectores que no son frontera, '
+                                 'producir picos cerca del punto crítico u omitir una rama '
+                                 'completa. Por eso cada envolvente trazada se audita con la '
+                                 'prueba general de estabilidad, que es independiente de las '
+                                 'ecuaciones de saturación. Si la auditoría no encuentra '
+                                 'defectos, la envolvente se entrega sin cambios.',
+                                 'In difficult mixtures the Michelsen continuation may jump '
+                                 'between branches, join segments with connectors that are not '
+                                 'boundary, produce spikes near the critical point or miss a whole '
+                                 'branch. Each traced envelope is therefore audited with the '
+                                 'general stability test, which is independent of the saturation '
+                                 'equations. If the audit finds no defects, the envelope is '
+                                 'returned unchanged.'),
+                                ('ul',
+                                 [('Prueba de tramos: cada tramo de longitud normalizada mayor que '
+                                   '0.04 (en T y ln P) debe separar una zona estable de una '
+                                   'inestable; se prueba a ambos lados de su punto medio, en la '
+                                   'normal a la curva, a 0.3 % y 1.2 % de la escala.',
+                                   'Segment test: each segment with normalized length above 0.04 '
+                                   '(in T and ln P) must separate a stable from an unstable zone; '
+                                   'it is tested on both sides of its midpoint, along the normal to '
+                                   'the curve, at 0.3 % and 1.2 % of the scale.'),
+                                  ('Prueba de isotermas: en siete isotermas se localizan los cruces '
+                                   'reales de la frontera (48 presiones entre 14.7 y 9 800 psia y '
+                                   'bisección) y se comparan con los cruces de la envolvente '
+                                   '(tolerancia: el mayor entre 4 % y 15 psia). Un cruce de la '
+                                   'envolvente sin frontera real se vuelve a probar localmente '
+                                   'antes de contarse como defecto.',
+                                   'Isotherm test: on seven isotherms the true boundary crossings '
+                                   '(48 pressures between 14.7 and 9 800 psia, plus bisection) are '
+                                   'located and compared with the envelope crossings (tolerance: '
+                                   'the larger of 4 % and 15 psia). An envelope crossing without a '
+                                   'true boundary is retested locally before being counted as a '
+                                   'defect.')]),
+                                ('p',
+                                 'Si la auditoría detecta defectos, la frontera se reconstruye por '
+                                 'barrido de estabilidad: 50 isotermas y 36 isobaras cubren el '
+                                 'plano P-T y cada punto de la envolvente original se refina por '
+                                 'bisección en su normal. Los puntos se clasifican como burbuja o '
+                                 'rocío según la fase incipiente (más densa o menos densa que la '
+                                 'alimentación) y cada tipo se encadena por vecino más cercano. La '
+                                 'rama de rocío es la que contiene la cricondenterma; la de '
+                                 'burbuja, la que termina más cerca de ella, y el punto crítico es '
+                                 'el encuentro de ambas. Los tramos sueltos (por ejemplo, la pared '
+                                 'líquido-líquido) se unen a los extremos libres si están a menos '
+                                 'de 0.15 en la escala normalizada.',
+                                 'If the audit detects defects, the boundary is rebuilt by '
+                                 'stability scanning: 50 isotherms and 36 isobars cover the P-T '
+                                 'plane and each point of the original envelope is refined by '
+                                 'bisection along its normal. The points are classified as bubble '
+                                 'or dew according to the incipient phase (denser or lighter than '
+                                 'the feed) and each type is chained by nearest neighbour. The '
+                                 'dew branch is the one containing the cricondentherm; the bubble '
+                                 'branch, the one ending closest to it, and the critical point is '
+                                 'where both meet. Loose segments (for example the liquid-liquid '
+                                 'wall) are joined to the free ends if they lie within 0.15 on the '
+                                 'normalized scale.'),
+                                ('p',
+                                 'La envolvente reconstruida se adopta solo si es mejor que la '
+                                 'original: ambas se auditan en el mismo intervalo de temperatura '
+                                 'y la reconstruida debe tener menos defectos y reproducir al '
+                                 'menos el 95 % de los puntos de la original confirmados como '
+                                 'frontera real. Esta última condición protege las envolventes '
+                                 'angostas de mezclas casi puras, que la malla del barrido no '
+                                 'resuelve. Si los puntos no reproducidos forman la cola de un '
+                                 'extremo (la rama de burbuja de baja presión que continúa más '
+                                 'allá del pie de la pared líquido-líquido), esa cola se injerta '
+                                 'desde la envolvente original. En un barrido de 1 188 binarios metano + componente '
+                                 '(1 % a 99 %) con PR, la auditoría aprobó sin cambios la gran '
+                                 'mayoría de los casos y la reconstrucción corrigió los conectores '
+                                 'falsos, los picos cerca del crítico y las ramas faltantes.',
+                                 'The rebuilt envelope is adopted only if it is better than the '
+                                 'original: both are audited over the same temperature interval '
+                                 'and the rebuilt one must have fewer defects and reproduce at '
+                                 'least 95 % of the original points confirmed as true boundary. '
+                                 'This last condition protects the narrow envelopes of nearly pure '
+                                 'mixtures, which the scanning grid does not resolve. If the '
+                                 'points not reproduced form the tail of one end (the low-pressure '
+                                 'bubble branch continuing past the foot of the liquid-liquid '
+                                 'wall), that tail is grafted from the original envelope. In a sweep '
+                                 'of 1 188 methane + component binaries (1 % to 99 %) with PR, the '
+                                 'audit passed the large majority of cases unchanged and the '
+                                 'reconstruction removed the false connectors, the spikes near '
+                                 'the critical point and the missing branches.'),
+                                ('p',
+                                 'Como la frontera se define por la estabilidad de la ecuación de '
+                                 'estado, en mezclas metano + CO<sub>2</sub> a temperaturas muy '
+                                 'bajas puede aparecer una pared líquido-líquido. Es una '
+                                 'predicción del modelo de fluidos: en esa zona el CO<sub>2</sub> '
+                                 'real se solidifica (punto triple −69.8 °F), lo que la ecuación '
+                                 'de estado no representa.',
+                                 'Since the boundary is defined by the stability of the equation '
+                                 'of state, methane + CO<sub>2</sub> mixtures may show a '
+                                 'liquid-liquid wall at very low temperatures. It is a prediction '
+                                 'of the fluid model: in that zone real CO<sub>2</sub> solidifies '
+                                 '(triple point −69.8 °F), which the equation of state does not '
+                                 'represent.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'Michelsen, M.L. (1982). The isothermal flash problem. Part I. '
+                                 'Stability. <em>Fluid Phase Equilibria</em>, 9(1), 1–19.',
+                                 'Michelsen, M.L. (1982). The isothermal flash problem. Part I. '
+                                 'Stability. <em>Fluid Phase Equilibria</em>, 9(1), 1–19.'),
+                                ('p',
+                                 'Michelsen, M.L. y Mollerup, J.M. (2007). <em>Thermodynamic '
+                                 'Models: Fundamentals and Computational Aspects</em>, 2.ª ed. '
+                                 'Tie-Line Publications.',
+                                 'Michelsen, M.L. and Mollerup, J.M. (2007). <em>Thermodynamic '
+                                 'Models: Fundamentals and Computational Aspects</em>, 2nd ed. '
+                                 'Tie-Line Publications.')]},
                    {'titulo': ('Punto crítico de la mezcla', 'Mixture critical point'),
                     'bloques': [('p',
                                  'El punto crítico de una mezcla es el estado en el que las fases '
@@ -8286,156 +8400,331 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                  'Pedersen, K.S., Christensen, P.L. and Shaikh, J.A. (2015). '
                                  '<em>Phase Behavior of Petroleum Reservoir Fluids</em>, 2nd ed. '
                                  'CRC Press.')]},
+                   {'titulo': ('Método de estados correspondientes',
+                               'Corresponding states method'),
+                    'bloques': [('p',
+                                 'Como alternativa a LBC, la viscosidad de las fases de '
+                                 'hidrocarburos puede calcularse por el principio de estados '
+                                 'correspondientes (CSP) en la forma de Pedersen y colaboradores, '
+                                 'que se elige en el selector «Viscosidad» de la barra superior. '
+                                 'A diferencia de LBC, no depende de la densidad de la fase '
+                                 'calculada por la ecuación de estado, sino de la temperatura, la '
+                                 'presión y la composición, por lo que da el mismo resultado con '
+                                 'cualquier ecuación de estado y método de densidad.',
+                                 'As an alternative to LBC, the viscosity of the hydrocarbon '
+                                 'phases can be computed with the corresponding states principle '
+                                 '(CSP) in the form of Pedersen et al., chosen in the «Viscosity» '
+                                 'selector of the top bar. Unlike LBC, it does not depend on the '
+                                 'phase density from the equation of state but on temperature, '
+                                 'pressure and composition, so it gives the same result with any '
+                                 'equation of state and density method.'),
+                                ('eq',
+                                 '\\eta_{mix}(P,T) = \\left(\\frac{T_{c,mix}}{T_{co}}\\right)^{-1/6}'
+                                 '\\left(\\frac{P_{c,mix}}{P_{co}}\\right)^{2/3}'
+                                 '\\left(\\frac{M_{mix}}{M_o}\\right)^{1/2}'
+                                 '\\frac{\\alpha_{mix}}{\\alpha_o}\\,\\eta_o(P_o,T_o)'),
+                                ('eq',
+                                 'P_o = \\frac{P\\,P_{co}\\,\\alpha_o}{P_{c,mix}\\,\\alpha_{mix}}'
+                                 '\\qquad T_o = \\frac{T\\,T_{co}\\,\\alpha_o}{T_{c,mix}\\,\\alpha_{mix}}'),
+                                ('p',
+                                 'donde el subíndice o designa al metano, componente de '
+                                 'referencia, y η<sub>o</sub> su viscosidad en el estado '
+                                 'correspondiente (P<sub>o</sub>, T<sub>o</sub>).',
+                                 'where subscript o denotes methane, the reference component, '
+                                 'and η<sub>o</sub> its viscosity at the corresponding state '
+                                 '(P<sub>o</sub>, T<sub>o</sub>).'),
+                                ('h3', 'Propiedades de la mezcla', 'Mixture properties'),
+                                ('eq',
+                                 'T_{c,mix} = \\frac{\\sum_i\\sum_j z_i z_j\\left[(T_{ci}/P_{ci})^{1/3}'
+                                 '+(T_{cj}/P_{cj})^{1/3}\\right]^3\\sqrt{T_{ci}T_{cj}}}'
+                                 '{\\sum_i\\sum_j z_i z_j\\left[(T_{ci}/P_{ci})^{1/3}'
+                                 '+(T_{cj}/P_{cj})^{1/3}\\right]^3}'),
+                                ('eq',
+                                 'P_{c,mix} = \\frac{8\\sum_i\\sum_j z_i z_j\\left[(T_{ci}/P_{ci})^{1/3}'
+                                 '+(T_{cj}/P_{cj})^{1/3}\\right]^3\\sqrt{T_{ci}T_{cj}}}'
+                                 '{\\left(\\sum_i\\sum_j z_i z_j\\left[(T_{ci}/P_{ci})^{1/3}'
+                                 '+(T_{cj}/P_{cj})^{1/3}\\right]^3\\right)^2}'),
+                                ('eq',
+                                 'M_{mix} = 1.304\\times10^{-4}\\left(\\bar M_w^{2.303}-\\bar M_n^{2.303}'
+                                 '\\right)+\\bar M_n \\qquad \\bar M_w = \\frac{\\sum z_i M_i^2}{\\sum z_i M_i}'
+                                 '\\quad \\bar M_n = \\sum z_i M_i'),
+                                ('eq',
+                                 '\\alpha = 1 + 7.378\\times10^{-3}\\,\\rho_r^{1.847}\\,M^{0.5173}'
+                                 '\\qquad \\rho_r = \\frac{\\rho_o\\left(T\\,T_{co}/T_{c,mix},\\;'
+                                 'P\\,P_{co}/P_{c,mix}\\right)}{\\rho_{co}}'),
+                                ('p',
+                                 'α<sub>mix</sub> se evalúa con M<sub>mix</sub> y α<sub>o</sub> '
+                                 'con el peso molecular del metano; ρ<sub>co</sub> = 0.16284 '
+                                 'g/cm³. Las reglas de mezcla son las de Murad y Gubbins. T<sub>c</sub>, '
+                                 'P<sub>c</sub> y M de cada componente son los del juego de '
+                                 'parámetros de la ecuación activa.',
+                                 'α<sub>mix</sub> is evaluated with M<sub>mix</sub> and '
+                                 'α<sub>o</sub> with the molecular weight of methane; '
+                                 'ρ<sub>co</sub> = 0.16284 g/cm³. The mixing rules are those of '
+                                 'Murad and Gubbins. T<sub>c</sub>, P<sub>c</sub> and M of each '
+                                 'component are those of the active parameter set.'),
+                                ('h3', 'Metano de referencia', 'Reference methane'),
+                                ('p',
+                                 'La densidad del metano se obtiene de la ecuación BWR de McCarty '
+                                 '(32 constantes; P en atm, ρ en mol/L, T en K); cuando hay varias '
+                                 'raíces se toma la de mayor densidad para una fase líquida y la de '
+                                 'menor densidad para una fase gaseosa. La viscosidad del '
+                                 'metano es la de Hanley, McCarty y Haynes, con el término de '
+                                 'Pedersen y Fredenslund que da continuidad bajo el punto de '
+                                 'fusión del metano (90.69 K):',
+                                 'Methane density is obtained from the McCarty BWR equation (32 '
+                                 'constants; P in atm, ρ in mol/L, T in K); when there are '
+                                 'several roots, the densest one is taken for a liquid phase and the '
+                                 'least dense for a gas phase. '
+                                 'Methane viscosity is that of Hanley, McCarty and Haynes, with '
+                                 'the Pedersen-Fredenslund term that gives continuity below the '
+                                 'methane melting point (90.69 K):'),
+                                ('eq',
+                                 '\\eta_o = \\eta_0(T) + \\eta_1(T)\\,\\rho + F_1\\,\\Delta\\eta\'(\\rho,T)'
+                                 ' + F_2\\,\\Delta\\eta\'\'(\\rho,T) \\qquad F_{1,2} = '
+                                 '\\frac{1\\pm\\tanh\\left[(T-T_F)/5\\right]}{2}'),
+                                ('p',
+                                 'Si T<sub>o</sub> &lt; 75 K (aceites pesados) la viscosidad se '
+                                 'combina con la correlación de Rønningsen para crudo '
+                                 'estabilizado, adaptada por Lindeloff y colaboradores con su '
+                                 'corrección de presión; bajo 50 K se usa sólo esta última.',
+                                 'If T<sub>o</sub> &lt; 75 K (heavy oils) the viscosity is '
+                                 'blended with the Rønningsen stabilized-crude correlation as '
+                                 'adapted by Lindeloff et al. with its pressure correction; '
+                                 'below 50 K only the latter is used.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'Pedersen, K.S., Fredenslund, Aa., Christensen, P.L. y '
+                                 'Thomassen, P. (1984). Viscosity of crude oils. <em>Chemical '
+                                 'Engineering Science</em>, 39, 1011–1016.',
+                                 'Pedersen, K.S., Fredenslund, Aa., Christensen, P.L. and '
+                                 'Thomassen, P. (1984). Viscosity of crude oils. <em>Chemical '
+                                 'Engineering Science</em>, 39, 1011–1016.'),
+                                ('p',
+                                 'Pedersen, K.S. y Fredenslund, Aa. (1987). An improved '
+                                 'corresponding states model for the prediction of oil and gas '
+                                 'viscosities and thermal conductivities. <em>Chemical '
+                                 'Engineering Science</em>, 42, 182–186.',
+                                 'Pedersen, K.S. and Fredenslund, Aa. (1987). An improved '
+                                 'corresponding states model for the prediction of oil and gas '
+                                 'viscosities and thermal conductivities. <em>Chemical '
+                                 'Engineering Science</em>, 42, 182–186.'),
+                                ('p',
+                                 'Hanley, H.J.M., McCarty, R.D. y Haynes, W.M. (1975). Equations '
+                                 'for the viscosity and thermal conductivity coefficients of '
+                                 'methane. <em>Cryogenics</em>, 15, 413–417. — McCarty, R.D. '
+                                 '(1974). A modified Benedict-Webb-Rubin equation of state for '
+                                 'methane. <em>Cryogenics</em>, 14, 276–280. — Lindeloff, N., '
+                                 'Pedersen, K.S., Rønningsen, H.P. y Milter, J. (2004). The '
+                                 'corresponding states viscosity model applied to heavy oil '
+                                 'systems. <em>J. Can. Pet. Technol.</em>, 43(9), 47–53.',
+                                 'Hanley, H.J.M., McCarty, R.D. and Haynes, W.M. (1975). '
+                                 'Equations for the viscosity and thermal conductivity '
+                                 'coefficients of methane. <em>Cryogenics</em>, 15, 413–417. — '
+                                 'McCarty, R.D. (1974). A modified Benedict-Webb-Rubin equation of '
+                                 'state for methane. <em>Cryogenics</em>, 14, 276–280. — '
+                                 'Lindeloff, N., Pedersen, K.S., Rønningsen, H.P. and Milter, J. '
+                                 '(2004). The corresponding states viscosity model applied to '
+                                 'heavy oil systems. <em>J. Can. Pet. Technol.</em>, 43(9), '
+                                 '47–53.')]},
                    {'titulo': ('Viscosidad de la fase acuosa', 'Aqueous-phase viscosity'),
                     'bloques': [('p',
-                                 'El método LBC fue desarrollado para hidrocarburos y no '
-                                 'representa adecuadamente la viscosidad del agua líquida. Para la '
-                                 'fase acuosa del flash trifásico, ThermoPhase emplea una '
-                                 'correlación de viscosidad del agua pura basada en Meyer y '
-                                 'colaboradores (1967) y Schmidt (1969), que divide el plano '
-                                 'temperatura-presión en cuatro regiones. La correlación se evalúa '
-                                 'con la temperatura en K, la presión en MN/m² y la densidad de la '
-                                 'fase acuosa en g/cm³, obtenida con el método de densidad '
-                                 'seleccionado.',
-                                 'The LBC method was developed for hydrocarbons and does not '
-                                 'adequately represent the viscosity of liquid water. For the '
-                                 'aqueous phase of the three-phase flash, ThermoPhase uses a '
-                                 'pure-water viscosity correlation based on Meyer et al. (1967) '
-                                 'and Schmidt (1969), which divides the temperature-pressure plane '
-                                 'into four regions. The correlation is evaluated with temperature '
-                                 'in K, pressure in MN/m² and the aqueous-phase density in g/cm³, '
-                                 'obtained with the selected density method.'),
-                                ('h3', 'Región de agua líquida', 'Liquid-water region'),
-                                ('p',
-                                 'Para 273.15 K &lt; T &lt; 573.15 K y P<sub>sat</sub> &lt; P &lt; '
-                                 '80 MN/m², que es la región habitual de la fase acuosa:',
-                                 'For 273.15 K &lt; T &lt; 573.15 K and P<sub>sat</sub> &lt; P '
-                                 '&lt; 80 MN/m², the usual region of the aqueous phase:'),
+                                 'Ni LBC ni el método de estados correspondientes representan el '
+                                 'agua líquida. La fase acuosa del flash trifásico usa siempre la '
+                                 'viscosidad del agua pura a la temperatura y presión del flash, '
+                                 'independiente de la ecuación de estado y de los gases '
+                                 'disueltos, con las ecuaciones de Meyer y colaboradores (1967) y '
+                                 'Schmidt (1969) del manual de PVTsim (η en poise). Para el agua '
+                                 'líquida (región 1):',
+                                 'Neither LBC nor the corresponding states method represents '
+                                 'liquid water. The aqueous phase of the three-phase flash always '
+                                 'uses the pure-water viscosity at the flash temperature and '
+                                 'pressure, independent of the equation of state and of the '
+                                 'dissolved gases, with the Meyer et al. (1967) and Schmidt (1969) '
+                                 'equations of the PVTsim manual (η in poise). For liquid water '
+                                 '(region 1):'),
                                 ('eq',
-                                 '\\eta = 10^{-6}\\,a_1\\left[1 + \\left(\\frac{\\rho}{\\rho_c} - '
-                                 '\\frac{P_{sat}}{P_c}\\right)a_4\\left(T_r - '
-                                 'a_5\\right)\\right]10^{a_2/(T_r - a_3)}'),
+                                 '\\eta = 10^{-6}a_1\\left[1+\\left(\\frac{P}{P_c}-\\frac{P_{sat}}{P_c}\\right)'
+                                 'a_4\\left(\\frac{T}{T_c}-a_5\\right)\\right]10^{a_2/(T/T_c-a_3)}'),
                                 ('p',
-                                 'donde η es la viscosidad (poise, multiplicada por 100 para '
-                                 'expresarla en cP), ρ la densidad de la fase (g/cm³), '
-                                 'ρ<sub>c</sub> = 0.317 g/cm³, P<sub>c</sub> = 22.12 MN/m², '
-                                 'T<sub>r</sub> = T/647.3 K, P<sub>sat</sub> la presión de vapor '
-                                 'del agua (MN/m²) y a<sub>1</sub> = 241.4, a<sub>2</sub> = '
-                                 '0.3828209486, a<sub>3</sub> = 0.2162830218, a<sub>4</sub> = '
-                                 '0.1498693949, a<sub>5</sub> = 0.4711880117.',
-                                 'where η is the viscosity (poise, multiplied by 100 to express it '
-                                 'in cP), ρ the phase density (g/cm³), ρ<sub>c</sub> = 0.317 '
-                                 'g/cm³, P<sub>c</sub> = 22.12 MN/m², T<sub>r</sub> = T/647.3 K, '
-                                 'P<sub>sat</sub> the water vapor pressure (MN/m²) and '
-                                 'a<sub>1</sub> = 241.4, a<sub>2</sub> = 0.3828209486, '
-                                 'a<sub>3</sub> = 0.2162830218, a<sub>4</sub> = 0.1498693949, '
-                                 'a<sub>5</sub> = 0.4711880117.'),
-                                ('eq',
-                                 '\\log_{10} P_{sat} = (D_1 - 1) + \\frac{D_2}{T} + '
-                                 '\\sum_{j=3}^{7} D_j\\,T^{\\,j-2}'),
-                                ('p',
-                                 'donde P<sub>sat</sub> está en MN/m², T en K y D<sub>1</sub> a '
-                                 'D<sub>7</sub> son las constantes de la correlación '
-                                 '(D<sub>1</sub> = 2.9304370, D<sub>2</sub> = −2309.5789, '
-                                 'D<sub>3</sub> = 3.4522497·10<sup>−2</sup>, D<sub>4</sub> = '
-                                 '−1.3621289·10<sup>−4</sup>, D<sub>5</sub> = '
-                                 '2.5878044·10<sup>−7</sup>, D<sub>6</sub> = '
-                                 '−2.4709162·10<sup>−10</sup>, D<sub>7</sub> = '
-                                 '9.5937646·10<sup>−14</sup>).',
-                                 'where P<sub>sat</sub> is in MN/m², T in K and D<sub>1</sub> to '
-                                 'D<sub>7</sub> are the constants of the correlation '
-                                 '(D<sub>1</sub> = 2.9304370, D<sub>2</sub> = −2309.5789, '
-                                 'D<sub>3</sub> = 3.4522497·10<sup>−2</sup>, D<sub>4</sub> = '
-                                 '−1.3621289·10<sup>−4</sup>, D<sub>5</sub> = '
-                                 '2.5878044·10<sup>−7</sup>, D<sub>6</sub> = '
-                                 '−2.4709162·10<sup>−10</sup>, D<sub>7</sub> = '
-                                 '9.5937646·10<sup>−14</sup>).'),
-                                ('p',
-                                 'Por debajo de 273.15 K, si la fase es líquida (ρ &gt; 0.7 '
-                                 'g/cm³), se mantiene la expresión de agua líquida con presión de '
-                                 'vapor nula, como agua subenfriada, y la viscosidad se limita a '
-                                 '7.2551 cP.',
-                                 'Below 273.15 K, if the phase is liquid (ρ &gt; 0.7 g/cm³), the '
-                                 'liquid-water expression is retained with zero vapor pressure, as '
-                                 'subcooled water, and the viscosity is capped at 7.2551 cP.'),
-                                ('h3', 'Otras regiones', 'Other regions'),
-                                ('p',
-                                 'Las regiones restantes parten de la viscosidad a presión '
-                                 'atmosférica η<sub>1</sub> = '
-                                 '10<sup>−6</sup>[b<sub>1</sub>(T<sub>r</sub> − b<sub>2</sub>) + '
-                                 'b<sub>3</sub>] poise, con b<sub>1</sub> = 263.4511, '
-                                 'b<sub>2</sub> = 0.4219836243 y b<sub>3</sub> = 80.4:',
-                                 'The remaining regions start from the atmospheric-pressure '
-                                 'viscosity η<sub>1</sub> = '
-                                 '10<sup>−6</sup>[b<sub>1</sub>(T<sub>r</sub> − b<sub>2</sub>) + '
-                                 'b<sub>3</sub>] poise, with b<sub>1</sub> = 263.4511, '
-                                 'b<sub>2</sub> = 0.4219836243 and b<sub>3</sub> = 80.4:'),
-                                ('ul',
-                                 [('Vapor subsaturado (0.1 MN/m² &lt; P &lt; P<sub>sat</sub>, '
-                                   '373.15 K &lt; T &lt; 573.15 K): η = η<sub>1</sub> − '
-                                   '10<sup>−5</sup>(ρ/ρ<sub>c</sub>)[c<sub>1</sub> − '
-                                   'c<sub>2</sub>(T<sub>r</sub> − c<sub>3</sub>)], con '
-                                   'c<sub>1</sub> = 586.1198738, c<sub>2</sub> = 1204.753943, '
-                                   'c<sub>3</sub> = 0.4219836243.',
-                                   'Subsaturated vapor (0.1 MN/m² &lt; P &lt; P<sub>sat</sub>, '
-                                   '373.15 K &lt; T &lt; 573.15 K): η = η<sub>1</sub> − '
-                                   '10<sup>−5</sup>(ρ/ρ<sub>c</sub>)[c<sub>1</sub> − '
-                                   'c<sub>2</sub>(T<sub>r</sub> − c<sub>3</sub>)], with '
-                                   'c<sub>1</sub> = 586.1198738, c<sub>2</sub> = 1204.753943, '
-                                   'c<sub>3</sub> = 0.4219836243.'),
-                                  ('Alta temperatura (0.1 &lt; P &lt; 80 MN/m², 648.15 K &lt; T '
-                                   '&lt; 1073.15 K): η = η<sub>1</sub> + '
-                                   '10<sup>−6</sup>[d<sub>1</sub>(ρ/ρ<sub>c</sub>)³ + '
-                                   'd<sub>2</sub>(ρ/ρ<sub>c</sub>)² + '
-                                   'd<sub>3</sub>(ρ/ρ<sub>c</sub>)], con d<sub>1</sub> = '
-                                   '111.3564669, d<sub>2</sub> = 67.32080129, d<sub>3</sub> = '
-                                   '3.205147019.',
-                                   'High temperature (0.1 &lt; P &lt; 80 MN/m², 648.15 K &lt; T '
-                                   '&lt; 1073.15 K): η = η<sub>1</sub> + '
-                                   '10<sup>−6</sup>[d<sub>1</sub>(ρ/ρ<sub>c</sub>)³ + '
-                                   'd<sub>2</sub>(ρ/ρ<sub>c</sub>)² + '
-                                   'd<sub>3</sub>(ρ/ρ<sub>c</sub>)], with d<sub>1</sub> = '
-                                   '111.3564669, d<sub>2</sub> = 67.32080129, d<sub>3</sub> = '
-                                   '3.205147019.'),
-                                  ('Resto del plano: η = η<sub>1</sub> + '
-                                   '10<sup>−6</sup>·10<sup>Y</sup>/0.0192, con Y un polinomio de '
-                                   'cuarto grado en X = log<sub>10</sub>(ρ/ρ<sub>c</sub>) cuyos '
-                                   'coeficientes dependen de si ρ/ρ<sub>c</sub> ≤ 4/3.14.',
-                                   'Rest of the plane: η = η<sub>1</sub> + '
-                                   '10<sup>−6</sup>·10<sup>Y</sup>/0.0192, with Y a fourth-degree '
-                                   'polynomial in X = log<sub>10</sub>(ρ/ρ<sub>c</sub>) whose '
-                                   'coefficients depend on whether ρ/ρ<sub>c</sub> ≤ 4/3.14.')]),
-                                ('h3',
-                                 'Implementación en ThermoPhase',
-                                 'Implementation in ThermoPhase'),
-                                ('p',
-                                 'La densidad de la fase acuosa en lb/ft³ se convierte a g/cm³ '
-                                 'dividiendo por 62.42796, y la presión de psia a MN/m² '
-                                 'multiplicando por 0.00689476. Si la correlación del agua no '
-                                 'produce un valor positivo, la viscosidad de la fase acuosa se '
-                                 'calcula por el método LBC sobre sus catorce componentes, con los '
-                                 'parámetros críticos del agua del juego de parámetros activo.',
-                                 'The aqueous-phase density in lb/ft³ is converted to g/cm³ by '
-                                 'dividing by 62.42796, and the pressure from psia to MN/m² by '
-                                 'multiplying by 0.00689476. If the water correlation does not '
-                                 'yield a positive value, the aqueous-phase viscosity is computed '
-                                 'with the LBC method over its fourteen components, with the water '
-                                 'critical parameters of the active parameter set.'),
+                                 'con a<sub>1</sub>…a<sub>5</sub> = 241.4, 0.3828209486, '
+                                 '0.2162830218, 0.1498693949, 0.4711880117, T<sub>c</sub> = 647.3 K '
+                                 'y P<sub>c</sub> = 22.12 MN/m². Es la ecuación de la IFC-67, '
+                                 'η[μP] = 241.4·10<sup>247.8/(T−140)</sup>[1 + 1.0467·10<sup>−6</sup>'
+                                 '(P − P<sub>sat</sub>)[bar](T − 305)], reducida con T<sub>c</sub> y '
+                                 'P<sub>c</sub>: a<sub>4</sub> = 1.0467·10<sup>−6</sup>·P<sub>c</sub>'
+                                 '·T<sub>c</sub>. Por eso el primer término del corchete es '
+                                 'P/P<sub>c</sub>, aunque el manual imprime ρ/ρ<sub>c</sub>. Las '
+                                 'regiones 2 a 4 (vapor y supercrítico) usan las expresiones del '
+                                 'mismo manual. La densidad del agua es la de la ecuación de '
+                                 'Keyes, Keenan, Hill y Moore. Bajo el punto de congelación la '
+                                 'fase acuosa de la ecuación de estado es agua subenfriada: la '
+                                 'región 1 se extrapola y bajo 243.15 K (−30 °C) se mantiene '
+                                 'constante, el mismo límite de la conductividad térmica del '
+                                 'agua.',
+                                 'with a<sub>1</sub>…a<sub>5</sub> = 241.4, 0.3828209486, '
+                                 '0.2162830218, 0.1498693949, 0.4711880117, T<sub>c</sub> = 647.3 K '
+                                 'and P<sub>c</sub> = 22.12 MN/m². It is the IFC-67 equation, '
+                                 'η[μP] = 241.4·10<sup>247.8/(T−140)</sup>[1 + 1.0467·10<sup>−6</sup>'
+                                 '(P − P<sub>sat</sub>)[bar](T − 305)], reduced with T<sub>c</sub> '
+                                 'and P<sub>c</sub>: a<sub>4</sub> = 1.0467·10<sup>−6</sup>·'
+                                 'P<sub>c</sub>·T<sub>c</sub>. Hence the first term in brackets is '
+                                 'P/P<sub>c</sub>, although the manual prints ρ/ρ<sub>c</sub>. '
+                                 'Regions 2 to 4 (vapor and supercritical) use the expressions of '
+                                 'the same manual. Water density is that of the Keyes, Keenan, '
+                                 'Hill and Moore equation. Below the freezing point the aqueous '
+                                 'phase of the equation of state is subcooled water: region 1 is '
+                                 'extrapolated and held constant below 243.15 K (−30 °C), the '
+                                 'same limit as the water thermal conductivity.'),
                                 ('h3', 'Referencias', 'References'),
                                 ('p',
                                  'Meyer, C.A., McClintock, R.B., Silvestri, G.J. y Spencer, R.C. '
-                                 '(1967). <em>ASME Steam Tables: Thermodynamic and Transport '
-                                 'Properties of Steam</em>. American Society of Mechanical '
-                                 'Engineers.',
-                                 'Meyer, C.A., McClintock, R.B., Silvestri, G.J. and Spencer, R.C. '
-                                 '(1967). <em>ASME Steam Tables: Thermodynamic and Transport '
-                                 'Properties of Steam</em>. American Society of Mechanical '
-                                 'Engineers.'),
+                                 '(1967). <em>ASME Steam Tables</em>. ASME. — Schmidt, E. (1969). '
+                                 '<em>Properties of Water and Steam in SI-Units</em>. Springer.',
+                                 'Meyer, C.A., McClintock, R.B., Silvestri, G.J. and Spencer, '
+                                 'R.C. (1967). <em>ASME Steam Tables</em>. ASME. — Schmidt, E. '
+                                 '(1969). <em>Properties of Water and Steam in SI-Units</em>. '
+                                 'Springer.'),
                                 ('p',
-                                 'Schmidt, E. (1969). <em>Properties of Water and Steam in '
-                                 'SI-Units</em>. Springer-Verlag.',
-                                 'Schmidt, E. (1969). <em>Properties of Water and Steam in '
-                                 'SI-Units</em>. Springer-Verlag.')]}]},
+                                 'Keenan, J.H., Keyes, F.G., Hill, P.G. y Moore, J.G. (1969). '
+                                 '<em>Steam Tables: Thermodynamic Properties of Water Including '
+                                 'Vapor, Liquid, and Solid Phases</em>. Wiley.',
+                                 'Keenan, J.H., Keyes, F.G., Hill, P.G. and Moore, J.G. (1969). '
+                                 '<em>Steam Tables: Thermodynamic Properties of Water Including '
+                                 'Vapor, Liquid, and Solid Phases</em>. Wiley.')]}]},
+ {'titulo': ('Propiedades térmicas y de transporte del flash',
+              'Flash thermal and transport properties'),
+  'subsecciones': [{'titulo': ('Capacidades caloríficas, Joule-Thomson y sonido',
+                               'Heat capacities, Joule-Thomson and sound'),
+                    'bloques': [('p',
+                                 'Además de la densidad, la entalpía, la entropía y la '
+                                 'viscosidad, el flash reporta por fase el volumen molar, las '
+                                 'capacidades caloríficas a presión y a volumen constante, su '
+                                 'cociente, el coeficiente de Joule-Thomson y la velocidad del '
+                                 'sonido. Todas se derivan de la misma ecuación de estado y regla '
+                                 'de mezcla del flash (clásica, o Huron-Vidal con agua):',
+                                 'Besides density, enthalpy, entropy and viscosity, the flash '
+                                 'reports per phase the molar volume, the constant-pressure and '
+                                 'constant-volume heat capacities, their ratio, the '
+                                 'Joule-Thomson coefficient and the velocity of sound. All are '
+                                 'derived from the same equation of state and mixing rule as the '
+                                 'flash (classical, or Huron-Vidal with water):'),
+                                ('eq',
+                                 'C_v = C_p^0 - R + \\frac{T\\,a\'\'}{(\\delta_1-\\delta_2)\\,b}'
+                                 '\\ln\\frac{V+\\delta_1 b}{V+\\delta_2 b} \\qquad '
+                                 'C_p = C_v - T\\,\\frac{(\\partial P/\\partial T)_V^2}'
+                                 '{(\\partial P/\\partial V)_T}'),
+                                ('eq',
+                                 '\\mu_{JT} = \\frac{T\\,(\\partial V/\\partial T)_P - V}{C_p}'
+                                 '\\qquad u = \\sqrt{-\\frac{V^2}{M}\\,\\frac{C_p}{C_v}\\,'
+                                 '\\left(\\frac{\\partial P}{\\partial V}\\right)_T}'),
+                                ('p',
+                                 'donde C<sub>p</sub><sup>0</sup> es la capacidad calorífica de '
+                                 'gas ideal (los mismos polinomios de la entalpía), a\'\' la '
+                                 'segunda derivada del parámetro de atracción de la mezcla y '
+                                 'δ<sub>1</sub>, δ<sub>2</sub> las constantes de la ecuación '
+                                 '(PR: 1±√2; SRK: 1 y 0). Con la corrección de Peneloux el volumen '
+                                 'es V − c, lo que cambia μ<sub>JT</sub>, u y el volumen molar '
+                                 'pero no C<sub>p</sub> ni C<sub>v</sub>. En la columna de la '
+                                 'mezcla, C<sub>p</sub>, C<sub>v</sub> y el volumen molar son '
+                                 'promedios molares de las fases.',
+                                 'where C<sub>p</sub><sup>0</sup> is the ideal-gas heat capacity '
+                                 '(the same polynomials as for enthalpy), a\'\' the second '
+                                 'derivative of the mixture attraction parameter and '
+                                 'δ<sub>1</sub>, δ<sub>2</sub> the equation constants (PR: 1±√2; '
+                                 'SRK: 1 and 0). With the Peneloux correction the volume is '
+                                 'V − c, which changes μ<sub>JT</sub>, u and the molar volume '
+                                 'but not C<sub>p</sub> or C<sub>v</sub>. In the mixture column, '
+                                 'C<sub>p</sub>, C<sub>v</sub> and molar volume are molar '
+                                 'averages of the phases.')]},
+                   {'titulo': ('Conductividad térmica', 'Thermal conductivity'),
+                    'bloques': [('p',
+                                 'Con la viscosidad LBC, la conductividad térmica de las fases '
+                                 'de hidrocarburos es la suma de una contribución de traslación, '
+                                 'polinómica en la densidad reducida de LBC, y una contribución '
+                                 'interna:',
+                                 'With LBC viscosity, the thermal conductivity of the '
+                                 'hydrocarbon phases is the sum of a translational contribution, '
+                                 'polynomial in the LBC reduced density, and an internal '
+                                 'contribution:'),
+                                ('eq',
+                                 '\\lambda = C_1 T^{C_2} P^{C_3}\\sum_{k=0}^{4} a_{k+1}\\rho_r^k + '
+                                 '1.1865\\,\\zeta\\,(C_p^0 - 2.5R)\\,f(\\rho_r)/\\bar M_n'),
+                                ('eq',
+                                 'f(\\rho_r) = 1 + 0.053432\\rho_r - 0.030182\\rho_r^2 - '
+                                 '0.029725\\rho_r^3'),
+                                ('p',
+                                 'con T en K, P en atm, ζ la viscosidad de gas diluido de la '
+                                 'mezcla (cP) y λ en mW/(m·K); C<sub>1</sub> = 2.30528, '
+                                 'C<sub>2</sub> = −0.59394, C<sub>3</sub> = 0.06928, '
+                                 'a<sub>1</sub>…a<sub>5</sub> = 270.28341, −148.95858, 408.63577, '
+                                 '−127.74598, 13.52979. Con '
+                                 'la viscosidad de estados correspondientes se usa el modelo de '
+                                 'Christensen y Fredenslund con metano de referencia (Hanley y '
+                                 'colaboradores), con η* la viscosidad del gas a 1 atm. En el peso '
+                                 'molecular de Murad y Gubbins se usa la constante 1/8 en vez del '
+                                 '1/16 impreso en el manual: con 1/16 un componente puro tendría '
+                                 'M<sub>mix</sub> = M/2, en contradicción con la propia definición. '
+                                 'La fase acuosa usa la conductividad del agua pura de Meyer y '
+                                 'Schmidt, constante bajo 243.15 K.',
+                                 'with T in K, P in atm, ζ the mixture dilute-gas viscosity (cP) '
+                                 'and λ in mW/(m·K); C<sub>1</sub> = 2.30528, C<sub>2</sub> = '
+                                 '−0.59394, C<sub>3</sub> = 0.06928, a<sub>1</sub>…a<sub>5</sub> = '
+                                 '270.28341, −148.95858, 408.63577, −127.74598, 13.52979. With the '
+                                 'corresponding-states viscosity the Christensen-Fredenslund '
+                                 'model with methane reference (Hanley et al.) is used, with η* '
+                                 'the gas viscosity at 1 atm. The Murad-Gubbins molecular weight '
+                                 'uses the constant 1/8 instead of the 1/16 printed in the manual: '
+                                 'with 1/16 a pure component would get M<sub>mix</sub> = M/2, '
+                                 'contradicting the definition itself. The aqueous phase uses the Meyer-Schmidt pure-water conductivity, '
+                                 'constant below 243.15 K.')]},
+                   {'titulo': ('Tensión superficial e interfacial', 'Surface and interfacial tension'),
+                    'bloques': [('p',
+                                 'La tensión entre el gas y el líquido de hidrocarburos se calcula '
+                                 'con la relación de Weinaug y Katz, con las densidades molares '
+                                 'de la ecuación de estado (con Peneloux si está activo):',
+                                 'The tension between hydrocarbon gas and liquid is computed with '
+                                 'the Weinaug-Katz relation, with the equation-of-state molar '
+                                 'densities (with Peneloux if active):'),
+                                ('eq',
+                                 '\\sigma^{1/4} = \\sum_i [P]_i\\left(\\bar\\rho_L x_i - '
+                                 '\\bar\\rho_V y_i\\right)'),
+                                ('p',
+                                 'σ en mN/m (= dyn/cm), ρ̄ en mol/cm³ y [P]<sub>i</sub> los '
+                                 'parachores: N₂ 41.0, CO₂ 78.0, C1 77.3, C2 108.9, C3 151.9, '
+                                 'iC4 181.5, nC4 191.7, iC5 225.0, nC5 233.9, nC6 271.0, nC7 '
+                                 '311.0, nC8 351.0, nC9 391.0 (el agua disuelta no se incluye). La tensión entre el '
+                                 'agua y cada fase de hidrocarburos es la de Firoozabadi y Ramey:',
+                                 'σ in mN/m (= dyn/cm), ρ̄ in mol/cm³ and [P]<sub>i</sub> the '
+                                 'parachors: N₂ 41.0, CO₂ 78.0, C1 77.3, C2 108.9, C3 151.9, iC4 '
+                                 '181.5, nC4 191.7, iC5 225.0, nC5 233.9, nC6 271.0, nC7 311.0, '
+                                 'nC8 351.0, nC9 391.0 (dissolved water is not included). The tension between water and '
+                                 'each hydrocarbon phase is that of Firoozabadi and Ramey:'),
+                                ('eq',
+                                 '\\sigma^{1/4} = \\frac{a_1\\,\\Delta\\rho^{\\,1+b_1}}{T_r^{0.3125}}'),
+                                ('p',
+                                 'con Δρ = |ρ<sub>agua</sub> − ρ<sub>HC</sub>| en g/cm³, '
+                                 'T<sub>r</sub> = T/Σx<sub>i</sub>T<sub>c,i</sub> de la fase de '
+                                 'hidrocarburos (con su agua disuelta), y (a<sub>1</sub>, b<sub>1</sub>) = (2.2062, '
+                                 '−0.94716) si Δρ &lt; 0.2, (2.915, −0.76852) si 0.2 ≤ Δρ &lt; 0.5 '
+                                 'y (3.3858, −0.62590) si Δρ ≥ 0.5.',
+                                 'with Δρ = |ρ<sub>water</sub> − ρ<sub>HC</sub>| in g/cm³, '
+                                 'T<sub>r</sub> = T/Σx<sub>i</sub>T<sub>c,i</sub> of the '
+                                 'hydrocarbon phase (with its dissolved water), and (a<sub>1</sub>, b<sub>1</sub>) = (2.2062, '
+                                 '−0.94716) if Δρ &lt; 0.2, (2.915, −0.76852) if 0.2 ≤ Δρ &lt; 0.5 '
+                                 'and (3.3858, −0.62590) if Δρ ≥ 0.5.'),
+                                ('h3', 'Referencias', 'References'),
+                                ('p',
+                                 'Weinaug, C.F. y Katz, D.L. (1943). Surface tensions of '
+                                 'methane-propane mixtures. <em>Ind. Eng. Chem.</em>, 35, '
+                                 '239–246. — Firoozabadi, A. y Ramey, H.J. (1988). Surface '
+                                 'tension of water-hydrocarbon systems at reservoir conditions. '
+                                 '<em>J. Can. Pet. Technol.</em>, 27(3), 41–48.',
+                                 'Weinaug, C.F. and Katz, D.L. (1943). Surface tensions of '
+                                 'methane-propane mixtures. <em>Ind. Eng. Chem.</em>, 35, '
+                                 '239–246. — Firoozabadi, A. and Ramey, H.J. (1988). Surface '
+                                 'tension of water-hydrocarbon systems at reservoir conditions. '
+                                 '<em>J. Can. Pet. Technol.</em>, 27(3), 41–48.')]}]},
  {'titulo': ('Propiedades del gas', 'Gas properties'),
   'subsecciones': [{'titulo': ('Poder calorífico: definiciones y bases',
                                'Heating value: definitions and bases'),

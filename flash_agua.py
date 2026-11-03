@@ -613,12 +613,29 @@ def flash_trifasico(z, T, P, eos='PR', metodo='simple', max_iter=400, tol=1e-11)
     # Si solo queda una fase HC, identificar V o L por Z (respaldo).
     # Al cambiar la etiqueta se toma la raíz de Z que corresponde a la nueva
     # fase (menor para líquido, mayor para vapor).
+    def _es_vapor_hc(comp):
+        # Con la EOS de PVTsim y una sola raíz, el criterio de PVTsim sobre la
+        # fase de hidrocarburos sin agua (punto crítico real de esa mezcla),
+        # el mismo que usa el flash sin agua.
+        try:
+            import eos as _e
+            if _e.es_pvtsim(_EOS_CTX):
+                Zs = _Z_roots(*_am_bm(comp, aa, bi, kij), T, P, es_srk)[0]
+                if Zs and len(Zs) == 1:
+                    c13 = np.asarray(comp, dtype=float)[:13]
+                    if c13.sum() > 0:
+                        c13 = c13/c13.sum()
+                        return _e.fase_pvtsim(list(c13), T, P, Zs[0],
+                                              _e.kij_base(_EOS_CTX)) == "vapor"
+        except Exception:
+            pass
+        return _es_vapor(comp, aa,bi,kij,T,P,es_srk, Tc)
     if bV > UMB and bL <= UMB:
-        if not _es_vapor(y, aa,bi,kij,T,P,es_srk, Tc):
+        if not _es_vapor_hc(y):
             bL, x = bV, y; bV = 0.0; y = np.zeros(14)
             ZL = _ln_phi(x, aa,bi,kij,T,P,es_srk,'L')[1]
     elif bL > UMB and bV <= UMB:
-        if _es_vapor(x, aa,bi,kij,T,P,es_srk, Tc):
+        if _es_vapor_hc(x):
             bV, y = bL, x; bL = 0.0; x = np.zeros(14)
             ZV = _ln_phi(y, aa,bi,kij,T,P,es_srk,'V')[1]
 

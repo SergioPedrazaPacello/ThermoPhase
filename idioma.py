@@ -122,6 +122,12 @@ TRAD = {
     # Barra de selectores / navegador
     "Ecuación de estado:": "Equation of state:", "Densidad:": "Density:",
     "Corrección de volumen:": "Volume correction:", "Ninguna": "None",
+    "Viscosidad:": "Viscosity:", "Volumen molar": "Molar volume",
+    "Capacidad calorifica Cp": "Heat capacity Cp", "Capacidad calorifica Cv": "Heat capacity Cv",
+    "Relacion Cp/Cv": "Cp/Cv ratio", "Coeficiente Joule-Thomson": "Joule-Thomson coefficient",
+    "Velocidad del sonido": "Velocity of sound", "Conductividad termica": "Thermal conductivity",
+    "Tension superficial gas-liquido": "Gas-liquid surface tension",
+    "Tension interfacial con el agua": "Interfacial tension with water", "Estados correspondientes": "Corresponding states",
     "Método envolvente:": "Envelope method:", "Navegador": "Navigator",
     "Cálculos": "Calculations", "Datos": "Data",
 
