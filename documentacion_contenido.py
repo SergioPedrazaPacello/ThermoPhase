@@ -10484,7 +10484,31 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'inH₂O reference. The isentropic exponent (κ = 1.3, used only '
                                    'in the expansion factor) and the viscosity (μ = 0.010268 cP, '
                                    'used only in the Reynolds number) are fixed at the values AGA '
-                                   '3 allows for natural gas.')]),
+                                   '3 allows for natural gas.'),
+                                  ('Presión atmosférica ingresada o calculada por la elevación '
+                                   'del punto de medición con la atmósfera estándar (U.S. '
+                                   'Standard Atmosphere 1976): P<sub>atm</sub> = 101.325·(1 − '
+                                   '2.25577·10⁻⁵·h)<sup>5.25588</sup> kPa, con h en m.',
+                                   'Atmospheric pressure entered or calculated from the elevation '
+                                   'of the metering point with the standard atmosphere (U.S. '
+                                   'Standard Atmosphere 1976): P<sub>atm</sub> = 101.325·(1 − '
+                                   '2.25577·10⁻⁵·h)<sup>5.25588</sup> kPa, with h in m.'),
+                                  ('Gravedad específica (con AGA 8 o la ecuación de estado): '
+                                   'calculada de la cromatografía o ingresada. La opción '
+                                   'ingresada reproduce la configuración «Specific Gravity: '
+                                   'Entered» de los computadores de flujo: los factores Z siguen '
+                                   'saliendo de la composición, pero la masa molar del gas se toma '
+                                   'de la gravedad específica real ingresada, M = G<sub>r</sub>·'
+                                   'M<sub>aire</sub>·Z<sub>b</sub>/Z<sub>aire</sub>, de modo que '
+                                   'el caudal corresponde a F<sub>gr</sub> = 1/√G<sub>r</sub>.',
+                                   'Specific gravity (with AGA 8 or the equation of state): '
+                                   'calculated from the chromatography or entered. The entered '
+                                   'option reproduces the «Specific Gravity: Entered» setting of '
+                                   'flow computers: the Z factors still come from the '
+                                   'composition, but the gas molar mass is taken from the entered '
+                                   'real specific gravity, M = G<sub>r</sub>·M<sub>air</sub>·'
+                                   'Z<sub>b</sub>/Z<sub>air</sub>, so that the flow rate '
+                                   'corresponds to F<sub>gr</sub> = 1/√G<sub>r</sub>.')]),
                                 ('h3', 'Modos de cálculo', 'Calculation modes'),
                                 ('p',
                                  'La lista «Modo de cálculo» elige la incógnita: Caudal, Presión '

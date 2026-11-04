@@ -132,6 +132,13 @@ def fraccion_vapor(x, T, P, eos='PR'):
         return None
 
 
+def patm_elevacion(h_m):
+    """Presión atmosférica (Pa) a la elevación h (m) por la atmósfera
+    estándar (U.S. Standard Atmosphere 1976 / ISA, troposfera):
+        P = 101325·(1 − 2.25577·10⁻⁵·h)^5.25588"""
+    return 101325.0*(1.0 - 2.25577e-5*h_m)**5.25588
+
+
 def z_aire_base(Tb, Pb):
     return a8.propiedades(Tb, Pb/1000.0, _AIRE)['Z']
 
@@ -166,7 +173,12 @@ class Medidor:
        x (22, AGA 8), d_ref, D_ref, alfa_d, alfa_D (1/K), T_ref_d, T_ref_D,
        T_f, P_f (Pa abs en la toma), toma ('arriba'|'abajo'), dP, Pb, Tb,
        z_metodo ('AGA8'|'MANUAL'), Zf_man, Zb_man, G_man (gravedad específica
-       ideal), y_metodo ('1992'|'ISO'), k_metodo ('FIJO'|'AGA8'), k_val, mu_val."""
+       ideal), y_metodo ('1992'|'ISO'), k_metodo ('FIJO'|'AGA8'), k_val, mu_val.
+       G_ing (opcional, con AGA8 o EOS): gravedad específica REAL ingresada
+       (como la «Specific Gravity: Entered» de los computadores de flujo).
+       Los factores Z siguen siendo los de la composición, pero la masa molar
+       se toma de la gravedad ingresada, M = G_r·M_aire·Z_b/Z_aire; con ello
+       ρ_f, ρ_b y el caudal corresponden a esa gravedad (F_gr = 1/√G_r)."""
 
     def __init__(self, spec):
         self.s = spec
@@ -174,11 +186,20 @@ class Medidor:
         x = spec['x']
         self.M_aga8 = (spec['G_man']*M_AIRE if spec['z_metodo'] == 'MANUAL'
                        else a8.masa_molar(x))
+        self.fM = 1.0                   # escala de masa molar (G ingresada)
         sb = self._densidad(spec['Tb'], spec['Pb'], base=True)
-        self.base = sb
         Zair = z_aire_base(spec['Tb'], spec['Pb'])
         rho_air = spec['Pb']*M_AIRE/1000.0/(Zair*R_SI*spec['Tb'])
         self.Z_aire = Zair
+        self.Gr_comp = sb['rho']/rho_air          # de la composición
+        G_ing = spec.get('G_ing')
+        if G_ing and spec['z_metodo'] != 'MANUAL':
+            M_ef = G_ing*M_AIRE*sb['Z']/Zair
+            self.fM = M_ef/sb['M']
+            self.M_aga8 = M_ef
+            self._cache = {}
+            sb = self._densidad(spec['Tb'], spec['Pb'], base=True)
+        self.base = sb
         self.Gr = sb['rho']/rho_air
         self.Gi = sb['M']/M_AIRE
 
@@ -200,6 +221,8 @@ class Medidor:
             p['kappa'] = None
         else:
             p = _props_aga8(s['x'], T, P)
+        if self.fM != 1.0:
+            p = dict(p); p['rho'] = p['rho']*self.fM; p['M'] = p['M']*self.fM
         self._cache[key] = p
         return p
 
@@ -355,6 +378,7 @@ def calcular(spec):
         except Exception:
             pass
     res.update(op='orificio', base=m.base, M=m.M_aga8, Gr=m.Gr, Gi=m.Gi,
+               Gr_comp=m.Gr_comp, G_ing=s.get('G_ing'),
                Z_aire=m.Z_aire, avisos=adv, V_flujo=V, hhv_mas=hhv_mas,
                calcular=s.get('calcular', 'Q'), z_metodo=s['z_metodo'],
                y_metodo=s.get('y_metodo', '1992'), spec=s)

@@ -49,6 +49,7 @@ U_DP = [("inH₂O", lambda v: v*_INH2O[0], lambda p: p/_INH2O[0]),
 U_T = [("°F", lambda v: (v - 32.0)/1.8 + 273.15, lambda k: (k - 273.15)*1.8 + 32.0),
        ("°C", lambda v: v + 273.15, lambda k: k - 273.15)]
 U_L = [("in", *_lin(0.0254)), ("mm", *_lin(1e-3))]
+U_ELEV = [("ft", *_lin(0.3048)), ("m", *_lin(1.0))]
 # Caudal: desde (qm kg/s, Qb m³/s a condiciones base)
 U_Q = [("MMscfd", lambda qm, qb: qb/M_FT3*86400.0/1e6),
        ("MCF/d", lambda qm, qb: qb/M_FT3*86400.0/1e3),
@@ -168,6 +169,15 @@ class VentanaOrificio(QWidget):
         c1.addSpacing(4)
         c1.addWidget(self._lbl_txt("Configuración avanzada:"))
         g = QGridLayout(); g.setSpacing(4); r = 0
+        # Presión atmosférica: ingresada o calculada por la elevación
+        # (atmósfera estándar), como la opción «Calculated» de los
+        # computadores de flujo.
+        self.c_patm = self._combo(["Ingresada", "Calculada por elevación"])
+        self.l_cpatm = self._etq("Cálculo de presión atmosférica:")
+        g.addWidget(self.l_cpatm, r, 0); g.addWidget(self.c_patm, r, 1); r += 1
+        self.f_elev = CampoUnidad(self, U_ELEV, 0 if F else 1)
+        self.l_elev = self._etq("Elevación:")
+        g.addWidget(self.l_elev, r, 0); g.addLayout(self.f_elev.layout(), r, 1); r += 1
         self.f_Patm = CampoUnidad(self, U_PABS, 0 if F else 1)
         self.l_Patm = self._etq("Presión atmosférica:")
         g.addWidget(self.l_Patm, r, 0); g.addLayout(self.f_Patm.layout(), r, 1); r += 1
@@ -181,6 +191,14 @@ class VentanaOrificio(QWidget):
         g.addWidget(self.l_Zb, r, 0); g.addWidget(self.e_Zb, r, 1); r += 1
         self.l_G = self._etq("Gravedad específica ideal:"); self.e_G = self._campo()
         g.addWidget(self.l_G, r, 0); g.addWidget(self.e_G, r, 1); r += 1
+        # Gravedad específica con Z de AGA 8 o de la ecuación de estado:
+        # calculada de la cromatografía o ingresada (valor fijo del
+        # computador de flujo, «Specific Gravity: Entered»).
+        self.c_g = self._combo(["Calculada (cromatografía)", "Ingresada"])
+        self.l_cg = self._etq("Gravedad específica:")
+        g.addWidget(self.l_cg, r, 0); g.addWidget(self.c_g, r, 1); r += 1
+        self.l_Gr = self._etq("Gravedad específica real:"); self.e_Gr = self._campo()
+        g.addWidget(self.l_Gr, r, 0); g.addWidget(self.e_Gr, r, 1); r += 1
         self.f_Pb = CampoUnidad(self, U_PABS, 0 if F else 1)
         r = self._fila(g, r, "Presión base:", self.f_Pb)
         self.f_Tb = CampoUnidad(self, U_T, 0 if F else 1)
@@ -270,6 +288,11 @@ class VentanaOrificio(QWidget):
         self.c_du.currentIndexChanged.connect(lambda _i: self._mostrar())
         self.c_calc.currentIndexChanged.connect(lambda _i: self._on_calc())
         self.c_z.currentIndexChanged.connect(lambda _i: self._visibles())
+        self.c_g.currentIndexChanged.connect(lambda _i: self._visibles())
+        self.c_patm.currentIndexChanged.connect(lambda _i: self._visibles())
+        self.f_elev.e.textChanged.connect(lambda _t: self._patm_calc())
+        self.f_elev.c.currentIndexChanged.connect(lambda _i: self._patm_calc())
+        self.f_Patm.c.currentIndexChanged.connect(lambda _i: self._patm_calc())
         self.c_modo.currentIndexChanged.connect(lambda _i: self._visibles())
         self.serie = None
         self.c_h2o.currentIndexChanged.connect(self._on_h2o)
@@ -286,6 +309,7 @@ class VentanaOrificio(QWidget):
         for f in (self.f_Tb, self.f_Trd, self.f_TrD):
             f.set_si((60.0 - 32.0)/1.8 + 273.15)
         self.e_Zf.setText("1"); self.e_Zb.setText("1"); self.e_G.setText("0.6")
+        self.e_Gr.setText("0.6"); self.f_elev.set_si(0.0)
         self.actualizar(fuentes, activos)
         if fuentes:
             self.cmb_fuente.setCurrentIndex(1)
@@ -361,9 +385,32 @@ class VentanaOrificio(QWidget):
         man = self.c_z.currentIndex() == 2
         for w in (self.l_Zf, self.e_Zf, self.l_Zb, self.e_Zb, self.l_G, self.e_G):
             w.setVisible(man)
+        self.l_cg.setVisible(not man); self.c_g.setVisible(not man)
+        g_ing = (not man) and self.c_g.currentIndex() == 1
+        self.l_Gr.setVisible(g_ing); self.e_Gr.setVisible(g_ing)
         gauge = self.f_P.nombre().endswith('g')
+        calc = self.c_patm.currentIndex() == 1
+        self.l_cpatm.setVisible(gauge); self.c_patm.setVisible(gauge)
+        self.l_elev.setVisible(gauge and calc); self.f_elev.set_visible(gauge and calc)
         self.l_Patm.setVisible(gauge); self.f_Patm.set_visible(gauge)
+        self.f_Patm.e.setReadOnly(calc)
+        self.f_Patm.e.setStyleSheet(po.ED_QSS + (f'QLineEdit {{ background:{po.GRAY_EMPTY}; }}' if calc else ''))
+        if calc:
+            self._patm_calc()
         self._ajustar()
+
+    def _patm_calc(self):
+        """Con «Calculada por elevación», muestra la presión atmosférica de
+        la atmósfera estándar para la elevación ingresada."""
+        if self.c_patm.currentIndex() != 1:
+            return
+        h = self.f_elev.si()
+        if h is None:
+            self.f_Patm.e.setText(""); return
+        try:
+            self.f_Patm.set_si(ag.patm_elevacion(h))
+        except Exception:
+            self.f_Patm.e.setText("")
 
     def _ajustar(self):
         self.layout().invalidate(); self.layout().activate()
@@ -522,6 +569,11 @@ class VentanaOrificio(QWidget):
         if inc != 'Q':
             v = req(self.f_Qin, "Ingrese el caudal especificado.")
             spec['flujo_obj'] = (v, U_QIN[self.f_Qin.c.currentIndex()][2])
+        if not man and self.c_g.currentIndex() == 1:
+            v = _f(self.e_Gr.text())
+            if not v or v <= 0:
+                raise ValueError("Ingrese la gravedad específica real.")
+            spec['G_ing'] = v
         if man:
             for key, e, msg in (('Zf_man', self.e_Zf, "Ingrese el factor Z en condiciones de flujo."),
                                 ('Zb_man', self.e_Zb, "Ingrese el factor Z en condiciones base."),

@@ -3603,7 +3603,7 @@ class MainWindow(QMainWindow):
         self._barra_min = QTabBar()
         self._barra_min.setDrawBase(False)
         self._barra_min.setExpanding(False)
-        self._barra_min.setUsesScrollButtons(True)
+        self._barra_min.setUsesScrollButtons(False)
         self._barra_min.setElideMode(Qt.TextElideMode.ElideNone)
         self._barra_min.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._barra_min.setStyleSheet(
@@ -3620,9 +3620,18 @@ class MainWindow(QMainWindow):
         cont_area = QWidget()
         va = QVBoxLayout(cont_area)
         va.setContentsMargins(0, 0, 0, 0); va.setSpacing(0)
-        fila_min = QWidget(); fila_min.setStyleSheet('background:#D4D4D4;')
-        hm = QHBoxLayout(fila_min); hm.setContentsMargins(0, 0, 0, 0); hm.setSpacing(0)
-        hm.addWidget(self._barra_min); hm.addStretch(1)
+        # Si las pestañas no caben, se desplazan con una barra de scroll
+        # horizontal (estilo del programa) en lugar de las flechas del QTabBar.
+        fila_min = QScrollArea()
+        fila_min.setFrameShape(QFrame.Shape.NoFrame)
+        fila_min.setStyleSheet('QScrollArea { background:#D4D4D4; border:none; }')
+        fila_min.setWidgetResizable(False)
+        fila_min.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        fila_min.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        fila_min.setWidget(self._barra_min)
+        fila_min.viewport().setStyleSheet('background:#D4D4D4;')
+        fila_min.horizontalScrollBar().rangeChanged.connect(
+            lambda *_: self._ajustar_fila_min())
         self._fila_min = fila_min
         fila_min.hide()
         va.addWidget(fila_min)
@@ -3786,6 +3795,7 @@ class MainWindow(QMainWindow):
         self._wins_min.append(win)
         self._barra_min.addTab(win.windowTitle())
         self._fila_min.show()
+        self._ajustar_fila_min()
 
     def _quitar_minimizada(self, win):
         if win not in self._wins_min:
@@ -3795,6 +3805,8 @@ class MainWindow(QMainWindow):
         self._barra_min.removeTab(i)
         if not self._wins_min:
             self._fila_min.hide()
+        else:
+            self._ajustar_fila_min()
 
     def _restaurar_minimizada(self, i):
         if 0 <= i < len(self._wins_min):
@@ -3805,6 +3817,19 @@ class MainWindow(QMainWindow):
     def _refrescar_minimizadas(self):
         for i, win in enumerate(getattr(self, '_wins_min', [])):
             self._barra_min.setTabText(i, win.windowTitle())
+        if getattr(self, '_wins_min', None):
+            self._ajustar_fila_min()
+
+    def _ajustar_fila_min(self):
+        """Ajusta la barra de pestañas a su contenido y el alto de la fila:
+        el de las pestañas más el de la barra de scroll cuando no caben."""
+        b = self._barra_min
+        b.resize(b.sizeHint())
+        sb = self._fila_min.horizontalScrollBar()
+        alto = b.sizeHint().height()
+        if b.sizeHint().width() > self._fila_min.viewport().width() or sb.maximum() > 0:
+            alto += sb.sizeHint().height()
+        self._fila_min.setFixedHeight(alto)
 
     def _menu_minimizadas(self, pos):
         from PyQt6.QtWidgets import QMenu
