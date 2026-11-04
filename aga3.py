@@ -33,6 +33,7 @@ IN_M = 0.0254
 PSI_PA = 6894.757293168
 INH2O_PA = PSI_PA/27.707     # pulgada de agua a 60 °F (AGA 3: 1 psi = 27.707 inH2O)
 INH2O_4C_PA = 249.08891      # pulgada de agua a 4 °C (39.2 °F), convención convencional
+BTU_LB_J_KG = 1055.05585262/0.45359237   # Btu/lb → J/kg
 MU_DEFECTO = 0.010268e-3     # Pa·s (0.010268 cP, valor admitido por AGA 3)
 K_DEFECTO = 1.3
 
@@ -377,6 +378,21 @@ def calcular(spec):
             hhv_mas = hhv_masico(s['x'])                             # Btu/lb
         except Exception:
             pass
+    # Poder calorífico superior volumétrico REAL a las condiciones base
+    # (J/m³ base): HHV másico de la composición (GPA 2172) × densidad base
+    # del gas real con la composición (AGA 8 / EOS).  Base húmeda: gas
+    # saturado con agua a Tb, Pb → × (1 − x_w), x_w = Psat(Tb)/Pb.
+    hv_seco = hv_hum = None
+    if hhv_mas is not None:
+        try:
+            rho_b = m.base['rho']/m.fM                                # kg/m³
+            hv_seco = hhv_mas*BTU_LB_J_KG*rho_b
+            import agua_pura as _ap
+            xw = _ap._psat_MN(s['Tb'])*1e6/s['Pb']
+            hv_hum = hv_seco*(1.0 - xw) if 0.0 <= xw < 1.0 else None
+        except Exception:
+            pass
+    res.update(hv_seco=hv_seco, hv_humedo=hv_hum)
     res.update(op='orificio', base=m.base, M=m.M_aga8, Gr=m.Gr, Gi=m.Gi,
                Gr_comp=m.Gr_comp, G_ing=s.get('G_ing'),
                Z_aire=m.Z_aire, avisos=adv, V_flujo=V, hhv_mas=hhv_mas,

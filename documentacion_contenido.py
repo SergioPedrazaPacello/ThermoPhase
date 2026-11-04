@@ -10508,7 +10508,28 @@ CAPITULOS = [{'titulo': ('Introducción y datos de componentes', 'Introduction a
                                    'composition, but the gas molar mass is taken from the entered '
                                    'real specific gravity, M = G<sub>r</sub>·M<sub>air</sub>·'
                                    'Z<sub>b</sub>/Z<sub>air</sub>, so that the flow rate '
-                                   'corresponds to F<sub>gr</sub> = 1/√G<sub>r</sub>.')]),
+                                   'corresponds to F<sub>gr</sub> = 1/√G<sub>r</sub>.'),
+                                  ('Poder calorífico: calculado de la cromatografía en base seca '
+                                   'o húmeda, o ingresado. El calculado es el poder calorífico '
+                                   'superior real a las condiciones base: el másico de la '
+                                   'composición (GPA 2172, constantes GPA 2145) multiplicado por la '
+                                   'densidad base del gas real; en base húmeda el gas se considera '
+                                   'saturado con agua a T<sub>b</sub> y P<sub>b</sub>, '
+                                   'HV<sub>húmedo</sub> = HV<sub>seco</sub>·(1 − P<sub>sat</sub>/'
+                                   'P<sub>b</sub>). Debajo del caudal se muestran la energía, '
+                                   'caudal a condiciones base × poder calorífico (MMBtu/d, MMBtu/h, '
+                                   'Btu/h, GJ/d, MJ/h o Gcal/d), y el poder calorífico usado '
+                                   '(Btu/scf, MJ/Sm³ o kcal/Sm³).',
+                                   'Heating value: calculated from the chromatography on a dry or '
+                                   'wet basis, or entered. The calculated value is the real gross '
+                                   'heating value at base conditions: the mass value of the '
+                                   'composition (GPA 2172, GPA 2145 constants) times the real-gas '
+                                   'base density; on a wet basis the gas is taken as saturated with '
+                                   'water at T<sub>b</sub> and P<sub>b</sub>, HV<sub>wet</sub> = '
+                                   'HV<sub>dry</sub>·(1 − P<sub>sat</sub>/P<sub>b</sub>). Below the '
+                                   'flow rate the energy, base flow rate × heating value (MMBtu/d, '
+                                   'MMBtu/h, Btu/h, GJ/d, MJ/h or Gcal/d), and the heating value '
+                                   'used (Btu/scf, MJ/Sm³ or kcal/Sm³) are shown.')]),
                                 ('h3', 'Modos de cálculo', 'Calculation modes'),
                                 ('p',
                                  'La lista «Modo de cálculo» elige la incógnita: Caudal, Presión '

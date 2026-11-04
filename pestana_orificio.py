@@ -64,6 +64,13 @@ U_QIN = [("MMscfd", 1e6*M_FT3/86400.0, 'std'), ("MCF/d", 1e3*M_FT3/86400.0, 'std
          ("scf/h", M_FT3/3600.0, 'std'), ("E3M3/d", 1e3/86400.0, 'std'),
          ("Sm³/d", 1.0/86400.0, 'std'), ("Sm³/h", 1.0/3600.0, 'std'),
          ("kg/h", 1.0/3600.0, 'mas'), ("lb/h", LB_KG/3600.0, 'mas')]
+# Poder calorífico volumétrico (J/m³ a condiciones base)
+U_HV = [("Btu/scf", *_lin(1055.05585262/M_FT3)), ("MJ/Sm³", *_lin(1e6)), ("kcal/Sm³", *_lin(4186.8))]
+# Caudal de energía (W)
+U_E = [("MMBtu/d", *_lin(1055.05585262e6/86400.0)), ("MMBtu/h", *_lin(1055.05585262e6/3600.0)),
+       ("Btu/h", *_lin(1055.05585262/3600.0)), ("GJ/d", *_lin(1e9/86400.0)),
+       ("MJ/h", *_lin(1e6/3600.0)), ("Gcal/d", *_lin(4.1868e9/86400.0))]
+HV_METODOS = ["Calculado (base seca)", "Calculado (base húmeda)", "Ingresado"]
 INCOGNITAS = ['Q', 'dP', 'd']
 Y_METODOS = [('ISO', "AGA 3 (2012) / ISO 5167-2"), ('1992', "AGA 3 (1992)")]
 
@@ -212,6 +219,14 @@ class VentanaOrificio(QWidget):
         r = self._fila(g, r, "Temperatura del tubo:", self.f_TrD)
         self.c_mat_D = self._combo(mats); self.c_mat_D.setCurrentIndex(len(mats) - 1)
         r = self._fila_w(g, r, "Material del tubo:", self.c_mat_D)
+        # Poder calorífico para el caudal de energía: calculado de la
+        # cromatografía (base seca o húmeda) o ingresado (como el «Heating
+        # Value: Entered» de los computadores de flujo).
+        self.c_hv = self._combo(HV_METODOS)
+        r = self._fila_w(g, r, "Poder calorífico:", self.c_hv)
+        self.f_hv = CampoUnidad(self, U_HV, 0 if F else 1)
+        self.l_hv = self._etq("Poder calorífico ingresado:")
+        g.addWidget(self.l_hv, r, 0); g.addLayout(self.f_hv.layout(), r, 1); r += 1
         self.c_y = self._combo([t for _k, t in Y_METODOS])
         r = self._fila_w(g, r, "Factor de expansión:", self.c_y)
         self.c_h2o = self._combo([t for t, _v in H2O_REF])
@@ -260,6 +275,7 @@ class VentanaOrificio(QWidget):
         hq = QHBoxLayout(); hq.setSpacing(4); hq.addWidget(self.l_Q)
         for c_ in (self.c_Qu, self.c_dPu, self.c_du):
             hq.addWidget(c_)
+        hq.addStretch(1)
         # Relación de diámetros β (modo diámetro del orificio)
         self.l_beta_t = self._etq("Relación β:"); self.l_beta_t.setMinimumWidth(0)
         self.l_beta = QLabel(""); self.l_beta.setFixedSize(130, 22)
@@ -270,6 +286,20 @@ class VentanaOrificio(QWidget):
         self.l_beta.setStyleSheet(self.l_Q.styleSheet())
         hb = QHBoxLayout(); hb.setSpacing(4); hb.addWidget(self.l_beta); hb.addStretch(1)
         gr.addWidget(self.l_beta_t, 1, 0); gr.addLayout(hb, 1, 1)
+        # Energía (caudal × poder calorífico) y poder calorífico usado
+        def _fila_res(fila, txt, unidades, idx):
+            et = self._etq(txt); et.setMinimumWidth(0)
+            val = QLabel(""); val.setFixedSize(130, 22)
+            val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            val.setStyleSheet(self.l_Q.styleSheet())
+            cb = QComboBox(); cb.setFixedSize(W_U, 22); h['estilo_combo'](cb)
+            cb.addItems([n for n, *_r in unidades]); cb.setCurrentIndex(idx)
+            cb.currentIndexChanged.connect(lambda _i: self._mostrar())
+            hl = QHBoxLayout(); hl.setSpacing(4); hl.addWidget(val); hl.addWidget(cb); hl.addStretch(1)
+            gr.addWidget(et, fila, 0); gr.addLayout(hl, fila, 1)
+            return et, val, cb
+        self.l_E_t, self.l_E, self.c_Eu = _fila_res(2, "Energía:", U_E, 0 if F else 3)
+        self.l_HVr_t, self.l_HVr, self.c_HVu = _fila_res(3, "Poder calorífico:", U_HV, 0 if F else 1)
         c2.addLayout(gr)
         self.lbl_aviso = QLabel(""); self.lbl_aviso.setWordWrap(True)
         self.lbl_aviso.setStyleSheet(f'font-family:"{po.FONT_F}";font-size:{po.FS}pt;'
@@ -290,6 +320,7 @@ class VentanaOrificio(QWidget):
         self.c_z.currentIndexChanged.connect(lambda _i: self._visibles())
         self.c_g.currentIndexChanged.connect(lambda _i: self._visibles())
         self.c_patm.currentIndexChanged.connect(lambda _i: self._visibles())
+        self.c_hv.currentIndexChanged.connect(lambda _i: self._visibles())
         self.f_elev.e.textChanged.connect(lambda _t: self._patm_calc())
         self.f_elev.c.currentIndexChanged.connect(lambda _i: self._patm_calc())
         self.f_Patm.c.currentIndexChanged.connect(lambda _i: self._patm_calc())
@@ -310,6 +341,7 @@ class VentanaOrificio(QWidget):
             f.set_si((60.0 - 32.0)/1.8 + 273.15)
         self.e_Zf.setText("1"); self.e_Zb.setText("1"); self.e_G.setText("0.6")
         self.e_Gr.setText("0.6"); self.f_elev.set_si(0.0)
+        self.f_hv.set_si(1000.0*1055.05585262/M_FT3)
         self.actualizar(fuentes, activos)
         if fuentes:
             self.cmb_fuente.setCurrentIndex(1)
@@ -371,6 +403,11 @@ class VentanaOrificio(QWidget):
         for w in (self.l_resultado, self.l_caudal, self.l_Q):
             w.setVisible(not serie)
         self.c_Qu.setVisible(not serie and inc == 'Q')
+        en = not serie and inc == 'Q'
+        for w_ in (self.l_E_t, self.l_E, self.c_Eu, self.l_HVr_t, self.l_HVr, self.c_HVu):
+            w_.setVisible(en)
+        hv_ing = self.c_hv.currentIndex() == 2
+        self.l_hv.setVisible(hv_ing); self.f_hv.set_visible(hv_ing)
         self.c_dPu.setVisible(inc == 'dP'); self.c_du.setVisible(inc == 'd')
         self.l_beta_t.setVisible(inc == 'd'); self.l_beta.setVisible(inc == 'd')
         self.l_caudal.setText(_i18n.t({'Q': "Caudal:", 'dP': "Presión diferencial:",
@@ -569,6 +606,9 @@ class VentanaOrificio(QWidget):
         if inc != 'Q':
             v = req(self.f_Qin, "Ingrese el caudal especificado.")
             spec['flujo_obj'] = (v, U_QIN[self.f_Qin.c.currentIndex()][2])
+        spec['hv_metodo'] = ('SECO', 'HUMEDO', 'ING')[self.c_hv.currentIndex()]
+        if spec['hv_metodo'] == 'ING':
+            spec['hv_ing'] = req(self.f_hv, "Ingrese el poder calorífico.")
         if not man and self.c_g.currentIndex() == 1:
             v = _f(self.e_Gr.text())
             if not v or v <= 0:
@@ -628,6 +668,15 @@ class VentanaOrificio(QWidget):
         else:
             v = U_Q[self.c_Qu.currentIndex()][1](q['qm'], q['Qb'])
         self.l_Q.setText(_num(v, 8))
+        self.l_E.setText(""); self.l_HVr.setText("")
+        if inc == 'Q':
+            sp = self.res.get('spec') or {}
+            met = sp.get('hv_metodo', 'SECO')
+            hv = (sp.get('hv_ing') if met == 'ING' else
+                  self.res.get('hv_humedo') if met == 'HUMEDO' else self.res.get('hv_seco'))
+            if hv:
+                self.l_HVr.setText(_num(U_HV[self.c_HVu.currentIndex()][2](hv), 7))
+                self.l_E.setText(_num(U_E[self.c_Eu.currentIndex()][2](q['Qb']*hv), 8))
         av = [_i18n.t("Advertencia:") + " " + _i18n.t(a) for a in self.res.get('avisos') or []]
         self.lbl_aviso.setText("\n".join(av)); self.lbl_aviso.setVisible(bool(av))
         self.lbl_aviso.setFixedWidth(self.tc.width())
